@@ -9,6 +9,7 @@ from bs4 import BeautifulSoup
 from PushShoppingList.app import create_app
 from PushShoppingList.routes import recipe_routes
 from PushShoppingList.services import guest_session_service
+from PushShoppingList.services import job_service
 from PushShoppingList.services import recipe_equipment_requirement_service as equipment
 from PushShoppingList.services import recipe_master_data_service as master_data
 from PushShoppingList.services import storage_service
@@ -161,6 +162,7 @@ def _configure_isolated_app(monkeypatch, tmp_path):
     monkeypatch.setattr(guest_session_service, "GUEST_DATA_DIR", tmp_path / "guests")
     monkeypatch.setattr(storage_service, "GUEST_DATA_DIR", tmp_path / "guests")
     monkeypatch.setattr(storage_service, "USER_DATA_DIR", tmp_path / "users")
+    monkeypatch.setattr(job_service, "JOBS_DB_PATH", tmp_path / "jobs.sqlite3")
     monkeypatch.setattr(user_account_service, "USERS_FILE", tmp_path / "users.json")
     user_account_service.save_users({
         "users": [

@@ -2981,6 +2981,17 @@ def api_device_status_route():
         session_user_id=user_id,
         guest_session_id=guest_session_id,
     )
+    if event.get("write_suppressed"):
+        return jsonify({
+            "ok": True,
+            "recorded": False,
+            "event": {
+                "timestamp": None,
+                "device_id": None,
+                "stale_reason": None,
+            },
+        })
+
     return jsonify({
         "ok": True,
         "event": {

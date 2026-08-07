@@ -1,6 +1,7 @@
 from PushShoppingList.app import create_app
 from PushShoppingList.routes import main_routes
 from PushShoppingList.services import guest_session_service
+from PushShoppingList.services import job_service
 from PushShoppingList.services import storage_service
 from PushShoppingList.services import user_account_service
 
@@ -11,6 +12,7 @@ def configure_auth_paths(monkeypatch, tmp_path):
     monkeypatch.setattr(storage_service, "GUEST_DATA_DIR", tmp_path / "guests")
     monkeypatch.setattr(storage_service, "USER_DATA_DIR", tmp_path / "users")
     monkeypatch.setattr(user_account_service, "USERS_FILE", tmp_path / "users.json")
+    monkeypatch.setattr(job_service, "JOBS_DB_PATH", tmp_path / "jobs.sqlite3")
     user_account_service.save_users({"users": []})
 
 

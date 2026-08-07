@@ -295,6 +295,20 @@ The included launcher currently sets `SHOPPING_APP_PORT=5083`, so it opens:
 http://127.0.0.1:5083
 ```
 
+To start the same Python application without opening a browser automatically,
+set the launcher-only option before invoking the batch file:
+
+```powershell
+$env:SHOPPING_APP_OPEN_BROWSER="false"
+.\start_app.bat
+```
+
+You may instead set `SHOPPING_APP_OPEN_BROWSER=false` in the untracked
+`local_env.bat`. An unset value preserves the existing automatic browser-open
+behavior. This option skips only the browser command; it does not skip Python
+validation or application startup. Because the decision occurs before Python
+starts, `.env` does not control this launcher option.
+
 For production-style background processing, start Redis and run one or more RQ workers alongside the Flask app:
 
 Local Redis with Docker Desktop on Windows:

@@ -8,6 +8,7 @@ from PushShoppingList.services import admin_support_service as support
 from PushShoppingList.services import device_status_service as device_status
 from PushShoppingList.services import email_service
 from PushShoppingList.services import guest_session_service
+from PushShoppingList.services import job_service
 from PushShoppingList.services import storage_service
 from PushShoppingList.services import user_account_service as accounts
 
@@ -16,6 +17,14 @@ def configure_admin_support(monkeypatch, tmp_path):
     monkeypatch.setattr(accounts, "USERS_FILE", tmp_path / "users.json")
     monkeypatch.setattr(accounts, "ADMIN_EMAIL", "admin@example.com")
     monkeypatch.setattr(storage_service, "USER_DATA_DIR", tmp_path / "user_data")
+    monkeypatch.setattr(storage_service, "GUEST_DATA_DIR", tmp_path / "guest_data")
+    monkeypatch.setattr(
+        guest_session_service,
+        "GUEST_SESSIONS_FILE",
+        tmp_path / "guest_sessions.json",
+    )
+    monkeypatch.setattr(guest_session_service, "GUEST_DATA_DIR", tmp_path / "guest_data")
+    monkeypatch.setattr(job_service, "JOBS_DB_PATH", tmp_path / "jobs.sqlite3")
     monkeypatch.setattr(support, "USER_DATA_DIR", tmp_path / "user_data")
     monkeypatch.setattr(support, "ADMIN_SUPPORT_AUDIT_FILE", tmp_path / "admin_support_audit.json")
     monkeypatch.setattr(
@@ -32,6 +41,14 @@ def configure_device_status(monkeypatch, tmp_path):
     monkeypatch.setattr(guest_session_service, "GUEST_SESSIONS_FILE", tmp_path / "guest_sessions.json")
     monkeypatch.setattr(guest_session_service, "GUEST_DATA_DIR", tmp_path / "guest_data")
     monkeypatch.setattr(guest_session_service, "now_utc", lambda: datetime(2026, 7, 4, 3, 30))
+    monkeypatch.setenv(
+        "SHOPPING_APP_DEVICE_STATUS_EVENTS_FILE",
+        str(tmp_path / "anonymous-device-status-events.json"),
+    )
+    monkeypatch.delenv(
+        device_status.DEVICE_STATUS_WRITE_SUPPRESSED_TENANTS_ENV,
+        raising=False,
+    )
 
 
 def admin_user():

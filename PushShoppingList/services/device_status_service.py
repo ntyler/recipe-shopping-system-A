@@ -18,6 +18,9 @@ from PushShoppingList.services.user_account_service import user_display_name
 DEVICE_STATUS_EVENTS_FILE = "device_status_events.json"
 DEVICE_STATUS_MAX_EVENTS = 500
 DEVICE_STATUS_ACTIVE_MINUTES = 60
+DEVICE_STATUS_WRITE_SUPPRESSED_TENANTS_ENV = (
+    "SHOPPING_APP_DEVICE_STATUS_WRITE_SUPPRESSED_TENANTS"
+)
 
 
 def now_iso():
@@ -105,6 +108,32 @@ def device_status_events_path(user_id="", guest_session_id=""):
     ))
 
 
+def device_status_write_suppressed(session_user_id="", guest_session_id=""):
+    """Return whether writes are disabled for one validated registered tenant."""
+    tenant = str(session_user_id or "").strip()
+    if not tenant:
+        return False
+
+    # Storage also gives a registered ID precedence if a malformed internal
+    # caller supplies both identities, so suppression must use that same
+    # precedence rather than allowing a guest ID to bypass the tenant guard.
+    # Exact canonical values only. Sanitized aliases, overlong values, and
+    # wildcard/glob tokens are ignored rather than broadened into a match.
+    if "*" in tenant or tenant != safe_user_id(tenant):
+        return False
+
+    configured = {
+        token
+        for raw_token in str(
+            os.getenv(DEVICE_STATUS_WRITE_SUPPRESSED_TENANTS_ENV, "") or ""
+        ).split(",")
+        if (token := raw_token.strip())
+        and "*" not in token
+        and token == safe_user_id(token)
+    }
+    return tenant in configured
+
+
 def load_device_status_events(user_id="", guest_session_id=""):
     path = device_status_events_path(user_id=user_id, guest_session_id=guest_session_id)
     if not path.exists():
@@ -157,6 +186,12 @@ def normalize_device_status_event(payload, request_user_agent="", session_user_i
 
 
 def record_device_status_event(payload, request_user_agent="", session_user_id="", guest_session_id=""):
+    if device_status_write_suppressed(
+        session_user_id=session_user_id,
+        guest_session_id=guest_session_id,
+    ):
+        return {"write_suppressed": True}
+
     event = normalize_device_status_event(
         payload,
         request_user_agent=request_user_agent,

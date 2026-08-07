@@ -10,6 +10,7 @@ from flask import session
 from PushShoppingList.app import create_app
 from PushShoppingList.routes import account_routes
 from PushShoppingList.services import guest_session_service
+from PushShoppingList.services import job_service
 from PushShoppingList.services import storage_service
 from PushShoppingList.services import user_account_service
 
@@ -25,6 +26,7 @@ def configure_identity_paths(monkeypatch, tmp_path, users=()):
     monkeypatch.setattr(storage_service, "GUEST_DATA_DIR", tmp_path / "guests")
     monkeypatch.setattr(guest_session_service, "GUEST_SESSIONS_FILE", tmp_path / "guest_sessions.json")
     monkeypatch.setattr(guest_session_service, "GUEST_DATA_DIR", tmp_path / "guests")
+    monkeypatch.setattr(job_service, "JOBS_DB_PATH", tmp_path / "jobs.sqlite3")
     user_account_service.save_users({"users": list(users)})
 
 
@@ -71,7 +73,8 @@ def test_explicit_local_development_uses_random_ephemeral_key_with_warning(monke
     assert first.config["SESSION_COOKIE_SECURE"] is False
 
 
-def test_production_cookie_configuration_is_secure(monkeypatch):
+def test_production_cookie_configuration_is_secure(monkeypatch, tmp_path):
+    configure_identity_paths(monkeypatch, tmp_path)
     monkeypatch.setenv("SHOPPING_APP_ENV", "production")
     monkeypatch.setenv("SHOPPING_APP_SECRET_KEY", STRONG_PRODUCTION_KEY)
     app = create_app()
@@ -176,7 +179,8 @@ def test_guest_blocked_account_mutations_execute_guard_before_public_bypass(
     assert token_delete.headers["Cache-Control"] == "private, no-store"
 
 
-def test_central_private_cache_policy_covers_response_types_and_statuses():
+def test_central_private_cache_policy_covers_response_types_and_statuses(monkeypatch, tmp_path):
+    configure_identity_paths(monkeypatch, tmp_path)
     app = create_app({"TESTING": True})
     app.config.update(PROPAGATE_EXCEPTIONS=False)
 

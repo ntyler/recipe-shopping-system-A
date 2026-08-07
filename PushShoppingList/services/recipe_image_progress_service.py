@@ -1,14 +1,11 @@
 import json
 import threading
 import time
-from pathlib import Path
 
 from PushShoppingList.services.storage_service import scoped_extractor_data_path
 
 
-BASE_DIR = Path(__file__).resolve().parent
 PROGRESS_FILE = scoped_extractor_data_path("recipe_image_progress.json")
-PROGRESS_FILE.parent.mkdir(parents=True, exist_ok=True)
 
 PROGRESS_LOCK = threading.RLock()
 RUNNING_STALE_SECONDS = 15 * 60
@@ -69,6 +66,7 @@ def save_recipe_image_progress(progress):
         for item in progress.get("items", [])
         if isinstance(item, dict)
     )
+    PROGRESS_FILE.parent.mkdir(parents=True, exist_ok=True)
     PROGRESS_FILE.write_text(
         json.dumps(progress, indent=2, ensure_ascii=False),
         encoding="utf-8",
@@ -114,7 +112,9 @@ def load_recipe_image_progress(url=None):
         progress = compact_recipe_image_progress(load_recipe_image_progress_file())
 
         if PROGRESS_FILE.exists() or progress.get("items"):
-            save_recipe_image_progress(progress)
+            # Preserve the response's prior freshness semantics without turning
+            # a read into a filesystem write.
+            progress["updated_at"] = time.time()
 
     if url:
         recipe_url = str(url or "").strip()

@@ -128,6 +128,33 @@ and output fingerprints, exact process, exact allowlists, and an empty new run
 audit before enabling the runner. The owner must sign in normally after any
 restart and press Start; Codex must not handle authentication state.
 
+### Future Phase 4D-R2C retry controls
+
+The R3 restart reconciliation failed because existing browser activity changed
+tenant-owned device-status and image-progress files before the canary began. A
+future retry therefore requires separate authorization and all of these
+additional controls:
+
+- Perform a server-only restart with `SHOPPING_APP_OPEN_BROWSER=false`. This
+  disables only the launcher's automatic URL opening; the owner performs any
+  later navigation manually.
+- Set
+  `SHOPPING_APP_DEVICE_STATUS_WRITE_SUPPRESSED_TENANTS=6700fb164ae645e29cc592cccc101bc7`
+  for the retry. Suppression applies only to exact, validated registered
+  workspace IDs. Blank, malformed, sanitized-alias, and wildcard entries never
+  match or broaden its scope; other registered tenants and guests retain their
+  existing behavior.
+- Keep `RECIPE_EQUIPMENT_AUTHENTICATED_CANARY_ENABLED=false` and
+  `RECIPE_EQUIPMENT_STRUCTURED_READ_ENABLED=false`, with both allowlists empty,
+  until the separately authorized retry procedure reaches the approved gate
+  transition.
+- Fingerprint the complete protected tenant-file set after server startup and
+  before manual navigation, then fingerprint it again immediately after manual
+  navigation and before enabling or starting the canary.
+- Treat every unexplained tenant-file change as a fail-closed condition: stop
+  the verified process, restore the disabled gates and empty allowlists,
+  preserve evidence, and do not continue the retry.
+
 For request-regression evidence, first run the 528-read `legacy_baseline` with
 structured reads disabled. After reconciling that run, stop the exact app,
 enable structured reads only for the approved tenant, restart, sign in normally

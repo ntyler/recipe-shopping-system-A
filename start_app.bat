@@ -21,13 +21,16 @@ call :load_user_env SHOPPING_APP_SMTP_FROM_NAME
 call :load_user_env SHOPPING_APP_SMTP_USE_TLS
 call :load_user_env SHOPPING_APP_PASSWORD_RESET_BASE_URL
 call :load_user_env SHOPPING_APP_ACCOUNT_LINK_BASE_URL
+call :load_user_env SHOPPING_APP_OPEN_BROWSER
 if exist local_env.bat call local_env.bat
 set PRODUCT_SEARCH_WORKERS=2
 set PRODUCT_DETAIL_LIMIT_PER_STORE=4
 set PRODUCT_AI_ANALYSIS_LIMIT_PER_STORE=2
 set PRODUCT_FINAL_SELECTION_CANDIDATES=96
 set PRODUCT_AI_BROWSER_WAIT_SECONDS=4
+if /I "%SHOPPING_APP_OPEN_BROWSER%"=="false" goto :skip_open_browser
 start http://127.0.0.1:%SHOPPING_APP_PORT%
+:skip_open_browser
 
 if not exist "%SHOPPING_APP_PYTHON_EXE%" (
     echo Required Python executable not found: %SHOPPING_APP_PYTHON_EXE%
