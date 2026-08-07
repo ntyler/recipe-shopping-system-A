@@ -252,6 +252,123 @@ def _request_sample(client, plan, sequence):
     )
 
 
+def _observation_context():
+    return {
+        "recipe": {
+            "recipe_id": "https://example.test/canary/000",
+            "structured_state_fingerprint": "D" * 64,
+        }
+    }
+
+
+def _valid_observation(consumer="editor_api", **overrides):
+    event = {
+        "event": "shadow_compare",
+        "user_id": TENANT,
+        "recipe_id": "https://example.test/canary/000",
+        "consumer": consumer,
+        "eligible": True,
+        "fallback_reason": "",
+        "structured_state_fingerprint": "D" * 64,
+        "latency_ms": 1.25,
+        **{key: 0 for key in canary.DIFFERENCE_METRICS},
+    }
+    event.update(overrides)
+    return event
+
+
+def test_canary_observation_selects_one_primary_and_validates_ancillary_events():
+    primary = _valid_observation(latency_ms=1.25)
+    ancillary = _valid_observation("recipe_output", latency_ms=2.5)
+
+    first = canary.select_authenticated_canary_observation(
+        [primary, ancillary], _observation_context(), TENANT
+    )
+    reversed_order = canary.select_authenticated_canary_observation(
+        [ancillary, primary], _observation_context(), TENANT
+    )
+    duplicated_ancillary = canary.select_authenticated_canary_observation(
+        [ancillary, primary, dict(ancillary)], _observation_context(), TENANT
+    )
+
+    assert first["consumer"] == "editor_api"
+    assert first["eligible"] is True
+    assert first["latency_ms"] == 2.5
+    assert reversed_order == first
+    assert duplicated_ancillary == first
+
+
+def test_canary_observation_requires_exactly_one_primary():
+    ancillary = _valid_observation("recipe_output")
+    missing = canary.select_authenticated_canary_observation(
+        [ancillary], _observation_context(), TENANT
+    )
+    duplicate = canary.select_authenticated_canary_observation(
+        [_valid_observation(), _valid_observation()],
+        _observation_context(),
+        TENANT,
+    )
+
+    assert missing["eligible"] is False
+    assert missing["fallback_reason"] == "missing_primary_canary_observation"
+    assert duplicate["eligible"] is False
+    assert duplicate["fallback_reason"] == "ambiguous_primary_canary_observation"
+
+
+@pytest.mark.parametrize(
+    ("override", "expected_reason", "tenant_violation"),
+    [
+        ({"user_id": OTHER_TENANT}, "canary_observation_identity_mismatch", 1),
+        ({"recipe_id": "https://example.test/wrong"}, "canary_observation_identity_mismatch", 0),
+        ({"eligible": False}, "ineligible_canary_observation", 0),
+        ({"fallback_reason": "stale_sync"}, "canary_observation_fallback", 0),
+        ({"structured_state_fingerprint": "E" * 64}, "canary_observation_fingerprint_mismatch", 0),
+        ({"pending_set_changed": True}, "canary_observation_difference", 0),
+        ({"latency_ms": "1.25"}, "malformed_canary_observation", 0),
+        ({"fallback_reason": None}, "malformed_canary_observation", 0),
+    ],
+)
+def test_canary_observation_rejects_invalid_ancillary_events(
+    override, expected_reason, tenant_violation
+):
+    result = canary.select_authenticated_canary_observation(
+        [_valid_observation(), _valid_observation("recipe_output", **override)],
+        _observation_context(),
+        TENANT,
+    )
+
+    assert result["eligible"] is False
+    assert result["fallback_reason"] == expected_reason
+    assert result["tenant_violations"] == tenant_violation
+
+
+@pytest.mark.parametrize("metric", canary.DIFFERENCE_METRICS)
+def test_canary_observation_preserves_every_ancillary_difference(metric):
+    result = canary.select_authenticated_canary_observation(
+        [_valid_observation(), _valid_observation("recipe_output", **{metric: 1})],
+        _observation_context(),
+        TENANT,
+    )
+
+    assert result["eligible"] is False
+    assert result["fallback_reason"] == "canary_observation_difference"
+    assert result[metric] == 1
+
+
+def test_canary_observation_repeated_validation_is_deterministic():
+    observations = [
+        _valid_observation("recipe_output", latency_ms=3.0),
+        _valid_observation(latency_ms=2.0),
+    ]
+    results = [
+        canary.select_authenticated_canary_observation(
+            observations, _observation_context(), TENANT
+        )
+        for _ in range(5)
+    ]
+    assert results == [results[0]] * 5
+
+
 def test_canary_gate_is_default_deny_exact_tenant_and_rejects_wildcards(monkeypatch):
     monkeypatch.delenv(canary.CANARY_FLAG, raising=False)
     monkeypatch.delenv(canary.CANARY_TENANTS_ENV, raising=False)

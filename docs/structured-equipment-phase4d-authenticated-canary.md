@@ -71,6 +71,16 @@ stop on the first authentication, token, tenant, manifest, structured-state,
 eligibility, fallback, equivalence, HTTP, JSON, or audit failure. **Stop safely**
 aborts the active request and prevents further samples.
 
+Each HTTP sample requires exactly one primary `editor_api` structured
+observation. Nested read-only consumers such as PDF-asset hydration may emit
+additional observations for the same recipe. Those ancillary observations are
+accepted only when every one belongs to the authenticated tenant and expected
+recipe, is eligible, has the approved structured-state fingerprint, and reports
+zero fallback, pending-set, tenant, or equivalence differences. Observation
+order does not matter, but a missing or duplicate primary observation—or any
+malformed, cross-tenant, cross-recipe, ineligible, stale, or differing
+ancillary observation—fails closed and stops the run.
+
 ## Audit contract
 
 One append-only JSONL file is created per valid run in the configured audit

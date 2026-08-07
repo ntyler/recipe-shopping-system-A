@@ -4199,22 +4199,13 @@ def _structured_equipment_canary_recipe_get(token, recipe_url):
         response = _canary_error_response(500)
         application_status = 500
 
-    expected_recipe_id = context["recipe"]["recipe_id"]
-    matching_events = [
-        event for event in captured_events
-        if event.get("event") in {"shadow_compare", "read_decision"}
-        and str(event.get("user_id") or "") == tenant
-        and str(event.get("recipe_id") or "") == expected_recipe_id
-    ]
-    if len(matching_events) == 1:
-        structured_event = matching_events[0]
-    else:
-        structured_event = {
-            "consumer": "editor_api",
-            "eligible": False,
-            "fallback_reason": "missing_or_ambiguous_canary_observation",
-            "latency_ms": 0,
-        }
+    structured_event = (
+        structured_equipment_canary_service.select_authenticated_canary_observation(
+            captured_events,
+            context,
+            tenant,
+        )
+    )
     record = structured_equipment_canary_service.sample_audit_record(
         context,
         structured_event,

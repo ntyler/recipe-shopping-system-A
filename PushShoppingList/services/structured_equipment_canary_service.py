@@ -601,6 +601,172 @@ def _coerce_metric(value):
         return 0
 
 
+def _observation_failure(reason, observations, *, tenant_violation=False):
+    """Return a sanitized fail-closed event without retaining observation data."""
+    metrics = {key: 0 for key in DIFFERENCE_METRICS}
+    latency_ms = 0.0
+    fingerprints = set()
+    for event in observations:
+        if not isinstance(event, dict):
+            continue
+        fingerprint = event.get("structured_state_fingerprint")
+        if isinstance(fingerprint, str) and SHA256_PATTERN.fullmatch(fingerprint):
+            fingerprints.add(fingerprint)
+        for key in DIFFERENCE_METRICS:
+            metrics[key] = max(metrics[key], _coerce_metric(event.get(key)))
+        value = event.get("latency_ms", 0)
+        if isinstance(value, bool):
+            continue
+        try:
+            parsed = float(value or 0)
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(parsed) and parsed >= 0:
+            latency_ms = max(latency_ms, parsed)
+    if tenant_violation:
+        metrics["tenant_violations"] = max(1, metrics["tenant_violations"])
+    fingerprint = next(iter(fingerprints)) if len(fingerprints) == 1 else ""
+    return {
+        "consumer": "editor_api",
+        "eligible": False,
+        "fallback_reason": str(reason or "invalid_canary_observation")[:120],
+        "structured_state_fingerprint": fingerprint,
+        "latency_ms": latency_ms,
+        **metrics,
+    }
+
+
+def select_authenticated_canary_observation(captured_events, context, tenant):
+    """Select one primary editor observation and validate every ancillary event.
+
+    Nested recipe reads can emit additional structured observations. They are
+    safe to accept only when each describes the same authenticated recipe and
+    proves the same eligible, difference-free structured state.
+    """
+    observations = (
+        list(captured_events)
+        if isinstance(captured_events, (list, tuple))
+        else []
+    )
+    recipe = context.get("recipe") if isinstance(context, dict) else None
+    expected_recipe_id = str((recipe or {}).get("recipe_id") or "")
+    expected_fingerprint = str(
+        (recipe or {}).get("structured_state_fingerprint") or ""
+    )
+    tenant = str(tenant or "")
+    if (
+        not observations
+        or not tenant
+        or not expected_recipe_id
+        or not SHA256_PATTERN.fullmatch(expected_fingerprint)
+    ):
+        return _observation_failure(
+            "missing_primary_canary_observation", observations
+        )
+
+    primary_events = [
+        event
+        for event in observations
+        if isinstance(event, dict) and event.get("consumer") == "editor_api"
+    ]
+    if len(primary_events) != 1:
+        reason = (
+            "missing_primary_canary_observation"
+            if not primary_events
+            else "ambiguous_primary_canary_observation"
+        )
+        return _observation_failure(reason, observations)
+
+    max_latency_ms = 0.0
+    for event in observations:
+        if not isinstance(event, dict):
+            return _observation_failure(
+                "malformed_canary_observation", observations
+            )
+        if event.get("event") not in {"shadow_compare", "read_decision"}:
+            return _observation_failure(
+                "malformed_canary_observation", observations
+            )
+        consumer = event.get("consumer")
+        if not isinstance(consumer, str) or not consumer.strip():
+            return _observation_failure(
+                "malformed_canary_observation", observations
+            )
+        event_tenant = event.get("user_id")
+        event_recipe_id = event.get("recipe_id")
+        if not isinstance(event_tenant, str) or event_tenant != tenant:
+            return _observation_failure(
+                "canary_observation_identity_mismatch",
+                observations,
+                tenant_violation=True,
+            )
+        if (
+            not isinstance(event_recipe_id, str)
+            or event_recipe_id != expected_recipe_id
+        ):
+            return _observation_failure(
+                "canary_observation_identity_mismatch", observations
+            )
+        if event.get("eligible") is not True:
+            return _observation_failure(
+                "ineligible_canary_observation", observations
+            )
+        fallback_reason = event.get("fallback_reason", "")
+        if not isinstance(fallback_reason, str):
+            return _observation_failure(
+                "malformed_canary_observation", observations
+            )
+        if fallback_reason:
+            return _observation_failure(
+                "canary_observation_fallback", observations
+            )
+        fingerprint = event.get("structured_state_fingerprint")
+        if (
+            not isinstance(fingerprint, str)
+            or fingerprint != expected_fingerprint
+        ):
+            return _observation_failure(
+                "canary_observation_fingerprint_mismatch", observations
+            )
+
+        for key in DIFFERENCE_METRICS:
+            value = event.get(key, 0)
+            if isinstance(value, bool):
+                parsed = int(value)
+            elif isinstance(value, (int, float)) and math.isfinite(float(value)):
+                parsed = int(value)
+                if float(parsed) != float(value):
+                    return _observation_failure(
+                        "malformed_canary_observation", observations
+                    )
+            else:
+                return _observation_failure(
+                    "malformed_canary_observation", observations
+                )
+            if parsed:
+                return _observation_failure(
+                    "canary_observation_difference", observations
+                )
+
+        latency = event.get("latency_ms", 0)
+        if isinstance(latency, bool) or not isinstance(latency, (int, float)):
+            return _observation_failure(
+                "malformed_canary_observation", observations
+            )
+        latency = float(latency)
+        if not math.isfinite(latency) or latency < 0:
+            return _observation_failure(
+                "malformed_canary_observation", observations
+            )
+        max_latency_ms = max(max_latency_ms, latency)
+
+    selected = dict(primary_events[0])
+    selected["latency_ms"] = max_latency_ms
+    for key in DIFFERENCE_METRICS:
+        selected[key] = 0
+    return selected
+
+
 def sample_audit_record(
     context,
     structured_event,
