@@ -356,6 +356,190 @@ def test_shadow_comparison_never_changes_returned_data_and_emits_metrics(
     connection.close()
 
 
+def test_shadow_connector_comparison_uses_actual_instruction_context_and_is_deterministic(
+    monkeypatch, tmp_path
+):
+    connection = _connection(tmp_path / "contextual-connector.sqlite3")
+    _install_structured_schema(connection)
+    target_id = _insert_equipment(connection, "Blender")
+    recipe_data = {
+        "equipment": [{
+            "equipment": "blender and food processor",
+            "quantity": "2",
+            "equipment_image_url": "/recipe/contextual.png",
+            "equipment_image_prompt": "Preserve this exact prompt",
+        }],
+        "instructions": [{
+            "instruction": (
+                "Blend the mixture in a blender or food processor until smooth."
+            ),
+            "step_image_url": "/recipe/step.png",
+        }],
+        "arbitrary_metadata": {"owner": "preserve", "nested": [1, 2, 3]},
+    }
+    _stage(connection, recipe_data)
+    _resolve_all_equipment_options(connection, target_id)
+    _insert_sync(connection, recipe_data)
+    stored_before = {
+        "requirements": [tuple(row) for row in connection.execute(
+            "SELECT * FROM recipe_equipment_requirements ORDER BY id"
+        )],
+        "options": [tuple(row) for row in connection.execute(
+            "SELECT * FROM recipe_equipment_options ORDER BY id"
+        )],
+        "sync": [tuple(row) for row in connection.execute(
+            "SELECT * FROM recipe_equipment_requirement_sync ORDER BY user_id, recipe_id"
+        )],
+    }
+    recipe_before = json.loads(json.dumps(recipe_data))
+    changes_before = connection.total_changes
+
+    first = equipment.structured_equipment_read_result(
+        connection, TENANT, RECIPE, recipe_data
+    )
+    second = equipment.structured_equipment_read_result(
+        connection, TENANT, RECIPE, recipe_data
+    )
+    assert first["eligible"] is True
+    assert first["fallback_reason"] == ""
+    assert first["metrics"]["connector_differences"] == 0
+    assert second["metrics"] == first["metrics"]
+    assert second["semantic_rows"] == first["semantic_rows"]
+    assert first["semantic_rows"][0]["connector"] == "or"
+    assert first["semantic_rows"][0]["conjunction_group"] == ""
+    assert first["semantic_rows"][0]["quantity"] == "2"
+    assert first["equipment"] == recipe_data["equipment"]
+
+    _enable(monkeypatch, "SHADOW")
+    returned = equipment.apply_structured_equipment_read(
+        RECIPE,
+        recipe_data,
+        user_id=TENANT,
+        connection=connection,
+        consumer="phase4b3_context_fixture",
+    )
+    assert returned is recipe_data
+    assert recipe_data == recipe_before
+    assert connection.total_changes == changes_before
+    assert {
+        "requirements": [tuple(row) for row in connection.execute(
+            "SELECT * FROM recipe_equipment_requirements ORDER BY id"
+        )],
+        "options": [tuple(row) for row in connection.execute(
+            "SELECT * FROM recipe_equipment_options ORDER BY id"
+        )],
+        "sync": [tuple(row) for row in connection.execute(
+            "SELECT * FROM recipe_equipment_requirement_sync ORDER BY user_id, recipe_id"
+        )],
+    } == stored_before
+    connection.close()
+
+
+def test_shadow_connector_comparison_preserves_genuine_and_group_and_quantity(tmp_path):
+    connection = _connection(tmp_path / "genuine-and.sqlite3")
+    _install_structured_schema(connection)
+    target_id = _insert_equipment(connection, "Knife")
+    recipe_data = {
+        "equipment": [{
+            "equipment": "Knife and cutting board",
+            "quantity": "2",
+            "optional": True,
+        }],
+        "instructions": ["Use the knife and cutting board together."],
+    }
+    _stage(connection, recipe_data)
+    _resolve_all_equipment_options(connection, target_id)
+    _insert_sync(connection, recipe_data)
+
+    result = equipment.structured_equipment_read_result(
+        connection, TENANT, RECIPE, recipe_data
+    )
+    assert result["eligible"] is True
+    assert result["metrics"]["connector_differences"] == 0
+    assert result["equipment"] == recipe_data["equipment"]
+    assert len(result["semantic_rows"]) == 1
+    assert result["semantic_rows"][0]["connector"] == "and"
+    assert result["semantic_rows"][0]["conjunction_group"]
+    assert result["semantic_rows"][0]["quantity"] == "2"
+    assert result["semantic_rows"][0]["optional"] is True
+    connection.close()
+
+
+def test_shadow_connector_mismatch_remains_detectable_and_fails_closed(tmp_path):
+    connection = _connection(tmp_path / "connector-mismatch.sqlite3")
+    _install_structured_schema(connection)
+    target_id = _insert_equipment(connection, "Blender")
+    recipe_data = {
+        "equipment": [{"equipment": "blender and food processor"}],
+        "instructions": [
+            "Use a blender or food processor to make the mixture smooth."
+        ],
+    }
+    _stage(connection, recipe_data)
+    _resolve_all_equipment_options(connection, target_id)
+    connection.execute(
+        """
+        UPDATE recipe_equipment_requirements
+           SET connector = 'and', conjunction_group = 'fixture-wrong-group'
+        """
+    )
+    _insert_sync(connection, recipe_data)
+    rows_before = [tuple(row) for row in connection.execute(
+        "SELECT * FROM recipe_equipment_requirements ORDER BY id"
+    )]
+    changes_before = connection.total_changes
+
+    result = equipment.structured_equipment_read_result(
+        connection, TENANT, RECIPE, recipe_data
+    )
+    assert result["eligible"] is False
+    assert result["fallback_reason"] == "connector_mismatch"
+    assert result["fallback_details"] == {"count": 1}
+    assert result["metrics"]["connector_differences"] == 1
+    assert result["equipment"] is recipe_data["equipment"]
+    assert connection.total_changes == changes_before
+    assert [tuple(row) for row in connection.execute(
+        "SELECT * FROM recipe_equipment_requirements ORDER BY id"
+    )] == rows_before
+    connection.close()
+
+
+@pytest.mark.parametrize(
+    ("context_kind", "instructions"),
+    (
+        ("missing", None),
+        ("malformed", "not-a-list"),
+        ("unusable", [{"unexpected": "no instruction text"}]),
+    ),
+)
+def test_shadow_connector_invalid_instruction_context_does_not_hide_mismatch(
+    tmp_path, context_kind, instructions
+):
+    connection = _connection(tmp_path / f"invalid-context-{context_kind}.sqlite3")
+    _install_structured_schema(connection)
+    target_id = _insert_equipment(connection, "Blender")
+    equipment_rows = [{"equipment": "blender and food processor"}]
+    staged = {
+        "equipment": equipment_rows,
+        "instructions": ["Use a blender or food processor."],
+    }
+    _stage(connection, staged)
+    _resolve_all_equipment_options(connection, target_id)
+    current = {"equipment": equipment_rows}
+    if context_kind != "missing":
+        current["instructions"] = instructions
+    _insert_sync(connection, current)
+
+    result = equipment.structured_equipment_read_result(
+        connection, TENANT, RECIPE, current
+    )
+    assert result["eligible"] is False
+    assert result["fallback_reason"] == "connector_mismatch"
+    assert result["metrics"]["connector_differences"] == 1
+    assert result["equipment"] is current["equipment"]
+    connection.close()
+
+
 def test_tenant_approved_read_uses_validated_projection_but_stays_user_equivalent(
     monkeypatch, tmp_path
 ):

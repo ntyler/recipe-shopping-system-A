@@ -494,7 +494,13 @@ def compatibility_equipment_rows(requirements, legacy_rows=None):
     return rows
 
 
-def compare_legacy_and_structured_rows(legacy_rows, projected_rows, semantic_rows=None):
+def compare_legacy_and_structured_rows(
+    legacy_rows,
+    projected_rows,
+    semantic_rows=None,
+    *,
+    instructions=None,
+):
     legacy_rows = legacy_rows if isinstance(legacy_rows, list) else []
     projected_rows = projected_rows if isinstance(projected_rows, list) else []
     semantic_rows = semantic_rows if isinstance(semantic_rows, list) else []
@@ -523,7 +529,13 @@ def compare_legacy_and_structured_rows(legacy_rows, projected_rows, semantic_row
         if isinstance(legacy, dict) and isinstance(projected, dict):
             if any(legacy.get(key) != projected.get(key) for key in image_keys):
                 metrics["image_differences"] += 1
-    parsed_legacy = semantic_equipment_projection(parse_equipment_list(legacy_rows)) if legacy_rows else []
+    parsed_legacy = (
+        semantic_equipment_projection(
+            parse_equipment_list(legacy_rows, instructions=instructions)
+        )
+        if legacy_rows
+        else []
+    )
     for legacy_semantic, structured_semantic in zip(parsed_legacy, semantic_rows):
         if legacy_semantic.get("connector") != structured_semantic.get("connector"):
             metrics["connector_differences"] += 1
@@ -558,6 +570,7 @@ def structured_equipment_read_result(
         if isinstance(recipe_data, dict) and isinstance(recipe_data.get("equipment"), list)
         else []
     )
+    instructions = recipe_data.get("instructions", []) if isinstance(recipe_data, dict) else []
     result = {
         "eligible": False,
         "fallback_reason": "invalid_structured_data",
@@ -601,28 +614,45 @@ def structured_equipment_read_result(
             if int(sync.get("requirement_count") or 0) != len(requirements):
                 raise StructuredEquipmentFallback("sync_count_mismatch")
         projected_rows = compatibility_equipment_rows(requirements, legacy_rows=legacy_rows)
+        metrics = compare_legacy_and_structured_rows(
+            legacy_rows,
+            projected_rows,
+            semantic_rows,
+            instructions=instructions,
+        )
+        if int(metrics.get("connector_differences") or 0):
+            raise StructuredEquipmentFallback(
+                "connector_mismatch",
+                {"count": int(metrics["connector_differences"])},
+            )
         result.update({
             "eligible": True,
             "fallback_reason": "",
             "equipment": projected_rows,
             "semantic_rows": semantic_rows,
             "pending_identifier_fingerprint": pending_fingerprint,
-            "metrics": compare_legacy_and_structured_rows(
-                legacy_rows, projected_rows, semantic_rows
-            ),
+            "metrics": metrics,
         })
     except StructuredEquipmentFallback as exc:
         result["fallback_reason"] = exc.reason
         result["fallback_details"] = exc.details
         result["metrics"] = compare_legacy_and_structured_rows(
-            legacy_rows, candidate_rows, semantic_rows
+            legacy_rows,
+            candidate_rows,
+            semantic_rows,
+            instructions=instructions,
         )
         if "attributes_json" in str(exc.details.get("field") or ""):
             result["metrics"]["attribute_validation_errors"] = 1
     except (sqlite3.DatabaseError, TypeError, ValueError) as exc:
         result["fallback_reason"] = "unreadable_structured_data"
         result["fallback_details"] = {"error_type": type(exc).__name__}
-        result["metrics"] = compare_legacy_and_structured_rows(legacy_rows, [], [])
+        result["metrics"] = compare_legacy_and_structured_rows(
+            legacy_rows,
+            [],
+            [],
+            instructions=instructions,
+        )
     result["latency_ms"] = round((time.perf_counter() - started) * 1000, 3)
     return result
 
