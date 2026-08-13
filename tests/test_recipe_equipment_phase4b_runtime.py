@@ -324,7 +324,7 @@ def test_repository_rejects_cross_tenant_option_even_when_database_is_corrupt(tm
 
 
 def test_shadow_comparison_never_changes_returned_data_and_emits_metrics(
-    monkeypatch, tmp_path, caplog
+    monkeypatch, tmp_path, capfd
 ):
     connection = _connection(tmp_path / "shadow.sqlite3")
     _install_structured_schema(connection)
@@ -334,7 +334,43 @@ def test_shadow_comparison_never_changes_returned_data_and_emits_metrics(
     _resolve_all_equipment_options(connection, target_id)
     _insert_sync(connection, recipe_data)
     _enable(monkeypatch, "SHADOW")
-    caplog.set_level(logging.INFO, logger=equipment.__name__)
+    root_logger = logging.getLogger()
+    unrelated_logger = logging.getLogger("phase5b.telemetry.unrelated")
+    root_state = (
+        root_logger.level,
+        tuple(root_logger.handlers),
+        root_logger.propagate,
+    )
+    unrelated_state = (
+        unrelated_logger.level,
+        tuple(unrelated_logger.handlers),
+        unrelated_logger.propagate,
+    )
+    equipment._configure_structured_equipment_observability_logger()
+    equipment._configure_structured_equipment_observability_logger()
+    owned_handlers = [
+        handler
+        for handler in equipment.LOGGER.handlers
+        if getattr(
+            handler,
+            equipment._STRUCTURED_EQUIPMENT_HANDLER_MARKER,
+            False,
+        )
+    ]
+    assert len(owned_handlers) == 1
+    assert equipment.LOGGER.level == logging.INFO
+    assert equipment.LOGGER.propagate is False
+    assert (
+        root_logger.level,
+        tuple(root_logger.handlers),
+        root_logger.propagate,
+    ) == root_state
+    assert (
+        unrelated_logger.level,
+        tuple(unrelated_logger.handlers),
+        unrelated_logger.propagate,
+    ) == unrelated_state
+    capfd.readouterr()
     before = json.loads(json.dumps(recipe_data))
     result = equipment.apply_structured_equipment_read(
         RECIPE,
@@ -345,20 +381,43 @@ def test_shadow_comparison_never_changes_returned_data_and_emits_metrics(
     )
     assert result is recipe_data
     assert recipe_data == before
-    message = "\n".join(record.getMessage() for record in caplog.records)
-    assert '"event":"shadow_compare"' in message
-    assert '"eligible":true' in message
-    assert '"consumer":"pdf_export"' in message
-    assert '"row_count_difference":0' in message
-    assert '"wording_order_differences":0' in message
-    assert '"quantity_differences":0' in message
-    assert '"image_differences":0' in message
-    assert '"conjunction_group_differences":0' in message
-    assert '"classification_differences":0' in message
-    assert '"metadata_differences":0' in message
-    assert '"response_body_differences":0' in message
-    assert '"structured_state_fingerprint":"' in message
-    assert '"latency_ms":' in message
+    captured = capfd.readouterr()
+    assert captured.err == ""
+    assert captured.out.endswith("\n")
+    lines = captured.out.splitlines()
+    assert len(lines) == 1
+    prefix = "structured_equipment_observability "
+    assert lines[0].startswith(prefix)
+    payload = json.loads(lines[0][len(prefix):])
+    assert payload["event"] == "shadow_compare"
+    assert payload["eligible"] is True
+    assert payload["consumer"] == "pdf_export"
+    for field in (
+        "attribute_differences",
+        "classification_differences",
+        "conjunction_group_differences",
+        "connector_differences",
+        "image_differences",
+        "metadata_differences",
+        "optional_differences",
+        "quantity_differences",
+        "response_body_differences",
+        "row_count_difference",
+        "wording_order_differences",
+    ):
+        assert payload[field] == 0
+    assert payload["structured_state_fingerprint"]
+    assert isinstance(payload["latency_ms"], (int, float))
+    assert (
+        root_logger.level,
+        tuple(root_logger.handlers),
+        root_logger.propagate,
+    ) == root_state
+    assert (
+        unrelated_logger.level,
+        tuple(unrelated_logger.handlers),
+        unrelated_logger.propagate,
+    ) == unrelated_state
     connection.close()
 
 

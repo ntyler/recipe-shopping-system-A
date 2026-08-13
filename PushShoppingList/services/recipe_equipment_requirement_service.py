@@ -11,6 +11,7 @@ import json
 import logging
 import os
 import sqlite3
+import sys
 import time
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -31,6 +32,46 @@ from PushShoppingList.services.equipment_normalization_service import (
 TRUE_VALUES = {"1", "true", "yes", "y", "on"}
 PHASE3A_MIGRATION_TOKEN = "phase3a-additive-stage-v1"
 LOGGER = logging.getLogger(__name__)
+_STRUCTURED_EQUIPMENT_HANDLER_MARKER = (
+    "_structured_equipment_observability_stdout_handler_v1"
+)
+
+
+class _CurrentStdout:
+    """Resolve stdout at emit time so redirected/captured streams stay current."""
+
+    def write(self, value):
+        return sys.stdout.write(value)
+
+    def flush(self):
+        return sys.stdout.flush()
+
+
+def _configure_structured_equipment_observability_logger():
+    """Install exactly one module-owned INFO handler without changing root logging."""
+    owned_handlers = [
+        handler
+        for handler in LOGGER.handlers
+        if getattr(handler, _STRUCTURED_EQUIPMENT_HANDLER_MARKER, False)
+    ]
+    if owned_handlers:
+        handler = owned_handlers[0]
+        for duplicate in owned_handlers[1:]:
+            LOGGER.removeHandler(duplicate)
+            duplicate.close()
+    else:
+        handler = logging.StreamHandler(_CurrentStdout())
+        setattr(handler, _STRUCTURED_EQUIPMENT_HANDLER_MARKER, True)
+        LOGGER.addHandler(handler)
+
+    handler.setLevel(logging.INFO)
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    LOGGER.setLevel(logging.INFO)
+    LOGGER.propagate = False
+    return handler
+
+
+_configure_structured_equipment_observability_logger()
 _STRUCTURED_EQUIPMENT_EVENT_CAPTURE = ContextVar(
     "structured_equipment_event_capture",
     default=None,
