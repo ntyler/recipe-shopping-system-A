@@ -40866,6 +40866,14 @@ function recipeImagePromptFocusableElements(modal) {
     ) || []).filter(element => !element.hidden && element.getAttribute("aria-hidden") !== "true");
 }
 
+function focusRecipeImagePromptDraftAtStart(draft) {
+    if (!draft) return;
+    draft.focus({ preventScroll: true });
+    draft.setSelectionRange(0, 0);
+    draft.scrollTop = 0;
+    draft.scrollLeft = 0;
+}
+
 function handleRecipeImagePromptKeydown(event) {
     const modal = recipeImagePromptModal();
     if (!modal || modal.hidden) return;
@@ -40904,12 +40912,12 @@ function openRecipeImagePromptModal(trigger = null) {
 
     closeRecipeImageChangeActions();
     if (trigger && !modal.contains(trigger)) recipeEditImagePromptTrigger = trigger;
-    draft.value = String(promptText.textContent || "").trim();
+    draft.value = String(promptText.textContent || "");
     modal.hidden = false;
     document.body.classList.add("recipe-image-prompt-modal-open");
     document.removeEventListener("keydown", handleRecipeImagePromptKeydown);
     document.addEventListener("keydown", handleRecipeImagePromptKeydown);
-    window.requestAnimationFrame(() => draft.focus());
+    window.requestAnimationFrame(() => focusRecipeImagePromptDraftAtStart(draft));
     return false;
 }
 

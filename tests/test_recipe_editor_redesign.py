@@ -302,8 +302,22 @@ def test_recipe_image_prompt_uses_accessible_modal_and_existing_form_state():
     assert "Cancel" in modal
     assert "data-recipe-edit-image-prompt-draft" in modal
     assert "closeRecipeImagePromptModalFromBackdrop(event)" in modal
+    modal_header = modal.index("<header>")
+    modal_body = modal.index('<div class="recipe-edit-image-prompt-body">', modal_header)
+    modal_footer = modal.index("<footer>", modal_body)
+    assert modal_header < modal_body < modal_footer
 
-    assert 'draft.value = String(promptText.textContent || "").trim();' in modal_script
+    open_modal_script = modal_script[
+        modal_script.index("function openRecipeImagePromptModal"):
+        modal_script.index(
+            "function closeRecipeImagePromptModal",
+            modal_script.index("function openRecipeImagePromptModal"),
+        )
+    ]
+    draft_assignment = next(
+        line for line in open_modal_script.splitlines() if "draft.value =" in line
+    )
+    assert ".trim()" not in draft_assignment
     assert "promptText.textContent = prompt;" in modal_script
     assert 'updateRecipeEditorDirtyState(document.getElementById("recipeEditForm"))' in modal_script
     assert 'event.key === "Escape"' in modal_script
@@ -318,20 +332,83 @@ def test_recipe_image_prompt_uses_accessible_modal_and_existing_form_state():
 
     assert ".recipe-edit-image-prompt-backdrop {" in css
     assert ".recipe-edit-image-prompt-dialog {" in css
-    assert "body.recipe-image-prompt-modal-open [data-app-content]" in css
     assert ".recipe-edit-image-prompt-backdrop[hidden]" in css
-    assert "max-width: calc(100vw - 24px);" in css
+    image_prompt_scroll_lock_css = css[
+        css.index("body.recipe-image-prompt-modal-open,"):
+        css.index(".recipe-edit-image-prompt-backdrop {", css.index("body.recipe-image-prompt-modal-open,"))
+    ]
+    assert "body.recipe-image-prompt-modal-open [data-app-content]" in image_prompt_scroll_lock_css
+    assert "overflow: hidden !important;" in image_prompt_scroll_lock_css
     image_prompt_dialog_css = css[
         css.index(".recipe-edit-image-prompt-dialog {"):
         css.index(".recipe-edit-image-prompt-dialog > header", css.index(".recipe-edit-image-prompt-dialog {"))
+    ]
+    image_prompt_chrome_css = css[
+        css.index(".recipe-edit-image-prompt-dialog > header,"):
+        css.index(".recipe-edit-image-prompt-dialog > header {", css.index(".recipe-edit-image-prompt-dialog > header,"))
+    ]
+    image_prompt_body_css = css[
+        css.index(".recipe-edit-image-prompt-body {"):
+        css.index(".recipe-edit-image-prompt-body label", css.index(".recipe-edit-image-prompt-body {"))
     ]
     image_prompt_textarea_css = css[
         css.index(".recipe-edit-image-prompt-body textarea {"):
         css.index(".recipe-edit-image-prompt-body textarea:focus-visible")
     ]
-    assert "width: min(92vw, 760px);" in image_prompt_dialog_css
-    assert "max-height: min(88dvh, 720px);" in image_prompt_dialog_css
-    assert "min-height: 220px;" in image_prompt_textarea_css
+    image_prompt_mobile_start = css.index(
+        "@media (max-width: 640px) {",
+        css.index(
+            ".recipe-edit-image-prompt-dialog > footer .recipe-edit-image-prompt-save",
+        ),
+    )
+    image_prompt_narrow_mobile_start = css.index(
+        "@media (max-width: 340px) {",
+        image_prompt_mobile_start,
+    )
+    image_prompt_mobile_css = css[
+        image_prompt_mobile_start:image_prompt_narrow_mobile_start
+    ]
+
+    assert "display: flex;" in image_prompt_dialog_css
+    assert "width: min(92vw, 960px);" in image_prompt_dialog_css
+    assert any(
+        declaration in image_prompt_dialog_css
+        for declaration in ("max-height: 85vh;", "max-height: 85dvh;")
+    )
+    assert "overflow: hidden;" in image_prompt_dialog_css
+    assert "flex-direction: column;" in image_prompt_dialog_css
+    assert "flex: 0 0 auto;" in image_prompt_chrome_css
+    assert "min-height: 0;" in image_prompt_body_css
+    assert "overflow-y: auto;" in image_prompt_body_css
+    assert "overflow-x: hidden;" in image_prompt_body_css
+    assert any(
+        declaration in image_prompt_textarea_css
+        for declaration in (
+            "height: clamp(360px, 55vh,",
+            "height: clamp(360px, 55dvh,",
+        )
+    )
+    assert "min-height: 360px;" in image_prompt_textarea_css
+    assert "max-height:" in image_prompt_textarea_css
+    assert "resize: vertical;" in image_prompt_textarea_css
+
+    assert ".recipe-edit-image-prompt-backdrop" in image_prompt_mobile_css
+    assert "env(safe-area-inset-top, 0px)" in image_prompt_mobile_css
+    assert "env(safe-area-inset-right, 0px)" in image_prompt_mobile_css
+    assert "env(safe-area-inset-bottom, 0px)" in image_prompt_mobile_css
+    assert "env(safe-area-inset-left, 0px)" in image_prompt_mobile_css
+    assert "box-sizing: border-box;" in css[
+        css.index(".recipe-edit-image-prompt-backdrop {"):
+        css.index(".recipe-edit-image-prompt-backdrop[hidden]")
+    ]
+    assert "width: 100%;" in image_prompt_mobile_css
+    assert "max-width: 100%;" in image_prompt_mobile_css
+    assert "height: 100%;" in image_prompt_mobile_css
+    assert "max-height: 100%;" in image_prompt_mobile_css
+    assert "flex-wrap: nowrap;" in image_prompt_mobile_css
+    image_prompt_narrow_mobile_css = css[image_prompt_narrow_mobile_start:]
+    assert "flex-direction: column;" in image_prompt_narrow_mobile_css
+    assert "width: 100%;" in image_prompt_narrow_mobile_css
 
 
 def test_recipe_image_generation_menu_is_single_flight_and_state_aware():
