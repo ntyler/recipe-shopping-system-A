@@ -26535,6 +26535,58 @@ function updateRecipeEditDescriptionCount() {
     if (textarea && counter) counter.textContent = `${String(textarea.value || "").length} characters`;
 }
 
+function bindRecipeEditNameInput(input) {
+    if (!input || input.dataset.recipeEditNameBound === "true") return;
+    input.dataset.recipeEditNameBound = "true";
+    input.setAttribute("aria-label", "Edit recipe name");
+
+    input.addEventListener("pointerdown", event => {
+        if (document.activeElement === input) return;
+        event.preventDefault();
+        input.focus({ preventScroll: true });
+        if (typeof input.select === "function") input.select();
+    });
+    input.addEventListener("focus", () => {
+        if (input.dataset.recipeEditNameEditing === "true") return;
+        input.dataset.recipeEditNameEditing = "true";
+        input.dataset.recipeEditNameOriginalValue = input.value;
+        if (typeof input.select === "function") input.select();
+    });
+    input.addEventListener("input", () => input.setCustomValidity(""));
+    input.addEventListener("keydown", event => {
+        if (event.key === "Escape") {
+            event.preventDefault();
+            input.value = input.dataset.recipeEditNameOriginalValue || "";
+            input.setCustomValidity("");
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+            input.blur();
+            return;
+        }
+        if (event.key !== "Enter") return;
+        event.preventDefault();
+        const value = String(input.value || "").trim();
+        if (!value) {
+            input.setCustomValidity("Enter a recipe name.");
+            input.reportValidity();
+            return;
+        }
+        input.value = value;
+        input.dataset.recipeEditNameOriginalValue = value;
+        input.setCustomValidity("");
+        updateRecipeEditorDirtyState(input.closest("#recipeEditForm"));
+        input.blur();
+    });
+    input.addEventListener("blur", () => {
+        if (!String(input.value || "").trim()) {
+            input.value = input.dataset.recipeEditNameOriginalValue || "";
+            input.setCustomValidity("");
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+        input.dataset.recipeEditNameEditing = "false";
+        updateRecipeEditorDirtyState(input.closest("#recipeEditForm"));
+    });
+}
+
 function organizeRecipeEditImageCard() {
     const imageCardContent = document.getElementById("recipeEditImageCardContent");
     const coverField = document.getElementById("recipeEditCoverField");
@@ -26644,20 +26696,13 @@ function organizeRecipeEditInformationCard() {
     const nameLine = document.createElement("div");
     nameLine.className = "recipe-edit-summary-name-line";
     if (nameField) nameField.classList.add("recipe-edit-summary-name-field");
-    const editName = document.createElement("button");
-    editName.type = "button";
-    editName.className = "recipe-edit-summary-name-edit";
-    editName.setAttribute("aria-label", "Edit recipe name");
-    editName.title = "Edit recipe name";
-    editName.innerHTML = recipeEditSvgIcon("edit");
-    editName.addEventListener("click", () => {
-        const input = document.getElementById("recipeEditDisplayName");
-        if (!input) return;
-        input.focus({ preventScroll: true });
-        if (typeof input.select === "function") input.select();
-    });
-    appendRecipeEditWorkspaceChildren(nameLine, [nameField, editName]);
-    if (ratingField) ratingField.classList.add("recipe-edit-header-rating");
+    const nameInput = document.getElementById("recipeEditDisplayName");
+    bindRecipeEditNameInput(nameInput);
+    appendRecipeEditWorkspaceChildren(nameLine, [nameField]);
+    if (ratingField) {
+        ratingField.classList.remove("recipe-edit-wide");
+        ratingField.classList.add("recipe-edit-header-rating");
+    }
 
     const selectors = document.createElement("div");
     selectors.className = "recipe-edit-summary-selectors";
@@ -38473,6 +38518,9 @@ function updateSharedRatingControl(source, rating, options = {}) {
         button.setAttribute("aria-checked", value === normalizedRating ? "true" : "false");
         button.textContent = active ? "\u2605" : "\u2606";
     });
+    if (control.dataset.ratingMode === "recipe") {
+        control.setAttribute("aria-label", `Recipe rating: ${normalizedRating} out of 5`);
+    }
     const clear = control.querySelector(".recipe-edit-rating-clear");
     if (clear) clear.hidden = normalizedRating <= 0;
 }

@@ -550,6 +550,11 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     assert 'class="recipe-edit-price-prefix" aria-hidden="true">$</span>' in template
     assert 'id="recipeEditMenuPrice" inputmode="decimal"' in template
     assert 'ratingField.classList.add("recipe-edit-header-rating")' in organizer
+    assert 'ratingField.classList.remove("recipe-edit-wide")' in organizer
+    assert 'bindRecipeEditNameInput(nameInput)' in organizer
+    assert 'appendRecipeEditWorkspaceChildren(nameLine, [nameField])' in organizer
+    assert "recipe-edit-summary-name-edit" not in organizer
+    assert 'recipeEditSvgIcon("edit")' not in organizer
     assert 'const mobileImageSlot = document.querySelector("[data-recipe-edit-mobile-image-slot]")' in organizer
     assert "appendRecipeEditWorkspaceChildren(identity, [nameLine, ratingField])" in organizer
     assert "appendRecipeEditWorkspaceChildren(selectors, [cookbookField, sectionField, priceField])" in organizer
@@ -584,6 +589,51 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     assert "background-color: transparent;" in hierarchy_css
     assert ".recipe-edit-summary-selectors .recipe-edit-price-control" in hierarchy_css
     assert ".recipe-edit-summary-selectors .recipe-edit-price-control:not(:focus-within):not(:has(" in hierarchy_css
+
+
+def test_recipe_name_is_directly_editable_without_a_pencil_control():
+    template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    script = read_text("PushShoppingList/static/js/app.js")
+    css = read_text("PushShoppingList/static/css/app.css")
+    binder_start = script.index("function bindRecipeEditNameInput(input)")
+    binder_end = script.index("function organizeRecipeEditImageCard()", binder_start)
+    binder = script[binder_start:binder_end]
+
+    display_name_start = template.index('id="recipeEditDisplayName"')
+    display_name_markup = template[display_name_start - 100:display_name_start + 220]
+    assert 'aria-label="Edit recipe name"' in display_name_markup
+    assert "required" in display_name_markup
+    assert 'input.addEventListener("pointerdown"' in binder
+    assert 'input.addEventListener("focus"' in binder
+    assert 'if (typeof input.select === "function") input.select();' in binder
+    assert 'event.key === "Escape"' in binder
+    assert 'event.key !== "Enter"' in binder
+    assert 'input.setCustomValidity("Enter a recipe name.")' in binder
+    assert 'input.dataset.recipeEditNameOriginalValue' in binder
+    assert ".recipe-edit-summary-name-edit" not in css
+    assert "#recipeEditDisplayName:focus-visible" in css
+
+
+def test_recipe_header_rating_stays_five_star_and_independent_from_restaurant_rating():
+    template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    macros = read_text("PushShoppingList/templates/includes/app_shell_macros.html")
+    script = read_text("PushShoppingList/static/js/app.js")
+    css = read_text("PushShoppingList/static/css/app.css")
+
+    assert "{% for rating_value in range(1, 6) %}" in macros
+    assert macros.count('data-rating-value="{{ rating_value }}"') == 1
+    assert template.count('id="recipeEditRating"') == 1
+    assert template.count('id="recipeEditRatingStars"') == 0
+    assert template.count('shell.rating_control("recipeEditRatingStars", "Recipe rating", mode="recipe")') == 1
+    assert template.count('shell.rating_control("recipeEditRestaurantRatingStars", "Restaurant rating", mode="restaurant")') == 1
+    assert 'control.setAttribute("aria-label", `Recipe rating: ${normalizedRating} out of 5`)' in script
+    assert 'control.dataset.ratingMode === "restaurant"' in script
+    assert 'control.dataset.ratingMode === "recipe"' in script
+    assert "Math.max(0, Math.min(5, rating))" in script
+    assert "grid-template-columns: minmax(0, 1fr) auto;" in css
+    assert "justify-self: end;" in css
+    assert "justify-self: start;" in css
+    assert "align-items: flex-start;" in css[css.index("@media (max-width: 767px)", css.index("/* Edit Recipe hierarchy")):]
 
 
 def test_recipe_metadata_fields_have_accessible_tooltips():
