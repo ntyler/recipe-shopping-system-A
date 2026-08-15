@@ -3,6 +3,7 @@ import json
 import os
 import re
 import uuid
+from copy import deepcopy
 from datetime import date
 from datetime import datetime
 from datetime import timezone
@@ -195,6 +196,7 @@ from PushShoppingList.services.device_status_service import record_device_status
 main_bp = Blueprint("main_bp", __name__)
 address_openai_client = None
 APP_LOCAL_DATE_COOKIE = "ai_pantry_local_date"
+RECIPE_VIEW_PAGE_SIZE = 8
 MASTER_DATA_PAGE_CONFIG = {
     "ingredients": {
         "title": "Ingredient Master Data",
@@ -486,19 +488,139 @@ def cookbooks_context():
     )
 
 
-def shopping_views_context():
-    items = load_items()
-    item_state = load_item_state()
-    store_settings = load_store_settings()
-    product_choices = product_choices_by_item()
-    recipe_context = recipe_rows_context(
+def recipe_quantity_rows(recipe_urls):
+    """Build only the recipe fields needed by shopping-list quantity summaries."""
+    rows = []
+    recipe_ingredient_data = load_recipe_ingredients()
+
+    for index, recipe in enumerate(recipe_urls, start=1):
+        recipe_quantity = normalize_recipe_quantity(recipe.get("quantity") or 1)
+        recipe_data = load_saved_recipe_output(recipe["url"])
+        recipe_meta = recipe_ingredient_data.get(normalize_recipe_url_key(recipe["url"]), {})
+        use_scaled_meta = multipliers_match(recipe_meta.get("quantity", 1), recipe_quantity)
+        scaled_ingredients = recipe_meta.get("scaled_ingredients", {}) if use_scaled_meta else {}
+
+        rows.append({
+            "number": index,
+            "url": recipe["url"],
+            "quantity": recipe_quantity,
+            "sections": build_recipe_sections(
+                recipe_data,
+                recipe_quantity,
+                scaled_ingredients,
+                include_images=False,
+            ),
+        })
+
+    return rows
+
+
+def recipe_view_batch_context(recipe_urls):
+    """Build rich rows only for the visible recipe batch."""
+    food_rules = load_food_rules()
+    recipe_rows = recipe_view_rows(
+        recipe_urls,
+        food_rules=food_rules,
         image_variants=("thumb", "card", "detail"),
         include_detail_images=True,
     )
+    ensure_unclassified_cookbook_for_recipes(recipe_rows)
+    cookbook_assignments = recipe_cookbook_assignments()
+    apply_cookbook_assignments_to_recipe_rows(recipe_rows, cookbook_assignments)
+    cookbook_view_data = lightweight_cookbook_view()
+
+    return {
+        "recipe_urls": recipe_urls,
+        "food_rules": food_rules,
+        "recipe_view_rows": recipe_rows,
+        "cookbook_view": cookbook_view_data,
+        "cookbook_count": len(cookbook_view_data.get("cookbooks", [])),
+        "cookbook_recipe_count": sum(
+            int(cookbook.get("recipe_count") or 0)
+            for cookbook in cookbook_view_data.get("cookbooks", [])
+        ),
+        "cookbook_assignments": cookbook_assignments,
+    }
+
+
+def recipe_view_page(recipe_urls, requested_page, page_size=RECIPE_VIEW_PAGE_SIZE):
+    total_count = len(recipe_urls)
+    page_count = max(1, (total_count + page_size - 1) // page_size)
+
+    try:
+        page = int(requested_page)
+    except (TypeError, ValueError):
+        page = 1
+
+    page = min(max(1, page), page_count)
+    start = (page - 1) * page_size
+    end = min(start + page_size, total_count)
+
+    return {
+        "page": page,
+        "page_count": page_count,
+        "page_size": page_size,
+        "total_count": total_count,
+        "start": start,
+        "end": end,
+        "has_more": end < total_count,
+        "recipe_urls": recipe_urls[start:end],
+    }
+
+
+def shopping_views_context(recipe_page=None, recipe_batch_only=False):
+    items = [] if recipe_batch_only else load_items()
+    item_state = load_item_state()
+    store_settings = load_store_settings()
+    product_choices = product_choices_by_item()
+    all_recipe_urls = recipe_url_rows()
+    pagination = None
+
+    if recipe_page is None:
+        page_recipe_urls = all_recipe_urls
+    else:
+        pagination = recipe_view_page(all_recipe_urls, recipe_page)
+        page_recipe_urls = pagination["recipe_urls"]
+
+    if pagination:
+        if not recipe_batch_only:
+            # Preserve the pre-pagination invariant without hydrating every rich recipe card.
+            ensure_unclassified_cookbook_for_recipes(all_recipe_urls)
+        recipe_context = recipe_view_batch_context(page_recipe_urls)
+    else:
+        recipe_context = recipe_rows_context(
+            recipe_urls=page_recipe_urls,
+            image_variants=("thumb", "card", "detail"),
+            include_detail_images=True,
+        )
     recipe_rows = recipe_context["recipe_view_rows"]
+
+    if pagination:
+        for index, recipe_row in enumerate(recipe_rows, start=pagination["start"] + 1):
+            recipe_row["number"] = index
+        pagination["next_url"] = (
+            url_for(
+                "main_bp.recipe_view_section",
+                page=pagination["page"] + 1,
+                batch="1",
+            )
+            if pagination["has_more"]
+            else ""
+        )
+
+    if recipe_batch_only:
+        quantity_rows = []
+    elif recipe_page is None:
+        quantity_rows = recipe_rows
+    else:
+        quantity_rows = recipe_quantity_rows(all_recipe_urls)
     purchase_mappings = purchase_mapping_lookup_for_items(shopping_items_only(items), item_state)
-    recipe_item_quantities = recipe_quantity_lookup(recipe_rows)
-    recipe_item_quantity_sources = recipe_quantity_sources_lookup(recipe_rows)
+    recipe_item_quantities = (
+        {} if recipe_batch_only else recipe_quantity_lookup(quantity_rows)
+    )
+    recipe_item_quantity_sources = (
+        {} if recipe_batch_only else recipe_quantity_sources_lookup(quantity_rows)
+    )
     item_quantities = apply_manual_item_quantities(
         recipe_item_quantities,
         item_state,
@@ -513,6 +635,8 @@ def shopping_views_context():
         "item_quantities": item_quantities,
         "recipe_item_quantities": recipe_item_quantities,
         "recipe_item_quantity_sources": recipe_item_quantity_sources,
+        "recipe_view_pagination": pagination,
+        "recipe_view_batch_only": recipe_batch_only,
         "section_counts": section_counts(items),
         "store_view": build_store_view(
             items,
@@ -4223,6 +4347,8 @@ def apply_food_rules_to_saved_recipe(recipe_url, food_rules=None):
         "applied_at": applied_at,
     }
     save_recipe_output(recipe_url, recipe_data)
+    if has_request_context():
+        g.pop("_saved_recipe_output_cache", None)
 
     return {
         "ok": True,
@@ -4487,10 +4613,30 @@ def load_saved_recipe_output(recipe_url):
     # The editor loader overlays the user-scoped normalized SQLite hierarchy
     # when it exists. Keep route-level meal/shopping resolution on that same
     # source of truth instead of consulting the JSON-only index directly.
-    return load_recipe_output(recipe_url, equipment_consumer="recipe_display") or {}
+    if not has_request_context():
+        return load_recipe_output(recipe_url, equipment_consumer="recipe_display") or {}
+
+    cache = getattr(g, "_saved_recipe_output_cache", None)
+    if cache is None:
+        cache = {}
+        g._saved_recipe_output_cache = cache
+    recipe_key = normalize_recipe_url_key(recipe_url) or str(recipe_url or "").strip()
+    if recipe_key not in cache:
+        cache[recipe_key] = (
+            load_recipe_output(recipe_url, equipment_consumer="recipe_display") or {}
+        )
+    # Historically every load returned an independent JSON/SQL projection.
+    # Keep that mutation isolation while eliminating repeated file/SQL reads.
+    return deepcopy(cache[recipe_key])
 
 
-def build_recipe_sections(recipe_data, recipe_quantity=1, scaled_ingredients=None, image_variants=None):
+def build_recipe_sections(
+    recipe_data,
+    recipe_quantity=1,
+    scaled_ingredients=None,
+    image_variants=None,
+    include_images=True,
+):
     sections = {section: [] for section in STORE_SECTION_ORDER.keys()}
     scaled_ingredients = scaled_ingredients or {}
 
@@ -4535,9 +4681,13 @@ def build_recipe_sections(recipe_data, recipe_quantity=1, scaled_ingredients=Non
         ingredient_image_generated_at = clean_display_text(
             ingredient.get("ingredient_image_generated_at") or ingredient.get("image_generated_at") or ""
         )
-        image_variant_payload = local_static_image_variants(
-            ingredient_image_url,
-            variants=image_variants,
+        image_variant_payload = (
+            local_static_image_variants(
+                ingredient_image_url,
+                variants=image_variants,
+            )
+            if include_images
+            else {}
         )
 
         sections[section].append({
@@ -5371,9 +5521,15 @@ def cookbooks_section():
 
 @main_bp.route("/sections/recipe-view")
 def recipe_view_section():
+    requested_page = request.args.get("page", "1")
+    batch_only = request.args.get("batch", "").strip() == "1"
+
     return render_template(
         "sections/shopping_views.html",
-        **shopping_views_context(),
+        **shopping_views_context(
+            recipe_page=requested_page,
+            recipe_batch_only=batch_only,
+        ),
     )
 
 

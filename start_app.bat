@@ -22,7 +22,11 @@ call :load_user_env SHOPPING_APP_SMTP_USE_TLS
 call :load_user_env SHOPPING_APP_PASSWORD_RESET_BASE_URL
 call :load_user_env SHOPPING_APP_ACCOUNT_LINK_BASE_URL
 call :load_user_env SHOPPING_APP_OPEN_BROWSER
+call :load_user_env REDIS_URL
+call :load_user_env JOB_QUEUE_THREAD_FALLBACK
+call :load_user_env WORKER_QUEUES
 if exist local_env.bat call local_env.bat
+if not defined JOB_QUEUE_THREAD_FALLBACK set JOB_QUEUE_THREAD_FALLBACK=0
 set PRODUCT_SEARCH_WORKERS=2
 set PRODUCT_DETAIL_LIMIT_PER_STORE=4
 set PRODUCT_AI_ANALYSIS_LIMIT_PER_STORE=2

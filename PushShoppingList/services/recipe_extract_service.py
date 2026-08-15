@@ -1004,15 +1004,26 @@ def get_openai_client():
     return client
 
 
-def openai_client_with_timeout(timeout_seconds):
+def openai_client_with_timeout(timeout_seconds, *, max_retries=None):
     try:
         timeout = max(5, min(120, int(timeout_seconds or 45)))
     except (TypeError, ValueError):
         timeout = 45
     try:
-        return get_openai_client().with_options(timeout=timeout)
+        options = {"timeout": timeout}
+        if max_retries is not None:
+            options["max_retries"] = max(0, int(max_retries))
+        return get_openai_client().with_options(**options)
     except Exception:
         return get_openai_client()
+
+
+def openai_vision_client():
+    """Use the intended vision timeout and leave retries to the outer workflow."""
+    return openai_client_with_timeout(
+        VISION_REQUEST_TIMEOUT_SECONDS,
+        max_retries=0,
+    )
 
 
 def build_vision_debug(uploaded_file_path="", filename="", mime_type=""):
@@ -8610,7 +8621,7 @@ def call_openai_vision_image(
             f"image_bytes={len(image_bytes)} base64_length={base64_length}"
         )
         try:
-            client = OpenAI()
+            client = openai_vision_client()
             vision_payload = {
                 "model": model,
                 "messages": [{

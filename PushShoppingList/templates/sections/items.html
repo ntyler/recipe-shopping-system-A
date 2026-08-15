@@ -1,3 +1,4 @@
+{% if not recipe_view_batch_only|default(false) %}
 <div id="sectionView">
     <div class="items-title-row">
         <h2 class="items-title">Items</h2>
@@ -145,8 +146,17 @@
         </div>
     {% endif %}
 </div>
+{% endif %}
 
-<div id="recipeView" data-recipe-view-sort-list style="display:none;">
+{% set recipe_pagination = recipe_view_pagination|default(none) %}
+<div id="recipeView"
+     data-recipe-view-sort-list
+     data-recipe-view-page="{{ recipe_pagination.page if recipe_pagination else 1 }}"
+     data-recipe-view-page-count="{{ recipe_pagination.page_count if recipe_pagination else 1 }}"
+     data-recipe-view-page-size="{{ recipe_pagination.page_size if recipe_pagination else (recipe_view_rows|length) }}"
+     data-recipe-view-total-count="{{ recipe_pagination.total_count if recipe_pagination else (recipe_view_rows|length) }}"
+     data-recipe-view-has-more="{% if recipe_pagination and recipe_pagination.has_more %}1{% else %}0{% endif %}"
+     style="display:none;">
     <h2 class="items-title">Items by Recipe</h2>
     {% if recipe_view_rows %}
         {% set unclassified_cookbook = namespace(id="", name="unclassified") %}
@@ -171,7 +181,10 @@
                     <button type="button"
                             class="recipe-url-drag-handle recipe-view-drag-handle"
                             data-recipe-drag-handle
+                            data-recipe-order-control
+                            {% if recipe_pagination and recipe_pagination.has_more %}disabled{% endif %}
                             aria-label="Reorder recipe {{ recipe.number }}"
+                            title="{% if recipe_pagination and recipe_pagination.has_more %}Load all recipes to reorder{% else %}Reorder recipe {{ recipe.number }}{% endif %}"
                             onclick="event.stopPropagation()">
                         <span class="recipe-url-drag-dots" aria-hidden="true">
                             <span></span><span></span><span></span>
@@ -406,10 +419,14 @@
                                 <div class="overflow-menu-section recipe-view-menu-section">
                                     <div class="overflow-menu-section-title recipe-view-menu-section-title">Recipe Order</div>
                                     <button type="button"
+                                            data-recipe-order-control
+                                            {% if recipe_pagination and recipe_pagination.has_more %}disabled{% endif %}
                                             onclick="moveRecipeEditRow(this, -1); return false;">
                                         Move Up
                                     </button>
                                     <button type="button"
+                                            data-recipe-order-control
+                                            {% if recipe_pagination and recipe_pagination.has_more %}disabled{% endif %}
                                             onclick="moveRecipeEditRow(this, 1); return false;">
                                         Move Down
                                     </button>
@@ -1104,6 +1121,17 @@
                 {% endif %}
             </div>
         {% endfor %}
+        {% if recipe_pagination and recipe_pagination.has_more %}
+            <div class="source-line"
+                 data-recipe-view-load-more-row>
+                <button type="button"
+                        data-recipe-view-load-more
+                        data-recipe-view-next-url="{{ recipe_pagination.next_url }}"
+                        onclick="loadMoreRecipeViewPage(this); return false;">
+                    Load more recipes ({{ recipe_pagination.end }} of {{ recipe_pagination.total_count }} shown)
+                </button>
+            </div>
+        {% endif %}
     {% else %}
         <div class="recipe-view-card">
             <div class="source-line">No recipe URLs yet.</div>

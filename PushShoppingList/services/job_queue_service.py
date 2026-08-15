@@ -97,9 +97,11 @@ def app_is_production():
 
 
 def thread_fallback_enabled():
+    if app_is_production():
+        return False
     raw_value = os.getenv("JOB_QUEUE_THREAD_FALLBACK")
     if raw_value is None:
-        return not app_is_production()
+        return False
     return raw_value.strip().lower() in {
         "1",
         "true",
@@ -109,6 +111,8 @@ def thread_fallback_enabled():
 
 
 def inline_jobs_enabled():
+    if app_is_production():
+        return False
     return os.getenv("JOB_QUEUE_MODE", "").strip().lower() in {"inline", "sync"}
 
 
@@ -143,7 +147,7 @@ def log_redis_not_configured_once():
     if _REDIS_NOT_CONFIGURED_LOGGED:
         return
     _REDIS_NOT_CONFIGURED_LOGGED = True
-    print("[Job Queue] Redis not configured. Using local thread fallback for development.")
+    print("[Job Queue] Redis not configured. Using explicitly enabled local thread fallback.")
 
 
 def _missing_dependency_error(module_name, package_name, install_name):

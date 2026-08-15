@@ -16,6 +16,9 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
+from flask import g
+from flask import has_request_context
+
 from PushShoppingList.services import recipe_master_data_service as master_data
 from PushShoppingList.services import storage_service
 from PushShoppingList.services.ingredient_option_service import (
@@ -83,6 +86,10 @@ ITEM_RELATIONAL_FIELDS = {
     "optional",
     "sort_order",
 }
+
+
+_REQUEST_REQUIREMENT_CONNECTION = "_recipe_ingredient_requirement_connection"
+_REQUEST_CONNECTION_UNSET = object()
 
 INTERNAL_METADATA_KEY = "_normalized_requirement_compatibility"
 INTERNAL_COMPONENT_METADATA_KEY = "_normalized_option_item_compatibility"
@@ -1306,11 +1313,45 @@ def recipe_requirement_sync_status(recipe_url, user_id=None, *, connection=None)
 
 @contextmanager
 def _existing_requirement_connection():
-    """Open the shared DB read-only without running schema initialization."""
+    """Reuse one request-local read connection without leaking or widening locks."""
     db_path = master_data.recipe_master_db_path()
     if not db_path.is_file():
+        if has_request_context():
+            setattr(g, _REQUEST_REQUIREMENT_CONNECTION, None)
         yield None
         return
+
+    if has_request_context():
+        connection = getattr(
+            g,
+            _REQUEST_REQUIREMENT_CONNECTION,
+            _REQUEST_CONNECTION_UNSET,
+        )
+        if connection is _REQUEST_CONNECTION_UNSET:
+            with master_data.RECIPE_MASTER_DB_LOCK:
+                connection = sqlite3.connect(
+                    f"{db_path.resolve().as_uri()}?mode=ro",
+                    uri=True,
+                    timeout=30,
+                )
+                connection.row_factory = sqlite3.Row
+                try:
+                    connection.execute("PRAGMA query_only=ON")
+                except Exception:
+                    connection.close()
+                    raise
+                setattr(g, _REQUEST_REQUIREMENT_CONNECTION, connection)
+
+        if connection is None:
+            yield None
+            return
+
+        # Preserve the service's existing process-local serialization while
+        # avoiding connection setup/teardown for every recipe in one request.
+        with master_data.RECIPE_MASTER_DB_LOCK:
+            yield connection
+        return
+
     with master_data.RECIPE_MASTER_DB_LOCK:
         connection = sqlite3.connect(
             f"{db_path.resolve().as_uri()}?mode=ro",
@@ -1322,6 +1363,16 @@ def _existing_requirement_connection():
             connection.execute("PRAGMA query_only=ON")
             yield connection
         finally:
+            connection.close()
+
+
+def close_request_requirement_connection(_error=None):
+    """Close the request-local normalized-ingredient read connection."""
+    if not has_request_context():
+        return
+    connection = g.pop(_REQUEST_REQUIREMENT_CONNECTION, None)
+    if connection is not None:
+        with master_data.RECIPE_MASTER_DB_LOCK:
             connection.close()
 
 

@@ -44,6 +44,7 @@ from PushShoppingList.services.user_account_service import pending_two_factor_se
 from PushShoppingList.services.recipe_extract_service import log_openai_startup_diagnostics
 from PushShoppingList.services.recipe_url_service import recipe_edit_page_url
 from PushShoppingList.services.job_queue_service import log_job_queue_startup_diagnostics
+from PushShoppingList.services.recipe_ingredient_requirement_service import close_request_requirement_connection
 
 
 mimetypes.add_type("image/webp", ".webp")
@@ -346,6 +347,7 @@ def create_app(config=None):
     app.register_blueprint(recipe_bp)
     app.register_blueprint(store_bp)
     app.register_blueprint(product_bp)
+    app.teardown_request(close_request_requirement_connection)
 
     @app.before_request
     def protect_workspace_routes():

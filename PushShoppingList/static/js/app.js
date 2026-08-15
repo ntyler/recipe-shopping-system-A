@@ -5782,11 +5782,15 @@ function firstRenderableElementFromHtml(html, sectionName = "") {
 }
 
 function afterDynamicMarkupLoaded(options = {}) {
+    const itemStateRoots = Array.isArray(options.itemStateRoots) && options.itemStateRoots.length
+        ? options.itemStateRoots
+        : [options.root || document];
+
     restoreCardCollapseState();
     restoreHomeAddressHistoryCollapseState();
     restoreOpenStorePanels();
     restoreViewBehaviorSettings();
-    restoreItemCheckState();
+    itemStateRoots.forEach(root => restoreItemCheckState(root));
     bindHeaderProfileMenus();
     bindAccountMenuDropdowns();
     bindFirebaseAuthInfo();
@@ -5834,7 +5838,9 @@ function afterDynamicMarkupLoaded(options = {}) {
     if (authCollapseAllIsActive()) {
         applyShoppingListCollapsedDomState({ showStatus: false });
     }
-    scheduleRecipeImageProgressPoll(250);
+    if (options.scheduleImagePoll !== false) {
+        scheduleRecipeImageProgressPoll(250);
+    }
 
     if (options.updateSticky !== false) {
         window.setTimeout(updateAddStoreStickyVisibility, 140);
@@ -17712,6 +17718,128 @@ function eventStartedInNestedInteractive(event, container) {
     return Boolean(interactive && interactive !== container);
 }
 
+const recipeViewPageLoadPromises = new WeakMap();
+
+function recipeViewCardForUrl(recipeUrl) {
+    if (!recipeUrl) {
+        return null;
+    }
+
+    return document.querySelector(`[data-recipe-view-url="${cssEscape(recipeUrl)}"]`);
+}
+
+async function loadMoreRecipeViewPage(button) {
+    const list = button ? button.closest("[data-recipe-view-sort-list]") : null;
+
+    if (!button || !list || !button.dataset.recipeViewNextUrl) {
+        return [];
+    }
+
+    if (recipeViewPageLoadPromises.has(button)) {
+        return recipeViewPageLoadPromises.get(button);
+    }
+
+    const loadPromise = (async () => {
+        const originalText = button.textContent;
+        button.disabled = true;
+        button.textContent = "Loading recipes...";
+
+        try {
+            const response = await fetch(button.dataset.recipeViewNextUrl, {
+                cache: "no-store",
+                headers: {
+                    "X-Requested-With": "fetch",
+                },
+            });
+
+            if (!response.ok || response.redirected) {
+                throw new Error("Unable to load the next recipe batch.");
+            }
+
+            const nextPage = new DOMParser().parseFromString(await response.text(), "text/html");
+            const nextList = nextPage.querySelector("[data-recipe-view-sort-list]");
+
+            if (!nextList) {
+                throw new Error("Recipe batch returned unexpected markup.");
+            }
+
+            const existingUrls = new Set(recipeViewOrder(list));
+            const nextCards = [...nextList.children].filter(child => (
+                child.matches("[data-recipe-view-card]")
+                && !existingUrls.has(child.dataset.recipeViewUrl || "")
+            ));
+
+            if (!nextCards.length && nextList.dataset.recipeViewHasMore === "1") {
+                throw new Error("Recipe batch did not advance.");
+            }
+
+            const loadMoreRow = button.closest("[data-recipe-view-load-more-row]") || button;
+            nextCards.forEach(card => list.insertBefore(card, loadMoreRow));
+
+            [
+                "recipeViewPage",
+                "recipeViewPageCount",
+                "recipeViewPageSize",
+                "recipeViewTotalCount",
+                "recipeViewHasMore",
+            ].forEach(key => {
+                list.dataset[key] = nextList.dataset[key] || "";
+            });
+
+            const nextButton = nextList.querySelector("[data-recipe-view-load-more]");
+            if (nextButton && nextButton.dataset.recipeViewNextUrl) {
+                button.dataset.recipeViewNextUrl = nextButton.dataset.recipeViewNextUrl;
+                button.textContent = `Load more recipes (${recipeViewOrder(list).length} of ${list.dataset.recipeViewTotalCount} shown)`;
+                button.disabled = false;
+            } else {
+                loadMoreRow.remove();
+            }
+
+            list.dataset.savedOrder = recipeViewOrder(list).join("\n");
+            afterDynamicMarkupLoaded({
+                root: list,
+                itemStateRoots: nextCards,
+                updateSticky: false,
+                scheduleImagePoll: false,
+            });
+            return nextCards;
+        } catch (err) {
+            console.warn("Unable to load more recipes.", err);
+            button.disabled = false;
+            button.textContent = originalText || "Load more recipes";
+            return [];
+        }
+    })();
+
+    recipeViewPageLoadPromises.set(button, loadPromise);
+
+    try {
+        return await loadPromise;
+    } finally {
+        recipeViewPageLoadPromises.delete(button);
+    }
+}
+
+async function loadRecipeViewUntilRecipeAvailable(recipeUrl) {
+    let target = recipeViewCardForUrl(recipeUrl);
+
+    while (!target) {
+        const button = document.querySelector("[data-recipe-view-load-more]");
+        if (!button) {
+            break;
+        }
+
+        const addedCards = await loadMoreRecipeViewPage(button);
+        target = recipeViewCardForUrl(recipeUrl);
+
+        if (!target && !addedCards.length) {
+            break;
+        }
+    }
+
+    return target;
+}
+
 function jumpToRecipeViewRecipe(button, event = null) {
     if (event) {
         event.preventDefault();
@@ -17742,9 +17870,14 @@ function jumpToRecipeViewRecipe(button, event = null) {
 
     showView("recipe");
 
-    const target = document.querySelector(`[data-recipe-view-url="${cssEscape(recipeUrl)}"]`);
+    const target = recipeViewCardForUrl(recipeUrl);
 
     if (!target) {
+        loadRecipeViewUntilRecipeAvailable(recipeUrl).then(loadedTarget => {
+            if (loadedTarget) {
+                jumpToRecipeViewRecipe(button);
+            }
+        });
         return false;
     }
 
@@ -18718,8 +18851,15 @@ function restoreToggleSetting(inputId, storageKey, defaultChecked, bodyClass, in
     syncViewBehaviorMenuToggles(inputId);
 }
 
-function restoreItemCheckState() {
-    document.querySelectorAll(".row[data-key]").forEach(row => {
+function restoreItemCheckState(root = document) {
+    const scope = root && typeof root.querySelectorAll === "function" ? root : document;
+    const rows = [...scope.querySelectorAll(".row[data-key]")];
+
+    if (scope.matches && scope.matches(".row[data-key]")) {
+        rows.unshift(scope);
+    }
+
+    rows.forEach(row => {
         const checkbox = row.querySelector(".item-check");
         const itemText = row.querySelector(".item-text");
 
@@ -18731,10 +18871,13 @@ function restoreItemCheckState() {
         checkbox.checked = localStorage.getItem(`item-checked:${key}`) === "1";
         syncItemCheckedState(row, checkbox, itemText);
 
-        checkbox.addEventListener("change", () => {
-            syncItemCheckedState(row, checkbox, itemText);
-            localStorage.setItem(`item-checked:${key}`, checkbox.checked ? "1" : "0");
-        });
+        if (checkbox.dataset.itemCheckStateBound !== "1") {
+            checkbox.dataset.itemCheckStateBound = "1";
+            checkbox.addEventListener("change", () => {
+                syncItemCheckedState(row, checkbox, itemText);
+                localStorage.setItem(`item-checked:${key}`, checkbox.checked ? "1" : "0");
+            });
+        }
 
         if (itemText && itemText.dataset.itemTextToggleBound !== "1") {
             itemText.dataset.itemTextToggleBound = "1";
@@ -21904,23 +22047,48 @@ function bindRecipeUrlLogDragAndDrop() {
     });
 }
 
+function recipeViewOrderIsComplete(list) {
+    return Boolean(list && list.dataset.recipeViewHasMore !== "1");
+}
+
+function updateRecipeViewOrderControls(list) {
+    const orderIsComplete = recipeViewOrderIsComplete(list);
+
+    list.querySelectorAll("[data-recipe-view-card]").forEach(row => {
+        row.setAttribute("draggable", orderIsComplete ? "true" : "false");
+        row.querySelectorAll("[data-recipe-order-control]").forEach(control => {
+            control.disabled = !orderIsComplete;
+            control.setAttribute("aria-disabled", orderIsComplete ? "false" : "true");
+            if (!orderIsComplete) {
+                control.title = "Load all recipes to reorder";
+            } else if (control.matches("[data-recipe-drag-handle]")) {
+                control.title = control.getAttribute("aria-label") || "Reorder recipe";
+            } else {
+                control.removeAttribute("title");
+            }
+        });
+    });
+}
+
 function bindRecipeViewDragAndDrop() {
     const list = document.querySelector("[data-recipe-view-sort-list]");
 
-    if (!list || list.dataset.dragBound === "1") {
+    if (!list) {
         return;
     }
 
-    list.dataset.dragBound = "1";
     list.dataset.savedOrder = recipeViewOrder(list).join("\n");
 
-    list.querySelectorAll("[data-recipe-view-card]").forEach(row => {
+    list.querySelectorAll("[data-recipe-view-card]:not([data-recipe-drag-bound='1'])").forEach(row => {
         const handle = row.querySelector("[data-recipe-drag-handle]");
-        row.setAttribute("draggable", "true");
+        row.dataset.recipeDragBound = "1";
         row.setAttribute("aria-grabbed", "false");
 
         if (handle) {
             handle.addEventListener("pointerdown", () => {
+                if (!recipeViewOrderIsComplete(list)) {
+                    return;
+                }
                 row.dataset.dragHandleActive = "1";
             });
             handle.addEventListener("pointerup", () => {
@@ -21932,7 +22100,7 @@ function bindRecipeViewDragAndDrop() {
         }
 
         row.addEventListener("dragstart", event => {
-            if (row.dataset.dragHandleActive !== "1") {
+            if (!recipeViewOrderIsComplete(list) || row.dataset.dragHandleActive !== "1") {
                 event.preventDefault();
                 return;
             }
@@ -21964,6 +22132,14 @@ function bindRecipeViewDragAndDrop() {
             }
         });
     });
+
+    updateRecipeViewOrderControls(list);
+
+    if (list.dataset.dragBound === "1") {
+        return;
+    }
+
+    list.dataset.dragBound = "1";
 
     list.addEventListener("dragover", event => {
         const draggingRow = list.querySelector("[data-recipe-view-card].is-dragging");
@@ -22574,7 +22750,7 @@ function updateRecipeViewOrderNumbers(list) {
 async function saveRecipeViewOrder(list) {
     const urls = recipeViewOrder(list);
 
-    if (!urls.length || list.dataset.savePending === "1") {
+    if (!urls.length || list.dataset.savePending === "1" || !recipeViewOrderIsComplete(list)) {
         return;
     }
 
@@ -24410,6 +24586,11 @@ async function restoreRecipeEditPageReturnState() {
 
     await loadRecipeEditorReturnSurface(state);
     expandRecipeEditorReturnSurface(state);
+
+    if (state.sourceSurface === "recipe-view") {
+        await loadRecipeViewUntilRecipeAvailable(state.recipeUrl);
+    }
+
     await waitForNextPaint();
 
     const target = findRecipeEditorReturnTarget(state);
