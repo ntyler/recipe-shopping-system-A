@@ -63492,6 +63492,30 @@ body.recipe-edit-standalone-page :is(
     flex: 0 0 14px;
 }
 
+body.recipe-edit-standalone-page [data-recipe-image-change-toggle]
+    .recipe-edit-image-change-chevron {
+    display: inline-flex;
+    width: 12px;
+    height: 12px;
+    margin-left: 2px;
+    align-items: center;
+    justify-content: center;
+    color: var(--app-text-muted);
+    transition: transform 140ms ease;
+}
+
+body.recipe-edit-standalone-page [data-recipe-image-change-toggle]
+    .recipe-edit-image-change-chevron > :is(.app-icon-svg, svg) {
+    width: 12px;
+    min-width: 12px;
+    height: 12px;
+}
+
+body.recipe-edit-standalone-page [data-recipe-image-change-toggle][aria-expanded="true"]
+    .recipe-edit-image-change-chevron {
+    transform: rotate(180deg);
+}
+
 body.recipe-edit-standalone-page :is(
     .recipe-edit-image-card .recipe-edit-cover-primary-actions,
     .recipe-edit-mobile-image-actions
@@ -76310,15 +76334,49 @@ body.recipe-edit-standalone-page #recipeEditForm
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-primary-hover) 34%, transparent);
 }
 
-body.recipe-edit-standalone-page .recipe-edit-image-card
-    .recipe-edit-cover-details > .recipe-edit-image-change-actions,
-body.recipe-edit-standalone-page .recipe-edit-image-mobile-card
-    > .recipe-edit-image-change-actions {
-    position: static;
-    width: 100%;
-    max-width: 100%;
+body.recipe-edit-standalone-page > .recipe-edit-image-change-actions.recipe-edit-floating-menu {
+    position: fixed;
+    z-index: var(--app-layer-floating);
+    display: grid;
+    width: min(220px, calc(100vw - 16px));
+    min-width: 0;
+    max-width: calc(100vw - 16px);
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
     margin: 0;
+    padding: 6px;
     box-sizing: border-box;
+    overflow: hidden;
+    border: 1px solid var(--app-border);
+    border-radius: 8px;
+    background: var(--app-surface-soft);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, .4);
+}
+
+body.recipe-edit-standalone-page > .recipe-edit-image-change-actions.recipe-edit-floating-menu
+    > button {
+    min-height: 34px;
+    margin: 0;
+    padding: 0 10px;
+    justify-content: flex-start;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--app-text);
+    font-size: 11px;
+    font-weight: 720;
+    line-height: 1.2;
+    text-align: left;
+    white-space: nowrap;
+}
+
+body.recipe-edit-standalone-page > .recipe-edit-image-change-actions.recipe-edit-floating-menu
+    > button:is(:hover, :focus-visible) {
+    border-color: color-mix(in srgb, var(--app-primary-hover) 38%, transparent);
+    outline: 2px solid color-mix(in srgb, var(--app-primary-hover) 58%, transparent);
+    outline-offset: -2px;
+    background: color-mix(in srgb, var(--app-primary-soft) 64%, transparent);
+    color: var(--app-text-strong);
 }
 
 body.recipe-edit-standalone-page :is(.recipe-edit-cover-prompt, .recipe-edit-mobile-image-prompt) {

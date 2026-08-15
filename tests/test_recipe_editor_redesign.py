@@ -187,6 +187,14 @@ def test_recipe_image_card_matches_dark_mockup_without_changing_image_workflows(
     assert 'onclick="return toggleRecipeFavorite(this, event)"' in cover
     assert '<span>Remove</span>' in cover
     assert 'aria-expanded="false"' in cover
+    assert cover.count('aria-haspopup="menu"') == 1
+    assert template.count('aria-haspopup="menu"') >= 2
+    assert 'aria-controls="recipeEditImageChangeMenu"' in cover
+    assert 'aria-controls="recipeEditImageChangeMenuMobile"' in template
+    assert 'aria-labelledby="recipeEditCoverReplaceButton"' in cover
+    assert 'aria-labelledby="recipeEditCoverReplaceButtonMobile"' in template
+    assert cover.count('class="recipe-edit-image-change-chevron"') == 1
+    assert template.count('class="recipe-edit-image-change-chevron"') == 2
     assert "Upload Image" in cover
     assert "Regenerate with AI" in cover
     assert "Generate with AI" in script
@@ -228,11 +236,44 @@ def test_recipe_image_card_matches_dark_mockup_without_changing_image_workflows(
     assert "position: absolute;" in css
     assert "bottom: calc(100% + 8px);" in css
     assert "function closeRecipeImageChangeActions(options = {})" in script
+    assert "function handleRecipeImageChangeMenuKeydown(event)" in script
     assert 'event.key === "Escape"' in script
+    assert '["ArrowDown", "ArrowUp", "Home", "End"]' in script
     assert "closeRecipeImageChangeActions();" in script
     assert "template?.content.firstElementChild?.cloneNode(true)" in script
-    assert 'document.querySelectorAll("[data-recipe-image-change-actions]").forEach(actions => actions.remove());' in script
-    assert 'if (upload) upload.setAttribute("aria-expanded", "false");' in script
+    assert 'actions.classList.add("recipe-edit-row-menu");' in script
+    assert "positionRecipeEditPopupMenu(actions, button);" in script
+    assert '".recipe-edit-unit-menu, .recipe-edit-type-menu, .recipe-edit-image-change-actions"' in script
+    assert "restoreRecipeEditPopupMenu(actions);" in script
+    assert "actions.remove();" in script
+    assert 'button.setAttribute("aria-expanded", "false");' in script
+    assert 'document.addEventListener("focusin"' in script
+    assert '+ "[data-recipe-image-change-toggle], "' in script
+    upload_workflow = script[
+        script.index("function openRecipeCoverUpload()"):
+        script.index("async function uploadRecipeCoverImage(input)")
+    ]
+    generate_workflow = script[
+        script.index("async function generateRecipeCoverImage(button)"):
+        script.index("async function removeRecipeCoverImage(button)")
+    ]
+    assert upload_workflow.index("closeRecipeImageChangeActions();") < upload_workflow.index("input.click();")
+    assert generate_workflow.index("closeRecipeImageChangeActions();") < generate_workflow.index(
+        "requestRecipeCoverImageGeneration("
+    )
+    floating_menu_rule_start = css.index(
+        "body.recipe-edit-standalone-page > .recipe-edit-image-change-actions.recipe-edit-floating-menu {"
+    )
+    floating_menu_rule = css[floating_menu_rule_start:css.index("}", floating_menu_rule_start)]
+    for declaration in (
+        "position: fixed;",
+        "z-index: var(--app-layer-floating);",
+        "width: min(220px, calc(100vw - 16px));",
+        "grid-template-columns: minmax(0, 1fr);",
+        "box-shadow: 0 12px 28px rgba(0, 0, 0, .4);",
+    ):
+        assert declaration in floating_menu_rule
+    assert "position: static;" not in floating_menu_rule
 
 
 def test_recipe_image_actions_render_as_standalone_controls_without_group_border():

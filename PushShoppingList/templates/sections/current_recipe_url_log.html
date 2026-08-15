@@ -938,13 +938,16 @@
                             </span>
                             <div class="recipe-edit-cover-actions">
                                 <button type="button"
+                                        id="recipeEditCoverReplaceButton"
                                         class="recipe-edit-cover-upload-button"
                                         data-recipe-image-change-toggle
                                         aria-haspopup="menu"
                                         aria-expanded="false"
+                                        aria-controls="recipeEditImageChangeMenu"
                                         onclick="return toggleRecipeImageChangeActions(this)">
                                     {{ shell.svg_icon("image-copy") }}
                                     <span id="recipeEditCoverUploadLabel">Replace Image</span>
+                                    <span class="recipe-edit-image-change-chevron" aria-hidden="true">{{ shell.svg_icon("chevron-down") }}</span>
                                 </button>
                                 <button type="button"
                                         id="recipeEditCoverRemove"
@@ -963,7 +966,11 @@
                                        onchange="return uploadRecipeCoverImage(this)">
                             </div>
                             <template data-recipe-image-change-menu-template>
-                                <div class="recipe-edit-image-change-actions" data-recipe-image-change-actions role="menu">
+                                <div id="recipeEditImageChangeMenu"
+                                     class="recipe-edit-image-change-actions"
+                                     data-recipe-image-change-actions
+                                     role="menu"
+                                     aria-labelledby="recipeEditCoverReplaceButton">
                                     <button type="button" role="menuitem" onclick="return openRecipeCoverUpload()">Upload Image</button>
                                     <button type="button"
                                             id="recipeEditCoverGenerate"
@@ -1036,12 +1043,15 @@
                             </div>
                             <div class="recipe-edit-mobile-image-actions">
                                 <button type="button"
+                                        id="recipeEditCoverReplaceButtonMobile"
                                         data-recipe-image-change-toggle
                                         aria-haspopup="menu"
                                         aria-expanded="false"
+                                        aria-controls="recipeEditImageChangeMenuMobile"
                                         onclick="return toggleRecipeImageChangeActions(this)">
                                     {{ shell.svg_icon("image-copy") }}
                                     <span>Replace Image</span>
+                                    <span class="recipe-edit-image-change-chevron" aria-hidden="true">{{ shell.svg_icon("chevron-down") }}</span>
                                 </button>
                                 <button type="button"
                                         class="recipe-edit-cover-remove-button"
@@ -1054,7 +1064,11 @@
                                 </button>
                             </div>
                             <template data-recipe-image-change-menu-template>
-                                <div class="recipe-edit-image-change-actions" data-recipe-image-change-actions role="menu">
+                                <div id="recipeEditImageChangeMenuMobile"
+                                     class="recipe-edit-image-change-actions"
+                                     data-recipe-image-change-actions
+                                     role="menu"
+                                     aria-labelledby="recipeEditCoverReplaceButtonMobile">
                                     <button type="button" role="menuitem" onclick="return openRecipeCoverUpload()">Upload Image</button>
                                     <button type="button"
                                             class="recipe-edit-cover-generate-button"

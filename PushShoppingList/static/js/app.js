@@ -41608,12 +41608,13 @@ function recipeImageProviderFieldHtml(selectId = "") {
 
 function toggleRecipeImageChangeActions(button) {
     const wrapper = button?.closest(".recipe-edit-cover-details, .recipe-edit-image-mobile-card");
-    const openMenu = wrapper?.querySelector("[data-recipe-image-change-actions]");
-    if (openMenu) {
+    const openMenu = document.querySelector("[data-recipe-image-change-actions]");
+    if (openMenu && recipeEditImageChangeTrigger === button) {
         closeRecipeImageChangeActions({ restoreFocus: true });
         return false;
     }
     closeRecipeImageChangeActions();
+    if (recipeEditorStandalonePageIsActive()) closeRecipeEditRowMenus();
     const template = wrapper?.querySelector("[data-recipe-image-change-menu-template]");
     const actions = template?.content.firstElementChild?.cloneNode(true);
     if (actions) {
@@ -41622,22 +41623,60 @@ function toggleRecipeImageChangeActions(button) {
         else wrapper.appendChild(actions);
         recipeEditImageChangeTrigger = button;
         button.setAttribute("aria-expanded", "true");
+        if (recipeEditorStandalonePageIsActive()) {
+            actions.classList.add("recipe-edit-row-menu");
+            positionRecipeEditPopupMenu(actions, button);
+        }
         const coverImage = collectRecipeEditorCoverImage();
         const hasImage = Boolean(coverImage.path || coverImage.url);
         syncRecipeCoverGenerationControls(recipeCoverImageGenerationPending, hasImage);
-        actions.querySelector("button")?.focus();
+        actions.querySelector("[role=\"menuitem\"]:not([disabled])")?.focus();
     }
     return false;
 }
 
 function closeRecipeImageChangeActions(options = {}) {
     const trigger = recipeEditImageChangeTrigger;
-    document.querySelectorAll("[data-recipe-image-change-actions]").forEach(actions => actions.remove());
+    document.querySelectorAll("[data-recipe-image-change-actions]").forEach(actions => {
+        restoreRecipeEditPopupMenu(actions);
+        actions.remove();
+    });
     document.querySelectorAll("[data-recipe-image-change-toggle]").forEach(button => {
         button.setAttribute("aria-expanded", "false");
     });
     recipeEditImageChangeTrigger = null;
     if (options.restoreFocus && trigger?.isConnected) trigger.focus({ preventScroll: true });
+}
+
+function recipeImageChangeMenuItems(actions) {
+    return actions
+        ? [...actions.querySelectorAll("[role=\"menuitem\"]")].filter(item => !item.disabled && !item.hidden)
+        : [];
+}
+
+function handleRecipeImageChangeMenuKeydown(event) {
+    const actions = event.target?.closest?.("[data-recipe-image-change-actions]");
+    if (!actions) return;
+
+    if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        closeRecipeImageChangeActions({ restoreFocus: true });
+        return;
+    }
+
+    if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+
+    const items = recipeImageChangeMenuItems(actions);
+    if (!items.length) return;
+
+    event.preventDefault();
+    const currentIndex = items.indexOf(document.activeElement);
+    let nextIndex = 0;
+    if (event.key === "End") nextIndex = items.length - 1;
+    else if (event.key === "ArrowUp") nextIndex = currentIndex <= 0 ? items.length - 1 : currentIndex - 1;
+    else if (event.key === "ArrowDown") nextIndex = currentIndex >= items.length - 1 ? 0 : currentIndex + 1;
+    items[nextIndex].focus();
 }
 
 document.addEventListener("pointerdown", event => {
@@ -41647,12 +41686,13 @@ document.addEventListener("pointerdown", event => {
     closeRecipeImageChangeActions();
 });
 
-document.addEventListener("keydown", event => {
+document.addEventListener("keydown", handleRecipeImageChangeMenuKeydown);
+
+document.addEventListener("focusin", event => {
     const actions = document.querySelector("[data-recipe-image-change-actions]");
-    if (event.key === "Escape" && actions) {
-        event.preventDefault();
-        closeRecipeImageChangeActions({ restoreFocus: true });
-    }
+    const toggle = recipeEditImageChangeTrigger;
+    if (!actions || actions.contains(event.target) || toggle === event.target) return;
+    closeRecipeImageChangeActions();
 });
 
 function openRecipeCoverUpload() {
@@ -50714,7 +50754,9 @@ function positionRecipeEditPopupMenu(menu, button) {
     }
 
     const isIngredientOptionsMenu = menu.classList.contains("recipe-edit-ingredient-row-menu");
-    const alignMenuToAnchorStart = menu.matches(".recipe-edit-unit-menu, .recipe-edit-type-menu")
+    const alignMenuToAnchorStart = menu.matches(
+        ".recipe-edit-unit-menu, .recipe-edit-type-menu, .recipe-edit-image-change-actions"
+    )
         || menu.classList.contains("recipe-edit-ingredient-column-view-menu")
         || menu.classList.contains("recipe-edit-ingredient-master-menu");
     const margin = isIngredientOptionsMenu ? 16 : 8;
@@ -51322,6 +51364,9 @@ function recipeEditAdjacentMovableRow(row, direction) {
 
 function closeRecipeEditRowMenus() {
     const options = arguments[0] || {};
+    if (document.querySelector("[data-recipe-image-change-actions].recipe-edit-row-menu")) {
+        closeRecipeImageChangeActions();
+    }
     document.querySelectorAll(".recipe-edit-row-menu").forEach(menu => {
         const anchorButton = menu.recipeEditAnchorButton;
         menu.hidden = true;
@@ -51442,6 +51487,7 @@ function handleRecipeEditRowMenuOutsideClick(event) {
         && typeof target.closest === "function"
         && target.closest(
             ".recipe-edit-row-menu, .recipe-edit-row-menu-btn, "
+            + "[data-recipe-image-change-toggle], "
             + "[data-recipe-edit-unit-trigger], [data-recipe-edit-store-section-trigger], "
             + "[data-recipe-ingredient-column-view-trigger], "
             + "[data-recipe-edit-type-trigger], [data-recipe-edit-ingredient-master-trigger]"
