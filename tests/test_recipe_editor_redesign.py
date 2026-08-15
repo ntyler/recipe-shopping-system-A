@@ -605,7 +605,11 @@ def test_recipe_metadata_strip_uses_spacing_without_internal_separators():
     strip_rule = css[strip_start : css.index("}", strip_start)]
 
     for declaration in (
-        "gap: 12px;",
+        "display: flex;",
+        "flex-wrap: wrap;",
+        "align-items: flex-start;",
+        "column-gap: clamp(32px, 2.5vw, 48px);",
+        "row-gap: 12px;",
         "border: 0;",
         "border-radius: 0;",
         "outline: 0;",
@@ -614,13 +618,30 @@ def test_recipe_metadata_strip_uses_spacing_without_internal_separators():
     ):
         assert declaration in strip_rule
 
+    assert "grid-template-columns" not in strip_rule
+
+    metric_rule_start = css.index(
+        f"{strip_selector[:-1]}> label,",
+        strip_start,
+    )
+    metric_rule = css[metric_rule_start : css.index("}", metric_rule_start)]
+    assert "flex: 0 0 112px;" in metric_rule
+    assert "width: 112px;" in metric_rule
+    assert "border: 0;" in metric_rule
+
+    total_metric_selector = (
+        "body.recipe-edit-standalone-page .recipe-edit-info-panel-organized\n"
+        "    .recipe-edit-metadata-strip > .recipe-edit-total-time-field {"
+    )
+    total_metric_start = css.index(total_metric_selector, strip_start)
+    total_metric_rule = css[total_metric_start : css.index("}", total_metric_start)]
+    assert "flex-basis: 160px;" in total_metric_rule
+    assert "width: 160px;" in total_metric_rule
+    assert ".recipe-edit-total-time-field .recipe-edit-metadata-heading" in css
+    assert "gap: 3px;" in css[total_metric_start:]
+
     assert ".recipe-edit-metadata-strip::before" not in css
     assert ".recipe-edit-metadata-strip::after" not in css
-
-    separator_selector = f"{strip_selector[:-1]}> label {{"
-    separator_start = css.index(separator_selector, strip_start)
-    separator_rule = css[separator_start : css.index("}", separator_start)]
-    assert "border: 0;" in separator_rule
 
     metric_label_rules = re.findall(
         r"([^{}]*\.recipe-edit-metadata-strip\s*>\s*label[^{}]*)\{([^{}]*)\}",
@@ -649,9 +670,11 @@ def test_recipe_time_breakdown_is_one_accessible_persisted_disclosure():
     ]
 
     assert 'button.type = "button"' in control
-    assert '<span>Time Breakdown</span>' in control
+    assert 'class="recipe-edit-time-breakdown-label-wide">Breakdown</span>' in control
+    assert 'class="recipe-edit-time-breakdown-label-compact">Details</span>' in control
     assert 'button.setAttribute("aria-expanded", "true")' in control
     assert 'button.setAttribute("aria-controls", "recipeEditTimeBreakdown")' in control
+    assert 'button.setAttribute("aria-label", "Hide time breakdown")' in control
     assert 'class="recipe-edit-time-breakdown-chevron" aria-hidden="true"' in control
     assert 'button.addEventListener("click"' in control
     assert 'timeBreakdownGroup.id = "recipeEditTimeBreakdown"' in organizer
@@ -661,6 +684,7 @@ def test_recipe_time_breakdown_is_one_accessible_persisted_disclosure():
         "[prepField, cookField, inactiveField])"
     ) in organizer
     assert "recipe-edit-time-breakdown-collapsed" in disclosure
+    assert 'button.setAttribute("aria-label", `${isExpanded ? "Hide" : "Show"} time breakdown`)' in disclosure
     assert "group.hidden = !isExpanded" in disclosure
     assert ".value" not in script[
         script.index("function setRecipeEditTimeBreakdownExpanded"):
@@ -679,7 +703,13 @@ def test_recipe_time_breakdown_is_one_accessible_persisted_disclosure():
     assert ".recipe-edit-time-breakdown-toggle:focus-visible" in css
     assert 'recipe-edit-time-breakdown-toggle[aria-expanded="true"]' in css
     assert ".recipe-edit-time-breakdown-group > label" in css
-    assert ".recipe-edit-metadata-strip.recipe-edit-time-breakdown-collapsed" in css
+    assert 'totalField?.classList.add("recipe-edit-total-time-field")' in organizer
+    assert "(totalTimeHeading || totalField)?.appendChild(timeBreakdownControl)" in organizer
+    assert "recipe-edit-total-time-cluster" not in organizer
+    assert (
+        "appendRecipeEditWorkspaceChildren(metadataRow, "
+        "[servingsField, totalField, timeBreakdownGroup, levelField, scaleField])"
+    ) in organizer
 
 
 def test_recipe_total_time_calculation_preserves_manual_override_and_saved_components():

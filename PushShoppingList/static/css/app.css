@@ -57319,9 +57319,11 @@ body.recipe-edit-standalone-page .recipe-edit-summary-selectors :is(
 }
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-metadata-strip {
-    display: grid;
-    grid-template-columns: repeat(7, minmax(0, 1fr));
-    gap: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    column-gap: clamp(32px, 2.5vw, 48px);
+    row-gap: 12px;
     margin-top: 18px;
     padding: 12px 8px;
     border: 0;
@@ -57331,39 +57333,30 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-
     box-shadow: none;
 }
 
-body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-metadata-strip > label {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto auto;
-    gap: 9px;
-    min-width: 0;
-    align-content: center;
-    padding: 3px 12px;
-    border: 0;
-}
-
-body.recipe-edit-standalone-page .recipe-edit-total-time-cluster {
-    display: grid;
-    min-width: 0;
-    gap: 5px;
-    align-content: center;
-    padding: 3px 12px;
-}
-
-body.recipe-edit-standalone-page .recipe-edit-total-time-cluster > label,
+body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-metadata-strip > label,
 body.recipe-edit-standalone-page .recipe-edit-time-breakdown-group > label {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto auto;
+    flex: 0 0 112px;
+    width: 112px;
     gap: 9px;
     min-width: 0;
     align-content: center;
-    padding: 3px 12px;
+    padding: 3px 0;
+    box-sizing: border-box;
     border: 0;
 }
 
-body.recipe-edit-standalone-page .recipe-edit-total-time-cluster > label {
-    padding: 0;
+body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+    .recipe-edit-metadata-strip > .recipe-edit-total-time-field {
+    flex-basis: 160px;
+    width: 160px;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+    .recipe-edit-total-time-field .recipe-edit-metadata-heading {
+    gap: 3px;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-time-breakdown-group {
@@ -57378,19 +57371,19 @@ body.recipe-edit-standalone-page .recipe-edit-time-breakdown-toggle {
     display: inline-flex;
     width: auto;
     max-width: 100%;
-    min-height: 24px;
-    gap: 6px;
+    min-height: 18px;
+    gap: 4px;
     align-items: center;
     justify-content: flex-start;
     justify-self: start;
     margin: 0;
-    padding: 2px 1px;
+    padding: 1px;
     border: 0;
     border-radius: 4px;
     background: transparent;
     box-shadow: none;
     color: var(--app-muted);
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 700;
     line-height: 1.2;
     white-space: nowrap;
@@ -57399,6 +57392,10 @@ body.recipe-edit-standalone-page .recipe-edit-time-breakdown-toggle {
 body.recipe-edit-standalone-page .recipe-edit-time-breakdown-toggle:is(:hover, :focus-visible) {
     background: transparent;
     color: var(--app-primary-hover);
+}
+
+body.recipe-edit-standalone-page .recipe-edit-time-breakdown-label-compact {
+    display: none;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-time-breakdown-toggle:focus-visible {
@@ -57417,13 +57414,6 @@ body.recipe-edit-standalone-page .recipe-edit-time-breakdown-chevron {
 body.recipe-edit-standalone-page .recipe-edit-time-breakdown-toggle[aria-expanded="true"]
     .recipe-edit-time-breakdown-chevron {
     transform: translateY(2px) rotate(225deg);
-}
-
-@media (min-width: 1441px) {
-    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
-        .recipe-edit-metadata-strip.recipe-edit-time-breakdown-collapsed {
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-    }
 }
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-metadata-heading {
@@ -58068,7 +58058,7 @@ body.recipe-edit-standalone-page .recipe-edit-health-attention.is-clear {
     }
 
     body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-metadata-strip {
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+        column-gap: 32px;
         row-gap: 12px;
     }
 }
@@ -58089,6 +58079,10 @@ body.recipe-edit-standalone-page .recipe-edit-health-attention.is-clear {
 
     body.recipe-edit-standalone-page .recipe-edit-context-sidebar > * {
         min-width: 0;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-metadata-strip {
+        column-gap: 24px;
     }
 }
 
@@ -58153,20 +58147,34 @@ body.recipe-edit-standalone-page .recipe-edit-health-attention.is-clear {
     }
 
     body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-metadata-strip {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        column-gap: 16px;
+        row-gap: 12px;
     }
 
-    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-metadata-strip > label {
-        padding: 5px 8px;
-    }
-
-    body.recipe-edit-standalone-page .recipe-edit-total-time-cluster,
+    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-metadata-strip > label,
     body.recipe-edit-standalone-page .recipe-edit-time-breakdown-group > label {
-        padding: 5px 8px;
+        flex-basis: calc(50% - 8px);
+        width: calc(50% - 8px);
+        padding: 5px 0;
     }
 
-    body.recipe-edit-standalone-page .recipe-edit-total-time-cluster > label {
-        padding: 0;
+    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+        .recipe-edit-metadata-strip > .recipe-edit-total-time-field {
+        flex-basis: calc(50% - 8px);
+        width: calc(50% - 8px);
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+        .recipe-edit-total-time-field .recipe-edit-metadata-heading {
+        gap: 0;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-time-breakdown-label-wide {
+        display: none;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-time-breakdown-label-compact {
+        display: inline;
     }
 
     body.recipe-edit-standalone-page .recipe-edit-tabs-card {
@@ -58258,12 +58266,18 @@ body.recipe-edit-standalone-page .recipe-edit-health-attention.is-clear {
 }
 
 @media (max-width: 520px) {
-    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-metadata-strip {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
     body.recipe-edit-standalone-page .recipe-edit-summary-name-field #recipeEditDisplayName {
         font-size: 22px;
+    }
+}
+
+@media (max-width: 380px) {
+    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-metadata-strip > label,
+    body.recipe-edit-standalone-page .recipe-edit-time-breakdown-group > label,
+    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+        .recipe-edit-metadata-strip > .recipe-edit-total-time-field {
+        flex-basis: 100%;
+        width: 100%;
     }
 }
 

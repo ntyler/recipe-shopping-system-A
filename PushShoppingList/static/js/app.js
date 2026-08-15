@@ -26571,6 +26571,7 @@ function setRecipeEditTimeBreakdownExpanded(expanded) {
     if (!button || !group) return;
     const isExpanded = Boolean(expanded);
     button.setAttribute("aria-expanded", String(isExpanded));
+    button.setAttribute("aria-label", `${isExpanded ? "Hide" : "Show"} time breakdown`);
     group.hidden = !isExpanded;
     group.closest(".recipe-edit-metadata-strip")
         ?.classList.toggle("recipe-edit-time-breakdown-collapsed", !isExpanded);
@@ -26584,8 +26585,10 @@ function createRecipeEditTimeBreakdownControl() {
     button.id = "recipeEditTimeBreakdownToggle";
     button.setAttribute("aria-controls", "recipeEditTimeBreakdown");
     button.setAttribute("aria-expanded", "true");
+    button.setAttribute("aria-label", "Hide time breakdown");
     button.innerHTML = `
-        <span>Time Breakdown</span>
+        <span class="recipe-edit-time-breakdown-label-wide">Breakdown</span>
+        <span class="recipe-edit-time-breakdown-label-compact">Details</span>
         <span class="recipe-edit-time-breakdown-chevron" aria-hidden="true"></span>
     `;
     button.addEventListener("click", () => {
@@ -26919,16 +26922,17 @@ function organizeRecipeEditInformationCard() {
 
     const metadataRow = document.createElement("div");
     metadataRow.className = "recipe-edit-metadata-strip";
-    const totalTimeCluster = document.createElement("div");
-    totalTimeCluster.className = "recipe-edit-total-time-cluster";
     const timeBreakdownGroup = document.createElement("div");
     timeBreakdownGroup.className = "recipe-edit-time-breakdown-group";
     timeBreakdownGroup.id = "recipeEditTimeBreakdown";
     timeBreakdownGroup.setAttribute("role", "group");
     timeBreakdownGroup.setAttribute("aria-label", "Time breakdown");
-    appendRecipeEditWorkspaceChildren(totalTimeCluster, [totalField, createRecipeEditTimeBreakdownControl()]);
+    const timeBreakdownControl = createRecipeEditTimeBreakdownControl();
+    const totalTimeHeading = totalField?.querySelector(".recipe-edit-metadata-heading");
+    totalField?.classList.add("recipe-edit-total-time-field");
+    (totalTimeHeading || totalField)?.appendChild(timeBreakdownControl);
     appendRecipeEditWorkspaceChildren(timeBreakdownGroup, [prepField, cookField, inactiveField]);
-    appendRecipeEditWorkspaceChildren(metadataRow, [servingsField, totalTimeCluster, timeBreakdownGroup, levelField, scaleField]);
+    appendRecipeEditWorkspaceChildren(metadataRow, [servingsField, totalField, timeBreakdownGroup, levelField, scaleField]);
 
     const descriptionRow = document.createElement("div");
     descriptionRow.className = "recipe-edit-description-row";
