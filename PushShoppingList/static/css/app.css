@@ -57369,12 +57369,13 @@ body.recipe-edit-standalone-page .recipe-edit-time-breakdown-group[hidden] {
 
 body.recipe-edit-standalone-page .recipe-edit-time-breakdown-toggle {
     display: inline-flex;
-    width: auto;
+    width: 18px;
+    min-width: 18px;
     max-width: 100%;
+    height: 18px;
     min-height: 18px;
-    gap: 4px;
     align-items: center;
-    justify-content: flex-start;
+    justify-content: center;
     justify-self: start;
     margin: 0;
     padding: 1px;
@@ -57383,19 +57384,11 @@ body.recipe-edit-standalone-page .recipe-edit-time-breakdown-toggle {
     background: transparent;
     box-shadow: none;
     color: var(--app-muted);
-    font-size: 9px;
-    font-weight: 700;
-    line-height: 1.2;
-    white-space: nowrap;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-time-breakdown-toggle:is(:hover, :focus-visible) {
     background: transparent;
     color: var(--app-primary-hover);
-}
-
-body.recipe-edit-standalone-page .recipe-edit-time-breakdown-label-compact {
-    display: none;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-time-breakdown-toggle:focus-visible {
@@ -58167,14 +58160,6 @@ body.recipe-edit-standalone-page .recipe-edit-health-attention.is-clear {
     body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
         .recipe-edit-total-time-field .recipe-edit-metadata-heading {
         gap: 0;
-    }
-
-    body.recipe-edit-standalone-page .recipe-edit-time-breakdown-label-wide {
-        display: none;
-    }
-
-    body.recipe-edit-standalone-page .recipe-edit-time-breakdown-label-compact {
-        display: inline;
     }
 
     body.recipe-edit-standalone-page .recipe-edit-tabs-card {

@@ -711,8 +711,8 @@ def test_recipe_time_breakdown_is_one_accessible_persisted_disclosure():
     ]
 
     assert 'button.type = "button"' in control
-    assert 'class="recipe-edit-time-breakdown-label-wide">Breakdown</span>' in control
-    assert 'class="recipe-edit-time-breakdown-label-compact">Details</span>' in control
+    assert "Breakdown</span>" not in control
+    assert "Details</span>" not in control
     assert 'button.setAttribute("aria-expanded", "true")' in control
     assert 'button.setAttribute("aria-controls", "recipeEditTimeBreakdown")' in control
     assert 'button.setAttribute("aria-label", "Hide time breakdown")' in control

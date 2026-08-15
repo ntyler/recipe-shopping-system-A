@@ -26586,11 +26586,7 @@ function createRecipeEditTimeBreakdownControl() {
     button.setAttribute("aria-controls", "recipeEditTimeBreakdown");
     button.setAttribute("aria-expanded", "true");
     button.setAttribute("aria-label", "Hide time breakdown");
-    button.innerHTML = `
-        <span class="recipe-edit-time-breakdown-label-wide">Breakdown</span>
-        <span class="recipe-edit-time-breakdown-label-compact">Details</span>
-        <span class="recipe-edit-time-breakdown-chevron" aria-hidden="true"></span>
-    `;
+    button.innerHTML = '<span class="recipe-edit-time-breakdown-chevron" aria-hidden="true"></span>';
     button.addEventListener("click", () => {
         const expanded = button.getAttribute("aria-expanded") !== "true";
         setRecipeEditTimeBreakdownExpanded(expanded);
