@@ -76316,8 +76316,8 @@ body.recipe-image-prompt-modal-open [data-app-content] {
 
 .recipe-edit-image-prompt-dialog {
     display: flex;
-    width: min(92vw, 680px);
-    max-height: min(88dvh, 680px);
+    width: min(92vw, 760px);
+    max-height: min(88dvh, 720px);
     overflow: hidden;
     flex-direction: column;
     border: 1px solid var(--app-border);
@@ -76394,7 +76394,7 @@ body.recipe-image-prompt-modal-open [data-app-content] {
 .recipe-edit-image-prompt-body textarea {
     box-sizing: border-box;
     width: 100%;
-    min-height: 190px;
+    min-height: 220px;
     max-height: 48dvh;
     padding: 12px;
     resize: vertical;

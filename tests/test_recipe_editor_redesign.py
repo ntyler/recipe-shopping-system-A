@@ -321,6 +321,17 @@ def test_recipe_image_prompt_uses_accessible_modal_and_existing_form_state():
     assert "body.recipe-image-prompt-modal-open [data-app-content]" in css
     assert ".recipe-edit-image-prompt-backdrop[hidden]" in css
     assert "max-width: calc(100vw - 24px);" in css
+    image_prompt_dialog_css = css[
+        css.index(".recipe-edit-image-prompt-dialog {"):
+        css.index(".recipe-edit-image-prompt-dialog > header", css.index(".recipe-edit-image-prompt-dialog {"))
+    ]
+    image_prompt_textarea_css = css[
+        css.index(".recipe-edit-image-prompt-body textarea {"):
+        css.index(".recipe-edit-image-prompt-body textarea:focus-visible")
+    ]
+    assert "width: min(92vw, 760px);" in image_prompt_dialog_css
+    assert "max-height: min(88dvh, 720px);" in image_prompt_dialog_css
+    assert "min-height: 220px;" in image_prompt_textarea_css
 
 
 def test_recipe_image_generation_menu_is_single_flight_and_state_aware():
