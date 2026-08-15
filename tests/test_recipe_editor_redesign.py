@@ -187,7 +187,9 @@ def test_recipe_image_card_matches_dark_mockup_without_changing_image_workflows(
     assert '<span>Remove</span>' in cover
     assert 'aria-expanded="false"' in cover
     assert "Upload Image" in cover
-    assert "AI Regenerate" in cover
+    assert "Regenerate with AI" in cover
+    assert "Generate with AI" in script
+    assert "recipe-edit-cover-generate-direct" not in cover
     assert "data-recipe-image-change-menu-template" in cover
     assert '<template data-recipe-image-change-menu-template>' in cover
     assert 'onclick="return toggleRecipeImageChangeActions(this)"' in cover
@@ -228,13 +230,13 @@ def test_recipe_image_card_matches_dark_mockup_without_changing_image_workflows(
     assert 'event.key === "Escape"' in script
     assert "closeRecipeImageChangeActions();" in script
     assert "template?.content.firstElementChild?.cloneNode(true)" in script
-    assert "if (actions) actions.remove();" in script
+    assert 'document.querySelectorAll("[data-recipe-image-change-actions]").forEach(actions => actions.remove());' in script
     assert 'if (upload) upload.setAttribute("aria-expanded", "false");' in script
 
 
-def test_recipe_image_actions_render_as_one_balanced_toolbar():
+def test_recipe_image_actions_render_as_standalone_controls_without_group_border():
     css = read_text("PushShoppingList/static/css/app.css")
-    marker = "/* Recipe image actions: one balanced toolbar instead of three competing boxes. */"
+    marker = "/* Recipe image actions: standalone controls without a decorative group container. */"
     image_actions = css[css.index(marker):]
 
     assert ".recipe-edit-image-card .recipe-edit-cover-primary-actions" in image_actions
@@ -242,24 +244,18 @@ def test_recipe_image_actions_render_as_one_balanced_toolbar():
 
     toolbar_rule = image_actions[:image_actions.index("}")]
     for declaration in (
-        "display: grid;",
-        "grid-template-columns: repeat(3, minmax(0, 1fr));",
-        "gap: 4px;",
+        "display: flex;",
+        "flex-wrap: wrap;",
+        "gap: 8px;",
         "width: 100%;",
-        "padding: 3px;",
-        "border: 1px solid var(--recipe-editor-border-soft);",
-        "border-radius: 10px;",
+        "padding: 0;",
+        "border: 0;",
+        "border-radius: 0;",
+        "background: transparent;",
+        "box-shadow: none;",
     ):
         assert declaration in toolbar_rule
-
-    assert "):has(> .recipe-edit-cover-remove-button[hidden])" in image_actions
-    hidden_remove_rule_start = image_actions.index(
-        "):has(> .recipe-edit-cover-remove-button[hidden])"
-    )
-    hidden_remove_rule = image_actions[
-        hidden_remove_rule_start:image_actions.index("}", hidden_remove_rule_start)
-    ]
-    assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in hidden_remove_rule
+    assert "grid-template-columns: repeat(3, minmax(0, 1fr));" not in toolbar_rule
 
     button_rule_start = image_actions.index(
         ".recipe-edit-cover-primary-actions > .recipe-edit-cover-upload-button,"
@@ -267,6 +263,7 @@ def test_recipe_image_actions_render_as_one_balanced_toolbar():
     button_rule = image_actions[button_rule_start:image_actions.index("}", button_rule_start)]
     for declaration in (
         "display: inline-flex;",
+        "flex: 1 1 120px;",
         "width: 100%;",
         "height: 40px;",
         "align-items: center;",
@@ -281,8 +278,73 @@ def test_recipe_image_actions_render_as_one_balanced_toolbar():
     assert "> button:is(:hover, :focus-visible)" in image_actions
     assert "> .recipe-edit-cover-remove-button:is(:hover, :focus-visible)" in image_actions
     assert "background: color-mix(in srgb, var(--app-danger, #ef4444) 11%, transparent);" in image_actions
-    assert "> .recipe-edit-cover-remove-button:not([hidden])" in image_actions
-    assert "grid-column: 1 / -1;" in image_actions
+    assert "flex-basis: 100%;" in image_actions
+
+
+def test_recipe_image_prompt_uses_accessible_modal_and_existing_form_state():
+    template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    script = read_text("PushShoppingList/static/js/app.js")
+    css = read_text("PushShoppingList/static/css/app.css")
+    modal = template[template.index('<div class="recipe-edit-image-prompt-backdrop"'):]
+    modal_script = script[
+        script.index("function recipeImagePromptModal()"):
+        script.index("function setRecipeEditorCoverImageViewLoaded", script.index("function recipeImagePromptModal()"))
+    ]
+
+    assert template.count('onclick="return openRecipeImagePromptModal(this)"') == 2
+    assert 'id="recipeEditImagePromptModal"' in modal
+    assert 'role="dialog"' in modal
+    assert 'aria-modal="true"' in modal
+    assert 'aria-labelledby="recipeEditImagePromptTitle"' in modal
+    assert 'aria-describedby="recipeEditImagePromptHelp"' in modal
+    assert "AI Image Prompt" in modal
+    assert "Save Prompt" in modal
+    assert "Cancel" in modal
+    assert "data-recipe-edit-image-prompt-draft" in modal
+    assert "closeRecipeImagePromptModalFromBackdrop(event)" in modal
+
+    assert 'draft.value = String(promptText.textContent || "").trim();' in modal_script
+    assert "promptText.textContent = prompt;" in modal_script
+    assert 'updateRecipeEditorDirtyState(document.getElementById("recipeEditForm"))' in modal_script
+    assert 'event.key === "Escape"' in modal_script
+    assert 'event.key !== "Tab"' in modal_script
+    assert "modal.contains(document.activeElement)" in modal_script
+    assert "recipeEditImagePromptTrigger.focus({ preventScroll: true })" not in modal_script
+    assert "trigger.focus({ preventScroll: true })" in modal_script
+    assert 'document.body.classList.add("recipe-image-prompt-modal-open")' in modal_script
+    assert 'document.body.classList.remove("recipe-image-prompt-modal-open")' in modal_script
+    assert 'closeRecipeImagePromptModal({ restoreFocus: false });' in script
+    assert "normalized.prompt ? normalized : {};" in script
+
+    assert ".recipe-edit-image-prompt-backdrop {" in css
+    assert ".recipe-edit-image-prompt-dialog {" in css
+    assert "body.recipe-image-prompt-modal-open [data-app-content]" in css
+    assert ".recipe-edit-image-prompt-backdrop[hidden]" in css
+    assert "max-width: calc(100vw - 24px);" in css
+
+
+def test_recipe_image_generation_menu_is_single_flight_and_state_aware():
+    template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    script = read_text("PushShoppingList/static/js/app.js")
+    organizer = script[
+        script.index("function organizeRecipeEditImageCard()"):
+        script.index("function organizeRecipeEditInformationCard()")
+    ]
+    generator = script[
+        script.index("async function generateRecipeCoverImage(button)"):
+        script.index("async function removeRecipeCoverImage(button)")
+    ]
+
+    assert "recipe-edit-cover-generate-direct" not in organizer
+    assert "appendRecipeEditWorkspaceChildren(actions, [upload, remove])" in organizer
+    assert template.count("Regenerate with AI") == 2
+    assert "Generate with AI" in script
+    assert 'button?.closest(".recipe-edit-cover-details, .recipe-edit-image-mobile-card")' in script
+    assert 'document.querySelectorAll("[data-recipe-image-change-toggle]")' in script
+    assert "if (recipeCoverImageGenerationPending) return false;" in generator
+    assert "syncRecipeCoverGenerationControls(true, hasCoverImage);" in generator
+    assert "syncRecipeCoverGenerationControls(false, Boolean(currentCoverImage.path || currentCoverImage.url));" in generator
+    assert 'generateRecipeCoverImage(null);' in script
 
 
 def test_recipe_editor_header_actions_match_the_mockup_order_and_icons():
@@ -387,6 +449,8 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     assert "[servingsField, totalField, prepField, cookField, inactiveField, levelField, scaleField]" in organizer
     assert 'setRecipeEditFieldLabel(levelField, "Difficulty")' in organizer
     assert 'setRecipeEditFieldLabel(scaleField, "Scale")' in organizer
+    assert 'setRecipeEditFieldLabel(priceField, "Menu Price (optional)")' in organizer
+    assert 'setRecipeEditFieldLabel(cuisineField, "Cuisine tags")' in organizer
     assert 'heading.className = "recipe-edit-metadata-heading"' in script
     assert 'data-recipe-metadata-icon="servings"' in read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     assert 'shell.svg_icon("utensils")' in read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
@@ -394,24 +458,33 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     assert "data-recipe-edit-cuisine-chips" in script
     assert "renderRecipeEditCuisineChips" in script
     assert "recipe-edit-price-control" in organizer
+    assert template.count('class="recipe-edit-price-control"') == 1
+    assert 'class="recipe-edit-price-prefix" aria-hidden="true">$</span>' in template
+    assert 'id="recipeEditMenuPrice" inputmode="decimal"' in template
     assert 'ratingField.classList.add("recipe-edit-header-rating")' in organizer
     assert 'const mobileImageSlot = document.querySelector("[data-recipe-edit-mobile-image-slot]")' in organizer
-    assert "appendRecipeEditWorkspaceChildren(identity, [nameLine, ratingField, mobileImageSlot, tagRow])" in organizer
+    assert "appendRecipeEditWorkspaceChildren(identity, [nameLine, ratingField])" in organizer
+    assert "appendRecipeEditWorkspaceChildren(selectors, [cookbookField, sectionField, priceField])" in organizer
+    assert "appendRecipeEditWorkspaceChildren(primaryRow, [identity, selectors, mobileImageSlot])" in organizer
+    assert "appendRecipeEditWorkspaceChildren(descriptionRow, [descriptionField])" in organizer
     assert 'class="recipe-edit-rating-label">Rating</span>' in template
     assert 'shell.rating_control("recipeEditRatingStars", "Recipe rating", mode="recipe")' in template
     assert 'shell.rating_control("recipeEditRestaurantRatingStars", "Restaurant rating", mode="restaurant")' in template
     assert 'data-rating-toggle-selected="true"' in macros
     assert 'class="recipe-edit-rating-clear"' not in macros
     assert "appendRecipeEditWorkspaceChildren(technicalBody, [\n        titleField," in organizer
-    assert "appendRecipeEditWorkspaceChildren(grid, [primaryRow, metadataRow, descriptionRow, technicalDetails])" in organizer
+    final_order = "appendRecipeEditWorkspaceChildren(grid, [primaryRow, descriptionRow, tagRow, metadataRow, technicalDetails])"
+    assert final_order in organizer
     assert "if (infoActions) infoActions.hidden = true;" in organizer
     assert "technicalDetails.open = false;" in organizer
-    assert "grid-template-columns: repeat(5, minmax(0, 1fr));" in css
+    hierarchy_css = css[css.index("/* Edit Recipe hierarchy, borderless cooking summary, and AI Image Prompt dialog. */"):]
+    assert "grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(130px, .62fr);" in hierarchy_css
     assert ".recipe-edit-info-panel-organized .recipe-edit-metadata-heading {" in css
-    assert "grid-template-columns: minmax(0, 2fr) minmax(145px, .9fr);" in css
+    assert ".recipe-edit-description-row {\n    grid-template-columns: minmax(0, 1fr);" in hierarchy_css
     assert ".recipe-edit-price-prefix {" in css
     assert ".recipe-edit-tag-chip {" in css
     assert ".recipe-edit-description-count {" in css
+    assert 'event.target.id === "recipeEditDescription"' in script
     assert "updateRecipeEditDescriptionCount" in script
     assert 'value.replace(/\\s*(people|persons?|servings?|minutes?|mins?)' in script
     assert 'valueWrap.className = "recipe-edit-metadata-value"' in script
@@ -419,6 +492,10 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     assert "width: 68px;" in css
     assert "position: static;" in css
     assert "if (clear) clear.hidden = normalizedRating <= 0;" in script
+    assert "border-color: transparent;" in hierarchy_css
+    assert "background-color: transparent;" in hierarchy_css
+    assert ".recipe-edit-summary-selectors .recipe-edit-price-control" in hierarchy_css
+    assert ".recipe-edit-summary-selectors .recipe-edit-price-control:not(:focus-within):not(:has(" in hierarchy_css
 
 
 def test_recipe_metadata_fields_have_accessible_tooltips():
@@ -614,7 +691,8 @@ def test_recipe_image_has_explicit_mobile_view_below_rating_at_narrow_widths():
     assert 'class="recipe-edit-image-mobile-slot recipe-image-mobile-slot recipe-edit-wide"' in template
     assert 'class="recipe-edit-context-card recipe-edit-image-card recipe-edit-image-desktop-slot recipe-image-desktop-slot"' in template
     assert "No recipe image available" in template
-    assert "data-recipe-edit-mobile-generate-label" in template
+    assert "data-recipe-edit-mobile-generate-label" not in template
+    assert template.count("data-recipe-image-change-toggle") == 2
     assert template.count('onclick="return openRecipeCoverUpload()"') >= 2
     assert template.count('onclick="return generateRecipeCoverImage(this)"') >= 2
     assert template.count('onclick="return removeRecipeCoverImage(this)"') >= 2
@@ -632,7 +710,9 @@ def test_recipe_image_has_explicit_mobile_view_below_rating_at_narrow_widths():
     assert "organizeRecipeEditInformationCard();" in script
     assert "syncRecipeEditImageCardPlacement" not in script
     assert 'const mobileImageSlot = document.querySelector("[data-recipe-edit-mobile-image-slot]")' in script
-    assert "appendRecipeEditWorkspaceChildren(identity, [nameLine, ratingField, mobileImageSlot, tagRow])" in script
+    assert "appendRecipeEditWorkspaceChildren(identity, [nameLine, ratingField])" in script
+    assert "appendRecipeEditWorkspaceChildren(primaryRow, [identity, selectors, mobileImageSlot])" in script
+    assert 'button?.closest(".recipe-edit-cover-details, .recipe-edit-image-mobile-card")' in script
     assert 'document.querySelectorAll("[data-recipe-edit-cover-image]")' in script
     assert 'document.querySelectorAll("[data-recipe-edit-cover-remove]")' in script
     assert "function handleRecipeEditorCoverImageError(image)" in script

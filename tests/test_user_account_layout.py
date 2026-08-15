@@ -653,7 +653,8 @@ def test_recipe_editor_has_generate_title_image_action():
     assert "Image Generator" not in template
     assert "data-recipe-image-provider-select" not in template
     assert 'id="recipeEditCoverGenerate"' in template
-    assert 'id="recipeEditCoverGenerateLabel">Regenerate with AI' in template
+    assert 'id="recipeEditCoverGenerateLabel"' in template
+    assert "data-recipe-edit-cover-generate-label>Regenerate with AI" in template
     assert "data-recipe-image-change-actions" in template
     assert "generateRecipeCoverImage(this)" in template
     assert 'id="recipeEditCoverRemove"' in template

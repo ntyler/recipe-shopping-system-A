@@ -934,15 +934,18 @@
                             <div class="recipe-edit-cover-actions">
                                 <button type="button"
                                         class="recipe-edit-cover-upload-button"
+                                        data-recipe-image-change-toggle
+                                        aria-haspopup="menu"
                                         aria-expanded="false"
                                         onclick="return toggleRecipeImageChangeActions(this)">
                                     {{ shell.svg_icon("image-copy") }}
-                                    <span id="recipeEditCoverUploadLabel">Upload title image</span>
+                                    <span id="recipeEditCoverUploadLabel">Replace Image</span>
                                 </button>
                                 <button type="button"
                                         id="recipeEditCoverRemove"
                                         class="recipe-edit-cover-upload-button recipe-edit-cover-remove-button"
                                         data-recipe-edit-cover-remove
+                                        aria-label="Remove title image"
                                         onclick="return removeRecipeCoverImage(this)"
                                         hidden>
                                     {{ shell.svg_icon("trash") }}
@@ -962,23 +965,24 @@
                                             class="recipe-edit-cover-generate-button"
                                             role="menuitem"
                                             onclick="return generateRecipeCoverImage(this)">
-                                        <span id="recipeEditCoverGenerateLabel">AI Regenerate</span>
+                                        <span id="recipeEditCoverGenerateLabel"
+                                              data-recipe-edit-cover-generate-label>Regenerate with AI</span>
                                     </button>
                                 </div>
                             </template>
-                            <div class="recipe-image-prompt recipe-image-prompt-collapsed recipe-edit-cover-prompt"
+                            <div class="recipe-image-prompt recipe-edit-cover-prompt"
                                  id="recipeEditCoverPrompt"
-                                 data-title-image-prompt
-                                 hidden>
+                                 data-title-image-prompt>
                                 <button type="button"
                                         class="recipe-image-prompt-toggle"
                                         id="recipeEditCoverPromptToggle"
                                         data-title-image-prompt-toggle
-                                        aria-expanded="false"
-                                        aria-label="Toggle title image prompt"
-                                        onclick="return toggleRecipeImagePrompt(this)">
+                                        aria-haspopup="dialog"
+                                        aria-controls="recipeEditImagePromptModal"
+                                        aria-label="Edit AI image prompt"
+                                        onclick="return openRecipeImagePromptModal(this)">
                                     <span class="recipe-image-prompt-label">Image Prompt</span>
-                                    <span class="recipe-image-prompt-chevron" aria-hidden="true"></span>
+                                    <span class="recipe-image-prompt-action-icon" aria-hidden="true">{{ shell.svg_icon("edit") }}</span>
                                 </button>
                                 <pre id="recipeEditCoverPromptText" data-title-image-prompt-text hidden></pre>
                             </div>
@@ -1026,26 +1030,45 @@
                                 </div>
                             </div>
                             <div class="recipe-edit-mobile-image-actions">
-                                <button type="button" onclick="return openRecipeCoverUpload()">
+                                <button type="button"
+                                        data-recipe-image-change-toggle
+                                        aria-haspopup="menu"
+                                        aria-expanded="false"
+                                        onclick="return toggleRecipeImageChangeActions(this)">
                                     {{ shell.svg_icon("image-copy") }}
                                     <span>Replace Image</span>
                                 </button>
                                 <button type="button"
-                                        class="recipe-edit-cover-generate-direct"
-                                        onclick="return generateRecipeCoverImage(this)">
-                                    {{ shell.svg_icon("sparkles") }}
-                                    <span data-recipe-edit-cover-generate-label
-                                          data-recipe-edit-mobile-generate-label>AI Generate</span>
-                                </button>
-                                <button type="button"
                                         class="recipe-edit-cover-remove-button"
                                         data-recipe-edit-cover-remove
+                                        aria-label="Remove title image"
                                         onclick="return removeRecipeCoverImage(this)"
                                         hidden>
                                     {{ shell.svg_icon("trash") }}
                                     <span>Remove</span>
                                 </button>
                             </div>
+                            <template data-recipe-image-change-menu-template>
+                                <div class="recipe-edit-image-change-actions" data-recipe-image-change-actions role="menu">
+                                    <button type="button" role="menuitem" onclick="return openRecipeCoverUpload()">Upload Image</button>
+                                    <button type="button"
+                                            class="recipe-edit-cover-generate-button"
+                                            role="menuitem"
+                                            onclick="return generateRecipeCoverImage(this)">
+                                        <span data-recipe-edit-cover-generate-label>Regenerate with AI</span>
+                                    </button>
+                                </div>
+                            </template>
+                            <button type="button"
+                                    class="recipe-image-prompt-toggle recipe-edit-mobile-image-prompt"
+                                    data-title-image-prompt-toggle
+                                    aria-haspopup="dialog"
+                                    aria-controls="recipeEditImagePromptModal"
+                                    aria-label="Edit AI image prompt"
+                                    onclick="return openRecipeImagePromptModal(this)">
+                                <span class="recipe-image-prompt-label">Image Prompt</span>
+                                <span class="recipe-image-prompt-action-icon" aria-hidden="true">{{ shell.svg_icon("edit") }}</span>
+                            </button>
                         </section>
                     </div>
                     <div class="recipe-edit-mobile-pdf-actions recipe-edit-wide">
@@ -1357,7 +1380,10 @@
                             </label>
                             <label class="recipe-edit-file-field">
                                 <span>Menu Price</span>
-                                <input type="text" id="recipeEditMenuPrice">
+                                <span class="recipe-edit-price-control">
+                                    <span class="recipe-edit-price-prefix" aria-hidden="true">$</span>
+                                    <input type="text" id="recipeEditMenuPrice" inputmode="decimal">
+                                </span>
                             </label>
                             <label class="recipe-edit-file-field recipe-edit-menu-metadata-wide">
                                 <span>Menu Description</span>
@@ -3118,6 +3144,46 @@
                             class="recipe-edit-description-review-apply"
                             data-recipe-description-review-apply
                             onclick="return replaceRecipeDescriptionProposal(this)">Replace Description</button>
+                </footer>
+            </section>
+        </div>
+        <div class="recipe-edit-image-prompt-backdrop"
+             id="recipeEditImagePromptModal"
+             data-recipe-edit-image-prompt-modal
+             hidden
+             onclick="return closeRecipeImagePromptModalFromBackdrop(event)">
+            <section class="recipe-edit-image-prompt-dialog"
+                     role="dialog"
+                     aria-modal="true"
+                     aria-labelledby="recipeEditImagePromptTitle"
+                     aria-describedby="recipeEditImagePromptHelp">
+                <header>
+                    <div>
+                        <h3 id="recipeEditImagePromptTitle">AI Image Prompt</h3>
+                        <p id="recipeEditImagePromptHelp">Edit the saved AI prompt associated with this recipe image.</p>
+                    </div>
+                    <button type="button"
+                            class="recipe-edit-image-prompt-close"
+                            aria-label="Close AI image prompt"
+                            onclick="return closeRecipeImagePromptModal()">
+                        {{ shell.svg_icon("x") }}
+                    </button>
+                </header>
+                <div class="recipe-edit-image-prompt-body">
+                    <label for="recipeEditImagePromptDraft">Image prompt</label>
+                    <textarea id="recipeEditImagePromptDraft"
+                              data-recipe-edit-image-prompt-draft
+                              rows="8"
+                              placeholder="Describe the composition, ingredients, lighting, and style for the recipe image."></textarea>
+                </div>
+                <footer>
+                    <button type="button"
+                            class="recipe-edit-image-prompt-cancel"
+                            onclick="return closeRecipeImagePromptModal()">Cancel</button>
+                    <button type="button"
+                            class="recipe-edit-image-prompt-save"
+                            data-recipe-edit-image-prompt-save
+                            onclick="return saveRecipeImagePrompt()">Save Prompt</button>
                 </footer>
             </section>
         </div>
