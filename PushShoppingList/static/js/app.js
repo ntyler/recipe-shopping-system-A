@@ -23284,6 +23284,9 @@ const RECIPE_EDIT_INGREDIENT_COLUMN_STORAGE_KEY = "recipeEditIngredientColumnsV2
 const RECIPE_EDIT_INGREDIENT_VIEW_STORAGE_KEY = "ai-pantry-ingredient-view";
 const RECIPE_EDIT_INGREDIENT_DISPLAY_PREFERENCES_STORAGE_KEY =
     "ai-pantry:recipe-editor:ingredient-display:v1";
+const RECIPE_EDIT_TIME_BREAKDOWN_STORAGE_KEY =
+    "ai-pantry:recipe-editor:time-breakdown:v1";
+const recipeEditTotalTimeCalculationStates = new WeakMap();
 const RECIPE_EDIT_INGREDIENT_VIEWS = new Set(["recipe", "smart", "table"]);
 const RECIPE_EDIT_INGREDIENT_COLUMN_ORDER = [
     "media",
@@ -24861,6 +24864,7 @@ function populateRecipeEditor(recipe, originalUrl, options = {}) {
     setRecipeEditActiveTab("ingredients");
     updateRecipeEditAiConfidenceCard(recipe);
     updateRecipeEditContextPanels();
+    initializeRecipeEditTotalTimeCalculation();
     updateRecipeEditStickyOffsets();
     if (preserveSavedState) {
         recipeEditOriginalSnapshot = previousOriginalSnapshot;
@@ -26535,6 +26539,190 @@ function updateRecipeEditDescriptionCount() {
     if (textarea && counter) counter.textContent = `${String(textarea.value || "").length} characters`;
 }
 
+function recipeEditTimeBreakdownStorageKey() {
+    const userId = String(document.body?.dataset?.userId || "").trim();
+    return userId
+        ? `${RECIPE_EDIT_TIME_BREAKDOWN_STORAGE_KEY}:${encodeURIComponent(userId)}`
+        : RECIPE_EDIT_TIME_BREAKDOWN_STORAGE_KEY;
+}
+
+function loadRecipeEditTimeBreakdownExpanded() {
+    try {
+        return window.localStorage.getItem(recipeEditTimeBreakdownStorageKey()) !== "collapsed";
+    } catch (_error) {
+        return true;
+    }
+}
+
+function saveRecipeEditTimeBreakdownExpanded(expanded) {
+    try {
+        window.localStorage.setItem(
+            recipeEditTimeBreakdownStorageKey(),
+            expanded ? "expanded" : "collapsed",
+        );
+    } catch (_error) {
+        // The disclosure still works for this visit when browser storage is unavailable.
+    }
+}
+
+function setRecipeEditTimeBreakdownExpanded(expanded) {
+    const button = document.querySelector("[data-recipe-edit-time-breakdown-toggle]");
+    const group = document.getElementById("recipeEditTimeBreakdown");
+    if (!button || !group) return;
+    const isExpanded = Boolean(expanded);
+    button.setAttribute("aria-expanded", String(isExpanded));
+    group.hidden = !isExpanded;
+    group.closest(".recipe-edit-metadata-strip")
+        ?.classList.toggle("recipe-edit-time-breakdown-collapsed", !isExpanded);
+}
+
+function createRecipeEditTimeBreakdownControl() {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "recipe-edit-time-breakdown-toggle";
+    button.dataset.recipeEditTimeBreakdownToggle = "";
+    button.id = "recipeEditTimeBreakdownToggle";
+    button.setAttribute("aria-controls", "recipeEditTimeBreakdown");
+    button.setAttribute("aria-expanded", "true");
+    button.innerHTML = `
+        <span>Time Breakdown</span>
+        <span class="recipe-edit-time-breakdown-chevron" aria-hidden="true"></span>
+    `;
+    button.addEventListener("click", () => {
+        const expanded = button.getAttribute("aria-expanded") !== "true";
+        setRecipeEditTimeBreakdownExpanded(expanded);
+        saveRecipeEditTimeBreakdownExpanded(expanded);
+    });
+    return button;
+}
+
+function parseRecipeEditDurationMinutes(value) {
+    const text = String(value || "").trim().toLowerCase().replace(/,/g, " ");
+    if (!text) return null;
+    if (/^\d+(?:\.\d+)?$/.test(text)) return Number(text);
+    const clockMatch = text.match(/^(\d+):(\d{1,2})$/);
+    if (clockMatch) return (Number(clockMatch[1]) * 60) + Number(clockMatch[2]);
+
+    let minutes = 0;
+    let matched = false;
+    const durationPattern = /(\d+(?:\.\d+)?)\s*(days?|d|hours?|hrs?|hr|h|minutes?|mins?|min|m)\b/g;
+    let match = durationPattern.exec(text);
+    while (match) {
+        const amount = Number(match[1]);
+        const unit = match[2];
+        minutes += amount * (/^d/.test(unit) ? 1440 : (/^h/.test(unit) ? 60 : 1));
+        matched = true;
+        match = durationPattern.exec(text);
+    }
+    const remainder = text
+        .replace(/(\d+(?:\.\d+)?)\s*(days?|d|hours?|hrs?|hr|h|minutes?|mins?|min|m)\b/g, " ")
+        .replace(/\band\b/g, " ")
+        .trim();
+    if (remainder) {
+        if (!matched || !/^\d+(?:\.\d+)?$/.test(remainder)) return null;
+        minutes += Number(remainder);
+    }
+    return matched && Number.isFinite(minutes) ? minutes : null;
+}
+
+function calculateRecipeEditTimeBreakdownMinutes() {
+    const values = ["recipeEditPrepTime", "recipeEditCookTime", "recipeEditInactiveTime"]
+        .map(id => document.getElementById(id)?.value || "");
+    let hasValue = false;
+    let total = 0;
+    for (const value of values) {
+        if (!String(value).trim()) continue;
+        hasValue = true;
+        const minutes = parseRecipeEditDurationMinutes(value);
+        if (minutes === null) return null;
+        total += minutes;
+    }
+    return hasValue ? total : null;
+}
+
+function recipeEditDurationMinutesMatch(left, right) {
+    return left !== null && right !== null && Math.abs(left - right) < 0.001;
+}
+
+function formatRecipeEditDurationMinutes(minutes) {
+    if (!Number.isFinite(minutes)) return "";
+    return Number(minutes.toFixed(2)).toString();
+}
+
+function initializeRecipeEditTotalTimeCalculation() {
+    const form = document.getElementById("recipeEditForm");
+    const totalInput = document.getElementById("recipeEditTotalTime");
+    if (!form || !totalInput) return;
+    const calculatedMinutes = calculateRecipeEditTimeBreakdownMinutes();
+    let totalMinutes = parseRecipeEditDurationMinutes(totalInput.value);
+    if (!String(totalInput.value || "").trim() && calculatedMinutes !== null) {
+        totalInput.value = formatRecipeEditDurationMinutes(calculatedMinutes);
+        totalMinutes = calculatedMinutes;
+    }
+    recipeEditTotalTimeCalculationStates.set(form, {
+        lastCalculatedMinutes: calculatedMinutes,
+        manualOverride: Boolean(
+            String(totalInput.value || "").trim()
+            && !recipeEditDurationMinutesMatch(totalMinutes, calculatedMinutes)
+        ),
+    });
+}
+
+function updateRecipeEditCalculatedTotalTime() {
+    const form = document.getElementById("recipeEditForm");
+    const totalInput = document.getElementById("recipeEditTotalTime");
+    if (!form || !totalInput) return;
+    const state = recipeEditTotalTimeCalculationStates.get(form) || {
+        lastCalculatedMinutes: null,
+        manualOverride: false,
+    };
+    const calculatedMinutes = calculateRecipeEditTimeBreakdownMinutes();
+    if (calculatedMinutes === null) return;
+    const totalIsBlank = !String(totalInput.value || "").trim();
+    const totalMinutes = parseRecipeEditDurationMinutes(totalInput.value);
+    const stillMatchesPreviousSum = recipeEditDurationMinutesMatch(
+        totalMinutes,
+        state.lastCalculatedMinutes,
+    );
+    if (totalIsBlank || (!state.manualOverride && stillMatchesPreviousSum)) {
+        totalInput.value = formatRecipeEditDurationMinutes(calculatedMinutes);
+        state.manualOverride = false;
+    }
+    state.lastCalculatedMinutes = calculatedMinutes;
+    recipeEditTotalTimeCalculationStates.set(form, state);
+}
+
+function updateRecipeEditTotalTimeOverrideState() {
+    const form = document.getElementById("recipeEditForm");
+    const totalInput = document.getElementById("recipeEditTotalTime");
+    if (!form || !totalInput) return;
+    const calculatedMinutes = calculateRecipeEditTimeBreakdownMinutes();
+    const totalIsBlank = !String(totalInput.value || "").trim();
+    if (totalIsBlank && calculatedMinutes !== null) {
+        totalInput.value = formatRecipeEditDurationMinutes(calculatedMinutes);
+    }
+    const state = recipeEditTotalTimeCalculationStates.get(form) || {};
+    state.lastCalculatedMinutes = calculatedMinutes;
+    state.manualOverride = Boolean(
+        String(totalInput.value || "").trim()
+        && !recipeEditDurationMinutesMatch(
+            parseRecipeEditDurationMinutes(totalInput.value),
+            calculatedMinutes,
+        )
+    );
+    recipeEditTotalTimeCalculationStates.set(form, state);
+}
+
+function bindRecipeEditTotalTimeCalculation() {
+    const totalInput = document.getElementById("recipeEditTotalTime");
+    if (!totalInput || totalInput.dataset.recipeEditTimeCalculationBound === "true") return;
+    totalInput.dataset.recipeEditTimeCalculationBound = "true";
+    ["recipeEditPrepTime", "recipeEditCookTime", "recipeEditInactiveTime"].forEach(id => {
+        document.getElementById(id)?.addEventListener("input", updateRecipeEditCalculatedTotalTime);
+    });
+    totalInput.addEventListener("input", updateRecipeEditTotalTimeOverrideState);
+}
+
 function bindRecipeEditNameInput(input) {
     if (!input || input.dataset.recipeEditNameBound === "true") return;
     input.dataset.recipeEditNameBound = "true";
@@ -26731,7 +26919,16 @@ function organizeRecipeEditInformationCard() {
 
     const metadataRow = document.createElement("div");
     metadataRow.className = "recipe-edit-metadata-strip";
-    appendRecipeEditWorkspaceChildren(metadataRow, [servingsField, totalField, prepField, cookField, inactiveField, levelField, scaleField]);
+    const totalTimeCluster = document.createElement("div");
+    totalTimeCluster.className = "recipe-edit-total-time-cluster";
+    const timeBreakdownGroup = document.createElement("div");
+    timeBreakdownGroup.className = "recipe-edit-time-breakdown-group";
+    timeBreakdownGroup.id = "recipeEditTimeBreakdown";
+    timeBreakdownGroup.setAttribute("role", "group");
+    timeBreakdownGroup.setAttribute("aria-label", "Time breakdown");
+    appendRecipeEditWorkspaceChildren(totalTimeCluster, [totalField, createRecipeEditTimeBreakdownControl()]);
+    appendRecipeEditWorkspaceChildren(timeBreakdownGroup, [prepField, cookField, inactiveField]);
+    appendRecipeEditWorkspaceChildren(metadataRow, [servingsField, totalTimeCluster, timeBreakdownGroup, levelField, scaleField]);
 
     const descriptionRow = document.createElement("div");
     descriptionRow.className = "recipe-edit-description-row";
@@ -26782,6 +26979,8 @@ function organizeRecipeEditInformationCard() {
 
     grid.replaceChildren();
     appendRecipeEditWorkspaceChildren(grid, [primaryRow, descriptionRow, tagRow, metadataRow, technicalDetails]);
+    bindRecipeEditTotalTimeCalculation();
+    setRecipeEditTimeBreakdownExpanded(loadRecipeEditTimeBreakdownExpanded());
     if (categoriesPanel) {
         infoPanel.insertAdjacentElement("afterend", categoriesPanel);
         setRecipeEditCategoriesExpanded(true);

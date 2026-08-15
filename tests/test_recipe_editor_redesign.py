@@ -632,6 +632,102 @@ def test_recipe_metadata_strip_uses_spacing_without_internal_separators():
             assert border_side not in declarations
 
 
+def test_recipe_time_breakdown_is_one_accessible_persisted_disclosure():
+    script = read_text("PushShoppingList/static/js/app.js")
+    css = read_text("PushShoppingList/static/css/app.css")
+    organizer = script[
+        script.index("function organizeRecipeEditInformationCard()"):
+        script.index("function organizeRecipeEditAiAssistant()")
+    ]
+    control = script[
+        script.index("function createRecipeEditTimeBreakdownControl()"):
+        script.index("function parseRecipeEditDurationMinutes")
+    ]
+    disclosure = script[
+        script.index("function recipeEditTimeBreakdownStorageKey()"):
+        script.index("function createRecipeEditTimeBreakdownControl()")
+    ]
+
+    assert 'button.type = "button"' in control
+    assert '<span>Time Breakdown</span>' in control
+    assert 'button.setAttribute("aria-expanded", "true")' in control
+    assert 'button.setAttribute("aria-controls", "recipeEditTimeBreakdown")' in control
+    assert 'class="recipe-edit-time-breakdown-chevron" aria-hidden="true"' in control
+    assert 'button.addEventListener("click"' in control
+    assert 'timeBreakdownGroup.id = "recipeEditTimeBreakdown"' in organizer
+    assert 'timeBreakdownGroup.setAttribute("role", "group")' in organizer
+    assert (
+        "appendRecipeEditWorkspaceChildren(timeBreakdownGroup, "
+        "[prepField, cookField, inactiveField])"
+    ) in organizer
+    assert "recipe-edit-time-breakdown-collapsed" in disclosure
+    assert "group.hidden = !isExpanded" in disclosure
+    assert ".value" not in script[
+        script.index("function setRecipeEditTimeBreakdownExpanded"):
+        script.index("function createRecipeEditTimeBreakdownControl")
+    ]
+
+    assert '"ai-pantry:recipe-editor:time-breakdown:v1"' in script
+    assert "encodeURIComponent(userId)" in disclosure
+    assert '!== "collapsed"' in disclosure
+    assert "window.localStorage.getItem" in disclosure
+    assert "window.localStorage.setItem" in disclosure
+    assert disclosure.count("catch (_error)") == 2
+
+    assert ".recipe-edit-time-breakdown-group[hidden]" in css
+    assert "display: contents;" in css
+    assert ".recipe-edit-time-breakdown-toggle:focus-visible" in css
+    assert 'recipe-edit-time-breakdown-toggle[aria-expanded="true"]' in css
+    assert ".recipe-edit-time-breakdown-group > label" in css
+    assert ".recipe-edit-metadata-strip.recipe-edit-time-breakdown-collapsed" in css
+
+
+def test_recipe_total_time_calculation_preserves_manual_override_and_saved_components():
+    script = read_text("PushShoppingList/static/js/app.js")
+    calculation = script[
+        script.index("function parseRecipeEditDurationMinutes"):
+        script.index("function bindRecipeEditNameInput")
+    ]
+    population = script[
+        script.index("function populateRecipeEditor("):
+        script.index("function replaceRecipeEditorIngredients")
+    ]
+    payload = script[
+        script.index("function collectRecipeEditorPayload()"):
+        script.index("function recipeEditorPersistableText")
+    ]
+
+    for field_id in (
+        "recipeEditPrepTime",
+        "recipeEditCookTime",
+        "recipeEditInactiveTime",
+    ):
+        assert field_id in calculation
+        assert field_id in payload
+    for payload_field in ("total_time", "prep_time", "cook_time", "inactive_time"):
+        assert f"{payload_field}: document.getElementById" in payload
+
+    assert "function calculateRecipeEditTimeBreakdownMinutes()" in calculation
+    assert "lastCalculatedMinutes" in calculation
+    assert "manualOverride" in calculation
+    assert "const totalIsBlank" in calculation
+    assert "stillMatchesPreviousSum" in calculation
+    assert "!state.manualOverride && stillMatchesPreviousSum" in calculation
+    assert "updateRecipeEditTotalTimeOverrideState" in calculation
+    assert 'totalInput.addEventListener("input", updateRecipeEditTotalTimeOverrideState)' in calculation
+    assert 'addEventListener("input", updateRecipeEditCalculatedTotalTime)' in calculation
+    assert "dispatchEvent" not in calculation
+
+    initialize = population.index("initializeRecipeEditTotalTimeCalculation()")
+    baseline = population.index("rememberRecipeEditorSavedState(form)")
+    assert initialize < baseline
+    attached = script.index(
+        "appendRecipeEditWorkspaceChildren(grid, [primaryRow, descriptionRow, tagRow, metadataRow, technicalDetails])"
+    )
+    bound = script.index("bindRecipeEditTotalTimeCalculation()", attached)
+    assert attached < bound
+
+
 def test_recipe_name_is_directly_editable_without_a_pencil_control():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     script = read_text("PushShoppingList/static/js/app.js")
