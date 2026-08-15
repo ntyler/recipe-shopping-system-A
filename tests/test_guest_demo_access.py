@@ -149,11 +149,13 @@ def test_expired_remembered_guest_redirects_to_expired_and_clears_cookie(monkeyp
         assert "guest_demo_session=;" in response.headers.get("Set-Cookie", "")
 
     payload = guest_sessions_payload()
-    assert payload["guest_sessions"][0]["is_active"] is False
-    assert not (tmp_path / "guests" / guest_session_id).exists()
+    assert guest_session_service.guest_session_is_valid(payload["guest_sessions"][0]) is False
+    # Request authentication only denies access.  The hourly purge owns
+    # destructive cleanup, so an HTTP request cannot race-delete the workspace.
+    assert (tmp_path / "guests" / guest_session_id).exists()
 
 
-def test_cleanup_deletes_only_expired_guest_data(monkeypatch, tmp_path):
+def test_expiration_scan_only_revokes_expired_guest_access(monkeypatch, tmp_path):
     configure_guest_demo_paths(monkeypatch, tmp_path)
     guest_payload = {"guest_sessions": []}
     expired = guest_session_service.create_guest_session(guest_payload)
@@ -173,7 +175,7 @@ def test_cleanup_deletes_only_expired_guest_data(monkeypatch, tmp_path):
 
     guest_session_service.cleanup_expired_guest_sessions()
 
-    assert not expired_file.exists()
+    assert expired_file.exists()
     assert active_file.exists()
     assert real_user_file.exists()
     payload = guest_sessions_payload()

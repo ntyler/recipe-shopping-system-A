@@ -27,7 +27,6 @@ from PushShoppingList.routes.product_routes import product_bp
 from PushShoppingList.services.email_service import password_reset_email_configured
 from PushShoppingList.services.guest_session_service import GUEST_COOKIE_NAME
 from PushShoppingList.services.guest_session_service import clear_guest_cookie
-from PushShoppingList.services.guest_session_service import cleanup_expired_guest_sessions
 from PushShoppingList.services.guest_session_service import get_current_guest_session
 from PushShoppingList.services.guest_session_service import guest_banner_context
 from PushShoppingList.services.guest_session_service import is_guest_session
@@ -359,8 +358,6 @@ def create_app(config=None):
         g.session_identity_validated = False
         g.authenticated_user_id = ""
         g.authenticated_guest_session_id = ""
-
-        cleanup_expired_guest_sessions()
 
         if session.get("is_guest") and not get_current_guest_session():
             if str(session.get("user_id") or "").strip():

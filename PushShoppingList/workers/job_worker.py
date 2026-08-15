@@ -50,6 +50,16 @@ def run_job(job_id):
     if job_cancelled(job_id):
         return {"ok": False, "cancelled": True}
 
+    guest_session_id = str(job.get("guest_session_id") or "").strip()
+    if guest_session_id:
+        from PushShoppingList.services.guest_session_service import guest_session_can_accept_writes
+
+        if not guest_session_can_accept_writes(guest_session_id):
+            from PushShoppingList.services.job_service import cancel_job
+
+            cancel_job(job_id, message="Guest session is expired or being purged")
+            return {"ok": False, "cancelled": True, "guest_session_expired": True}
+
     try:
         from PushShoppingList.app import create_app
         from PushShoppingList.services.job_queue_service import enqueue_job

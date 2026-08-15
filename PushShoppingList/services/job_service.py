@@ -1510,6 +1510,158 @@ def delete_guest_jobs(guest_session_id):
         return cursor.rowcount
 
 
+def guest_jobs_for_cleanup(guest_session_id):
+    """Return every job owned by one exact guest for purge coordination."""
+    guest_session_id = str(guest_session_id or "").strip()
+    if not guest_session_id:
+        return []
+
+    with jobs_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT *
+              FROM jobs
+             WHERE guest_session_id = ?
+             ORDER BY created_at, id
+            """,
+            (guest_session_id,),
+        ).fetchall()
+    return [row_to_job(row) for row in rows]
+
+
+def preview_guest_jobs_cleanup(guest_session_id, db_path=None):
+    """Count guest jobs through a read-only connection without installing schema."""
+    guest_session_id = str(guest_session_id or "").strip()
+    resolved_path = Path(db_path) if db_path is not None else Path(JOBS_DB_PATH)
+    if not guest_session_id:
+        return {
+            "ok": False,
+            "dry_run": True,
+            "code": "invalid_guest_session_id",
+            "job_count": 0,
+            "active_job_count": 0,
+        }
+    if not resolved_path.is_file():
+        return {
+            "ok": True,
+            "dry_run": True,
+            "code": "database_not_found",
+            "job_count": 0,
+            "active_job_count": 0,
+        }
+
+    connection = None
+    try:
+        uri = f"file:{resolved_path.resolve().as_posix()}?mode=ro"
+        connection = sqlite3.connect(uri, uri=True, timeout=30)
+        connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA query_only=ON")
+        table_exists = connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'jobs'"
+        ).fetchone()
+        if not table_exists:
+            return {
+                "ok": True,
+                "dry_run": True,
+                "code": "jobs_table_not_found",
+                "job_count": 0,
+                "active_job_count": 0,
+            }
+        row = connection.execute(
+            """
+            SELECT COUNT(*) AS job_count,
+                   SUM(CASE WHEN status IN ('queued', 'running', 'cancel_requested')
+                            THEN 1 ELSE 0 END) AS active_job_count
+              FROM jobs
+             WHERE guest_session_id = ?
+            """,
+            (guest_session_id,),
+        ).fetchone()
+        return {
+            "ok": True,
+            "dry_run": True,
+            "code": "preview_complete",
+            "job_count": int(row["job_count"] or 0),
+            "active_job_count": int(row["active_job_count"] or 0),
+        }
+    except sqlite3.Error as exc:
+        return {
+            "ok": False,
+            "dry_run": True,
+            "code": "database_error",
+            "error": str(exc),
+            "job_count": 0,
+            "active_job_count": 0,
+        }
+    finally:
+        if connection is not None:
+            connection.close()
+
+
+def request_guest_job_cancellation(guest_session_id, message="Guest session expired"):
+    """Atomically prevent queued guest jobs from starting and flag running jobs."""
+    guest_session_id = str(guest_session_id or "").strip()
+    if not guest_session_id:
+        return {"ok": False, "jobs": [], "running_job_ids": [], "rq_job_ids": []}
+
+    now = now_iso()
+    with jobs_connection() as connection:
+        rows = connection.execute(
+            "SELECT * FROM jobs WHERE guest_session_id = ? ORDER BY created_at, id",
+            (guest_session_id,),
+        ).fetchall()
+        for row in rows:
+            status = normalize_status(row["status"])
+            if status in TERMINAL_JOB_STATUSES:
+                continue
+            if status in {"running", "cancel_requested"}:
+                next_status = "cancel_requested"
+                finished_at = row["finished_at"]
+                completed_at = row["completed_at"]
+            else:
+                next_status = "cancelled"
+                finished_at = now
+                completed_at = now
+            connection.execute(
+                """
+                UPDATE jobs
+                   SET status = ?, current_step = ?, updated_at = ?,
+                       completed_at = ?, finished_at = ?
+                 WHERE id = ? AND guest_session_id = ?
+                """,
+                (
+                    next_status,
+                    str(message or "Guest session expired"),
+                    now,
+                    completed_at,
+                    finished_at,
+                    row["id"],
+                    guest_session_id,
+                ),
+            )
+
+        updated_rows = connection.execute(
+            "SELECT * FROM jobs WHERE guest_session_id = ? ORDER BY created_at, id",
+            (guest_session_id,),
+        ).fetchall()
+
+    jobs = [row_to_job(row) for row in updated_rows]
+    return {
+        "ok": True,
+        "jobs": jobs,
+        "running_job_ids": [
+            job["id"]
+            for job in jobs
+            if normalize_status(job.get("status")) == "cancel_requested"
+        ],
+        "rq_job_ids": sorted({
+            str(job.get("rq_job_id") or "").strip()
+            for job in jobs
+            if str(job.get("rq_job_id") or "").strip()
+        }),
+    }
+
+
 def clear_recent_jobs(user_id="", guest_session_id="", include_all=False):
     cleanup_expired_jobs()
     mark_stuck_jobs()

@@ -14,7 +14,6 @@ from flask import url_for
 
 from PushShoppingList.services.guest_session_service import GUEST_COOKIE_NAME
 from PushShoppingList.services.guest_session_service import clear_guest_cookie
-from PushShoppingList.services.guest_session_service import cleanup_expired_guest_sessions
 from PushShoppingList.services.guest_session_service import delete_current_guest_session
 from PushShoppingList.services.guest_session_service import set_guest_cookie
 from PushShoppingList.services.guest_session_service import start_or_restore_guest_session
@@ -272,7 +271,6 @@ def firebase_logout_route():
 
 @account_bp.route("/guest/start", methods=["GET"])
 def guest_start_route():
-    cleanup_expired_guest_sessions()
     clear_admin_support_session()
     record = start_or_restore_guest_session(request.cookies.get(GUEST_COOKIE_NAME, ""))
     flash("Demo workspace started. Nothing is saved permanently.", "success")

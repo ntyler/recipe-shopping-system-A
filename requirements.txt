@@ -16,3 +16,4 @@ boto3>=1.37.32
 firebase-admin>=6.5
 redis>=5.0
 rq>=1.16
+cryptography>=42.0

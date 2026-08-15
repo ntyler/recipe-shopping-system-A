@@ -1,9 +1,14 @@
+from __future__ import annotations
+
 import json
 import os
 import shutil
+import tempfile
+import threading
 import uuid
 from datetime import datetime
 from datetime import timedelta
+from datetime import timezone
 from pathlib import Path
 
 from flask import current_app
@@ -22,50 +27,88 @@ GUEST_SESSION_TTL = timedelta(hours=24)
 GUEST_COOKIE_MAX_AGE = int(GUEST_SESSION_TTL.total_seconds())
 GUEST_SESSIONS_FILE = Path(os.getenv("SHOPPING_APP_GUEST_SESSIONS_FILE", PACKAGE_DIR / "guest_sessions.json"))
 GUEST_DATA_DIR = Path(os.getenv("SHOPPING_APP_GUEST_DATA_DIR", PACKAGE_DIR / "user_data" / "guests"))
+GUEST_SESSIONS_LOCK = threading.RLock()
+
+
+class GuestSessionStorageError(RuntimeError):
+    """Raised when the session registry cannot be read without losing data."""
 
 
 def now_utc():
-    return datetime.utcnow().replace(microsecond=0)
+    return datetime.now(timezone.utc).replace(microsecond=0)
 
 
 def now_iso():
-    return now_utc().isoformat() + "Z"
+    return now_utc().isoformat().replace("+00:00", "Z")
 
 
 def parse_iso_datetime(value):
-    try:
-        return datetime.fromisoformat(str(value or "").replace("Z", ""))
-    except ValueError:
+    text = str(value or "").strip()
+    if not text:
         return None
+    if text.endswith("Z"):
+        without_z = text[:-1]
+        text = without_z if without_z.endswith("+00:00") else without_z + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def normalize_utc_datetime(value):
+    value = value or now_utc()
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
 
 
 def load_guest_sessions():
-    if not GUEST_SESSIONS_FILE.exists():
-        return {"guest_sessions": []}
+    with GUEST_SESSIONS_LOCK:
+        if not GUEST_SESSIONS_FILE.exists():
+            return {"guest_sessions": []}
 
-    try:
-        payload = json.loads(GUEST_SESSIONS_FILE.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return {"guest_sessions": []}
+        try:
+            payload = json.loads(GUEST_SESSIONS_FILE.read_text(encoding="utf-8-sig"))
+        except (json.JSONDecodeError, OSError) as exc:
+            raise GuestSessionStorageError(
+                "Guest session registry is unreadable; refusing to treat it as empty."
+            ) from exc
 
-    if not isinstance(payload, dict):
-        return {"guest_sessions": []}
+        if not isinstance(payload, dict) or not isinstance(payload.get("guest_sessions"), list):
+            raise GuestSessionStorageError(
+                "Guest session registry must contain a guest_sessions list."
+            )
 
-    sessions = payload.get("guest_sessions")
-    if not isinstance(sessions, list):
-        payload["guest_sessions"] = []
-
-    return payload
+        return payload
 
 
 def save_guest_sessions(payload):
     payload = payload if isinstance(payload, dict) else {"guest_sessions": []}
     payload.setdefault("guest_sessions", [])
-    GUEST_SESSIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    GUEST_SESSIONS_FILE.write_text(
-        json.dumps(payload, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    if not isinstance(payload.get("guest_sessions"), list):
+        raise GuestSessionStorageError("guest_sessions must be a list.")
+    serialized = json.dumps(payload, indent=2, sort_keys=True) + "\n"
+    with GUEST_SESSIONS_LOCK:
+        GUEST_SESSIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        file_descriptor, temporary_name = tempfile.mkstemp(
+            dir=str(GUEST_SESSIONS_FILE.parent),
+            prefix=f".{GUEST_SESSIONS_FILE.name}.",
+            suffix=".tmp",
+            text=True,
+        )
+        temporary_path = Path(temporary_name)
+        try:
+            with os.fdopen(file_descriptor, "w", encoding="utf-8", newline="\n") as handle:
+                handle.write(serialized)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(str(temporary_path), str(GUEST_SESSIONS_FILE))
+        except BaseException:
+            temporary_path.unlink(missing_ok=True)
+            raise
 
 
 def guest_workspace_root(guest_session_id=None):
@@ -114,22 +157,21 @@ def guest_session_is_valid(record, at_time=None):
     if not isinstance(record, dict) or not record.get("is_active", False):
         return False
 
+    if str(record.get("lifecycle_state") or "active").strip().lower() not in {"", "active"}:
+        return False
+
     expires_at = parse_iso_datetime(record.get("expires_at"))
     if not expires_at:
         return False
 
-    return expires_at > (at_time or now_utc())
+    return expires_at > normalize_utc_datetime(at_time)
 
 
 def guest_session_is_expired(record, at_time=None):
     if not isinstance(record, dict):
         return False
-
-    if not record.get("is_active", False):
-        return True
-
     expires_at = parse_iso_datetime(record.get("expires_at"))
-    return bool(expires_at and expires_at <= (at_time or now_utc()))
+    return expires_at is None or expires_at <= normalize_utc_datetime(at_time)
 
 
 def clear_guest_session_flags():
@@ -160,10 +202,11 @@ def create_guest_session(payload=None):
     record = {
         "id": guest_session_id,
         "session_id": guest_session_id,
-        "created_at": created_at.isoformat() + "Z",
-        "expires_at": (created_at + GUEST_SESSION_TTL).isoformat() + "Z",
-        "used_at": created_at.isoformat() + "Z",
+        "created_at": created_at.isoformat().replace("+00:00", "Z"),
+        "expires_at": (created_at + GUEST_SESSION_TTL).isoformat().replace("+00:00", "Z"),
+        "used_at": created_at.isoformat().replace("+00:00", "Z"),
         "is_active": True,
+        "lifecycle_state": "active",
         "temporary_data_json": {},
     }
     payload.setdefault("guest_sessions", []).append(record)
@@ -212,7 +255,8 @@ def delete_guest_temporary_data(guest_session_id):
 
 
 def cleanup_expired_guest_sessions(at_time=None):
-    at_time = at_time or now_utc()
+    """Expire access only; physical deletion is owned by the purge command."""
+    at_time = normalize_utc_datetime(at_time)
     payload = load_guest_sessions()
     changed = False
 
@@ -225,9 +269,9 @@ def cleanup_expired_guest_sessions(at_time=None):
 
         if record.get("is_active", False):
             record["is_active"] = False
+            record["lifecycle_state"] = "inactive"
+            record["ended_at"] = now_iso()
             changed = True
-
-        delete_guest_temporary_data(record.get("id"))
 
     if changed:
         save_guest_sessions(payload)
@@ -236,7 +280,7 @@ def cleanup_expired_guest_sessions(at_time=None):
 
 
 def expired_guest_session_count(at_time=None):
-    at_time = at_time or now_utc()
+    at_time = normalize_utc_datetime(at_time)
     payload = load_guest_sessions()
     return sum(
         1
@@ -246,7 +290,7 @@ def expired_guest_session_count(at_time=None):
 
 
 def delete_expired_guest_sessions(at_time=None):
-    at_time = at_time or now_utc()
+    at_time = normalize_utc_datetime(at_time)
     payload = load_guest_sessions()
     kept = []
     deleted_ids = []
@@ -284,6 +328,7 @@ def deactivate_guest_session(guest_session_id, delete_data=True):
         return False
 
     record["is_active"] = False
+    record["lifecycle_state"] = "inactive"
     record["ended_at"] = now_iso()
     save_guest_sessions(payload)
 
@@ -320,8 +365,16 @@ def is_guest_session():
     return get_current_guest_session() is not None
 
 
+def guest_session_can_accept_writes(guest_session_id, at_time=None):
+    """Return whether an exact guest identity may create or update owned data."""
+    guest_session_id = str(guest_session_id or "").strip()
+    if not guest_session_id:
+        return False
+    record = find_guest_session(load_guest_sessions(), guest_session_id)
+    return guest_session_is_valid(record, at_time=at_time)
+
+
 def start_or_restore_guest_session(cookie_value=""):
-    cleanup_expired_guest_sessions()
     payload = load_guest_sessions()
     remembered_session_id = decode_guest_cookie(cookie_value)
     record = find_guest_session(payload, remembered_session_id)
@@ -336,7 +389,7 @@ def start_or_restore_guest_session(cookie_value=""):
 
 
 def restore_guest_session_from_cookie(cookie_value=""):
-    payload = cleanup_expired_guest_sessions()
+    payload = load_guest_sessions()
     remembered_session_id = decode_guest_cookie(cookie_value)
     record = find_guest_session(payload, remembered_session_id)
 
