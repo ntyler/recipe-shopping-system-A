@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 from jinja2 import Environment
@@ -591,7 +592,7 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     assert ".recipe-edit-summary-selectors .recipe-edit-price-control:not(:focus-within):not(:has(" in hierarchy_css
 
 
-def test_recipe_metadata_strip_is_borderless_without_losing_internal_separators():
+def test_recipe_metadata_strip_uses_spacing_without_internal_separators():
     css = read_text("PushShoppingList/static/css/app.css")
     phase_two_start = css.index(
         "/* Phase 2 recipe editor redesign using the AI Pantry shell tokens. */"
@@ -604,6 +605,7 @@ def test_recipe_metadata_strip_is_borderless_without_losing_internal_separators(
     strip_rule = css[strip_start : css.index("}", strip_start)]
 
     for declaration in (
+        "gap: 12px;",
         "border: 0;",
         "border-radius: 0;",
         "outline: 0;",
@@ -618,14 +620,16 @@ def test_recipe_metadata_strip_is_borderless_without_losing_internal_separators(
     separator_selector = f"{strip_selector[:-1]}> label {{"
     separator_start = css.index(separator_selector, strip_start)
     separator_rule = css[separator_start : css.index("}", separator_start)]
-    assert "border-left: 1px solid var(--recipe-editor-border-soft);" in separator_rule
+    assert "border: 0;" in separator_rule
 
-    first_metric_start = css.index(
-        f"{strip_selector[:-1]}> label:first-child {{",
-        separator_start,
+    metric_label_rules = re.findall(
+        r"([^{}]*\.recipe-edit-metadata-strip\s*>\s*label[^{}]*)\{([^{}]*)\}",
+        css[phase_two_start:],
     )
-    first_metric_rule = css[first_metric_start : css.index("}", first_metric_start)]
-    assert "border-left: 0;" in first_metric_rule
+    assert metric_label_rules
+    for _, declarations in metric_label_rules:
+        for border_side in ("border-left", "border-right", "border-top", "border-bottom"):
+            assert border_side not in declarations
 
 
 def test_recipe_name_is_directly_editable_without_a_pencil_control():

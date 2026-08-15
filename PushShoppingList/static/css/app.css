@@ -39990,7 +39990,7 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
 
 .recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-metadata-strip {
     grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 0;
+    gap: 12px;
     padding: 12px 8px;
 }
 
@@ -40002,7 +40002,6 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
     align-content: center;
     min-width: 0;
     padding: 2px 12px;
-    border-left: 1px solid rgba(82, 100, 90, 0.34);
 }
 
 .recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-metadata-heading {
@@ -40014,10 +40013,6 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
     font-size: 10px;
     font-weight: 750;
     line-height: 1.2;
-}
-
-.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-metadata-strip > label:first-child {
-    border-left: 0;
 }
 
 .recipe-edit-standalone-page .recipe-edit-metadata-icon {
@@ -40162,10 +40157,6 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
         grid-template-columns: repeat(3, minmax(0, 1fr));
         row-gap: 10px;
     }
-
-    .recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-metadata-strip > label:nth-child(4) {
-        border-left: 0;
-    }
 }
 
 @media (max-width: 767px) {
@@ -40192,12 +40183,6 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
 
     .recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-metadata-strip > label {
         padding: 5px 4px;
-        border-left: 0;
-        border-top: 1px solid rgba(82, 100, 90, 0.34);
-    }
-
-    .recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-metadata-strip > label:first-child {
-        border-top: 0;
     }
 
     .recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-tag-row {
@@ -57336,7 +57321,7 @@ body.recipe-edit-standalone-page .recipe-edit-summary-selectors :is(
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-metadata-strip {
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 1fr));
-    gap: 0;
+    gap: 12px;
     margin-top: 18px;
     padding: 12px 8px;
     border: 0;
@@ -57355,11 +57340,6 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-
     align-content: center;
     padding: 3px 12px;
     border: 0;
-    border-left: 1px solid var(--recipe-editor-border-soft);
-}
-
-body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-metadata-strip > label:first-child {
-    border-left: 0;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-metadata-heading {
@@ -58007,10 +57987,6 @@ body.recipe-edit-standalone-page .recipe-edit-health-attention.is-clear {
         grid-template-columns: repeat(4, minmax(0, 1fr));
         row-gap: 12px;
     }
-
-    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-metadata-strip > label:nth-child(5) {
-        border-left: 0;
-    }
 }
 
 @media (max-width: 1099px) {
@@ -58098,12 +58074,6 @@ body.recipe-edit-standalone-page .recipe-edit-health-attention.is-clear {
 
     body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-metadata-strip > label {
         padding: 5px 8px;
-        border-left: 0;
-        border-top: 1px solid var(--recipe-editor-border-soft);
-    }
-
-    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-metadata-strip > label:nth-child(-n + 2) {
-        border-top: 0;
     }
 
     body.recipe-edit-standalone-page .recipe-edit-tabs-card {
@@ -76475,13 +76445,6 @@ body.recipe-image-prompt-modal-open [data-app-content] {
         min-height: 36px;
     }
 
-    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-metadata-strip > label {
-        border-left: 1px solid var(--recipe-editor-border-soft);
-    }
-
-    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-metadata-strip > label:nth-child(odd) {
-        border-left: 0;
-    }
 }
 
 @media (max-width: 560px) {
