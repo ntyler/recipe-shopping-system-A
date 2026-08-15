@@ -412,13 +412,15 @@ def test_logout_clears_guest_session_and_cookie(monkeypatch, tmp_path):
         assert response.status_code == 302
         assert response.headers["Location"] == "/"
         assert "guest_demo_session=;" in response.headers.get("Set-Cookie", "")
-        assert not guest_file.exists()
+        # Logout revokes access only. The transactional expiration purge owns
+        # all physical/database deletion so rows and files cannot diverge.
+        assert guest_file.exists()
         with client.session_transaction() as session:
             assert "is_guest" not in session
             assert "guest_session_id" not in session
 
 
-def test_guest_delete_route_removes_temp_demo_session(monkeypatch, tmp_path):
+def test_guest_delete_route_revokes_access_without_partial_cleanup(monkeypatch, tmp_path):
     configure_guest_demo_paths(monkeypatch, tmp_path)
     app = create_app()
     app.config.update(TESTING=True)
@@ -436,7 +438,7 @@ def test_guest_delete_route_removes_temp_demo_session(monkeypatch, tmp_path):
         assert response.status_code == 302
         assert response.headers["Location"].endswith("/#userAccountSection")
         assert "guest_demo_session=;" in response.headers.get("Set-Cookie", "")
-        assert not guest_file.exists()
+        assert guest_file.exists()
 
         with client.session_transaction() as session:
             assert "is_guest" not in session

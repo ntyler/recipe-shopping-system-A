@@ -1,13 +1,16 @@
 import json
 import re
+import threading
 from pathlib import Path
 
 from PushShoppingList.services.storage_service import scoped_extractor_data_path
+from PushShoppingList.services import durable_document_runtime_service as durable_runtime
 
 
 BASE_DIR = Path(__file__).resolve().parent
 STORE_SETTINGS_FILE = scoped_extractor_data_path("store_settings.json")
 STORE_CREDENTIALS_FILE = scoped_extractor_data_path("store_credentials.json")
+STORE_SETTINGS_LOCK = threading.RLock()
 
 DEFAULT_STORES = {
     "aldi": {
@@ -54,23 +57,34 @@ def load_store_settings():
     legacy_credentials = {}
     needs_legacy_cleanup = False
 
-    if STORE_SETTINGS_FILE.exists():
+    def legacy_loader():
+        if not STORE_SETTINGS_FILE.exists():
+            return {}
         try:
-            saved = json.loads(STORE_SETTINGS_FILE.read_text(encoding="utf-8"))
-            if isinstance(saved, dict):
-                stores = saved.get("stores")
-                enabled = saved.get("enabled_stores")
-
-                if isinstance(stores, dict):
-                    data["stores"] = deepcopy_stores(stores)
-                if isinstance(enabled, list):
-                    data["enabled_stores"] = [
-                        key
-                        for key in enabled
-                        if key in data["stores"]
-                    ]
+            return json.loads(STORE_SETTINGS_FILE.read_text(encoding="utf-8"))
         except Exception:
-            pass
+            return {}
+
+    with STORE_SETTINGS_LOCK:
+        saved = durable_runtime.load_json_document(
+            legacy_loader,
+            domain="stores",
+            document_key="settings",
+            source_key="store_settings",
+            source_ref="recipe-extractor/data/store_settings.json",
+        )
+    if isinstance(saved, dict):
+        stores = saved.get("stores")
+        enabled = saved.get("enabled_stores")
+
+        if isinstance(stores, dict):
+            data["stores"] = deepcopy_stores(stores)
+        if isinstance(enabled, list):
+            data["enabled_stores"] = [
+                key
+                for key in enabled
+                if key in data["stores"]
+            ]
 
     for store_key, store in data["stores"].items():
         if not isinstance(store, dict):
@@ -170,11 +184,17 @@ def delete_store(store_key):
 
 def save_store_settings(settings):
     cleaned_settings = clean_store_settings(settings)
-    STORE_SETTINGS_FILE.write_text(
-        json.dumps(cleaned_settings, indent=2, ensure_ascii=False),
-        encoding="utf-8",
-    )
-    return cleaned_settings
+    with STORE_SETTINGS_LOCK:
+        return durable_runtime.save_json_document(
+            cleaned_settings,
+            lambda value: durable_runtime.atomic_write_json(
+                STORE_SETTINGS_FILE, value, newline=False
+            ),
+            domain="stores",
+            document_key="settings",
+            source_key="store_settings",
+            source_ref="recipe-extractor/data/store_settings.json",
+        )
 
 
 def clean_store_settings(settings):
@@ -199,13 +219,23 @@ def clean_store_settings(settings):
 
 
 def load_store_credentials():
-    if not STORE_CREDENTIALS_FILE.exists():
-        return {"credentials": {}}
+    def legacy_loader():
+        if not STORE_CREDENTIALS_FILE.exists():
+            return {"credentials": {}}
+        try:
+            return json.loads(STORE_CREDENTIALS_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            return {"credentials": {}}
 
-    try:
-        saved = json.loads(STORE_CREDENTIALS_FILE.read_text(encoding="utf-8"))
-    except Exception:
-        return {"credentials": {}}
+    with STORE_SETTINGS_LOCK:
+        saved = durable_runtime.load_json_document(
+            legacy_loader,
+            domain="stores",
+            document_key="credentials",
+            source_key="store_credentials",
+            source_ref="recipe-extractor/data/store_credentials.json",
+            encrypted=True,
+        )
 
     if not isinstance(saved, dict):
         return {"credentials": {}}
@@ -231,11 +261,19 @@ def save_store_credentials(credentials_payload):
         if normalized["username"] or normalized["password"]:
             credentials[str(store_key)] = normalized
 
-    STORE_CREDENTIALS_FILE.write_text(
-        json.dumps({"credentials": credentials}, indent=2, ensure_ascii=False),
-        encoding="utf-8",
-    )
-    return {"credentials": credentials}
+    normalized = {"credentials": credentials}
+    with STORE_SETTINGS_LOCK:
+        return durable_runtime.save_json_document(
+            normalized,
+            lambda value: durable_runtime.atomic_write_json(
+                STORE_CREDENTIALS_FILE, value, newline=False
+            ),
+            domain="stores",
+            document_key="credentials",
+            source_key="store_credentials",
+            source_ref="recipe-extractor/data/store_credentials.json",
+            encrypted=True,
+        )
 
 
 def save_store_credentials_for_form(store_key, form_data):

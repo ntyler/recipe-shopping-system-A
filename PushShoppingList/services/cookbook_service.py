@@ -12,6 +12,7 @@ from PushShoppingList.services.recipe_url_service import normalize_recipe_url_ke
 from PushShoppingList.services.storage_service import scoped_package_path
 from PushShoppingList.services import menu_store_service
 from PushShoppingList.services import menu_mega_json_service
+from PushShoppingList.services import durable_document_runtime_service as durable_runtime
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 COOKBOOKS_FILE = scoped_package_path("cookbooks.json")
@@ -604,14 +605,22 @@ def cookbook_recipe_assignment_for_url(recipe_url):
 
 def load_cookbooks_raw_payload():
     with COOKBOOKS_LOCK:
-        if not COOKBOOKS_FILE.exists():
-            return {"cookbooks": []}
+        def legacy_loader():
+            if not COOKBOOKS_FILE.exists():
+                return {"cookbooks": []}
+            try:
+                payload = json.loads(COOKBOOKS_FILE.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                return {"cookbooks": []}
+            return payload if isinstance(payload, dict) else {"cookbooks": []}
 
-        try:
-            payload = json.loads(COOKBOOKS_FILE.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            return {"cookbooks": []}
-
+        payload = durable_runtime.load_json_document(
+            legacy_loader,
+            domain="cookbooks",
+            document_key="catalog",
+            source_key="cookbooks",
+            source_ref="cookbooks.json",
+        )
         return payload if isinstance(payload, dict) else {"cookbooks": []}
 
 
@@ -1673,16 +1682,7 @@ def normalize_cookbooks_payload(payload):
 
 
 def load_cookbooks():
-    with COOKBOOKS_LOCK:
-        if not COOKBOOKS_FILE.exists():
-            return {"cookbooks": []}
-
-        try:
-            payload = json.loads(COOKBOOKS_FILE.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            return {"cookbooks": []}
-
-        return normalize_cookbooks_payload(payload)
+    return normalize_cookbooks_payload(load_cookbooks_raw_payload())
 
 
 def clear_cookbook_request_cache():
@@ -1700,12 +1700,16 @@ def clear_cookbook_request_cache():
 def save_cookbooks(payload):
     with COOKBOOKS_LOCK:
         normalized = normalize_cookbooks_payload(payload)
-        COOKBOOKS_FILE.write_text(
-            json.dumps(normalized, indent=2) + "\n",
-            encoding="utf-8",
+        saved = durable_runtime.save_json_document(
+            normalized,
+            lambda value: durable_runtime.atomic_write_json(COOKBOOKS_FILE, value),
+            domain="cookbooks",
+            document_key="catalog",
+            source_key="cookbooks",
+            source_ref="cookbooks.json",
         )
         clear_cookbook_request_cache()
-        return normalized
+        return saved
 
 
 def unique_cookbook_id(payload, name):

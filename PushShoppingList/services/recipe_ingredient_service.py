@@ -5,6 +5,8 @@ from PushShoppingList.services.recipe_extract_service import (
     OUTPUT_FOLDER,
     extract_ingredients_from_result,
     normalize_ingredient_for_shopping_list,
+    persist_recipe_output_document,
+    recipe_output_json_path,
 )
 from PushShoppingList.services.purchase_mapping_service import apply_purchase_mapping_to_ingredient
 from PushShoppingList.services.ingredient_unit_service import normalize_ingredient_unit_fields
@@ -16,6 +18,7 @@ from PushShoppingList.services.shopping_list_service import load_items
 from PushShoppingList.services.shopping_list_service import save_items
 from PushShoppingList.services.storage_service import scoped_extractor_data_path
 from PushShoppingList.services.user_account_service import current_public_user
+from PushShoppingList.services import durable_document_runtime_service as durable_runtime
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -25,26 +28,41 @@ RECIPE_INGREDIENTS_FILE.parent.mkdir(parents=True, exist_ok=True)
 
 
 def load_recipe_ingredients():
-    if not RECIPE_INGREDIENTS_FILE.exists():
-        return {}
+    def legacy_loader():
+        if not RECIPE_INGREDIENTS_FILE.exists():
+            return {}
+        try:
+            return json.loads(RECIPE_INGREDIENTS_FILE.read_text(encoding="utf-8-sig"))
+        except Exception:
+            return {}
 
-    try:
-        data = json.loads(RECIPE_INGREDIENTS_FILE.read_text(encoding="utf-8-sig"))
-        if isinstance(data, dict):
-            for recipe_data in data.values():
-                normalize_recipe_fraction_fields(recipe_data)
+    data = durable_runtime.load_json_document(
+        legacy_loader,
+        domain="recipes",
+        document_key="ingredients_index",
+        source_key="recipe_metadata",
+        source_ref="recipe-extractor/data/recipe_ingredients.json",
+    )
+    if isinstance(data, dict):
+        for recipe_data in data.values():
+            normalize_recipe_fraction_fields(recipe_data)
         return data
-    except Exception:
-        return {}
+    return {}
 
 
 def save_recipe_ingredients(data):
     if isinstance(data, dict):
         for recipe_data in data.values():
             normalize_recipe_fraction_fields(recipe_data)
-    RECIPE_INGREDIENTS_FILE.write_text(
-        json.dumps(data, indent=2, ensure_ascii=False),
-        encoding="utf-8",
+    return durable_runtime.save_json_document(
+        data,
+        lambda value: durable_runtime.atomic_write_json(
+            RECIPE_INGREDIENTS_FILE, value, newline=False
+        ),
+        domain="recipes",
+        document_key="ingredients_index",
+        source_key="recipe_metadata",
+        source_ref="recipe-extractor/data/recipe_ingredients.json",
     )
 
 
@@ -274,14 +292,42 @@ def update_saved_recipe_purchase_mapping(ingredient_name, purchasable_item):
     if not target_key:
         return changed_paths
 
-    for json_path in OUTPUT_FOLDER.glob("*.json"):
-        if json_path.name == "sorted_ingredients.json":
-            continue
+    mode = durable_runtime.durable_backend_mode()
+    candidates = []
+    if mode in {"db_preferred", "db_only"}:
+        # Kept lazy because recipe_edit_service imports this module.
+        from PushShoppingList.services.recipe_edit_service import (
+            recipe_output_identity_url,
+            recipe_output_index,
+        )
 
-        try:
-            json_data = json.loads(json_path.read_text(encoding="utf-8"))
-        except Exception:
-            continue
+        for json_data in recipe_output_index().values():
+            if not isinstance(json_data, dict):
+                continue
+            recipe_url = recipe_output_identity_url(json_data)
+            if not recipe_url:
+                continue
+            candidates.append(
+                (
+                    recipe_output_json_path(
+                        recipe_url, output_folder=OUTPUT_FOLDER
+                    ),
+                    recipe_url,
+                    json_data,
+                )
+            )
+    else:
+        for json_path in OUTPUT_FOLDER.glob("*.json"):
+            if json_path.name == "sorted_ingredients.json":
+                continue
+            try:
+                json_data = json.loads(json_path.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            recipe_url = str(json_data.get("source_url") or "").strip()
+            candidates.append((json_path, recipe_url, json_data))
+
+    for json_path, recipe_url, json_data in candidates:
 
         changed = False
         for item in json_data.get("ingredients", []) or []:
@@ -310,9 +356,10 @@ def update_saved_recipe_purchase_mapping(ingredient_name, purchasable_item):
         if not changed:
             continue
 
-        json_path.write_text(
-            json.dumps(json_data, indent=2, ensure_ascii=False),
-            encoding="utf-8",
+        persist_recipe_output_document(
+            recipe_url,
+            json_data,
+            json_path=json_path,
         )
         changed_paths.append(str(json_path))
 

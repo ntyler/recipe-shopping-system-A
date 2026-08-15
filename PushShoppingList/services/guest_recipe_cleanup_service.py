@@ -26,6 +26,14 @@ class GuestRecipeCleanupManifestError(RuntimeError):
         self.details = details if isinstance(details, dict) else {}
 
 
+class GuestRecipeCleanupOwnershipError(RuntimeError):
+    """Raised when an ID-only foreign key could delete another owner's row."""
+
+    def __init__(self, message, details=None):
+        super().__init__(message)
+        self.details = details if isinstance(details, dict) else {}
+
+
 # Every current recipe-master table whose rows are directly owned through a
 # user_id column.  Keep this explicit: schema drift must be reviewed instead
 # of being deleted through a guessed predicate.
@@ -167,6 +175,66 @@ def _foreign_key_parent_tables(connection, table_name):
     }
 
 
+def _foreign_key_groups(connection, table_name):
+    groups = {}
+    for row in connection.execute(
+        f"PRAGMA foreign_key_list({_quote_identifier(table_name)})"
+    ).fetchall():
+        group = groups.setdefault(
+            int(row[0]),
+            {
+                "parent_table": str(row[2]),
+                "on_delete": str(row[6] or "").upper(),
+                "columns": [],
+            },
+        )
+        group["columns"].append((str(row[3]), str(row[4])))
+    return tuple(groups.values())
+
+
+def _dangerous_master_foreign_keys(connection, present_tables, columns_by_table):
+    """Return ID-only cascades whose child ownership must be checked.
+
+    The legacy recipe-master schema uses globally unique integer IDs but keeps
+    tenant ownership in a separate ``user_id`` column.  An ID-only CASCADE or
+    SET NULL can therefore affect a different tenant if corrupt/imported data
+    crosses that boundary.  Composite ``(user_id, id)`` references are safe.
+    """
+
+    edges = []
+    unresolved = []
+    for child_table in sorted(present_tables):
+        for foreign_key in _foreign_key_groups(connection, child_table):
+            parent_table = foreign_key["parent_table"]
+            if (
+                parent_table not in {"ingredients", "equipment"}
+                or foreign_key["on_delete"] not in {"CASCADE", "SET NULL"}
+            ):
+                continue
+            mappings = tuple(foreign_key["columns"])
+            if ("user_id", "user_id") in mappings:
+                continue
+            id_mappings = [mapping for mapping in mappings if mapping[1] == "id"]
+            if len(id_mappings) != 1:
+                unresolved.append(f"{child_table}->{parent_table}")
+                continue
+            if (
+                "user_id" not in columns_by_table.get(child_table, set())
+                and child_table != "recipe_ingredient_option_items"
+            ):
+                unresolved.append(f"{child_table}->{parent_table}")
+                continue
+            edges.append(
+                {
+                    "child_table": child_table,
+                    "child_column": id_mappings[0][0],
+                    "parent_table": parent_table,
+                    "on_delete": foreign_key["on_delete"],
+                }
+            )
+    return edges, sorted(unresolved)
+
+
 def validate_guest_recipe_cleanup_manifest(connection):
     """Inspect the live schema and fail closed on uncovered owner tables."""
     configured = set(OWNER_SCOPED_TABLES) | set(CHILD_TABLES)
@@ -220,6 +288,13 @@ def validate_guest_recipe_cleanup_manifest(connection):
         for table_name in present_tables - managed_tables
         if _foreign_key_parent_tables(connection, table_name) & managed_tables
     )
+    _dangerous_edges, unresolved_cascade_ownership = (
+        _dangerous_master_foreign_keys(
+            connection,
+            present_tables,
+            columns_by_table,
+        )
+    )
 
     details = {
         "manifest_version": MANIFEST_VERSION,
@@ -229,18 +304,95 @@ def validate_guest_recipe_cleanup_manifest(connection):
         "owner_tables_missing_user_id": owner_tables_missing_user_id,
         "missing_child_columns": missing_child_columns,
         "unknown_dependent_tables": unknown_dependent_tables,
+        "unresolved_cascade_ownership": unresolved_cascade_ownership,
     }
     if (
         unknown_user_id_tables
         or owner_tables_missing_user_id
         or missing_child_columns
         or unknown_dependent_tables
+        or unresolved_cascade_ownership
     ):
         raise GuestRecipeCleanupManifestError(
             "The recipe-master schema is not fully covered by the guest cleanup manifest.",
             details,
         )
     return details
+
+
+def validate_guest_recipe_owner_isolation(
+    connection,
+    owner_scope,
+    schema_details=None,
+):
+    """Fail closed before an ID-only cascade can cross a tenant boundary."""
+
+    schema_details = schema_details or validate_guest_recipe_cleanup_manifest(
+        connection
+    )
+    present_tables = _table_names(connection)
+    columns_by_table = {
+        table_name: _table_columns(connection, table_name)
+        for table_name in present_tables
+    }
+    edges, unresolved = _dangerous_master_foreign_keys(
+        connection,
+        present_tables,
+        columns_by_table,
+    )
+    if unresolved:
+        raise GuestRecipeCleanupManifestError(
+            "A cascading recipe-master relationship has no reviewed owner resolver.",
+            {**schema_details, "unresolved_cascade_ownership": unresolved},
+        )
+
+    cross_owner_counts = {}
+    for edge in edges:
+        child_table = edge["child_table"]
+        parent_table = edge["parent_table"]
+        child_column = edge["child_column"]
+        edge_name = f"{child_table}->{parent_table}"
+        if child_table == "recipe_ingredient_option_items":
+            row = connection.execute(
+                f"""
+                SELECT COUNT(*)
+                  FROM {_quote_identifier(child_table)} AS child
+                  JOIN {_quote_identifier(parent_table)} AS parent
+                    ON parent.id = child.{_quote_identifier(child_column)}
+                  JOIN recipe_ingredient_options AS option_row
+                    ON option_row.id = child.option_id
+                  JOIN recipe_ingredient_requirements AS requirement
+                    ON requirement.id = option_row.requirement_id
+                 WHERE parent.user_id = ?
+                   AND requirement.user_id <> ?
+                """,
+                (owner_scope, owner_scope),
+            ).fetchone()
+        else:
+            row = connection.execute(
+                f"""
+                SELECT COUNT(*)
+                  FROM {_quote_identifier(child_table)} AS child
+                  JOIN {_quote_identifier(parent_table)} AS parent
+                    ON parent.id = child.{_quote_identifier(child_column)}
+                 WHERE parent.user_id = ?
+                   AND child.user_id <> ?
+                """,
+                (owner_scope, owner_scope),
+            ).fetchone()
+        count = int(row[0] or 0)
+        if count:
+            cross_owner_counts[edge_name] = count
+
+    if cross_owner_counts:
+        raise GuestRecipeCleanupOwnershipError(
+            "Recipe-master ownership is inconsistent; deletion was blocked.",
+            {
+                "owner_scope": owner_scope,
+                "cross_owner_references": cross_owner_counts,
+            },
+        )
+    return {"cross_owner_references": {}}
 
 
 def _ownership_where(table_name):
@@ -329,6 +481,7 @@ def preview_guest_recipe_cleanup(guest_session_id, *, db_path=None):
     try:
         connection = _readonly_connection(resolved_path)
         schema = validate_guest_recipe_cleanup_manifest(connection)
+        validate_guest_recipe_owner_isolation(connection, owner_scope, schema)
         counts = _owner_counts(connection, owner_scope, schema)
         result.update({
             "ok": True,
@@ -343,6 +496,13 @@ def preview_guest_recipe_cleanup(guest_session_id, *, db_path=None):
             "code": "manifest_drift",
             "error": str(exc),
             "schema": exc.details,
+        })
+        return result
+    except GuestRecipeCleanupOwnershipError as exc:
+        result.update({
+            "code": "cross_owner_reference",
+            "error": str(exc),
+            "ownership": exc.details,
         })
         return result
     except sqlite3.Error as exc:
@@ -372,6 +532,7 @@ def delete_guest_recipe_data_with_connection(
     """
     owner_scope = guest_recipe_owner_scope(guest_session_id)
     schema = validate_guest_recipe_cleanup_manifest(connection)
+    validate_guest_recipe_owner_isolation(connection, owner_scope, schema)
     expected_counts = _owner_counts(connection, owner_scope, schema)
     deleted_counts = {}
     present_tables = set(schema.get("present_manifest_tables", []))
@@ -481,6 +642,15 @@ def delete_guest_recipe_data(
             "code": "manifest_drift",
             "error": str(exc),
             "schema": exc.details,
+        })
+        return result
+    except GuestRecipeCleanupOwnershipError as exc:
+        if connection is not None and connection.in_transaction:
+            connection.rollback()
+        result.update({
+            "code": "cross_owner_reference",
+            "error": str(exc),
+            "ownership": exc.details,
         })
         return result
     except Exception as exc:

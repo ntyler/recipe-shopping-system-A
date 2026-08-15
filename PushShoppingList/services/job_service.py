@@ -60,6 +60,10 @@ JOBS_DB_PATH = Path(
 JOBS_DB_LOCK = threading.RLock()
 
 
+class GuestJobWriteFencedError(RuntimeError):
+    """Raised when a tombstoned guest attempts to enqueue new work."""
+
+
 JOB_SCHEMA_ADDITIONAL_COLUMNS = {
     "queue_name": "TEXT NOT NULL DEFAULT ''",
     "attempts": "INTEGER NOT NULL DEFAULT 0",
@@ -128,10 +132,106 @@ def json_loads(value, fallback):
 
 
 @contextmanager
-def jobs_connection():
-    JOBS_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+def _guest_job_write_guard(guest_session_id):
+    """Order one guest job mutation with the durable purge tombstone.
+
+    Jobs live in a separate SQLite database, so their row mutation cannot join
+    the purge transaction. Holding an application-database ``BEGIN IMMEDIATE``
+    reservation through the jobs commit supplies the cross-process ordering:
+    a following purge sees and deletes the committed job, while a following
+    job mutation sees the purge tombstone and is rejected or cancelled.
+
+    A JSON-only deployment has no application database. In that case this
+    guard does not open SQLite, create a database, or install schema.
+    """
+
+    guest_session_id = str(guest_session_id or "").strip()
+    if not guest_session_id:
+        yield False
+        return
+    if "\x00" in guest_session_id:
+        raise GuestJobWriteFencedError("Guest job ownership is invalid.")
+
+    from PushShoppingList.services import application_data_service as application_data
+
+    application_path = Path(application_data.application_data_db_path())
+    if not application_path.is_file():
+        yield False
+        return
+
+    connection = None
+    with application_data.APPLICATION_DATA_LOCK:
+        try:
+            # mode=rw is intentional: a disappearing/missing application DB
+            # must fail closed rather than being recreated by an ordinary job.
+            uri = "%s?mode=rw" % application_path.resolve().as_uri()
+            connection = sqlite3.connect(uri, uri=True, timeout=30)
+            connection.row_factory = sqlite3.Row
+            connection.execute("BEGIN IMMEDIATE")
+            tombstone_table = connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'guest_tombstones'"
+            ).fetchone()
+            fenced = False
+            if tombstone_table is not None:
+                columns = {
+                    str(row["name"])
+                    for row in connection.execute(
+                        "PRAGMA table_info(guest_tombstones)"
+                    ).fetchall()
+                }
+                if not {"guest_session_id", "lifecycle_state"}.issubset(columns):
+                    raise GuestJobWriteFencedError(
+                        "Guest purge fence schema is incomplete."
+                    )
+                row = connection.execute(
+                    """
+                    SELECT lifecycle_state
+                      FROM guest_tombstones
+                     WHERE guest_session_id = ?
+                     LIMIT 1
+                    """,
+                    (guest_session_id,),
+                ).fetchone()
+                fenced = bool(
+                    row
+                    and str(row["lifecycle_state"] or "") in {"purging", "purged"}
+                )
+        except GuestJobWriteFencedError:
+            if connection is not None:
+                connection.rollback()
+                connection.close()
+            raise
+        except sqlite3.Error as exc:
+            if connection is not None:
+                connection.rollback()
+                connection.close()
+            raise GuestJobWriteFencedError(
+                "Guest purge fence could not be verified."
+            ) from exc
+
+        try:
+            yield fenced
+        except BaseException:
+            connection.rollback()
+            raise
+        else:
+            try:
+                connection.commit()
+            except sqlite3.Error as exc:
+                connection.rollback()
+                raise GuestJobWriteFencedError(
+                    "Guest job ordering transaction could not commit."
+                ) from exc
+        finally:
+            connection.close()
+
+
+@contextmanager
+def jobs_connection(db_path=None):
+    resolved_path = Path(db_path) if db_path is not None else Path(JOBS_DB_PATH)
+    resolved_path.parent.mkdir(parents=True, exist_ok=True)
     with JOBS_DB_LOCK:
-        connection = sqlite3.connect(str(JOBS_DB_PATH), timeout=30)
+        connection = sqlite3.connect(str(resolved_path), timeout=30)
         connection.row_factory = sqlite3.Row
         try:
             connection.execute("PRAGMA journal_mode=WAL")
@@ -140,6 +240,28 @@ def jobs_connection():
             connection.commit()
         finally:
             connection.close()
+
+
+@contextmanager
+def _ordered_jobs_connection(*, guest_session_id="", job_id="", db_path=None):
+    """Yield a jobs transaction under the exact guest purge reservation."""
+
+    guest_session_id = str(guest_session_id or "").strip()
+    job_id = str(job_id or "").strip()
+    if not guest_session_id and job_id:
+        # Job ownership is immutable. Resolve it without holding JOBS_DB_LOCK
+        # while acquiring the application-database reservation, then re-read
+        # the job under the ordered jobs transaction in the caller.
+        with jobs_connection(db_path) as lookup_connection:
+            owner = lookup_connection.execute(
+                "SELECT guest_session_id FROM jobs WHERE id = ?", (job_id,)
+            ).fetchone()
+        if owner is not None:
+            guest_session_id = str(owner["guest_session_id"] or "").strip()
+
+    with _guest_job_write_guard(guest_session_id) as fenced:
+        with jobs_connection(db_path) as connection:
+            yield connection, fenced, guest_session_id
 
 
 def ensure_jobs_schema(connection):
@@ -886,7 +1008,15 @@ def create_job(
     expires_at = (utc_now() + timedelta(hours=job_retention_hours(bool(guest_session_id)))).isoformat() + "Z"
     job_id = str(job_id or "").strip() or new_job_id()
 
-    with jobs_connection() as connection:
+    with _ordered_jobs_connection(guest_session_id=guest_session_id) as (
+        connection,
+        fenced,
+        _guarded_guest_session_id,
+    ):
+        if fenced:
+            raise GuestJobWriteFencedError(
+                "Guest session is being purged and cannot accept new jobs."
+            )
         connection.execute(
             """
             INSERT INTO jobs (
@@ -1233,10 +1363,44 @@ def try_start_job(
     if not job_id:
         return {"started": False, "ok": False, "error": "Job id is required."}
 
-    with jobs_connection() as connection:
+    with _ordered_jobs_connection(job_id=job_id) as (
+        connection,
+        fenced,
+        guarded_guest_session_id,
+    ):
         row = connection.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
         if not row:
             return {"started": False, "ok": False, "error": "Job not found."}
+
+        guest_session_id = str(row["guest_session_id"] or "").strip()
+        if guest_session_id != guarded_guest_session_id:
+            return {
+                "started": False,
+                "ok": False,
+                "error": "Job ownership changed before the ordered start transaction.",
+            }
+        if guest_session_id and fenced:
+            now = now_iso()
+            connection.execute(
+                """
+                UPDATE jobs
+                   SET status = 'cancelled', current_step = ?, updated_at = ?,
+                       completed_at = COALESCE(completed_at, ?),
+                       finished_at = COALESCE(finished_at, ?)
+                 WHERE id = ?
+                """,
+                ("Guest session is being purged", now, now, now, job_id),
+            )
+            cancelled = connection.execute(
+                "SELECT * FROM jobs WHERE id = ?", (job_id,)
+            ).fetchone()
+            return {
+                "started": False,
+                "ok": True,
+                "cancelled": True,
+                "guest_session_purging": True,
+                "job": row_to_job(cancelled),
+            }
 
         if row["status"] in CANCEL_REQUESTED_JOB_STATUSES:
             return {"started": False, "ok": True, "cancelled": True, "job": row_to_job(row)}
@@ -1497,12 +1661,12 @@ def cleanup_expired_jobs():
         connection.execute("DELETE FROM jobs WHERE expires_at <= ?", (now,))
 
 
-def delete_guest_jobs(guest_session_id):
+def delete_guest_jobs(guest_session_id, db_path=None):
     guest_session_id = str(guest_session_id or "").strip()
     if not guest_session_id:
         return 0
 
-    with jobs_connection() as connection:
+    with jobs_connection(db_path) as connection:
         cursor = connection.execute(
             "DELETE FROM jobs WHERE guest_session_id = ?",
             (guest_session_id,),
@@ -1510,13 +1674,13 @@ def delete_guest_jobs(guest_session_id):
         return cursor.rowcount
 
 
-def guest_jobs_for_cleanup(guest_session_id):
+def guest_jobs_for_cleanup(guest_session_id, db_path=None):
     """Return every job owned by one exact guest for purge coordination."""
     guest_session_id = str(guest_session_id or "").strip()
     if not guest_session_id:
         return []
 
-    with jobs_connection() as connection:
+    with jobs_connection(db_path) as connection:
         rows = connection.execute(
             """
             SELECT *
@@ -1598,18 +1762,28 @@ def preview_guest_jobs_cleanup(guest_session_id, db_path=None):
             connection.close()
 
 
-def request_guest_job_cancellation(guest_session_id, message="Guest session expired"):
+def request_guest_job_cancellation(
+    guest_session_id,
+    message="Guest session expired",
+    db_path=None,
+):
     """Atomically prevent queued guest jobs from starting and flag running jobs."""
     guest_session_id = str(guest_session_id or "").strip()
     if not guest_session_id:
         return {"ok": False, "jobs": [], "running_job_ids": [], "rq_job_ids": []}
 
     now = now_iso()
-    with jobs_connection() as connection:
+    with jobs_connection(db_path) as connection:
         rows = connection.execute(
             "SELECT * FROM jobs WHERE guest_session_id = ? ORDER BY created_at, id",
             (guest_session_id,),
         ).fetchall()
+        rq_job_ids_to_cancel = sorted({
+            str(row["rq_job_id"] or "").strip()
+            for row in rows
+            if normalize_status(row["status"]) not in TERMINAL_JOB_STATUSES
+            and str(row["rq_job_id"] or "").strip()
+        })
         for row in rows:
             status = normalize_status(row["status"])
             if status in TERMINAL_JOB_STATUSES:
@@ -1654,11 +1828,7 @@ def request_guest_job_cancellation(guest_session_id, message="Guest session expi
             for job in jobs
             if normalize_status(job.get("status")) == "cancel_requested"
         ],
-        "rq_job_ids": sorted({
-            str(job.get("rq_job_id") or "").strip()
-            for job in jobs
-            if str(job.get("rq_job_id") or "").strip()
-        }),
+        "rq_job_ids": rq_job_ids_to_cancel,
     }
 
 

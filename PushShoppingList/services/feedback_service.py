@@ -11,6 +11,7 @@ from werkzeug.utils import secure_filename
 from PushShoppingList.services.user_account_service import SUPPORT_EMAIL
 from PushShoppingList.services.user_account_service import get_public_support_identity
 from PushShoppingList.services.user_account_service import is_admin_user
+from PushShoppingList.services import durable_document_runtime_service as durable_runtime
 
 
 PACKAGE_DIR = Path(__file__).resolve().parent.parent
@@ -77,14 +78,24 @@ def now_iso():
 
 
 def load_feedback_payload():
-    if not FEEDBACK_FILE.exists():
-        return {"feedback": []}
+    def legacy_loader():
+        if not FEEDBACK_FILE.exists():
+            return {"feedback": []}
+        try:
+            return json.loads(FEEDBACK_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            return {"feedback": []}
 
-    try:
-        payload = json.loads(FEEDBACK_FILE.read_text(encoding="utf-8"))
-    except Exception:
-        return {"feedback": []}
-
+    payload = durable_runtime.load_json_document(
+        legacy_loader,
+        domain="support",
+        document_key="feedback",
+        source_key="feedback",
+        source_ref="feedback",
+        workspace_id=durable_runtime.GLOBAL_WORKSPACE_ID,
+        workspace_type=durable_runtime.GLOBAL_WORKSPACE_TYPE,
+        subject_id=durable_runtime.GLOBAL_SUBJECT_ID,
+    )
     if not isinstance(payload, dict):
         return {"feedback": []}
 
@@ -105,12 +116,17 @@ def save_feedback_payload(payload):
             if isinstance(item, dict) and item.get("feedback_id")
         ],
     }
-    FEEDBACK_FILE.parent.mkdir(parents=True, exist_ok=True)
-    FEEDBACK_FILE.write_text(
-        json.dumps(normalized, indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
+    return durable_runtime.save_json_document(
+        normalized,
+        lambda value: durable_runtime.atomic_write_json(FEEDBACK_FILE, value),
+        domain="support",
+        document_key="feedback",
+        source_key="feedback",
+        source_ref="feedback",
+        workspace_id=durable_runtime.GLOBAL_WORKSPACE_ID,
+        workspace_type=durable_runtime.GLOBAL_WORKSPACE_TYPE,
+        subject_id=durable_runtime.GLOBAL_SUBJECT_ID,
     )
-    return normalized
 
 
 def normalize_feedback_record(item):

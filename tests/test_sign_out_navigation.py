@@ -82,7 +82,10 @@ def test_native_sign_out_routes_redirect_to_clean_public_sign_in(method, path):
             assert "email" not in session
 
 
-def test_json_sign_out_deletes_guest_workspace_and_clears_guest_identity(monkeypatch, tmp_path):
+def test_json_sign_out_retains_guest_workspace_for_purge_and_clears_identity(
+    monkeypatch,
+    tmp_path,
+):
     configure_guest_demo_paths(monkeypatch, tmp_path)
     app = create_app()
     app.config.update(TESTING=True)
@@ -100,7 +103,7 @@ def test_json_sign_out_deletes_guest_workspace_and_clears_guest_identity(monkeyp
         assert response.status_code == 200
         assert response.get_json()["authenticated"] is False
         assert "guest_demo_session=;" in response.headers.get("Set-Cookie", "")
-        assert not guest_file.exists()
+        assert guest_file.exists()
 
         with client.session_transaction() as session:
             assert "is_guest" not in session

@@ -1210,7 +1210,7 @@ def save_normalized_recipe_ingredient_requirements(
             sync_compatibility=sync_compatibility,
             force_store_sections_from_recipe=force_store_sections_from_recipe,
         )
-    with master_data.recipe_master_connection() as managed_connection:
+    with master_data.recipe_master_connection(user_id=user_id) as managed_connection:
         return _save_requirements_with_connection(
             managed_connection,
             recipe_url,
@@ -1709,7 +1709,7 @@ def backfill_recipe_ingredient_requirements_for_user(
     )
     started_at = _utc_now_iso()
     try:
-        with master_data.recipe_master_connection() as connection:
+        with master_data.recipe_master_connection(user_id=user_id) as connection:
             for _path, source_url, payload, requirements in candidates:
                 _save_requirements_with_connection(
                     connection,
@@ -1740,7 +1740,7 @@ def backfill_recipe_ingredient_requirements_for_user(
         summary["ok"] = False
         summary["error"] = str(exc)
         try:
-            with master_data.recipe_master_connection() as connection:
+            with master_data.recipe_master_connection(user_id=user_id) as connection:
                 connection.execute(
                     """
                     INSERT INTO recipe_ingredient_requirement_migration_runs (

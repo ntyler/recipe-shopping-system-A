@@ -8854,6 +8854,19 @@ def send_file_prompt_to_openai(prompt_text, file_path, mime_type, filename):
     return response.choices[0].message.content
 
 
+def persist_recipe_output_document(recipe_url, json_data, *, json_path=None):
+    """Persist full recipe JSON through the lazy durable compatibility boundary."""
+
+    # recipe_edit_service imports extraction helpers at module initialization,
+    # so this import must remain lazy to avoid a circular import.
+    from PushShoppingList.services.recipe_edit_service import (
+        save_recipe_output_to_path,
+    )
+
+    resolved_path = json_path or recipe_output_json_path(recipe_url)
+    return save_recipe_output_to_path(resolved_path, json_data, url=recipe_url)
+
+
 def save_json_response(recipe_url, response_text, html_text=None, source_text=None):
     cleaned = clean_json_response(response_text)
 
@@ -8880,9 +8893,10 @@ def save_json_response(recipe_url, response_text, html_text=None, source_text=No
             recipe_archive_pdf_path(recipe_url),
         )
 
-        json_path.write_text(
-            json.dumps(json_data, indent=2, ensure_ascii=False),
-            encoding="utf-8",
+        persist_recipe_output_document(
+            recipe_url,
+            json_data,
+            json_path=json_path,
         )
 
         print(f"Saved JSON: {json_path}")
@@ -10946,10 +10960,9 @@ def save_extracted_recipe_json(recipe_url, json_data, source_text=""):
             recipe_archive_pdf_path(recipe_url),
         )
 
-    json_path = recipe_output_json_path(recipe_url)
-    json_path.write_text(
-        json.dumps(json_data, indent=2, ensure_ascii=False),
-        encoding="utf-8",
+    json_path = persist_recipe_output_document(
+        recipe_url,
+        json_data,
     )
     return json_path
 

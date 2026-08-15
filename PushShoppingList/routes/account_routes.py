@@ -291,7 +291,10 @@ def guest_expired_route():
 def guest_delete_route():
     delete_current_guest_session()
     clear_admin_support_session()
-    flash("Temporary demo session deleted.", "success")
+    flash(
+        "Demo access ended. Temporary data will be securely deleted after its scheduled expiration.",
+        "success",
+    )
     response = make_response(redirect(url_for("main_bp.index", _anchor="userAccountSection")))
     clear_guest_cookie(response)
     return response
@@ -684,7 +687,12 @@ def delete_expired_guest_demos_route():
         flash("Admin access is required.", "error")
         return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
 
-    result = delete_expired_guest_demo_sessions_for_admin(admin_user)
+    result = delete_expired_guest_demo_sessions_for_admin(
+        admin_user,
+        dry_run=False,
+        authorized=True,
+        approval=request.form.get("approval", ""),
+    )
 
     if result.get("ok"):
         session.pop("admin_support_errors", None)

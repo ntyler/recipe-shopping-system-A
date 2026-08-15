@@ -564,7 +564,10 @@ def test_source_change_during_apply_rolls_back_the_entire_transaction(tmp_path):
         schema_audit_rows = connection.execute(
             "SELECT migration_kind, status FROM migration_runs"
         ).fetchall()
-    assert schema_audit_rows == [("application_schema_install", "succeeded")]
+    assert schema_audit_rows == [
+        ("application_schema_install", "succeeded"),
+        ("application_schema_upgrade", "succeeded"),
+    ]
 
 
 def test_stale_source_and_missing_encryption_fail_before_schema_install(

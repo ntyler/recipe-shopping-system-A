@@ -12,6 +12,8 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 
+from PushShoppingList.services import recipe_master_data_service as master_data
+
 from PushShoppingList.services.equipment_migration_preview_service import (
     discover_output_roots,
     output_equipment,
@@ -660,6 +662,7 @@ def stage_phase3a_migration(
         authorized=True,
         migration_token=requirements.PHASE3A_MIGRATION_TOKEN,
     )
+    master_data.install_recipe_master_connection_guest_write_fences(connection)
     run_key = f"{MIGRATION_VERSION}:{snapshot['source_hash']}"
     now = _utc_now_iso()
     summary = {

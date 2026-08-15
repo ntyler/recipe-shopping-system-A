@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 from urllib.parse import urlunparse
 
 from PushShoppingList.services.storage_service import scoped_package_path
+from PushShoppingList.services import durable_document_runtime_service as durable_runtime
 
 
 MENU_STORE_FILE = scoped_package_path("restaurant_menus.json")
@@ -104,22 +105,35 @@ def normalize_store(payload):
 
 def load_menu_store():
     path = menu_store_file()
-    if not path.exists():
-        return empty_store()
+    def legacy_loader():
+        if not path.exists():
+            return empty_store()
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return empty_store()
 
-    try:
-        return normalize_store(json.loads(path.read_text(encoding="utf-8")))
-    except (OSError, json.JSONDecodeError):
-        return empty_store()
+    return normalize_store(
+        durable_runtime.load_json_document(
+            legacy_loader,
+            domain="menus",
+            document_key="store",
+            source_key="restaurant_menus",
+            source_ref="restaurant_menus.json",
+        )
+    )
 
 
 def save_menu_store(payload):
     normalized = normalize_store(payload)
-    menu_store_file().write_text(
-        json.dumps(normalized, indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
+    return durable_runtime.save_json_document(
+        normalized,
+        lambda value: durable_runtime.atomic_write_json(menu_store_file(), value),
+        domain="menus",
+        document_key="store",
+        source_key="restaurant_menus",
+        source_ref="restaurant_menus.json",
     )
-    return normalized
 
 
 def restaurant_name_key(value):

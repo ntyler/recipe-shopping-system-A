@@ -29,6 +29,18 @@ RECIPE_MASTER_DB_PATH = Path(
     )
 )
 RECIPE_MASTER_DB_LOCK = threading.RLock()
+GUEST_RECIPE_OWNER_PREFIX = "guest:"
+GUEST_RECIPE_WRITE_FENCE_MESSAGE = "guest recipe owner is purge fenced"
+
+
+class RecipeMasterGuestWriteFencedError(RuntimeError):
+    """Raised when an irreversible guest tombstone forbids a recipe write."""
+
+
+class RecipeMasterNonAtomicDatabaseLayoutError(RuntimeError):
+    """Raised when guest recipe writes cannot be ordered with the purge fence."""
+
+
 RECIPE_MASTER_READ_SCHEMA_TABLES = frozenset({
     "canonical_units",
     "unit_aliases",
@@ -675,8 +687,213 @@ def scoped_recipe_user_id(user_id=None):
     return LOCAL_USER_ID
 
 
+def _guest_recipe_owner_parts(user_id):
+    owner_id = str(user_id or "").strip()
+    if not owner_id.startswith(GUEST_RECIPE_OWNER_PREFIX):
+        return "", ""
+    guest_session_id = owner_id[len(GUEST_RECIPE_OWNER_PREFIX):]
+    if not guest_session_id:
+        return "", ""
+    return owner_id, guest_session_id
+
+
+def _recipe_master_application_db_path(application_db_path=None):
+    """Resolve the purge-fence database without creating it or its schema."""
+
+    if application_db_path is not None:
+        return Path(application_db_path)
+    from PushShoppingList.services import application_data_service
+
+    return Path(application_data_service.application_data_db_path())
+
+
+def _same_database_path(left, right):
+    try:
+        return Path(left).resolve() == Path(right).resolve()
+    except OSError:
+        return os.path.abspath(str(left)) == os.path.abspath(str(right))
+
+
+def _quote_sql_identifier(value):
+    return '"' + str(value).replace('"', '""') + '"'
+
+
+def _connection_has_table(connection, table_name):
+    return connection.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+        (str(table_name or ""),),
+    ).fetchone() is not None
+
+
+def _validate_guest_tombstone_shape(connection):
+    if not _connection_has_table(connection, "guest_tombstones"):
+        return False
+    columns = {
+        str(row[1])
+        for row in connection.execute("PRAGMA table_info(guest_tombstones)").fetchall()
+    }
+    if not {"guest_session_id", "workspace_id"}.issubset(columns):
+        raise RecipeMasterGuestWriteFencedError(
+            "Guest recipe write fence schema is incomplete."
+        )
+    return True
+
+
+def _install_connection_guest_write_fences(connection):
+    """Install non-persistent triggers that inspect the actual row owner.
+
+    The triggers live only on this SQLite connection.  They therefore protect
+    explicit/background call sites whose declared owner is accidentally wrong
+    without mutating the durable recipe schema.  Legacy databases without the
+    application tombstone table remain untouched.
+    """
+
+    if not _validate_guest_tombstone_shape(connection):
+        return False
+    table_names = [
+        str(row[0])
+        for row in connection.execute(
+            """
+            SELECT name
+              FROM sqlite_master
+             WHERE type = 'table'
+               AND name NOT LIKE 'sqlite_%'
+             ORDER BY name
+            """
+        ).fetchall()
+    ]
+    for table_name in table_names:
+        columns = {
+            str(row[1])
+            for row in connection.execute(
+                "PRAGMA table_info(%s)" % _quote_sql_identifier(table_name)
+            ).fetchall()
+        }
+        if "user_id" not in columns:
+            continue
+        quoted_table = _quote_sql_identifier(table_name)
+        trigger_key = re.sub(r"[^A-Za-z0-9_]", "_", table_name)
+        for operation, row_reference in (
+            ("INSERT", "NEW"),
+            ("UPDATE", "NEW"),
+            ("DELETE", "OLD"),
+        ):
+            trigger_name = _quote_sql_identifier(
+                "guest_recipe_write_fence_%s_%s"
+                % (trigger_key, operation.lower())
+            )
+            connection.execute(
+                """
+                CREATE TEMP TRIGGER IF NOT EXISTS {trigger_name}
+                BEFORE {operation} ON main.{table_name}
+                WHEN substr({row_reference}.user_id, 1, 6) = 'guest:'
+                 AND EXISTS (
+                    SELECT 1
+                      FROM guest_tombstones
+                     WHERE workspace_id = {row_reference}.user_id
+                        OR guest_session_id = substr({row_reference}.user_id, 7)
+                 )
+                BEGIN
+                    SELECT RAISE(ABORT, '{message}');
+                END
+                """.format(
+                    trigger_name=trigger_name,
+                    operation=operation,
+                    row_reference=row_reference,
+                    table_name=quoted_table,
+                    message=GUEST_RECIPE_WRITE_FENCE_MESSAGE,
+                )
+            )
+    return True
+
+
+def install_recipe_master_connection_guest_write_fences(connection):
+    """Fence actual guest-owned rows on an externally managed write connection.
+
+    Approved migration utilities that manage their own ``BEGIN IMMEDIATE``
+    transaction must call this after creating any recipe tables and before
+    mutating rows.  It is a strict no-op for legacy databases that do not yet
+    contain the application guest tombstone table.
+    """
+
+    return _install_connection_guest_write_fences(connection)
+
+
+def _distinct_database_has_guest_fence(application_db_path):
+    from PushShoppingList.services import application_data_service
+
+    with application_data_service.existing_application_read_connection(
+        application_db_path
+    ) as connection:
+        if connection is None:
+            return False
+        return _validate_guest_tombstone_shape(connection)
+
+
+def _assert_guest_recipe_owner_not_fenced(connection, owner_id, guest_session_id):
+    from PushShoppingList.services import application_data_service
+
+    if application_data_service.guest_workspace_write_is_fenced(
+        owner_id,
+        workspace_type="guest",
+        external_id=guest_session_id,
+        guest_session_id=guest_session_id,
+        connection=connection,
+    ):
+        raise RecipeMasterGuestWriteFencedError(
+            "Guest recipe writes are blocked by an irreversible purge tombstone."
+        )
+
+
+def _prepare_recipe_master_write_connection(
+    connection,
+    *,
+    user_id=None,
+    application_db_path=None,
+):
+    """Prepare one recipe write connection and acquire an exact guest fence.
+
+    Recipe and application data normally share one SQLite file.  For a guest,
+    ``BEGIN IMMEDIATE`` serializes this check and the eventual recipe commit
+    with the purge transaction's tombstone-and-delete commit.  If an installed
+    tombstone schema is in a different SQLite file, the service refuses the
+    guest write because the two commits cannot be made atomically.
+    """
+
+    recipe_path = recipe_master_db_path()
+    fence_path = _recipe_master_application_db_path(application_db_path)
+    owner_id, guest_session_id = _guest_recipe_owner_parts(user_id)
+    same_database = _same_database_path(recipe_path, fence_path)
+
+    if not same_database and owner_id and _distinct_database_has_guest_fence(fence_path):
+        raise RecipeMasterNonAtomicDatabaseLayoutError(
+            "Guest recipe writes require the application and recipe data to share "
+            "one atomic SQLite transaction."
+        )
+
+    if owner_id and same_database:
+        # This must precede recipe schema maintenance: schema initialization
+        # normalizes existing owner rows and is therefore part of the guarded
+        # guest mutation, not an operation that may commit before the fence.
+        connection.execute("BEGIN IMMEDIATE")
+        _assert_guest_recipe_owner_not_fenced(
+            connection,
+            owner_id,
+            guest_session_id,
+        )
+    return (owner_id, guest_session_id, same_database)
+
+
+def _raise_recipe_write_fence_error(exc):
+    if GUEST_RECIPE_WRITE_FENCE_MESSAGE in str(exc).lower():
+        raise RecipeMasterGuestWriteFencedError(
+            "Guest recipe writes are blocked by an irreversible purge tombstone."
+        ) from exc
+    raise exc
+
+
 @contextmanager
-def recipe_master_connection():
+def recipe_master_connection(user_id=None, *, application_db_path=None):
     db_path = recipe_master_db_path()
     db_path.parent.mkdir(parents=True, exist_ok=True)
     with RECIPE_MASTER_DB_LOCK:
@@ -684,15 +901,34 @@ def recipe_master_connection():
         connection.row_factory = sqlite3.Row
         try:
             connection.execute("PRAGMA foreign_keys=ON")
+            guest_guard = _prepare_recipe_master_write_connection(
+                connection,
+                user_id=user_id,
+                application_db_path=application_db_path,
+            )
             ensure_recipe_master_schema(connection)
+            if guest_guard[2]:
+                _install_connection_guest_write_fences(connection)
             yield connection
+            if guest_guard[0] and guest_guard[2]:
+                _assert_guest_recipe_owner_not_fenced(
+                    connection,
+                    guest_guard[0],
+                    guest_guard[1],
+                )
             connection.commit()
+        except sqlite3.IntegrityError as exc:
+            connection.rollback()
+            _raise_recipe_write_fence_error(exc)
+        except BaseException:
+            connection.rollback()
+            raise
         finally:
             connection.close()
 
 
 @contextmanager
-def existing_recipe_master_connection():
+def existing_recipe_master_connection(user_id=None, *, application_db_path=None):
     db_path = recipe_master_db_path()
     if not db_path.is_file():
         yield None
@@ -703,9 +939,28 @@ def existing_recipe_master_connection():
         connection.row_factory = sqlite3.Row
         try:
             connection.execute("PRAGMA foreign_keys=ON")
+            guest_guard = _prepare_recipe_master_write_connection(
+                connection,
+                user_id=user_id,
+                application_db_path=application_db_path,
+            )
             ensure_recipe_master_schema(connection)
+            if guest_guard[2]:
+                _install_connection_guest_write_fences(connection)
             yield connection
+            if guest_guard[0] and guest_guard[2]:
+                _assert_guest_recipe_owner_not_fenced(
+                    connection,
+                    guest_guard[0],
+                    guest_guard[1],
+                )
             connection.commit()
+        except sqlite3.IntegrityError as exc:
+            connection.rollback()
+            _raise_recipe_write_fence_error(exc)
+        except BaseException:
+            connection.rollback()
+            raise
         finally:
             connection.close()
 
@@ -1763,7 +2018,7 @@ def _seed_workspace_unit_registry(connection, user_id):
 
 def ensure_workspace_unit_registry(user_id=None):
     user_id = str(user_id or scoped_recipe_user_id()).strip()
-    with recipe_master_connection() as connection:
+    with recipe_master_connection(user_id=user_id) as connection:
         _seed_workspace_unit_registry(connection, user_id)
         payload = _workspace_unit_registry_payload_from_connection(connection, user_id)
     from PushShoppingList.services.ingredient_unit_service import clear_unit_registry_cache
@@ -2004,7 +2259,7 @@ def save_workspace_unit(values, unit_id="", user_id=None):
     user_id = str(user_id or scoped_recipe_user_id()).strip()
     unit_id = str(unit_id or "").strip()
     values = values if isinstance(values, dict) else {}
-    with recipe_master_connection() as connection:
+    with recipe_master_connection(user_id=user_id) as connection:
         _seed_workspace_unit_registry(connection, user_id)
         existing = None
         if unit_id:
@@ -2739,7 +2994,7 @@ def create_ingredient_store_section(display_name, icon="basket", user_id=None):
     if not display_name or not section_key:
         return {"ok": False, "status": 400, "error": "Store Section name is required."}
 
-    with recipe_master_connection() as connection:
+    with recipe_master_connection(user_id=scoped_user_id) as connection:
         ensure_ingredient_store_sections_for_user(connection, scoped_user_id)
         duplicate = connection.execute(
             """
@@ -2821,7 +3076,7 @@ def update_ingredient_store_section_definition(
 
     scoped_user_id = scoped_recipe_user_id(user_id)
     action = clean_text(action).lower() or "save"
-    with recipe_master_connection() as connection:
+    with recipe_master_connection(user_id=scoped_user_id) as connection:
         ensure_ingredient_store_sections_for_user(connection, scoped_user_id)
         row = connection.execute(
             """
@@ -3898,7 +4153,7 @@ def update_equipment_display_name(record_id, display_name=None, *, reset=False, 
             "error": "Display name must be 160 characters or fewer.",
         }
 
-    with recipe_master_connection() as connection:
+    with recipe_master_connection(user_id=workspace_user_id) as connection:
         record = connection.execute(
             """
             SELECT id, name, display_name_override
@@ -4358,7 +4613,7 @@ def update_ingredient_store_section(ingredient_id, store_section, user_id=None, 
     section = clean_ingredient_store_section(store_section)
     scoped_user_id = scoped_recipe_user_id(user_id)
 
-    with existing_recipe_master_connection() as connection:
+    with existing_recipe_master_connection(user_id=scoped_user_id) as connection:
         if connection is None:
             return {"ok": False, "error": "Recipe master database was not found."}
 
@@ -4424,7 +4679,7 @@ def update_ingredient_store_section(ingredient_id, store_section, user_id=None, 
 
 def review_misc_ingredient_store_sections(user_id=None, apply=False):
     scoped_user_id = scoped_recipe_user_id(user_id)
-    with existing_recipe_master_connection() as connection:
+    with existing_recipe_master_connection(user_id=scoped_user_id) as connection:
         if connection is None:
             return {"ok": False, "error": "Recipe master database was not found."}
 
@@ -4760,7 +5015,7 @@ def apply_misc_ingredient_store_section_decisions(user_id=None, decisions=None):
 
     changed = []
     kept_misc = 0
-    with existing_recipe_master_connection() as connection:
+    with existing_recipe_master_connection(user_id=scoped_user_id) as connection:
         if connection is None:
             return {"ok": False, "status": 404, "error": "Recipe master database was not found."}
         prepared_decisions = []
@@ -5696,7 +5951,7 @@ def update_ingredient_master_record(
     if not normalized_name:
         return {"ok": False, "status": 400, "error": "Normalized name is required."}
 
-    with existing_recipe_master_connection() as connection:
+    with existing_recipe_master_connection(user_id=scoped_user_id) as connection:
         if connection is None:
             return {"ok": False, "status": 404, "error": "Recipe master database was not found."}
 
@@ -6311,7 +6566,7 @@ def merge_ingredient_master_records(
         return {"ok": False, "status": 400, "error": "Choose a different canonical ingredient."}
 
     scoped_user_id = scoped_recipe_user_id(user_id)
-    with existing_recipe_master_connection() as connection:
+    with existing_recipe_master_connection(user_id=scoped_user_id) as connection:
         if connection is None:
             return {"ok": False, "status": 404, "error": "Recipe master database was not found."}
 
@@ -6622,7 +6877,7 @@ def undo_last_ingredient_master_merge(user_id=None, expected_merge_id=None):
         expected_merge_id = int(expected_merge_id or 0)
     except (TypeError, ValueError):
         expected_merge_id = 0
-    with existing_recipe_master_connection() as connection:
+    with existing_recipe_master_connection(user_id=scoped_user_id) as connection:
         if connection is None:
             return {"ok": False, "status": 404, "error": "No ingredient merge is available to undo."}
 
@@ -7941,7 +8196,7 @@ def sync_recipe_master_records(
     if not scoped_user_id or not recipe_id_for_url(recipe_url):
         return {"ok": False, "error": "Recipe URL and user id are required."}
 
-    with recipe_master_connection() as connection:
+    with recipe_master_connection(user_id=scoped_user_id) as connection:
         if (
             isinstance(recipe_data, dict)
             and isinstance(recipe_data.get("ingredients"), list)
@@ -7978,7 +8233,7 @@ def remove_recipe_master_records_for_recipe(recipe_url, user_id=None):
     if not user_id or not recipe_id:
         return 0
 
-    with recipe_master_connection() as connection:
+    with recipe_master_connection(user_id=user_id) as connection:
         connection.execute(
             "DELETE FROM recipe_ingredient_requirements WHERE user_id = ? AND recipe_id = ?",
             (user_id, recipe_id),
@@ -8210,7 +8465,7 @@ def backfill_ingredient_store_sections_for_user(user_id):
     updated = 0
     defaulted = 0
 
-    with recipe_master_connection() as connection:
+    with recipe_master_connection(user_id=user_id) as connection:
         rows = connection.execute(
             """
             SELECT

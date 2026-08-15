@@ -5,8 +5,9 @@ from datetime import datetime
 from pathlib import Path
 
 from PushShoppingList.services.email_service import send_admin_support_access_email
-from PushShoppingList.services.guest_session_service import delete_expired_guest_sessions
 from PushShoppingList.services.guest_session_service import expired_guest_session_count
+from PushShoppingList.services import guest_session_service
+from PushShoppingList.services import guest_purge_service
 from PushShoppingList.services.storage_service import USER_DATA_DIR
 from PushShoppingList.services.storage_service import safe_user_id
 from PushShoppingList.services.user_account_service import display_datetime
@@ -17,6 +18,7 @@ from PushShoppingList.services.user_account_service import is_owner_admin_user
 from PushShoppingList.services.user_account_service import load_users
 from PushShoppingList.services.user_account_service import public_user
 from PushShoppingList.services.user_account_service import save_users
+from PushShoppingList.services import durable_document_runtime_service as durable_runtime
 
 
 PACKAGE_DIR = Path(__file__).resolve().parent.parent
@@ -33,13 +35,24 @@ def now_iso():
 
 
 def load_audit_entries():
-    if not ADMIN_SUPPORT_AUDIT_FILE.exists():
-        return []
+    def legacy_loader():
+        if not ADMIN_SUPPORT_AUDIT_FILE.exists():
+            return []
+        try:
+            return json.loads(ADMIN_SUPPORT_AUDIT_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            return []
 
-    try:
-        payload = json.loads(ADMIN_SUPPORT_AUDIT_FILE.read_text(encoding="utf-8"))
-    except Exception:
-        return []
+    payload = durable_runtime.load_json_document(
+        legacy_loader,
+        domain="audit",
+        document_key="admin_support",
+        source_key="admin_audit",
+        source_ref="admin_audit",
+        workspace_id=durable_runtime.GLOBAL_WORKSPACE_ID,
+        workspace_type=durable_runtime.GLOBAL_WORKSPACE_TYPE,
+        subject_id=durable_runtime.GLOBAL_SUBJECT_ID,
+    )
 
     entries = payload.get("entries", []) if isinstance(payload, dict) else payload
 
@@ -51,10 +64,18 @@ def load_audit_entries():
 
 
 def save_audit_entries(entries):
-    ADMIN_SUPPORT_AUDIT_FILE.parent.mkdir(parents=True, exist_ok=True)
-    ADMIN_SUPPORT_AUDIT_FILE.write_text(
-        json.dumps({"entries": entries}, indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
+    return durable_runtime.save_json_document(
+        {"entries": entries},
+        lambda value: durable_runtime.atomic_write_json(
+            ADMIN_SUPPORT_AUDIT_FILE, value
+        ),
+        domain="audit",
+        document_key="admin_support",
+        source_key="admin_audit",
+        source_ref="admin_audit",
+        workspace_id=durable_runtime.GLOBAL_WORKSPACE_ID,
+        workspace_type=durable_runtime.GLOBAL_WORKSPACE_TYPE,
+        subject_id=durable_runtime.GLOBAL_SUBJECT_ID,
     )
 
 
@@ -439,23 +460,125 @@ def update_account_admin_access(admin_user, target_user_id, enabled):
     }
 
 
-def delete_expired_guest_demo_sessions_for_admin(admin_user):
+def delete_expired_guest_demo_sessions_for_admin(
+    admin_user,
+    *,
+    dry_run=True,
+    authorized=False,
+    approval="",
+    db_path=None,
+    recipe_db_path=None,
+    jobs_db_path=None,
+    guest_base_dir=None,
+    at_time=None,
+    artifact_deleters=None,
+    rq_canceller=None,
+    failure_injector=None,
+):
     if not is_admin_user(admin_user):
         return {
             "ok": False,
             "errors": ["Admin access is required."],
         }
 
-    result = delete_expired_guest_sessions()
-    audit_entry = record_expired_guest_demo_cleanup(admin_user, result)
+    try:
+        result = guest_purge_service.purge_expired_guest_batch(
+            dry_run=bool(dry_run),
+            authorized=bool(authorized),
+            approval=approval,
+            db_path=db_path,
+            recipe_db_path=recipe_db_path,
+            jobs_db_path=jobs_db_path,
+            guest_base_dir=guest_base_dir,
+            at_time=at_time,
+            artifact_deleters=artifact_deleters,
+            rq_canceller=rq_canceller,
+            failure_injector=failure_injector,
+        )
+    except guest_purge_service.GuestPurgeApprovalError:
+        return {
+            "ok": False,
+            "dry_run": False,
+            "applied": False,
+            "code": "approval_required",
+            "errors": ["Type the exact guest purge approval phrase."],
+        }
+
+    if dry_run:
+        if not result.get("ok"):
+            return {
+                **result,
+                "errors": [
+                    "Guest cleanup is unavailable until the database schema and guest migration are complete."
+                ],
+            }
+        eligible_count = int(result.get("eligible_count") or 0)
+        return {
+            **result,
+            "deleted_count": 0,
+            "guest_session_ids": [],
+            "message": (
+                f"Previewed {eligible_count} expired or orphaned guest session"
+                f"{'s' if eligible_count != 1 else ''}; no data was deleted."
+            ),
+        }
+
+    audit_entry = (
+        record_expired_guest_demo_cleanup(admin_user, result)
+        if result.get("applied")
+        else None
+    )
     deleted_count = int(result.get("deleted_count") or 0)
+    if not result.get("ok"):
+        retryable_count = len(result.get("retryable_failures") or [])
+        return {
+            **result,
+            "deleted_count": deleted_count,
+            "guest_session_ids": result.get("guest_session_ids", []),
+            "audit_entry": audit_entry_for_render(audit_entry) if audit_entry else None,
+            "errors": [
+                (
+                    f"Guest cleanup is incomplete; {retryable_count} purge"
+                    f"{'s' if retryable_count != 1 else ''} can be retried."
+                )
+                if retryable_count
+                else "Guest cleanup failed safely without using legacy deletion."
+            ],
+        }
     return {
         "ok": True,
+        "dry_run": False,
+        "applied": True,
         "deleted_count": deleted_count,
         "guest_session_ids": result.get("guest_session_ids", []),
-        "audit_entry": audit_entry_for_render(audit_entry),
+        "audit_entry": audit_entry_for_render(audit_entry) if audit_entry else None,
         "message": f"Deleted {deleted_count} expired guest demo session{'s' if deleted_count != 1 else ''}.",
     }
+
+
+def expired_guest_purge_candidate_count_for_admin():
+    """Include retryable/orphan candidates after the database becomes authoritative."""
+
+    try:
+        legacy_count = expired_guest_session_count()
+    except Exception:
+        legacy_count = 0
+    try:
+        if guest_session_service.guest_session_backend_mode() not in {
+            "db_preferred",
+            "db_only",
+        }:
+            return legacy_count
+        database = guest_session_service.guest_session_db_path()
+        preview = guest_purge_service.preview_expired_guest_purge_batch(
+            db_path=database,
+            recipe_db_path=database,
+        )
+        if preview.get("ok"):
+            return int(preview.get("eligible_count") or 0)
+    except Exception:
+        pass
+    return legacy_count
 
 
 def admin_support_dashboard_for_user(admin_user, selected_user=None, errors=None, reason=""):
@@ -470,5 +593,10 @@ def admin_support_dashboard_for_user(admin_user, selected_user=None, errors=None
         "reason": normalize_reason(reason) if is_admin else "",
         "recent_audit": recent_support_audit_entries() if is_admin else [],
         "recent_admin_access": recent_admin_access_audit_entries() if can_manage_access else [],
-        "expired_guest_demo_count": expired_guest_session_count() if is_admin else 0,
+        "expired_guest_demo_count": (
+            expired_guest_purge_candidate_count_for_admin() if is_admin else 0
+        ),
+        "guest_purge_approval_phrase": (
+            guest_purge_service.GUEST_PURGE_BATCH_APPROVAL_PHRASE if is_admin else ""
+        ),
     }

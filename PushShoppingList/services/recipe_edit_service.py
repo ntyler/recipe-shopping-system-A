@@ -1,5 +1,6 @@
 import base64
 from copy import deepcopy
+import hashlib
 import json
 import logging
 import math
@@ -28,6 +29,7 @@ from flask import g
 from flask import has_request_context
 
 from PushShoppingList.services import cloudflare_r2_storage
+from PushShoppingList.services import durable_document_runtime_service as durable_runtime
 from PushShoppingList.services import menu_store_service
 from PushShoppingList.services.food_rules_service import load_food_rules
 from PushShoppingList.services.menu_mega_json_service import load_menu_mega_json_snapshot
@@ -194,6 +196,14 @@ NUTRITION_ESTIMATE_FIELDS = [
 STEP_IMAGE_FOLDER = Path(__file__).resolve().parents[1] / "static" / "generated" / "recipe_steps"
 STEP_IMAGE_URL_PREFIX = "/static/generated/recipe_steps"
 COVER_IMAGE_UPLOAD_FOLDER = UPLOAD_FOLDER / "recipe_covers"
+
+
+def new_artifact_write_kwargs(path_or_url):
+    """Keep JSON-mode call contracts unchanged for rollback compatibility."""
+
+    if durable_runtime.durable_backend_mode() == "json":
+        return {}
+    return {"new_artifact_paths": (path_or_url,)}
 RESTAURANT_LOGO_UPLOAD_FOLDER = UPLOAD_FOLDER / "restaurant_logos"
 COVER_IMAGE_EXTENSIONS = {
     ".avif",
@@ -4008,7 +4018,11 @@ def backfill_editable_restaurant_usage(restaurant_id):
         metadata = recipe_data.get("source_metadata")
         if isinstance(metadata, dict):
             metadata["restaurant_id"] = clean_recipe_menu_text(restaurant_id)
-        record["path"].write_text(json.dumps(recipe_data, indent=2, ensure_ascii=False), encoding="utf-8")
+        save_recipe_output_to_path(
+            record["path"],
+            recipe_data,
+            url=recipe_output_identity_url(recipe_data),
+        )
         updated += 1
     if has_request_context():
         g.pop("_recipe_edit_output_index", None)
@@ -6730,7 +6744,19 @@ def generate_editable_recipe_pdf_file(url, pdf_kind=PDF_KIND_GENERATED_RECIPE):
         recipe_data["pdf_path"] = local_path
     apply_recipe_pdf_asset_aliases(recipe_data)
     log_recipe_pdf_fields(f"generate_pdf_file:{pdf_kind}", recipe_data)
-    save_recipe_output(url, recipe_data)
+    try:
+        save_recipe_output(
+            url,
+            recipe_data,
+            **new_artifact_write_kwargs(saved_path),
+        )
+    except Exception:
+        from PushShoppingList.services.artifact_ownership_service import (
+            remove_new_local_artifact_family,
+        )
+
+        remove_new_local_artifact_family(saved_path)
+        raise
     result = {
         "ok": True,
         "url": url,
@@ -7086,6 +7112,7 @@ def save_recipe_output_with_requirements(
     previous_recipe_data=None,
     destination_previous_data=None,
     force_store_sections_from_recipe=True,
+    new_artifact_paths=(),
 ):
     """Save authoritative SQL first, then its legacy JSON projection."""
     recipe_url = str(recipe_url or "").strip()
@@ -7107,7 +7134,12 @@ def save_recipe_output_with_requirements(
                 recipe_data,
             )
         )
-        save_recipe_output(recipe_url, compatibility_data)
+        save_kwargs = {}
+        if previous_recipe_url:
+            save_kwargs["previous_url"] = previous_recipe_url
+        if new_artifact_paths:
+            save_kwargs["new_artifact_paths"] = new_artifact_paths
+        save_recipe_output(recipe_url, compatibility_data, **save_kwargs)
         return compatibility_data
     except Exception:
         LOGGER.exception(
@@ -8112,7 +8144,19 @@ def save_recipe_cover_image_upload(original_url, uploaded_file, source_url="", f
         "cover_image_prompt",
     ):
         existing_data.pop(field, None)
-    save_recipe_output(recipe_source_url, existing_data)
+    try:
+        save_recipe_output(
+            recipe_source_url,
+            existing_data,
+            **new_artifact_write_kwargs(upload_path),
+        )
+    except Exception:
+        from PushShoppingList.services.artifact_ownership_service import (
+            remove_new_local_artifact_family,
+        )
+
+        remove_new_local_artifact_family(upload_path)
+        raise
 
     recipe_meta = load_recipe_ingredients().get(normalize_recipe_url_key(recipe_source_url), {})
     quantity = normalize_recipe_quantity(recipe_meta.get("quantity", 1))
@@ -8180,7 +8224,19 @@ def save_generated_recipe_cover_image(
         recipe_data["cover_image_prompt"] = image_prompt
     else:
         recipe_data.pop("cover_image_prompt", None)
-    save_recipe_output(recipe_source_url, recipe_data)
+    try:
+        save_recipe_output(
+            recipe_source_url,
+            recipe_data,
+            **new_artifact_write_kwargs(image_path),
+        )
+    except Exception:
+        from PushShoppingList.services.artifact_ownership_service import (
+            remove_new_local_artifact_family,
+        )
+
+        remove_new_local_artifact_family(image_path)
+        raise
 
     recipe_meta = load_recipe_ingredients().get(normalize_recipe_url_key(recipe_source_url), {})
     quantity = normalize_recipe_quantity(recipe_meta.get("quantity", 1))
@@ -9599,7 +9655,19 @@ def generate_recipe_step_image(payload):
         "text": instruction_text,
     }
     recipe_data["instructions"] = instructions
-    save_recipe_output(url, recipe_data)
+    try:
+        save_recipe_output(
+            url,
+            recipe_data,
+            **new_artifact_write_kwargs(step_image_url),
+        )
+    except Exception:
+        from PushShoppingList.services.artifact_ownership_service import (
+            remove_new_local_artifact_family,
+        )
+
+        remove_new_local_artifact_family(step_image_url)
+        raise
     finish_recipe_image_progress(
         "step",
         url,
@@ -9745,11 +9813,20 @@ def generate_recipe_equipment_image(payload):
         "text": equipment_text,
     }
     recipe_data["equipment"] = equipment_items
-    recipe_data = save_recipe_output_with_requirements(
-        url,
-        recipe_data,
-        previous_recipe_data=previous_recipe_data,
-    )
+    try:
+        recipe_data = save_recipe_output_with_requirements(
+            url,
+            recipe_data,
+            previous_recipe_data=previous_recipe_data,
+            **new_artifact_write_kwargs(equipment_image_url),
+        )
+    except Exception:
+        from PushShoppingList.services.artifact_ownership_service import (
+            remove_new_local_artifact_family,
+        )
+
+        remove_new_local_artifact_family(equipment_image_url)
+        raise
     finish_recipe_image_progress(
         "equipment",
         url,
@@ -9895,11 +9972,20 @@ def generate_recipe_ingredient_image(payload):
         "ingredient": ingredient_text,
     }
     recipe_data["ingredients"] = ingredients
-    recipe_data = save_recipe_output_with_requirements(
-        url,
-        recipe_data,
-        previous_recipe_data=previous_recipe_data,
-    )
+    try:
+        recipe_data = save_recipe_output_with_requirements(
+            url,
+            recipe_data,
+            previous_recipe_data=previous_recipe_data,
+            **new_artifact_write_kwargs(ingredient_image_url),
+        )
+    except Exception:
+        from PushShoppingList.services.artifact_ownership_service import (
+            remove_new_local_artifact_family,
+        )
+
+        remove_new_local_artifact_family(ingredient_image_url)
+        raise
     finish_recipe_image_progress(
         "ingredient",
         url,
@@ -10534,6 +10620,46 @@ def _read_recipe_output_json(json_path):
         return None
 
 
+RECIPE_OUTPUT_SOURCE_KEY = "recipe_json"
+RECIPE_OUTPUT_SOURCE_PREFIX = "recipe-extractor/data/output"
+
+
+def recipe_output_document_key(recipe_data, fallback_url=""):
+    """Return the exact opaque document key used by the staged backfill."""
+
+    recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
+    fallback = str(fallback_url or "")
+    for field in (
+        "recipe_uuid",
+        "recipe_id",
+        "id",
+        "source_url",
+        "recipe_url",
+        "url",
+        "original_url",
+    ):
+        candidate = recipe_data.get(field)
+        if isinstance(candidate, (str, int)) and str(candidate):
+            identity = "%s:%s" % (field, candidate)
+            break
+    else:
+        if not fallback:
+            raise durable_runtime.DurableDocumentRuntimeError(
+                "Recipe output has no durable identity."
+            )
+        identity = "source_url:%s" % fallback
+    return "identity-sha256:" + hashlib.sha256(identity.encode("utf-8")).hexdigest()
+
+
+def recipe_output_source_ref(json_path):
+    filename = Path(os.fspath(json_path)).name
+    if not filename or Path(filename).suffix.lower() != ".json":
+        raise durable_runtime.DurableDocumentRuntimeError(
+            "Recipe output source filename is invalid."
+        )
+    return "%s/%s" % (RECIPE_OUTPUT_SOURCE_PREFIX, filename)
+
+
 def recipe_output_identity_url(recipe_data, fallback_url=""):
     """Return the unique record URL used to address one saved recipe.
 
@@ -10555,7 +10681,7 @@ def recipe_output_identity_key(recipe_data, fallback_url=""):
     )
 
 
-def build_recipe_output_index():
+def build_legacy_recipe_output_index():
     index = {}
     collisions = set()
 
@@ -10586,6 +10712,157 @@ def build_recipe_output_index():
     return index
 
 
+def database_recipe_output_records(*, include_shadow=False):
+    mode = durable_runtime.durable_backend_mode()
+    if mode == "json" or (mode == "shadow" and not include_shadow):
+        return []
+    workspace_id, _workspace_type, _subject_id = (
+        durable_runtime.active_workspace_identity()
+    )
+    return durable_runtime.list_database_documents(
+        workspace_id=workspace_id,
+        domain="recipes",
+        source_key=RECIPE_OUTPUT_SOURCE_KEY,
+        require_schema=mode == "db_only",
+        include_deleted=True,
+    )
+
+
+def _recipe_stable_identity_values(recipe_data):
+    recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
+    return {
+        (field, str(recipe_data.get(field)))
+        for field in ("recipe_uuid", "recipe_id", "id")
+        if isinstance(recipe_data.get(field), (str, int))
+        and str(recipe_data.get(field))
+    }
+
+
+def resolve_recipe_output_database_binding(
+    recipe_data,
+    json_path,
+    *,
+    url="",
+    previous_url="",
+    for_write=False,
+):
+    """Resolve an existing exact recipe marker without changing its row key."""
+
+    current_ref = recipe_output_source_ref(json_path)
+    mode = durable_runtime.durable_backend_mode()
+    try:
+        proposed_key = recipe_output_document_key(recipe_data, fallback_url=url)
+    except durable_runtime.DurableDocumentRuntimeError:
+        if mode not in {"json", "shadow"}:
+            raise
+        # Legacy mode historically allowed identity-free JSON.  Keep that
+        # write behavior while assigning only a path-derived compatibility key.
+        proposed_key = recipe_output_document_key(
+            recipe_data, fallback_url=current_ref
+        )
+    if mode == "json":
+        return proposed_key, current_ref, ""
+
+    try:
+        records = database_recipe_output_records(include_shadow=True)
+    except durable_runtime.DurableDocumentRuntimeError:
+        if mode == "shadow":
+            return proposed_key, current_ref, ""
+        raise
+
+    old_ref = ""
+    if previous_url:
+        old_ref = recipe_output_source_ref(
+            recipe_output_json_path(previous_url, output_folder=OUTPUT_FOLDER)
+        )
+    target_identity_keys = {
+        normalize_recipe_url_key(value)
+        for value in (url, previous_url, recipe_output_identity_url(recipe_data))
+        if str(value or "").strip()
+    }
+    target_stable_values = _recipe_stable_identity_values(recipe_data)
+    matches = {}
+    for record in records:
+        record_key = str(record.get("document_key") or "")
+        record_ref = str(record.get("source_ref") or "")
+        stored_data = record.get("document")
+        matches_exact_binding = record_ref in {current_ref, old_ref}
+        matches_proposed_key = record_key == proposed_key
+        matches_stored_identity = False
+        if isinstance(stored_data, dict):
+            stored_identity_key = normalize_recipe_url_key(
+                recipe_output_identity_url(stored_data)
+            )
+            matches_stored_identity = bool(
+                (stored_identity_key and stored_identity_key in target_identity_keys)
+                or (
+                    target_stable_values
+                    and target_stable_values.intersection(
+                        _recipe_stable_identity_values(stored_data)
+                    )
+                )
+            )
+        if matches_exact_binding or matches_proposed_key or matches_stored_identity:
+            matches[record_key] = record
+
+    if len(matches) > 1:
+        raise durable_runtime.DurableDocumentRuntimeError(
+            "Recipe output has more than one durable source binding."
+        )
+    if not matches:
+        return proposed_key, current_ref, ""
+
+    record = next(iter(matches.values()))
+    binding_ref = str(record.get("source_ref") or "")
+    if for_write:
+        return (
+            str(record.get("document_key") or proposed_key),
+            current_ref,
+            binding_ref if binding_ref != current_ref else "",
+        )
+    return str(record.get("document_key") or proposed_key), binding_ref, ""
+
+
+def build_recipe_output_index():
+    mode = durable_runtime.durable_backend_mode()
+    legacy_index = (
+        {} if mode == "db_only" else build_legacy_recipe_output_index()
+    )
+    if mode in {"json", "shadow"}:
+        return legacy_index
+
+    index = {} if mode == "db_only" else dict(legacy_index)
+    legacy_keys_by_document = {
+        recipe_output_document_key(recipe_data): recipe_key
+        for recipe_key, recipe_data in legacy_index.items()
+    }
+    records = database_recipe_output_records()
+    for record in records:
+        if record.get("status") != "deleted":
+            continue
+        recipe_key = legacy_keys_by_document.get(record.get("document_key"))
+        if recipe_key:
+            index.pop(recipe_key, None)
+
+    database_keys = {}
+    database_collisions = set()
+    for record in records:
+        recipe_data = record.get("document")
+        if record.get("status") != "covered" or not isinstance(recipe_data, dict):
+            continue
+        recipe_key = recipe_output_identity_key(recipe_data)
+        if not recipe_key or recipe_key in database_collisions:
+            continue
+        previous_document_key = database_keys.get(recipe_key)
+        if previous_document_key and previous_document_key != record.get("document_key"):
+            index.pop(recipe_key, None)
+            database_collisions.add(recipe_key)
+            continue
+        database_keys[recipe_key] = record.get("document_key")
+        index[recipe_key] = normalize_recipe_fraction_fields(recipe_data)
+    return index
+
+
 def recipe_output_index():
     if has_request_context():
         cached = getattr(g, "_recipe_edit_output_index", None)
@@ -10599,16 +10876,16 @@ def recipe_output_index():
 
 def load_recipe_output(url, *, equipment_consumer="recipe_output"):
     recipe_key = normalize_recipe_url_key(url)
-    direct_path = recipe_output_json_path(url, output_folder=OUTPUT_FOLDER)
     data = None
-
-    if direct_path.exists():
-        direct_data = _read_recipe_output_json(direct_path)
-        if isinstance(direct_data, dict):
-            identity_key = recipe_output_identity_key(direct_data, fallback_url=url)
-            if not identity_key or identity_key == recipe_key:
-                data = direct_data
-
+    mode = durable_runtime.durable_backend_mode()
+    if mode in {"json", "shadow"}:
+        direct_path = recipe_output_json_path(url, output_folder=OUTPUT_FOLDER)
+        if direct_path.exists():
+            direct_data = _read_recipe_output_json(direct_path)
+            if isinstance(direct_data, dict):
+                identity_key = recipe_output_identity_key(direct_data, fallback_url=url)
+                if not identity_key or identity_key == recipe_key:
+                    data = direct_data
     if not isinstance(data, dict):
         data = recipe_output_index().get(recipe_key)
     if not isinstance(data, dict):
@@ -10644,8 +10921,25 @@ def load_recipe_output(url, *, equipment_consumer="recipe_output"):
 def remove_recipe_output_file(url):
     recipe_key = normalize_recipe_url_key(url)
     json_path = Path(os.fspath(recipe_output_json_path(url, output_folder=OUTPUT_FOLDER)))
-    with _RECIPE_OUTPUT_WRITE_LOCK:
-        json_path.unlink(missing_ok=True)
+    recipe_data = recipe_output_index().get(recipe_key) or {"source_url": url}
+
+    def delete_legacy_file():
+        with _RECIPE_OUTPUT_WRITE_LOCK:
+            json_path.unlink(missing_ok=True)
+        return {"action": "deleted", "path": str(json_path)}
+
+    document_key, source_ref, _previous_ref = resolve_recipe_output_database_binding(
+        recipe_data,
+        json_path,
+        url=url,
+    )
+    durable_runtime.delete_json_document(
+        delete_legacy_file,
+        domain="recipes",
+        document_key=document_key,
+        source_key=RECIPE_OUTPUT_SOURCE_KEY,
+        source_ref=source_ref,
+    )
     if has_request_context():
         g._recipe_edit_output_index = None
 
@@ -10663,30 +10957,78 @@ def remove_stale_recipe_output(original_url, source_url):
     if normalize_recipe_url_key(original_data.get("source_url")) != original_key:
         return False
 
-    remove_recipe_output_file(original_url)
+    if durable_runtime.durable_backend_mode() == "json":
+        remove_recipe_output_file(original_url)
+    else:
+        # The preceding durable save already moved the logical recipe.  This
+        # only removes the obsolete compatibility filename for that rename.
+        with _RECIPE_OUTPUT_WRITE_LOCK:
+            original_path.unlink(missing_ok=True)
+        if has_request_context():
+            g._recipe_edit_output_index = None
     return True
 
 
-def save_recipe_output_to_path(json_path, recipe_data, *, url=""):
+def save_recipe_output_to_path(
+    json_path,
+    recipe_data,
+    *,
+    url="",
+    previous_url="",
+    new_artifact_paths=(),
+):
     json_path = Path(os.fspath(json_path))
-    json_path.parent.mkdir(parents=True, exist_ok=True)
-    temporary_path = json_path.with_name(f".{json_path.name}.{uuid.uuid4().hex}.tmp")
-    serialized = json.dumps(recipe_data, indent=2, ensure_ascii=False)
+
+    def save_legacy_file(value):
+        json_path.parent.mkdir(parents=True, exist_ok=True)
+        temporary_path = json_path.with_name(f".{json_path.name}.{uuid.uuid4().hex}.tmp")
+        serialized = json.dumps(value, indent=2, ensure_ascii=False)
+        with _RECIPE_OUTPUT_WRITE_LOCK:
+            try:
+                temporary_path.write_text(serialized, encoding="utf-8")
+                os.replace(temporary_path, json_path)
+            finally:
+                temporary_path.unlink(missing_ok=True)
+        return json_path
+
     with _RECIPE_OUTPUT_WRITE_LOCK:
-        try:
-            temporary_path.write_text(serialized, encoding="utf-8")
-            os.replace(temporary_path, json_path)
-        finally:
-            temporary_path.unlink(missing_ok=True)
+        document_key, source_ref, previous_source_ref = (
+            resolve_recipe_output_database_binding(
+                recipe_data,
+                json_path,
+                url=url,
+                previous_url=previous_url,
+                for_write=True,
+            )
+        )
+        durable_runtime.save_json_document(
+            recipe_data,
+            save_legacy_file,
+            domain="recipes",
+            document_key=document_key,
+            source_key=RECIPE_OUTPUT_SOURCE_KEY,
+            source_ref=source_ref,
+            new_artifact_paths=new_artifact_paths,
+            db_preferred_create_if_legacy_missing=lambda: not json_path.is_file(),
+            previous_source_ref=previous_source_ref,
+        )
     if has_request_context():
         # Rebuild on the next lookup so collision detection remains correct.
         g._recipe_edit_output_index = None
     return json_path
 
 
-def save_recipe_output(url, recipe_data):
+def save_recipe_output(
+    url, recipe_data, *, previous_url="", new_artifact_paths=()
+):
     json_path = Path(os.fspath(recipe_output_json_path(url, output_folder=OUTPUT_FOLDER)))
-    return save_recipe_output_to_path(json_path, recipe_data, url=url)
+    return save_recipe_output_to_path(
+        json_path,
+        recipe_data,
+        url=url,
+        previous_url=previous_url,
+        new_artifact_paths=new_artifact_paths,
+    )
 
 
 def replace_recipe_url(original_url, source_url):

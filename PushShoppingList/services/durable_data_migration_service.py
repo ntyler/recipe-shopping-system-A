@@ -152,6 +152,9 @@ class SecretEncryptor(Protocol):
     def encrypt_json(self, value: object, *, associated_data: str) -> str:
         ...
 
+    def decrypt_json(self, envelope_json: str, *, associated_data: str) -> object:
+        ...
+
 
 class DatabaseConnection(Protocol):
     """Minimal DB-API transaction surface required by apply."""
@@ -332,6 +335,7 @@ class MigrationDatabaseAdapter:
     upsert_durable_document: Callable[..., object]
     upsert_source_coverage: Callable[..., object]
     get_source_coverage: Optional[Callable[..., object]] = None
+    get_durable_document: Optional[Callable[..., object]] = None
 
 
 @dataclass(frozen=True)
@@ -405,7 +409,7 @@ DEFAULT_SOURCE_DESCRIPTORS: Tuple[SourceDescriptor, ...] = (
     ),
     _descriptor(
         "pdf_share_tokens", SCOPE_GLOBAL, "", "sharing", "pdf_share_links",
-        CLASSIFICATION_DURABLE, HANDLER_SHARE_TOKEN_DIGEST,
+        CLASSIFICATION_SKIPPED, HANDLER_DELEGATED_JSON,
         root_shape=ROOT_OBJECT_OR_ARRAY, collection_keys=("links",),
     ),
     _descriptor(
@@ -702,7 +706,40 @@ def apply_durable_data(
                         entry.domain,
                         entry.entry_id,
                     )
-                if _coverage_matches(existing_coverage, entry.source_sha256):
+                existing_document = None
+                if adapter.get_durable_document is not None:
+                    existing_document = adapter.get_durable_document(
+                        connection,
+                        entry.workspace_id,
+                        entry.domain,
+                        entry.document_key,
+                    )
+                if (
+                    _coverage_matches(existing_coverage, entry.source_sha256)
+                    and (
+                        adapter.get_durable_document is None
+                        or _stored_document_matches(
+                            existing_document,
+                            prepared,
+                            encryptor=encryptor,
+                        )
+                    )
+                ):
+                    coverage_summary = _coverage_summary(
+                        entry, source_ref=prepared.instance.source_ref
+                    )
+                    # Re-upserting an unchanged marker lets repository adapters
+                    # attach an audit run to coverage created by older code.
+                    adapter.upsert_source_coverage(
+                        connection,
+                        entry.workspace_id,
+                        entry.domain,
+                        entry.entry_id,
+                        entry.source_sha256,
+                        "covered",
+                        applied_at,
+                        coverage_summary,
+                    )
                     actions["unchanged"] = actions.get("unchanged", 0) + 1
                     source_rollup.update(entry.entry_id.encode("ascii"))
                     source_rollup.update(entry.source_sha256.encode("ascii"))
@@ -733,13 +770,8 @@ def apply_durable_data(
                 )
                 action_name = _adapter_action_name(action)
                 actions[action_name] = actions.get(action_name, 0) + 1
-                coverage_summary = canonical_json(
-                    {
-                        "byte_count": entry.byte_count,
-                        "classification": entry.classification,
-                        "document_sha256": entry.document_sha256,
-                        "record_count": entry.record_count,
-                    }
+                coverage_summary = _coverage_summary(
+                    entry, source_ref=prepared.instance.source_ref
                 )
                 adapter.upsert_source_coverage(
                     connection,
@@ -753,6 +785,39 @@ def apply_durable_data(
                 )
                 source_rollup.update(entry.entry_id.encode("ascii"))
                 source_rollup.update(entry.source_sha256.encode("ascii"))
+
+                if adapter.get_durable_document is not None:
+                    stored = adapter.get_durable_document(
+                        connection,
+                        entry.workspace_id,
+                        entry.domain,
+                        entry.document_key,
+                    )
+                    if not _stored_document_matches(
+                        stored,
+                        prepared,
+                        encryptor=encryptor,
+                        expected_encrypted_json=(
+                            document_json
+                            if prepared.instance.descriptor.handler
+                            == HANDLER_ENCRYPTED_JSON
+                            else None
+                        ),
+                    ):
+                        raise MigrationPreviewError(
+                            "A durable document failed validation before commit."
+                        )
+                if adapter.get_source_coverage is not None:
+                    validated_coverage = adapter.get_source_coverage(
+                        connection,
+                        entry.workspace_id,
+                        entry.domain,
+                        entry.entry_id,
+                    )
+                    if not _coverage_matches(validated_coverage, entry.source_sha256):
+                        raise MigrationPreviewError(
+                            "Source coverage failed validation before commit."
+                        )
             connection.commit()
         except BaseException:
             connection.rollback()
@@ -830,11 +895,31 @@ def application_data_service_adapter(
         covered_at: str,
         summary_json: str,
     ) -> object:
+        run_material = "\x1f".join(
+            (workspace_id, domain, source_key, source_sha256)
+        )
+        run_id = "durable-json:%s" % hashlib.sha256(
+            run_material.encode("utf-8")
+        ).hexdigest()
+        application_data_service.record_application_migration_run(
+            "durable_json_backfill",
+            "succeeded",
+            run_id=run_id,
+            source_sha256=source_sha256,
+            summary={
+                "documents": 1,
+                "schema_version": 1,
+            },
+            started_at=covered_at,
+            finished_at=covered_at,
+            connection=database,
+        )
         return application_data_service.upsert_source_coverage(
             workspace_id,
             domain,
             source_key,
             source_sha256,
+            migration_run_id=run_id,
             status=status,
             summary=_strict_json_loads(summary_json.encode("utf-8")),
             covered_at=covered_at,
@@ -854,12 +939,26 @@ def application_data_service_adapter(
             connection=database,
         )
 
+    def get_document(
+        database: DatabaseConnection,
+        workspace_id: str,
+        domain: str,
+        document_key: str,
+    ) -> object:
+        return application_data_service.get_durable_document(
+            workspace_id,
+            domain,
+            document_key,
+            connection=database,
+        )
+
     return MigrationDatabaseAdapter(
         connection=connection,
         ensure_workspace=ensure_workspace,
         upsert_durable_document=upsert_document,
         upsert_source_coverage=upsert_coverage,
         get_source_coverage=get_coverage,
+        get_durable_document=get_document,
     )
 
 
@@ -1491,6 +1590,77 @@ def _coverage_matches(value: object, source_sha256: str) -> bool:
             and value["status"] == "covered"
         )
     except (KeyError, TypeError, IndexError):
+        return False
+
+
+def _coverage_summary(entry: PreviewEntry, *, source_ref: str) -> str:
+    return canonical_json(
+        {
+            "byte_count": entry.byte_count,
+            "classification": entry.classification,
+            "document_key": entry.document_key,
+            "document_sha256": entry.document_sha256,
+            "record_count": entry.record_count,
+            "source_key": entry.source_key,
+            "source_ref": source_ref,
+        }
+    )
+
+
+def _stored_document_matches(
+    value: object,
+    prepared: _PreparedSource,
+    *,
+    encryptor: Optional[SecretEncryptor] = None,
+    expected_encrypted_json: Optional[str] = None,
+) -> bool:
+    if not isinstance(value, Mapping):
+        return False
+    entry = prepared.entry
+    if value.get("source_sha256") != entry.source_sha256:
+        return False
+    document = value.get("document")
+    if prepared.instance.descriptor.handler == HANDLER_ENCRYPTED_JSON:
+        if not (
+            isinstance(document, Mapping)
+            and set(document) == {"algorithm", "key_id", "nonce", "ciphertext"}
+            and all(
+                isinstance(document.get(key), str) and document.get(key)
+                for key in document
+            )
+        ):
+            return False
+        envelope_json = canonical_json(document)
+        if expected_encrypted_json is not None:
+            try:
+                return envelope_json == canonical_json(
+                    _strict_json_loads(expected_encrypted_json.encode("utf-8"))
+                )
+            except (TypeError, ValueError, UnicodeError):
+                return False
+        if encryptor is None or not callable(getattr(encryptor, "decrypt_json", None)):
+            return False
+        associated_data = "\x1f".join(
+            (
+                entry.workspace_id,
+                entry.domain,
+                entry.document_key,
+                entry.source_sha256 or "",
+            )
+        )
+        try:
+            decrypted = encryptor.decrypt_json(
+                envelope_json,
+                associated_data=associated_data,
+            )
+            return canonical_json(decrypted) == canonical_json(prepared.value)
+        except Exception:
+            return False
+    if prepared.document_json is None:
+        return False
+    try:
+        return canonical_json(document) == prepared.document_json
+    except (TypeError, ValueError):
         return False
 
 

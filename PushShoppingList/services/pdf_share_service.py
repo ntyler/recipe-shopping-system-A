@@ -1,8 +1,10 @@
 import json
 import os
 import secrets
+import tempfile
 from datetime import datetime
 from datetime import timedelta
+from datetime import timezone
 from pathlib import Path
 
 
@@ -12,6 +14,13 @@ EXTRACTOR_DATA_DIR = PACKAGE_DIR / "services" / "recipe-extractor" / "data"
 PDF_DIR = EXTRACTOR_DATA_DIR / "pdf"
 PDF_SHARE_LINKS_FILE = EXTRACTOR_DATA_DIR / "pdf_share_links.json"
 DEFAULT_SHARE_DAYS = 30
+PDF_SHARE_BACKEND_ENV = "SHOPPING_APP_PDF_SHARE_BACKEND"
+PDF_SHARE_BACKEND_MODES = frozenset({"json", "shadow", "db_preferred", "db_only"})
+PDF_SHARE_DB_PATH = None
+
+
+class PdfShareStorageError(RuntimeError):
+    """Raised when an authoritative PDF-share backend cannot be used safely."""
 
 
 def utc_now():
@@ -28,8 +37,12 @@ def iso_from_datetime(value):
 
 def parse_iso_datetime(value):
     try:
-        return datetime.fromisoformat(str(value or "").replace("Z", ""))
-    except ValueError:
+        text = str(value or "")
+        parsed = datetime.fromisoformat(text[:-1] + "+00:00" if text.endswith("Z") else text)
+        if parsed.tzinfo is not None:
+            parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
+        return parsed
+    except (TypeError, ValueError):
         return None
 
 
@@ -43,20 +56,79 @@ def pdf_storage_dir():
     return path
 
 
-def pdf_share_links_file():
+def pdf_share_links_file(create_parent=False):
     path = path_value(PDF_SHARE_LINKS_FILE)
-    path.parent.mkdir(parents=True, exist_ok=True)
+    if create_parent:
+        path.parent.mkdir(parents=True, exist_ok=True)
     return path
 
 
-def load_share_links():
+def pdf_share_backend_mode(environment=None):
+    environment = environment if environment is not None else os.environ
+    mode = str(environment.get(PDF_SHARE_BACKEND_ENV, "json") or "json").strip().lower()
+    if mode not in PDF_SHARE_BACKEND_MODES:
+        raise PdfShareStorageError("PDF-share backend mode is invalid.")
+    return mode
+
+
+def pdf_share_db_path():
+    if PDF_SHARE_DB_PATH is not None:
+        return Path(PDF_SHARE_DB_PATH)
+    from PushShoppingList.services.application_data_service import application_data_db_path
+
+    return application_data_db_path()
+
+
+def pdf_share_encryptor():
+    from PushShoppingList.services.data_encryption_service import AesGcmDataEncryptor
+
+    return AesGcmDataEncryptor.from_environment()
+
+
+def _database_is_authoritative(mode):
+    if mode not in {"db_preferred", "db_only"}:
+        return False
+    try:
+        from PushShoppingList.services import application_data_service
+
+        status = application_data_service.application_schema_status(pdf_share_db_path())
+        if status.get("exists") and not status.get("compatible"):
+            raise PdfShareStorageError("PDF-share database schema is incompatible.")
+        if not status.get("available"):
+            if mode == "db_only":
+                raise PdfShareStorageError("PDF-share database schema is unavailable.")
+            if (
+                status.get("current_version") is not None
+                or "application_source_coverage" not in status.get("missing_tables", ())
+            ):
+                raise PdfShareStorageError("PDF-share database schema is unavailable.")
+            return False
+        from PushShoppingList.services.pdf_share_migration_service import (
+            database_share_records_are_authoritative,
+        )
+
+        authoritative = database_share_records_are_authoritative(pdf_share_db_path())
+        if not authoritative:
+            if mode == "db_only":
+                raise PdfShareStorageError(
+                    "PDF-share database migration coverage is unavailable."
+                )
+            return False
+        return True
+    except PdfShareStorageError:
+        raise
+    except Exception as exc:
+        raise PdfShareStorageError("PDF-share database coverage could not be read.") from exc
+
+
+def _load_json_share_links():
     path = pdf_share_links_file()
 
     if not path.exists():
         return {"links": []}
 
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload = json.loads(path.read_text(encoding="utf-8-sig"))
     except Exception:
         return {"links": []}
 
@@ -76,7 +148,35 @@ def load_share_links():
     }
 
 
-def save_share_links(payload):
+def load_share_links(include_tokens=True):
+    mode = pdf_share_backend_mode()
+    if not _database_is_authoritative(mode):
+        payload = _load_json_share_links()
+        if include_tokens:
+            return payload
+        return {
+            "links": [
+                {**record, "token": ""}
+                for record in payload.get("links", [])
+            ]
+        }
+    try:
+        from PushShoppingList.services.pdf_share_migration_service import database_share_records
+
+        encryptor = pdf_share_encryptor() if include_tokens else None
+        return database_share_records(
+            pdf_share_db_path(),
+            include_tokens=bool(include_tokens),
+            encryptor=encryptor,
+            require_authoritative=True,
+        )
+    except Exception as exc:
+        if isinstance(exc, PdfShareStorageError):
+            raise
+        raise PdfShareStorageError("PDF-share database records could not be read.") from exc
+
+
+def _atomic_save_json_share_links(payload):
     normalized = {
         "links": [
             normalize_share_record(record)
@@ -84,10 +184,54 @@ def save_share_links(payload):
             if isinstance(record, dict) and record.get("token")
         ],
     }
-    pdf_share_links_file().write_text(
-        json.dumps(normalized, indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
+    destination = pdf_share_links_file(create_parent=True)
+    serialized = json.dumps(normalized, indent=2, ensure_ascii=False) + "\n"
+    file_descriptor, temporary_name = tempfile.mkstemp(
+        dir=str(destination.parent),
+        prefix=".%s." % destination.name,
+        suffix=".tmp",
+        text=True,
     )
+    temporary_path = Path(temporary_name)
+    try:
+        with os.fdopen(file_descriptor, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(serialized)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(str(temporary_path), str(destination))
+    except BaseException:
+        try:
+            temporary_path.unlink()
+        except OSError:
+            pass
+        raise
+    return normalized
+
+
+def save_share_links(payload):
+    """Compatibility save; JSON remains authoritative in json/shadow modes."""
+
+    mode = pdf_share_backend_mode()
+    if _database_is_authoritative(mode):
+        raise PdfShareStorageError(
+            "Authoritative database share records require a token-scoped operation."
+        )
+    normalized = _atomic_save_json_share_links(payload)
+    if mode == "shadow":
+        try:
+            from PushShoppingList.services.pdf_share_migration_service import database_upsert_share_record
+
+            encryptor = pdf_share_encryptor()
+            mirrored_at = now_iso()
+            for record in normalized["links"]:
+                database_upsert_share_record(
+                    record,
+                    pdf_share_db_path(),
+                    encryptor,
+                    updated_at=mirrored_at,
+                )
+        except Exception as exc:
+            raise PdfShareStorageError("PDF-share shadow write failed.") from exc
     return normalized
 
 
@@ -155,7 +299,7 @@ def format_file_size(size):
 
 
 def active_share_for_pdf(pdf_filename, payload=None):
-    payload = payload or load_share_links()
+    payload = payload if payload is not None else load_share_links(include_tokens=True)
     filename = Path(str(pdf_filename or "")).name
 
     for record in reversed(payload.get("links", [])):
@@ -194,7 +338,7 @@ def cloudflare_pdf_metadata_by_filename():
 
 def list_available_pdfs():
     pdf_dir = pdf_storage_dir()
-    payload = load_share_links()
+    payload = load_share_links(include_tokens=True)
     r2_metadata = cloudflare_pdf_metadata_by_filename()
     rows = []
     seen_filenames = set()
@@ -247,7 +391,7 @@ def list_available_pdfs():
 
 
 def generate_share_token(payload=None):
-    payload = payload or load_share_links()
+    payload = payload if payload is not None else load_share_links(include_tokens=True)
     existing_tokens = {
         str(record.get("token") or "")
         for record in payload.get("links", [])
@@ -270,7 +414,7 @@ def create_pdf_share_link(pdf_filename, current_user=None, expires_days=DEFAULT_
             "error": "PDF file was not found.",
         }
 
-    payload = load_share_links()
+    payload = load_share_links(include_tokens=True)
     existing = active_share_for_pdf(pdf_path.name, payload)
 
     if existing:
@@ -297,8 +441,24 @@ def create_pdf_share_link(pdf_filename, current_user=None, expires_days=DEFAULT_
         "access_count": 0,
         "last_accessed_at": None,
     }
-    payload["links"].append(record)
-    save_share_links(payload)
+    mode = pdf_share_backend_mode()
+    if _database_is_authoritative(mode):
+        try:
+            from PushShoppingList.services.pdf_share_migration_service import database_upsert_share_record
+
+            record = database_upsert_share_record(
+                record,
+                pdf_share_db_path(),
+                pdf_share_encryptor(),
+                register_artifact=True,
+                artifact_path=pdf_path,
+                require_authoritative=True,
+            )
+        except Exception as exc:
+            raise PdfShareStorageError("PDF-share database create failed.") from exc
+    else:
+        payload["links"].append(record)
+        save_share_links(payload)
 
     return {
         "ok": True,
@@ -313,7 +473,20 @@ def find_share_record(token, payload=None):
     if not token:
         return None
 
-    payload = payload or load_share_links()
+    if payload is None:
+        mode = pdf_share_backend_mode()
+        if _database_is_authoritative(mode):
+            try:
+                from PushShoppingList.services.pdf_share_migration_service import database_find_share_record
+
+                return database_find_share_record(
+                    token,
+                    pdf_share_db_path(),
+                    require_authoritative=True,
+                )
+            except Exception as exc:
+                raise PdfShareStorageError("PDF-share database lookup failed.") from exc
+        payload = _load_json_share_links()
 
     for record in payload.get("links", []):
         if record.get("token") == token:
@@ -372,7 +545,28 @@ def resolve_share_token(token):
 
 
 def revoke_share_token(token):
-    payload = load_share_links()
+    token = str(token or "").strip()
+    mode = pdf_share_backend_mode()
+    if _database_is_authoritative(mode):
+        try:
+            from PushShoppingList.services.pdf_share_migration_service import database_revoke_share_token
+
+            record = database_revoke_share_token(
+                token,
+                pdf_share_db_path(),
+                updated_at=now_iso(),
+                require_authoritative=True,
+            )
+        except Exception as exc:
+            raise PdfShareStorageError("PDF-share database revoke failed.") from exc
+        if not record:
+            return {
+                "ok": False,
+                "error": "PDF share link was not found.",
+            }
+        return {"ok": True, "record": record}
+
+    payload = _load_json_share_links()
     record = find_share_record(token, payload)
 
     if not record:
@@ -391,7 +585,22 @@ def revoke_share_token(token):
 
 
 def record_share_access(token):
-    payload = load_share_links()
+    token = str(token or "").strip()
+    mode = pdf_share_backend_mode()
+    if _database_is_authoritative(mode):
+        try:
+            from PushShoppingList.services.pdf_share_migration_service import database_record_share_access
+
+            return database_record_share_access(
+                token,
+                pdf_share_db_path(),
+                accessed_at=now_iso(),
+                require_authoritative=True,
+            )
+        except Exception as exc:
+            raise PdfShareStorageError("PDF-share database access update failed.") from exc
+
+    payload = _load_json_share_links()
     record = find_share_record(token, payload)
 
     if not record:

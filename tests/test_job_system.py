@@ -2667,7 +2667,7 @@ def test_menu_item_inference_bubbles_job_cancellation(monkeypatch, tmp_path):
         )
 
 
-def test_guest_cleanup_deletes_guest_jobs(monkeypatch, tmp_path):
+def test_legacy_partial_guest_cleanup_fails_closed(monkeypatch, tmp_path):
     configure_job_paths(monkeypatch, tmp_path)
     guest_root = tmp_path / "guests" / "guest-1"
     guest_root.mkdir(parents=True)
@@ -2680,10 +2680,11 @@ def test_guest_cleanup_deletes_guest_jobs(monkeypatch, tmp_path):
 
     assert job_service.get_job(job["id"])
 
-    guest_session_service.delete_guest_temporary_data("guest-1")
+    with pytest.raises(guest_session_service.GuestSessionStorageError):
+        guest_session_service.delete_guest_temporary_data("guest-1")
 
-    assert job_service.get_job(job["id"]) is None
-    assert not guest_root.exists()
+    assert job_service.get_job(job["id"]) is not None
+    assert guest_root.exists()
 
 
 def test_queue_routing_by_job_type_and_payload():

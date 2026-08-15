@@ -94,6 +94,40 @@ def test_expiration_scan_revokes_access_without_deleting_workspace(isolated_gues
     assert owned_file.read_text(encoding="utf-8") == "owned"
 
 
+def test_legacy_delete_api_fails_closed_without_registry_job_or_workspace_mutation(
+    isolated_guest_registry, monkeypatch
+):
+    monkeypatch.setenv(guests.GUEST_SESSION_BACKEND_ENV, "json")
+    record = guest_record(expires_at="2026-08-15T12:00:00Z")
+    guests.save_guest_sessions({"guest_sessions": [record]})
+    registry_before = guests.GUEST_SESSIONS_FILE.read_bytes()
+    owned_file = isolated_guest_registry / "guests" / record["id"] / "keep.json"
+    owned_file.parent.mkdir(parents=True)
+    owned_file.write_text("owned", encoding="utf-8")
+    cleanup_calls = []
+    monkeypatch.setattr(
+        guests,
+        "delete_guest_temporary_data",
+        lambda guest_id: cleanup_calls.append(guest_id),
+    )
+
+    result = guests.delete_expired_guest_sessions(
+        at_time=datetime(2026, 8, 15, 12, 0, tzinfo=timezone.utc)
+    )
+
+    assert result == {
+        "ok": False,
+        "applied": False,
+        "deleted_count": 0,
+        "guest_session_ids": [],
+        "code": "transactional_guest_purge_required",
+        "deprecated": True,
+    }
+    assert cleanup_calls == []
+    assert guests.GUEST_SESSIONS_FILE.read_bytes() == registry_before
+    assert owned_file.read_text(encoding="utf-8") == "owned"
+
+
 def test_used_at_update_never_extends_expiration(isolated_guest_registry, monkeypatch):
     record = guest_record(expires_at="2026-08-15T12:00:00Z")
     guests.save_guest_sessions({"guest_sessions": [record]})

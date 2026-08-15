@@ -4,6 +4,7 @@ from pathlib import Path
 from PushShoppingList.services.purchase_mapping_service import clean_text
 from PushShoppingList.services.purchase_mapping_service import purchase_group_for_item
 from PushShoppingList.services.storage_service import scoped_extractor_data_path
+from PushShoppingList.services import durable_document_runtime_service as durable_runtime
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -13,13 +14,21 @@ ITEM_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
 
 
 def load_item_state():
-    if not ITEM_STATE_FILE.exists():
-        return {}
+    def legacy_loader():
+        if not ITEM_STATE_FILE.exists():
+            return {}
+        try:
+            return json.loads(ITEM_STATE_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            return {}
 
-    try:
-        data = json.loads(ITEM_STATE_FILE.read_text(encoding="utf-8"))
-    except Exception:
-        return {}
+    data = durable_runtime.load_json_document(
+        legacy_loader,
+        domain="shopping",
+        document_key="item_state",
+        source_key="shopping_item_state",
+        source_ref="recipe-extractor/data/shopping_item_state.json",
+    )
 
     return data if isinstance(data, dict) else {}
 
@@ -90,7 +99,13 @@ def reset_item_stores():
 
 
 def save_item_state(state):
-    ITEM_STATE_FILE.write_text(
-        json.dumps(state, indent=2, ensure_ascii=False),
-        encoding="utf-8",
+    return durable_runtime.save_json_document(
+        state,
+        lambda value: durable_runtime.atomic_write_json(
+            ITEM_STATE_FILE, value, newline=False
+        ),
+        domain="shopping",
+        document_key="item_state",
+        source_key="shopping_item_state",
+        source_ref="recipe-extractor/data/shopping_item_state.json",
     )

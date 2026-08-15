@@ -9,6 +9,7 @@ from PushShoppingList.services.recipe_ingredient_requirement_service import (
 )
 from PushShoppingList.services.recipe_extract_service import normalize_ingredient_for_shopping_list
 from PushShoppingList.services.storage_service import scoped_package_path
+from PushShoppingList.services import durable_document_runtime_service as durable_runtime
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 SHOPPING_LIST_FILE = scoped_package_path("shopping_list.txt")
@@ -38,14 +39,23 @@ def save_items(items):
 
 def load_recipe_selections():
     with SHOPPING_LIST_LOCK:
-        if not SHOPPING_LIST_SELECTIONS_FILE.exists():
-            return {"recipes": {}}
-        try:
-            payload = json.loads(
-                SHOPPING_LIST_SELECTIONS_FILE.read_text(encoding="utf-8-sig")
-            )
-        except Exception:
-            return {"recipes": {}}
+        def legacy_loader():
+            if not SHOPPING_LIST_SELECTIONS_FILE.exists():
+                return {"recipes": {}}
+            try:
+                return json.loads(
+                    SHOPPING_LIST_SELECTIONS_FILE.read_text(encoding="utf-8-sig")
+                )
+            except Exception:
+                return {"recipes": {}}
+
+        payload = durable_runtime.load_json_document(
+            legacy_loader,
+            domain="shopping",
+            document_key="recipe_selections",
+            source_key="shopping_recipe_selections",
+            source_ref="shopping_list_recipe_selections.json",
+        )
         recipes = payload.get("recipes") if isinstance(payload, dict) else {}
         return {"recipes": recipes if isinstance(recipes, dict) else {}}
 
@@ -54,11 +64,16 @@ def save_recipe_selections(payload):
     recipes = payload.get("recipes") if isinstance(payload, dict) else {}
     normalized = {"recipes": recipes if isinstance(recipes, dict) else {}}
     with SHOPPING_LIST_LOCK:
-        SHOPPING_LIST_SELECTIONS_FILE.write_text(
-            json.dumps(normalized, indent=2, ensure_ascii=False) + "\n",
-            encoding="utf-8",
+        return durable_runtime.save_json_document(
+            normalized,
+            lambda value: durable_runtime.atomic_write_json(
+                SHOPPING_LIST_SELECTIONS_FILE, value
+            ),
+            domain="shopping",
+            document_key="recipe_selections",
+            source_key="shopping_recipe_selections",
+            source_ref="shopping_list_recipe_selections.json",
         )
-    return normalized
 
 
 def save_recipe_option_selections(recipe_url, selections):

@@ -378,7 +378,7 @@ def attach_master_record_image(row, image_url, image_path, record_type="ingredie
         raise ValueError("Unsupported master image record type.")
 
     now = master_data.utc_now_iso()
-    with master_data.recipe_master_connection() as connection:
+    with master_data.recipe_master_connection(user_id=row.get("user_id")) as connection:
         existing = connection.execute(
             f"""
             SELECT image_url

@@ -6,6 +6,7 @@ from datetime import datetime
 from PushShoppingList.services.storage_service import active_user_id
 from PushShoppingList.services.storage_service import scoped_package_path
 from PushShoppingList.services.storage_service import user_data_root
+from PushShoppingList.services import durable_document_runtime_service as durable_runtime
 
 
 OPENAI_USAGE_FILE = scoped_package_path("openai_usage.json")
@@ -53,14 +54,29 @@ def openai_usage_file_for_user(user_id=None):
     return OPENAI_USAGE_FILE
 
 
-def load_openai_usage_payload(usage_file=None):
+def load_openai_usage_payload(usage_file=None, *, user_id=None):
     usage_file = usage_file or OPENAI_USAGE_FILE
-    try:
-        if not usage_file.exists():
+    def legacy_loader():
+        try:
+            if not usage_file.exists():
+                return {"records": []}
+            return json.loads(usage_file.read_text(encoding="utf-8"))
+        except Exception:
             return {"records": []}
-        payload = json.loads(usage_file.read_text(encoding="utf-8"))
-    except Exception:
-        return {"records": []}
+
+    identity = ({
+        "workspace_id": str(user_id),
+        "workspace_type": "user",
+        "subject_id": str(user_id),
+    } if user_id else {})
+    payload = durable_runtime.load_json_document(
+        legacy_loader,
+        domain="usage",
+        document_key="openai",
+        source_key="openai_usage",
+        source_ref="openai_usage.json",
+        **identity,
+    )
 
     records = payload.get("records") if isinstance(payload, dict) else []
     return {
@@ -72,13 +88,23 @@ def load_openai_usage_payload(usage_file=None):
     }
 
 
-def save_openai_usage_payload(payload, usage_file=None):
+def save_openai_usage_payload(payload, usage_file=None, *, user_id=None):
     usage_file = usage_file or OPENAI_USAGE_FILE
     records = payload.get("records", []) if isinstance(payload, dict) else []
     payload = {"records": records[-MAX_USAGE_RECORDS:]}
-    usage_file.write_text(
-        json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
+    identity = ({
+        "workspace_id": str(user_id),
+        "workspace_type": "user",
+        "subject_id": str(user_id),
+    } if user_id else {})
+    return durable_runtime.save_json_document(
+        payload,
+        lambda value: durable_runtime.atomic_write_json(usage_file, value),
+        domain="usage",
+        document_key="openai",
+        source_key="openai_usage",
+        source_ref="openai_usage.json",
+        **identity,
     )
 
 
@@ -114,9 +140,9 @@ def record_openai_usage(response, feature, model=None, metadata=None, user_id=No
         "metadata": metadata if isinstance(metadata, dict) else {},
     })
     with OPENAI_USAGE_LOCK:
-        payload = load_openai_usage_payload(usage_file)
+        payload = load_openai_usage_payload(usage_file, user_id=record_user_id)
         payload.setdefault("records", []).append(record)
-        save_openai_usage_payload(payload, usage_file)
+        save_openai_usage_payload(payload, usage_file, user_id=record_user_id)
     return record
 
 
@@ -142,9 +168,9 @@ def record_app_activity(feature, metadata=None, user_id=None):
         "metadata": metadata if isinstance(metadata, dict) else {},
     })
     with OPENAI_USAGE_LOCK:
-        payload = load_openai_usage_payload(usage_file)
+        payload = load_openai_usage_payload(usage_file, user_id=record_user_id)
         payload.setdefault("records", []).append(record)
-        save_openai_usage_payload(payload, usage_file)
+        save_openai_usage_payload(payload, usage_file, user_id=record_user_id)
     return record
 
 
@@ -454,7 +480,9 @@ def openai_usage_dashboard_for_user(user=None):
     user_id = ""
     if isinstance(user, dict):
         user_id = str(user.get("user_id") or "").strip()
-    payload = load_openai_usage_payload(openai_usage_file_for_user(user_id))
+    payload = load_openai_usage_payload(
+        openai_usage_file_for_user(user_id), user_id=user_id
+    )
     records = payload.get("records", [])
     api_records = [
         record

@@ -11,6 +11,7 @@ from PushShoppingList.services import guest_session_service
 from PushShoppingList.services import job_service
 from PushShoppingList.services import storage_service
 from PushShoppingList.services import user_account_service as accounts
+from PushShoppingList.routes import account_routes
 
 
 def configure_admin_support(monkeypatch, tmp_path):
@@ -318,7 +319,9 @@ def test_device_status_account_type_filter_shows_zero_non_expired_guest_demo_opt
     ]
 
 
-def test_admin_delete_expired_guest_demo_sessions_removes_only_expired_guest_data(monkeypatch, tmp_path):
+def test_admin_delete_expired_guest_demo_sessions_delegates_only_to_purge_saga(
+    monkeypatch, tmp_path
+):
     configure_admin_support(monkeypatch, tmp_path)
     configure_device_status(monkeypatch, tmp_path)
     accounts.save_users({"users": [admin_user(), target_user()]})
@@ -346,21 +349,118 @@ def test_admin_delete_expired_guest_demo_sessions_removes_only_expired_guest_dat
     real_user_file.parent.mkdir(parents=True, exist_ok=True)
     real_user_file.write_text("real account data", encoding="utf-8")
 
-    result = support.delete_expired_guest_demo_sessions_for_admin(admin_user())
+    captured = {}
+
+    def batch_purge(**kwargs):
+        captured.update(kwargs)
+        return {
+            "ok": True,
+            "dry_run": False,
+            "applied": True,
+            "deleted_count": 1,
+            "guest_session_ids": ["expired-guest"],
+            "retryable_failures": [],
+        }
+
+    monkeypatch.setattr(
+        support.guest_purge_service,
+        "purge_expired_guest_batch",
+        batch_purge,
+    )
+    result = support.delete_expired_guest_demo_sessions_for_admin(
+        admin_user(),
+        dry_run=False,
+        authorized=True,
+        approval=support.guest_purge_service.GUEST_PURGE_BATCH_APPROVAL_PHRASE,
+    )
 
     assert result["ok"] is True
     assert result["deleted_count"] == 1
     assert result["guest_session_ids"] == ["expired-guest"]
+    assert captured["dry_run"] is False
+    assert captured["authorized"] is True
+    assert captured["approval"] == support.guest_purge_service.GUEST_PURGE_BATCH_APPROVAL_PHRASE
     assert active_file.exists()
-    assert not expired_file.exists()
+    # The admin layer never invokes the legacy JSON/file deletion path.  The
+    # real purge saga owns these mutations; this mocked boundary leaves both.
+    assert expired_file.exists()
     assert real_user_file.exists()
     payload = guest_session_service.load_guest_sessions()
-    assert [record["id"] for record in payload["guest_sessions"]] == ["active-guest"]
+    assert [record["id"] for record in payload["guest_sessions"]] == [
+        "active-guest",
+        "expired-guest",
+    ]
     audit_entries = support.load_audit_entries()
     assert len(audit_entries) == 1
     assert audit_entries[0]["action"] == "delete_expired_guest_demo_sessions"
     assert audit_entries[0]["deleted_count"] == 1
     assert audit_entries[0]["guest_session_ids"] == ["expired-guest"]
+
+
+def test_admin_guest_cleanup_missing_schema_fails_without_legacy_deletion(
+    monkeypatch, tmp_path
+):
+    configure_admin_support(monkeypatch, tmp_path)
+    guest_session_service.save_guest_sessions({
+        "guest_sessions": [{
+            "id": "expired-guest",
+            "expires_at": "2026-07-04T02:00:00Z",
+            "is_active": False,
+        }],
+    })
+    expired_file = tmp_path / "guest_data" / "expired-guest" / "keep.txt"
+    expired_file.parent.mkdir(parents=True, exist_ok=True)
+    expired_file.write_text("must survive", encoding="utf-8")
+    missing_database = tmp_path / "missing" / "application.sqlite3"
+
+    result = support.delete_expired_guest_demo_sessions_for_admin(
+        admin_user(),
+        dry_run=False,
+        authorized=True,
+        approval=support.guest_purge_service.GUEST_PURGE_BATCH_APPROVAL_PHRASE,
+        db_path=missing_database,
+        recipe_db_path=missing_database,
+        jobs_db_path=tmp_path / "missing" / "jobs.sqlite3",
+        guest_base_dir=tmp_path / "guest_data",
+    )
+
+    assert result["ok"] is False
+    assert result["applied"] is False
+    assert result["code"] == "guest_migration_unavailable"
+    assert expired_file.read_text(encoding="utf-8") == "must survive"
+    assert guest_session_service.load_guest_sessions()["guest_sessions"][0]["id"] == "expired-guest"
+    assert not missing_database.exists()
+
+
+def test_admin_cleanup_route_forwards_explicit_batch_approval(monkeypatch, tmp_path):
+    configure_admin_support(monkeypatch, tmp_path)
+    accounts.save_users({"users": [admin_user(), target_user()]})
+    captured = {}
+
+    def fake_admin_cleanup(user, **kwargs):
+        captured["user"] = user
+        captured.update(kwargs)
+        return {"ok": True, "message": "Cleanup complete."}
+
+    monkeypatch.setattr(
+        account_routes,
+        "delete_expired_guest_demo_sessions_for_admin",
+        fake_admin_cleanup,
+    )
+    app = create_app()
+    with app.test_client() as client:
+        with client.session_transaction() as session:
+            session["user_id"] = "admin"
+        response = client.post(
+            "/account/admin-support/delete-expired-guest-demos",
+            data={"approval": "PURGE ALL EXPIRED GUEST DATA"},
+        )
+
+    assert response.status_code == 302
+    assert captured["user"]["user_id"] == "admin"
+    assert captured["dry_run"] is False
+    assert captured["authorized"] is True
+    assert captured["approval"] == "PURGE ALL EXPIRED GUEST DATA"
 
 
 def test_admin_support_route_renders_device_status_filter(monkeypatch, tmp_path):
@@ -463,6 +563,8 @@ def test_admin_support_route_renders_device_status_filter(monkeypatch, tmp_path)
     assert 'action="/account/admin-support/delete-expired-guest-demos"' in html
     assert "Delete Expired Guest Demos (1)" in html
     assert "Delete 1 expired guest demo session? This cannot be undone." in html
+    assert "Type PURGE ALL EXPIRED GUEST DATA" in html
+    assert 'name="approval"' in html
     assert 'value="group:guest-demo"' in html
     assert "Guest Demo accounts (2)" in html
     assert 'value="group:guest-demo-active"' in html

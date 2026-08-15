@@ -1,9 +1,15 @@
 import json
+import hashlib
 import os
 import re
 import secrets
 import shutil
+import tempfile
+import threading
+import time
 import uuid
+from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import datetime
 from datetime import timedelta
 from pathlib import Path
@@ -37,6 +43,93 @@ AVATAR_UPLOAD_DIR = Path(os.getenv("SHOPPING_APP_AVATAR_UPLOAD_DIR", PACKAGE_DIR
 ALLOWED_AVATAR_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 PHONE_DIGITS_PATTERN = re.compile(r"\d+")
+_USERS_FILE_LOCK = threading.RLock()
+_USERS_FILE_LOCK_STATE = threading.local()
+_ACCOUNT_READ_REVISION = ContextVar("account_read_revision", default=None)
+USERS_FILE_LOCK_TIMEOUT_SECONDS = 30
+
+
+class AccountRegistryIntegrityError(RuntimeError):
+    """Raised instead of treating unreadable authentication state as empty."""
+
+
+class AccountRegistryConflictError(RuntimeError):
+    """Raised when an account registry changed during a read/modify/write."""
+
+
+def _try_lock_file(handle):
+    handle.seek(0)
+    if os.name == "nt":
+        import msvcrt
+
+        try:
+            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+            return True
+        except OSError:
+            return False
+    import fcntl
+
+    try:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return True
+    except OSError:
+        return False
+
+
+def _unlock_file(handle):
+    handle.seek(0)
+    if os.name == "nt":
+        import msvcrt
+
+        msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+        return
+    import fcntl
+
+    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+@contextmanager
+def _users_registry_write_lock():
+    """Serialize JSON compare-and-replace writes across threads and processes."""
+
+    with _USERS_FILE_LOCK:
+        depth = int(getattr(_USERS_FILE_LOCK_STATE, "depth", 0) or 0)
+        if depth:
+            _USERS_FILE_LOCK_STATE.depth = depth + 1
+            try:
+                yield
+            finally:
+                _USERS_FILE_LOCK_STATE.depth = depth
+            return
+
+        lock_path = USERS_FILE.with_name(".%s.lock" % USERS_FILE.name)
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        handle = lock_path.open("a+b")
+        acquired = False
+        try:
+            if lock_path.stat().st_size == 0:
+                handle.write(b"\0")
+                handle.flush()
+            deadline = time.monotonic() + USERS_FILE_LOCK_TIMEOUT_SECONDS
+            while not acquired:
+                acquired = _try_lock_file(handle)
+                if acquired:
+                    break
+                if time.monotonic() >= deadline:
+                    raise AccountRegistryConflictError(
+                        "Account registry write lock timed out."
+                    )
+                time.sleep(0.05)
+            _USERS_FILE_LOCK_STATE.depth = 1
+            yield
+        finally:
+            _USERS_FILE_LOCK_STATE.depth = 0
+            if acquired:
+                try:
+                    _unlock_file(handle)
+                except OSError:
+                    pass
+            handle.close()
 
 
 def configured_email(name, default):
@@ -111,40 +204,193 @@ def display_datetime(value):
     return parsed.strftime("%b %-d, %Y %-I:%M %p UTC") if os.name != "nt" else parsed.strftime("%b %#d, %Y %#I:%M %p UTC")
 
 
-def load_users():
-    if not USERS_FILE.exists():
-        return {"users": []}
-
-    try:
-        payload = json.loads(USERS_FILE.read_text(encoding="utf-8"))
-    except Exception:
-        return {"users": []}
-
-    if not isinstance(payload, dict):
-        return {"users": []}
-
-    users = [
-        user
-        for user in payload.get("users", [])
-        if isinstance(user, dict) and user.get("user_id")
-    ]
-    return {"users": users}
-
-
-def save_users(payload):
-    normalized = {
+def _normalized_users_payload(payload):
+    return {
         "users": [
             user
             for user in payload.get("users", [])
             if isinstance(user, dict) and user.get("user_id")
         ],
     }
-    USERS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    USERS_FILE.write_text(
-        json.dumps(normalized, indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
+
+
+def _json_users_revision():
+    if not USERS_FILE.exists():
+        return "missing"
+    return hashlib.sha256(USERS_FILE.read_bytes()).hexdigest()
+
+
+def _load_users_json_snapshot():
+    if not USERS_FILE.exists():
+        return {"users": []}, "missing"
+
+    try:
+        raw = USERS_FILE.read_bytes()
+        payload = json.loads(raw.decode("utf-8-sig", errors="strict"))
+    except Exception as exc:
+        raise AccountRegistryIntegrityError(
+            "Account registry is unreadable; refusing to treat it as empty."
+        ) from exc
+
+    if not isinstance(payload, dict):
+        raise AccountRegistryIntegrityError("Account registry root must be an object.")
+
+    return _normalized_users_payload(payload), hashlib.sha256(raw).hexdigest()
+
+
+def _load_users_json():
+    payload, _revision = _load_users_json_snapshot()
+    return payload
+
+
+def _save_users_json(normalized, *, expected_revision=None):
+    serialized = json.dumps(normalized, indent=2, ensure_ascii=False) + "\n"
+    with _users_registry_write_lock():
+        if (
+            expected_revision is not None
+            and _json_users_revision() != expected_revision
+        ):
+            raise AccountRegistryConflictError(
+                "Account registry changed concurrently; retry the operation."
+            )
+        USERS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        temporary_path = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                newline="",
+                dir=str(USERS_FILE.parent),
+                prefix=f".{USERS_FILE.name}.",
+                suffix=".tmp",
+                delete=False,
+            ) as handle:
+                temporary_path = Path(handle.name)
+                handle.write(serialized)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary_path, USERS_FILE)
+            temporary_path = None
+        finally:
+            if temporary_path is not None:
+                try:
+                    temporary_path.unlink()
+                except FileNotFoundError:
+                    pass
+    _ACCOUNT_READ_REVISION.set((
+        "json",
+        str(USERS_FILE.resolve()),
+        hashlib.sha256(serialized.encode("utf-8")).hexdigest(),
+    ))
     return normalized
+
+
+def _account_runtime_storage():
+    from PushShoppingList.services import account_runtime_storage_service
+
+    return account_runtime_storage_service
+
+
+def load_users():
+    runtime = _account_runtime_storage()
+    mode = runtime.account_backend_mode()
+    with _USERS_FILE_LOCK:
+        if mode == "db_only":
+            if not runtime.database_accounts_are_authoritative(require_schema=True):
+                raise runtime.AccountRuntimeStorageError(
+                    "Account database migration coverage is unavailable."
+                )
+            payload, revision = runtime.database_users_snapshot()
+            _ACCOUNT_READ_REVISION.set((
+                "database",
+                str(runtime.account_database_path().resolve()),
+                revision,
+            ))
+            return payload
+        if mode == "db_preferred" and runtime.database_accounts_are_authoritative():
+            payload, revision = runtime.database_users_snapshot()
+            _ACCOUNT_READ_REVISION.set((
+                "database",
+                str(runtime.account_database_path().resolve()),
+                revision,
+            ))
+            return payload
+        payload, revision = _load_users_json_snapshot()
+        _ACCOUNT_READ_REVISION.set(("json", str(USERS_FILE.resolve()), revision))
+        return payload
+
+
+def save_users(payload):
+    normalized = _normalized_users_payload(payload)
+    runtime = _account_runtime_storage()
+    mode = runtime.account_backend_mode()
+    read_revision = _ACCOUNT_READ_REVISION.get()
+
+    def expected_revision(kind, source_id):
+        if (
+            isinstance(read_revision, tuple)
+            and len(read_revision) == 3
+            and read_revision[0] == kind
+            and read_revision[1] == source_id
+        ):
+            return read_revision[2]
+        return None
+
+    def save_database():
+        database_source_id = str(runtime.account_database_path().resolve())
+        runtime.replace_database_users(
+            normalized,
+            expected_revision=expected_revision("database", database_source_id),
+            require_authoritative=True,
+        )
+        latest, revision = runtime.database_users_snapshot()
+        _ACCOUNT_READ_REVISION.set(("database", database_source_id, revision))
+        return latest
+
+    with _USERS_FILE_LOCK:
+        if mode == "db_only":
+            if not runtime.database_accounts_are_authoritative(require_schema=True):
+                raise runtime.AccountRuntimeStorageError(
+                    "Account database migration coverage is unavailable."
+                )
+            return save_database()
+        if mode == "db_preferred":
+            if runtime.database_accounts_are_authoritative():
+                return save_database()
+            return _save_users_json(
+                normalized,
+                expected_revision=expected_revision("json", str(USERS_FILE.resolve())),
+            )
+        if mode == "shadow":
+            # JSON remains authoritative in shadow mode.  A shadow failure is
+            # observable and prevents a later cutover because source coverage
+            # will no longer match, but it must not turn a completed primary
+            # write into an ambiguous application error.
+            saved = _save_users_json(
+                normalized,
+                expected_revision=expected_revision("json", str(USERS_FILE.resolve())),
+            )
+            try:
+                runtime.replace_database_users(normalized)
+            except Exception as exc:
+                from PushShoppingList.services.maintenance_log_service import (
+                    emit_maintenance_event,
+                )
+
+                emit_maintenance_event(
+                    event="account_shadow_write",
+                    run_id=uuid.uuid4().hex,
+                    phase="compatibility_write",
+                    mode=mode,
+                    outcome="failed",
+                    counts={"accounts": len(normalized["users"])},
+                    error_code=type(exc).__name__,
+                )
+            return saved
+        return _save_users_json(
+            normalized,
+            expected_revision=expected_revision("json", str(USERS_FILE.resolve())),
+        )
 
 
 def normalize_ntfy_topic(topic):

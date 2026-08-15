@@ -10,6 +10,7 @@ from PushShoppingList.services.request_security_service import build_canonical_u
 from PushShoppingList.services.user_account_service import current_user
 from PushShoppingList.services.storage_service import guest_data_root
 from PushShoppingList.services.storage_service import scoped_extractor_data_path
+from PushShoppingList.services import durable_document_runtime_service as durable_runtime
 from PushShoppingList.services.storage_service import scoped_package_path
 from PushShoppingList.services.storage_service import user_data_root
 
@@ -335,21 +336,35 @@ def save_recipe_url_quantity(url, quantity):
 
 
 def load_recipe_url_meta():
-    if not RECIPE_INGREDIENTS_FILE.exists():
-        return {}
+    def legacy_loader():
+        if not RECIPE_INGREDIENTS_FILE.exists():
+            return {}
+        try:
+            return json.loads(RECIPE_INGREDIENTS_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            return {}
 
-    try:
-        data = json.loads(RECIPE_INGREDIENTS_FILE.read_text(encoding="utf-8"))
-    except Exception:
-        return {}
+    data = durable_runtime.load_json_document(
+        legacy_loader,
+        domain="recipes",
+        document_key="ingredients_index",
+        source_key="recipe_metadata",
+        source_ref="recipe-extractor/data/recipe_ingredients.json",
+    )
 
     return data if isinstance(data, dict) else {}
 
 
 def save_recipe_url_meta(meta):
-    RECIPE_INGREDIENTS_FILE.write_text(
-        json.dumps(meta, indent=2, ensure_ascii=False),
-        encoding="utf-8",
+    return durable_runtime.save_json_document(
+        meta,
+        lambda value: durable_runtime.atomic_write_json(
+            RECIPE_INGREDIENTS_FILE, value, newline=False
+        ),
+        domain="recipes",
+        document_key="ingredients_index",
+        source_key="recipe_metadata",
+        source_ref="recipe-extractor/data/recipe_ingredients.json",
     )
 
 

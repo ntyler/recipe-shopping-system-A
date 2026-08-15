@@ -214,13 +214,14 @@ def test_default_catalog_prioritizes_durable_sources_and_explicit_exclusions():
         "openai_usage",
         "feedback",
         "admin_audit",
-        "pdf_share_tokens",
         "store_credentials",
     ):
         assert by_key[key].classification == migration.CLASSIFICATION_DURABLE
 
     assert by_key["accounts_auth"].handler == migration.HANDLER_SPECIALIZED_JSON
     assert by_key["guest_sessions"].handler == migration.HANDLER_DELEGATED_JSON
+    assert by_key["pdf_share_tokens"].handler == migration.HANDLER_DELEGATED_JSON
+    assert by_key["pdf_share_tokens"].classification == migration.CLASSIFICATION_SKIPPED
     assert by_key["extract_progress_cache"].classification == migration.CLASSIFICATION_CACHE
     assert by_key["recipe_raw_artifacts"].classification == migration.CLASSIFICATION_ARTIFACT
     assert by_key["shopping_list_text"].classification == migration.CLASSIFICATION_SKIPPED
@@ -342,6 +343,19 @@ class FakeEncryptor:
                 "ciphertext": "opaque-ciphertext",
             }
         )
+
+    def decrypt_json(self, envelope_json, *, associated_data):
+        envelope = json.loads(envelope_json)
+        if envelope != {
+            "algorithm": "TEST-AEAD",
+            "key_id": self.key_id,
+            "nonce": "test-nonce",
+            "ciphertext": "opaque-ciphertext",
+        }:
+            raise ValueError("The test envelope was changed.")
+        if not self.calls or associated_data != self.calls[-1][1]:
+            raise ValueError("The test record binding was changed.")
+        return self.calls[-1][0]
 
 
 def test_store_credentials_fail_closed_then_store_only_encryption_envelope(tmp_path):

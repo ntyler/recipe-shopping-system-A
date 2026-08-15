@@ -273,3 +273,58 @@ def test_manifest_covers_the_current_full_recipe_master_schema(tmp_path):
     assert details["missing_manifest_tables"] == []
     assert details["unknown_user_id_tables"] == []
     assert details["unknown_dependent_tables"] == []
+    assert details["unresolved_cascade_ownership"] == []
+
+
+def test_id_only_foreign_key_cross_owner_edge_blocks_preview_and_delete(
+    monkeypatch,
+    tmp_path,
+):
+    db_path = tmp_path / "cross_owner.sqlite3"
+    monkeypatch.setattr(master_data, "RECIPE_MASTER_DB_PATH", db_path)
+    with sqlite3.connect(db_path) as connection:
+        connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA foreign_keys=ON")
+        master_data.ensure_recipe_master_schema(connection)
+        equipment_requirements.ensure_structured_equipment_schema(
+            connection,
+            authorized=True,
+            migration_token=equipment_requirements.PHASE3A_MIGRATION_TOKEN,
+        )
+        ingredient_id = connection.execute(
+            """
+            INSERT INTO ingredients (
+                user_id, name, normalized_name, created_at, updated_at
+            ) VALUES (?, 'Target ingredient', 'target ingredient', ?, ?)
+            """,
+            (TARGET_OWNER, "2026-08-15T00:00:00Z", "2026-08-15T00:00:00Z"),
+        ).lastrowid
+        unrelated_row_id = connection.execute(
+            """
+            INSERT INTO recipe_ingredients (user_id, recipe_id, ingredient_id)
+            VALUES (?, 'unrelated-recipe', ?)
+            """,
+            (ACCOUNT_OWNER, ingredient_id),
+        ).lastrowid
+        connection.commit()
+
+    preview = cleanup.preview_guest_recipe_cleanup(TARGET_GUEST_ID)
+    deleted = cleanup.delete_guest_recipe_data(TARGET_GUEST_ID)
+
+    assert preview["ok"] is False
+    assert preview["code"] == "cross_owner_reference"
+    assert preview["ownership"]["cross_owner_references"] == {
+        "recipe_ingredients->ingredients": 1
+    }
+    assert deleted["ok"] is False
+    assert deleted["code"] == "cross_owner_reference"
+    with sqlite3.connect(db_path) as connection:
+        connection.execute("PRAGMA foreign_keys=ON")
+        assert connection.execute(
+            "SELECT user_id FROM ingredients WHERE id = ?",
+            (ingredient_id,),
+        ).fetchone()[0] == TARGET_OWNER
+        assert connection.execute(
+            "SELECT user_id FROM recipe_ingredients WHERE id = ?",
+            (unrelated_row_id,),
+        ).fetchone()[0] == ACCOUNT_OWNER

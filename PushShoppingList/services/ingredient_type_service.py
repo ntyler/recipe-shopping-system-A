@@ -429,7 +429,7 @@ def save_workspace_ingredient_type(values, type_id="", user_id=None):
     elif len(name) > 40:
         errors["name"] = "Use 40 characters or fewer."
 
-    with master_data.recipe_master_connection() as connection:
+    with master_data.recipe_master_connection(user_id=user_id) as connection:
         _seed_registry(connection, user_id)
         existing = None
         if type_id:
@@ -529,7 +529,7 @@ def save_workspace_ingredient_type(values, type_id="", user_id=None):
 def delete_workspace_ingredient_type(type_id, user_id=None):
     user_id = str(user_id or master_data.scoped_recipe_user_id()).strip()
     type_id = str(type_id or "").strip()
-    with master_data.recipe_master_connection() as connection:
+    with master_data.recipe_master_connection(user_id=user_id) as connection:
         _seed_registry(connection, user_id)
         existing = connection.execute(
             """

@@ -162,6 +162,82 @@ def test_incompatible_reserved_table_is_reported_and_not_overwritten(tmp_path):
     assert columns == ["user_id"]
 
 
+def test_schema_checksum_mismatch_blocks_reads_and_reinstall(tmp_path):
+    database = tmp_path / "application.sqlite3"
+    install(database)
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            "UPDATE schema_versions SET checksum_sha256 = ? WHERE component = ?",
+            (sha("unexpected-schema"), application_data.APPLICATION_SCHEMA_COMPONENT),
+        )
+
+    status = application_data.application_schema_status(database)
+    with pytest.raises(application_data.ApplicationSchemaUnavailableError):
+        with application_data.application_data_write_connection(database):
+            pass
+
+    with pytest.raises(application_data.ApplicationSchemaCompatibilityError):
+        install(database)
+
+    assert status["available"] is False
+    assert status["compatible"] is False
+    assert status["checksum_matches"] is False
+    assert "schema_versions:checksum_mismatch" in status["issues"]
+
+
+def test_explicit_v1_to_v2_upgrade_preserves_share_metadata(tmp_path):
+    database = tmp_path / "application.sqlite3"
+    created_at = "2026-08-14T10:00:00Z"
+    digest = sha("legacy-digest-only-share")
+    with sqlite3.connect(database) as connection:
+        for statement in application_data._SCHEMA_MIGRATION_STATEMENTS[1]:
+            connection.execute(statement)
+        connection.execute(
+            "INSERT INTO schema_versions VALUES (?, 1, ?, ?)",
+            (
+                application_data.APPLICATION_SCHEMA_COMPONENT,
+                application_data.schema_checksum_sha256(1),
+                created_at,
+            ),
+        )
+        connection.execute(
+            """
+            INSERT INTO workspaces (
+                id, workspace_type, external_id, lifecycle_state,
+                created_at, updated_at, metadata_json, source_sha256
+            ) VALUES ('pdf-workspace', 'system', 'pdf-shares', 'active', ?, ?, '{}', '')
+            """,
+            (created_at, created_at),
+        )
+        connection.execute(
+            """
+            INSERT INTO share_links (
+                token_digest, workspace_id, pdf_filename, created_at, expires_at
+            ) VALUES (?, 'pdf-workspace', 'preserved.pdf', ?, '2099-08-14T10:00:00Z')
+            """,
+            (digest, created_at),
+        )
+
+    before = application_data.application_schema_status(database)
+    upgraded = install(database)
+    with sqlite3.connect(database) as connection:
+        connection.row_factory = sqlite3.Row
+        row = connection.execute(
+            "SELECT * FROM share_links WHERE token_digest = ?", (digest,)
+        ).fetchone()
+
+    assert before["current_version"] == 1
+    assert before["pending_versions"] == [2]
+    assert before["compatible"] is True
+    assert upgraded["action"] == "upgraded"
+    assert row["pdf_filename"] == "preserved.pdf"
+    assert row["original_filename"] == "preserved.pdf"
+    assert row["updated_at"] == created_at
+    assert row["encrypted_token_json"] == "{}"
+    assert row["encryption_key_id"] == ""
+    assert "token" not in row.keys()
+
+
 def test_workspace_documents_and_coverage_are_canonical_idempotent_and_versioned(tmp_path):
     database = tmp_path / "application.sqlite3"
     install(database)
@@ -409,6 +485,254 @@ def test_tombstone_blocks_guest_reinsertion(tmp_path):
     assert application_data.get_guest_session(
         "tombstoned-guest", db_path=database
     ) is None
+
+
+def test_guest_workspace_tombstone_blocks_all_creation_primitives(tmp_path):
+    database = tmp_path / "application.sqlite3"
+    install(database)
+    guest_id = "late-in-flight-guest"
+    workspace_id = "opaque-purged-workspace"
+    with application_data.application_data_write_connection(database) as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        connection.execute(
+            """
+            INSERT INTO guest_tombstones (
+                guest_session_id, workspace_id, purge_run_id,
+                lifecycle_state, tombstoned_at
+            ) VALUES (?, ?, ?, 'purged', ?)
+            """,
+            (guest_id, workspace_id, "purge-run", "2026-08-14T10:00:00Z"),
+        )
+
+    assert application_data.guest_workspace_write_is_fenced(
+        workspace_id,
+        workspace_type="guest",
+        external_id=guest_id,
+        db_path=database,
+    ) is True
+    with pytest.raises(application_data.ApplicationDataLifecycleError):
+        application_data.ensure_workspace(
+            workspace_id, "guest", guest_id, db_path=database
+        )
+    with pytest.raises(application_data.ApplicationDataLifecycleError):
+        application_data.ensure_workspace(
+            "alternate-workspace", "guest", guest_id, db_path=database
+        )
+    with pytest.raises(application_data.ApplicationDataLifecycleError):
+        application_data.upsert_durable_document(
+            workspace_id,
+            "shopping",
+            "state",
+            {"items": []},
+            source_sha256=sha("document"),
+            db_path=database,
+        )
+    with pytest.raises(application_data.ApplicationDataLifecycleError):
+        application_data.upsert_source_coverage(
+            workspace_id,
+            "shopping",
+            "shopping-state",
+            sha("coverage"),
+            db_path=database,
+        )
+    with pytest.raises(application_data.ApplicationDataLifecycleError):
+        application_data.upsert_artifact(
+            "late-artifact",
+            workspace_id,
+            "generated_file",
+            "filesystem",
+            "guest/late.json",
+            exact_path="late.json",
+            db_path=database,
+        )
+    with pytest.raises(application_data.ApplicationDataLifecycleError):
+        application_data.upsert_account(
+            "late-account",
+            workspace_id,
+            username="late",
+            normalized_email="late@example.test",
+            db_path=database,
+        )
+    with pytest.raises(application_data.ApplicationDataLifecycleError):
+        application_data.upsert_share_link(
+            sha("late-share-token"),
+            {
+                "algorithm": "AES-256-GCM",
+                "key_id": "key-1",
+                "nonce": "nonce",
+                "ciphertext": "ciphertext",
+            },
+            "key-1",
+            workspace_id=workspace_id,
+            pdf_filename="late.pdf",
+            created_at="2026-08-14T10:00:00Z",
+            expires_at="2026-08-15T10:00:00Z",
+            db_path=database,
+        )
+
+    with sqlite3.connect(database) as connection:
+        assert connection.execute(
+            "SELECT 1 FROM workspaces WHERE id IN (?, ?)",
+            (workspace_id, "alternate-workspace"),
+        ).fetchone() is None
+        assert connection.execute(
+            "SELECT 1 FROM durable_documents WHERE workspace_id = ?", (workspace_id,)
+        ).fetchone() is None
+        assert connection.execute(
+            "SELECT 1 FROM application_source_coverage WHERE workspace_id = ?",
+            (workspace_id,),
+        ).fetchone() is None
+        assert connection.execute(
+            "SELECT 1 FROM artifacts WHERE workspace_id = ?", (workspace_id,)
+        ).fetchone() is None
+        assert connection.execute(
+            "SELECT 1 FROM accounts WHERE workspace_id = ?", (workspace_id,)
+        ).fetchone() is None
+        assert connection.execute(
+            "SELECT 1 FROM share_links WHERE workspace_id = ?", (workspace_id,)
+        ).fetchone() is None
+
+
+def test_guest_workspace_tombstone_does_not_block_unrelated_user_writes(tmp_path):
+    database = tmp_path / "application.sqlite3"
+    install(database)
+    with application_data.application_data_write_connection(database) as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        connection.execute(
+            """
+            INSERT INTO guest_tombstones (
+                guest_session_id, workspace_id, purge_run_id,
+                lifecycle_state, tombstoned_at
+            ) VALUES ('deleted-guest', 'deleted-workspace', 'purge-run', 'purged', ?)
+            """,
+            ("2026-08-14T10:00:00Z",),
+        )
+
+    assert application_data.guest_workspace_write_is_fenced(
+        "unrelated-workspace",
+        workspace_type="user",
+        external_id="unrelated-user",
+        db_path=database,
+    ) is False
+    application_data.ensure_workspace(
+        "unrelated-workspace", "user", "unrelated-user", db_path=database
+    )
+    document = application_data.upsert_durable_document(
+        "unrelated-workspace",
+        "shopping",
+        "state",
+        {"items": ["flour"]},
+        source_sha256=sha("unrelated-document"),
+        db_path=database,
+    )
+    coverage = application_data.upsert_source_coverage(
+        "unrelated-workspace",
+        "shopping",
+        "shopping-state",
+        sha("unrelated-coverage"),
+        db_path=database,
+    )
+    artifact = application_data.upsert_artifact(
+        "unrelated-artifact",
+        "unrelated-workspace",
+        "generated_file",
+        "filesystem",
+        "users/unrelated.json",
+        exact_path="unrelated.json",
+        db_path=database,
+    )
+
+    assert document["workspace_id"] == "unrelated-workspace"
+    assert coverage["workspace_id"] == "unrelated-workspace"
+    assert artifact["workspace_id"] == "unrelated-workspace"
+
+
+def test_guest_tombstone_blocks_updates_to_existing_owner_scoped_share(tmp_path):
+    database = tmp_path / "application.sqlite3"
+    install(database)
+    workspace_id = "guest-share-workspace"
+    guest_id = "guest-share-owner"
+    token_digest = sha("guest-share-token")
+    encrypted_token = {
+        "algorithm": "AES-256-GCM",
+        "key_id": "key-1",
+        "nonce": "nonce",
+        "ciphertext": "ciphertext",
+    }
+    application_data.ensure_workspace(
+        workspace_id, "guest", guest_id, db_path=database
+    )
+    application_data.upsert_share_link(
+        token_digest,
+        encrypted_token,
+        "key-1",
+        workspace_id=workspace_id,
+        pdf_filename="guest.pdf",
+        created_at="2026-08-14T10:00:00Z",
+        expires_at="2026-08-15T10:00:00Z",
+        db_path=database,
+    )
+    with application_data.application_data_write_connection(database) as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        connection.execute(
+            """
+            INSERT INTO guest_tombstones (
+                guest_session_id, workspace_id, purge_run_id,
+                lifecycle_state, tombstoned_at
+            ) VALUES (?, ?, 'purge-run', 'purging', ?)
+            """,
+            (guest_id, workspace_id, "2026-08-14T11:00:00Z"),
+        )
+
+    with pytest.raises(application_data.ApplicationDataLifecycleError):
+        application_data.update_share_link_state(
+            token_digest, access_count=1, db_path=database
+        )
+    with pytest.raises(application_data.ApplicationDataLifecycleError):
+        application_data.upsert_share_link(
+            token_digest,
+            encrypted_token,
+            "key-1",
+            workspace_id=workspace_id,
+            pdf_filename="guest.pdf",
+            created_at="2026-08-14T10:00:00Z",
+            expires_at="2026-08-16T10:00:00Z",
+            allow_update=True,
+            db_path=database,
+        )
+
+    persisted = application_data.get_share_link(token_digest, db_path=database)
+    assert persisted["access_count"] == 0
+    assert persisted["expires_at"] == "2026-08-15T10:00:00Z"
+
+
+def test_guest_workspace_fence_read_does_not_create_json_mode_database(tmp_path):
+    database = tmp_path / "missing-parent" / "application.sqlite3"
+
+    assert application_data.guest_workspace_write_is_fenced(
+        "guest:active-guest",
+        workspace_type="guest",
+        external_id="active-guest",
+        db_path=database,
+    ) is False
+    assert not database.exists()
+    assert not database.parent.exists()
+
+
+def test_inactive_legacy_guest_without_lifecycle_or_ended_at_is_preserved(tmp_path):
+    database = tmp_path / "application.sqlite3"
+    install(database)
+    legacy = active_guest_record("inactive-legacy-guest")
+    legacy["is_active"] = False
+    legacy.pop("lifecycle_state")
+
+    inserted = application_data.insert_guest_session(legacy, db_path=database)
+
+    assert inserted["id"] == "inactive-legacy-guest"
+    assert inserted["is_active"] is False
+    assert inserted["lifecycle_state"] == "inactive"
+    assert inserted["ended_at"] == ""
+    assert inserted["expires_at"] == legacy["expires_at"]
 
 
 def test_caller_owned_transaction_rolls_back_all_repository_writes(tmp_path):

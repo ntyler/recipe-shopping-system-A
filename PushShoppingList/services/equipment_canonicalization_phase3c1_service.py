@@ -15,6 +15,7 @@ from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
+from PushShoppingList.services import recipe_master_data_service as master_data
 from PushShoppingList.services import recipe_equipment_requirement_service as requirements
 from PushShoppingList.services.equipment_migration_apply_service import (
     LEGACY_LINK_COLUMNS,
@@ -1051,6 +1052,7 @@ def apply_phase3c1_canonicalization(
     connection = sqlite3.connect(db_path, timeout=60)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON")
+    master_data.install_recipe_master_connection_guest_write_fences(connection)
     try:
         connection.execute("BEGIN IMMEDIATE")
         if _staged_fingerprint(connection) != staged_before:

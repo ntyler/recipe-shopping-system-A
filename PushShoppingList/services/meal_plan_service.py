@@ -17,6 +17,7 @@ from PushShoppingList.services.recipe_ingredient_requirement_service import (
 )
 from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
 from PushShoppingList.services.storage_service import scoped_package_path
+from PushShoppingList.services import durable_document_runtime_service as durable_runtime
 
 
 MEAL_PLAN_FILE = scoped_package_path("meal_plan.json")
@@ -176,12 +177,21 @@ def normalize_meal(meal):
 
 def load_meal_plan():
     with MEAL_PLAN_LOCK:
-        if not MEAL_PLAN_FILE.exists():
-            return {"meals": []}
-        try:
-            payload = json.loads(MEAL_PLAN_FILE.read_text(encoding="utf-8-sig"))
-        except Exception:
-            return {"meals": []}
+        def legacy_loader():
+            if not MEAL_PLAN_FILE.exists():
+                return {"meals": []}
+            try:
+                return json.loads(MEAL_PLAN_FILE.read_text(encoding="utf-8-sig"))
+            except Exception:
+                return {"meals": []}
+
+        payload = durable_runtime.load_json_document(
+            legacy_loader,
+            domain="meal_plans",
+            document_key="current",
+            source_key="meal_plan",
+            source_ref="meal_plan.json",
+        )
 
         meals = []
         for value in payload.get("meals", []) if isinstance(payload, dict) else []:
@@ -202,11 +212,14 @@ def save_meal_plan(payload):
         ]
     }
     with MEAL_PLAN_LOCK:
-        MEAL_PLAN_FILE.write_text(
-            json.dumps(normalized, indent=2, ensure_ascii=False) + "\n",
-            encoding="utf-8",
+        return durable_runtime.save_json_document(
+            normalized,
+            lambda value: durable_runtime.atomic_write_json(MEAL_PLAN_FILE, value),
+            domain="meal_plans",
+            document_key="current",
+            source_key="meal_plan",
+            source_ref="meal_plan.json",
         )
-    return normalized
 
 
 def add_meal(meal):

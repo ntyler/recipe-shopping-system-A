@@ -801,7 +801,7 @@ def scan_potential_duplicates(user_id=None):
         limit=MAX_SCAN_RECORDS,
         sort="name_asc",
     )
-    with master_data.recipe_master_connection() as connection:
+    with master_data.recipe_master_connection(user_id=scoped_user_id) as connection:
         excluded_pairs = _manual_decision_pairs(connection, scoped_user_id)
     candidates = candidate_ingredient_pairs(rows, excluded_pairs=excluded_pairs)
     attach_second_opinion_recipe_context(candidates, scoped_user_id)
@@ -813,7 +813,7 @@ def scan_potential_duplicates(user_id=None):
     )
     now = master_data.utc_now_iso()
 
-    with master_data.recipe_master_connection() as connection:
+    with master_data.recipe_master_connection(user_id=scoped_user_id) as connection:
         connection.execute(
             """
             UPDATE ingredient_duplicate_reviews
@@ -892,7 +892,7 @@ def scan_potential_duplicates(user_id=None):
         "candidate_count": len(candidates),
         "review_count": len(reviews),
     }
-    with master_data.recipe_master_connection() as connection:
+    with master_data.recipe_master_connection(user_id=scoped_user_id) as connection:
         connection.execute(
             """
             INSERT INTO ingredient_duplicate_scans (
@@ -1144,7 +1144,7 @@ def restore_duplicate_review_decision(
         return {"ok": False, "status": 400, "error": "Choose a valid review decision."}
 
     scoped_user_id = master_data.scoped_recipe_user_id(user_id)
-    with master_data.existing_recipe_master_connection() as connection:
+    with master_data.existing_recipe_master_connection(user_id=scoped_user_id) as connection:
         if connection is None:
             return {"ok": False, "status": 404, "error": "Review decision was not found."}
         review = connection.execute(
@@ -1255,7 +1255,7 @@ def generate_ai_second_opinion(
         return {"ok": False, "status": 400, "error": "Choose a valid duplicate review."}
 
     scoped_user_id = master_data.scoped_recipe_user_id(user_id)
-    with master_data.existing_recipe_master_connection() as connection:
+    with master_data.existing_recipe_master_connection(user_id=scoped_user_id) as connection:
         if connection is None:
             return {"ok": False, "status": 404, "error": "Duplicate review was not found."}
         review = connection.execute(
@@ -1342,7 +1342,7 @@ def generate_ai_second_opinion(
             "error": "AI did not return a valid second opinion for this pair. Try again.",
         }
 
-    with master_data.recipe_master_connection() as connection:
+    with master_data.recipe_master_connection(user_id=review_user_id) as connection:
         updated = connection.execute(
             """
             UPDATE ingredient_duplicate_reviews
@@ -1388,7 +1388,7 @@ def decide_duplicate_review(review_id, action, target_ingredient_id=None, user_i
         return {"ok": False, "status": 400, "error": "Choose a valid review action."}
 
     scoped_user_id = master_data.scoped_recipe_user_id(user_id)
-    with master_data.existing_recipe_master_connection() as connection:
+    with master_data.existing_recipe_master_connection(user_id=scoped_user_id) as connection:
         if connection is None:
             return {"ok": False, "status": 404, "error": "Duplicate review was not found."}
         review = connection.execute(
@@ -1439,7 +1439,7 @@ def decide_duplicate_review(review_id, action, target_ingredient_id=None, user_i
         )
         if not merge_result.get("ok"):
             return merge_result
-        with master_data.recipe_master_connection() as connection:
+        with master_data.recipe_master_connection(user_id=review_user_id) as connection:
             connection.execute(
                 """
                 UPDATE ingredient_duplicate_reviews
@@ -1467,7 +1467,7 @@ def decide_duplicate_review(review_id, action, target_ingredient_id=None, user_i
         previous_classification = local_candidate_classification({
             "signals": _decode_signals(review["signals_json"]),
         })["classification"]
-    with master_data.recipe_master_connection() as connection:
+    with master_data.recipe_master_connection(user_id=review_user_id) as connection:
         connection.execute(
             """
             UPDATE ingredient_duplicate_reviews
@@ -1526,7 +1526,9 @@ def decide_duplicate_reviews(decisions, user_id=None, allow_other_users=False, l
         action = master_data.clean_text(raw_decision.get("action")).lower().replace("-", "_")
         if action == "merge":
             scoped_user_id = master_data.scoped_recipe_user_id(user_id)
-            with master_data.existing_recipe_master_connection() as connection:
+            with master_data.existing_recipe_master_connection(
+                user_id=scoped_user_id
+            ) as connection:
                 review = connection.execute(
                     "SELECT user_id, classification, confidence, signals_json "
                     "FROM ingredient_duplicate_reviews WHERE id = ?",

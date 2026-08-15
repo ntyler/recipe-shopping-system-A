@@ -28,12 +28,13 @@ from typing import Any, Dict, Iterable, Mapping, Optional, Sequence, Tuple
 
 
 APPLICATION_SCHEMA_COMPONENT = "application_data"
-APPLICATION_SCHEMA_VERSION = 1
+APPLICATION_SCHEMA_VERSION = 2
 SCHEMA_INSTALL_APPROVAL_PHRASE = "INSTALL APPLICATION DATA SCHEMA"
 APPLICATION_DATA_LOCK = threading.RLock()
 
 WORKSPACE_LIFECYCLE_STATES = frozenset({"active", "inactive", "purging", "purged"})
 GUEST_LIFECYCLE_STATES = frozenset({"active", "inactive", "purging", "purged", "failed"})
+ARTIFACT_LIFECYCLE_STATES = frozenset({"active", "pending_delete", "failed", "deleted"})
 MIGRATION_RUN_STATES = frozenset({"planned", "running", "succeeded", "failed", "cancelled"})
 TERMINAL_MIGRATION_RUN_STATES = frozenset({"succeeded", "failed", "cancelled"})
 
@@ -305,6 +306,32 @@ _INDEX_STATEMENTS: Tuple[str, ...] = (
     "CREATE INDEX IF NOT EXISTS idx_share_links_expiration ON share_links(revoked, expires_at)",
 )
 
+# Version one is the exact schema shipped before ordered evolution was added.
+# Never edit its statements: databases already store the digest of this text.
+_SCHEMA_V2_STATEMENTS: Tuple[str, ...] = (
+    "ALTER TABLE share_links ADD COLUMN encrypted_token_json TEXT NOT NULL DEFAULT '{}'",
+    "ALTER TABLE share_links ADD COLUMN encryption_key_id TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE share_links ADD COLUMN created_by_user_id TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE share_links ADD COLUMN created_by_email TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE share_links ADD COLUMN pdf_path TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE share_links ADD COLUMN original_filename TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE share_links ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE share_links ADD COLUMN source_version TEXT NOT NULL DEFAULT '1'",
+    "UPDATE share_links SET original_filename = pdf_filename, updated_at = created_at",
+)
+
+_SCHEMA_MIGRATION_STATEMENTS: Mapping[int, Tuple[str, ...]] = {
+    1: _TABLE_STATEMENTS + _INDEX_STATEMENTS,
+    2: _SCHEMA_V2_STATEMENTS,
+}
+
+# These literals make previously released migrations immutable.  The service
+# refuses to inspect or install a chain whose source no longer matches them.
+_EXPECTED_SCHEMA_CHECKSUMS: Mapping[int, str] = {
+    1: "19a0c638b0c75832fd1389b7c1befb75dcaffe4733574d64119e825fecf5bb5a",
+    2: "125cfc7037bc10e3508c92bec3a31b298114fae7b835f1627fc19d98239714b5",
+}
+
 REQUIRED_APPLICATION_TABLES = frozenset({
     "schema_versions",
     "migration_runs",
@@ -350,7 +377,26 @@ _REQUIRED_COLUMNS: Mapping[str, frozenset] = {
     "guest_purge_runs": frozenset({"id", "guest_session_id", "workspace_id", "status", "phase"}),
     "guest_purge_targets": frozenset({"id", "purge_run_id", "target_kind", "target_key", "status"}),
     "guest_tombstones": frozenset({"guest_session_id", "workspace_id", "lifecycle_state", "tombstoned_at"}),
-    "share_links": frozenset({"token_digest", "digest_algorithm", "expires_at", "revoked"}),
+    "share_links": frozenset({
+        "token_digest", "digest_algorithm", "encrypted_token_json", "encryption_key_id",
+        "workspace_id", "created_by_account_id", "created_by_user_id", "created_by_email",
+        "artifact_id", "pdf_filename", "pdf_path", "original_filename", "created_at",
+        "expires_at", "allow_download", "revoked", "access_count", "last_accessed_at",
+        "updated_at", "source_version", "source_sha256", "row_version",
+    }),
+}
+
+_V1_REQUIRED_COLUMNS: Mapping[str, frozenset] = dict(
+    _REQUIRED_COLUMNS,
+    share_links=frozenset({
+        "token_digest", "digest_algorithm", "workspace_id", "created_by_account_id",
+        "artifact_id", "pdf_filename", "created_at", "expires_at", "allow_download",
+        "revoked", "access_count", "last_accessed_at", "source_sha256", "row_version",
+    }),
+)
+_REQUIRED_COLUMNS_BY_VERSION: Mapping[int, Mapping[str, frozenset]] = {
+    1: _V1_REQUIRED_COLUMNS,
+    2: _REQUIRED_COLUMNS,
 }
 
 
@@ -381,9 +427,41 @@ def sha256_json(value: object) -> str:
     return hashlib.sha256(canonical_json(value).encode("utf-8")).hexdigest()
 
 
-def schema_checksum_sha256() -> str:
-    material = "\n".join(statement.strip() for statement in _TABLE_STATEMENTS + _INDEX_STATEMENTS)
-    return hashlib.sha256(material.encode("utf-8")).hexdigest()
+def _computed_schema_checksum(version: int) -> str:
+    digest = ""
+    for migration_version in range(1, version + 1):
+        statements = _SCHEMA_MIGRATION_STATEMENTS[migration_version]
+        material = "\n".join(statement.strip() for statement in statements)
+        if migration_version == 1:
+            digest = hashlib.sha256(material.encode("utf-8")).hexdigest()
+        else:
+            digest = hashlib.sha256((digest + "\n" + material).encode("utf-8")).hexdigest()
+    return digest
+
+
+def _assert_immutable_schema_migrations() -> None:
+    versions = tuple(sorted(_SCHEMA_MIGRATION_STATEMENTS))
+    if versions != tuple(range(1, APPLICATION_SCHEMA_VERSION + 1)):
+        raise ApplicationDataIntegrityError("Application schema migrations are not contiguous.")
+    if set(_EXPECTED_SCHEMA_CHECKSUMS) != set(versions):
+        raise ApplicationDataIntegrityError("Application schema migration checksums are incomplete.")
+    for version in versions:
+        if _computed_schema_checksum(version) != _EXPECTED_SCHEMA_CHECKSUMS[version]:
+            raise ApplicationDataIntegrityError(
+                "An immutable application schema migration was modified."
+            )
+
+
+def schema_checksum_sha256(version: Optional[int] = None) -> str:
+    """Return the immutable cumulative checksum for a released schema version."""
+
+    _assert_immutable_schema_migrations()
+    resolved_version = APPLICATION_SCHEMA_VERSION if version is None else version
+    if not isinstance(resolved_version, int) or isinstance(resolved_version, bool):
+        raise ApplicationDataValidationError("Schema version must be an integer.")
+    if resolved_version not in _EXPECTED_SCHEMA_CHECKSUMS:
+        raise ApplicationDataValidationError("Unknown application schema version.")
+    return _EXPECTED_SCHEMA_CHECKSUMS[resolved_version]
 
 
 @contextmanager
@@ -443,6 +521,9 @@ def application_schema_status(db_path=None, *, connection=None) -> Dict[str, obj
             "compatible": True,
             "current_version": None,
             "target_version": APPLICATION_SCHEMA_VERSION,
+            "checksum_matches": False,
+            "expected_checksum": schema_checksum_sha256(),
+            "pending_versions": list(range(1, APPLICATION_SCHEMA_VERSION + 1)),
             "missing_tables": sorted(REQUIRED_APPLICATION_TABLES),
             "issues": [],
         }
@@ -463,7 +544,7 @@ def install_application_schema(
     authorized: bool = False,
     approval: str = "",
 ) -> Dict[str, object]:
-    """Preview or explicitly install the additive version-one schema."""
+    """Preview or explicitly apply the ordered, additive schema migrations."""
 
     path = application_data_db_path(db_path)
     before = application_schema_status(path)
@@ -474,6 +555,8 @@ def install_application_schema(
             "would_create_database": not path.is_file(),
             "current_version": before["current_version"],
             "target_version": APPLICATION_SCHEMA_VERSION,
+            "applied_versions": [],
+            "pending_versions": before["pending_versions"],
             "missing_tables": before["missing_tables"],
             "issues": before["issues"],
         }
@@ -487,56 +570,62 @@ def install_application_schema(
         )
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    timestamp = _utc_timestamp()
-    checksum = schema_checksum_sha256()
-    schema_run_id = "schema:%s:v%d" % (APPLICATION_SCHEMA_COMPONENT, APPLICATION_SCHEMA_VERSION)
+    applied_versions = []
+    locked_initial_version = 0
     with APPLICATION_DATA_LOCK:
         connection = sqlite3.connect(str(path), timeout=30)
         connection.row_factory = sqlite3.Row
         try:
             connection.execute("PRAGMA foreign_keys=ON")
             connection.execute("BEGIN IMMEDIATE")
-            for statement in _TABLE_STATEMENTS:
-                connection.execute(statement)
-            for statement in _INDEX_STATEMENTS:
-                connection.execute(statement)
-            _assert_application_schema(connection, require_version=False)
-            existing_version = connection.execute(
-                "SELECT version, checksum_sha256 FROM schema_versions WHERE component = ?",
-                (APPLICATION_SCHEMA_COMPONENT,),
-            ).fetchone()
-            if existing_version and int(existing_version["version"]) > APPLICATION_SCHEMA_VERSION:
+            locked_status = _schema_status_from_connection(connection, exists=True)
+            if not locked_status["compatible"]:
                 raise ApplicationSchemaCompatibilityError(
-                    "The installed application schema is newer than this service."
+                    "Application schema changed after the migration preview."
                 )
-            connection.execute(
-                """
-                INSERT INTO schema_versions (component, version, checksum_sha256, installed_at)
-                VALUES (?, ?, ?, ?)
-                ON CONFLICT(component) DO UPDATE SET
-                    version = excluded.version,
-                    checksum_sha256 = excluded.checksum_sha256,
-                    installed_at = excluded.installed_at
-                WHERE schema_versions.version <> excluded.version
-                   OR schema_versions.checksum_sha256 <> excluded.checksum_sha256
-                """,
-                (APPLICATION_SCHEMA_COMPONENT, APPLICATION_SCHEMA_VERSION, checksum, timestamp),
-            )
-            connection.execute(
-                """
-                INSERT OR IGNORE INTO migration_runs (
-                    id, migration_kind, status, source_sha256,
-                    started_at, finished_at, error_code, summary_json
-                ) VALUES (?, ?, 'succeeded', '', ?, ?, '', ?)
-                """,
-                (
-                    schema_run_id,
-                    "application_schema_install",
-                    timestamp,
-                    timestamp,
-                    canonical_json({"schema_version": APPLICATION_SCHEMA_VERSION}),
-                ),
-            )
+            current_version = int(locked_status["current_version"] or 0)
+            locked_initial_version = current_version
+            for version in range(current_version + 1, APPLICATION_SCHEMA_VERSION + 1):
+                timestamp = _utc_timestamp()
+                for statement in _SCHEMA_MIGRATION_STATEMENTS[version]:
+                    connection.execute(statement)
+                connection.execute(
+                    """
+                    INSERT INTO schema_versions (component, version, checksum_sha256, installed_at)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(component) DO UPDATE SET
+                        version = excluded.version,
+                        checksum_sha256 = excluded.checksum_sha256,
+                        installed_at = excluded.installed_at
+                    """,
+                    (
+                        APPLICATION_SCHEMA_COMPONENT,
+                        version,
+                        schema_checksum_sha256(version),
+                        timestamp,
+                    ),
+                )
+                connection.execute(
+                    """
+                    INSERT OR IGNORE INTO migration_runs (
+                        id, migration_kind, status, source_sha256,
+                        started_at, finished_at, error_code, summary_json
+                    ) VALUES (?, ?, 'succeeded', ?, ?, ?, '', ?)
+                    """,
+                    (
+                        "schema:%s:v%d" % (APPLICATION_SCHEMA_COMPONENT, version),
+                        "application_schema_install" if version == 1 else "application_schema_upgrade",
+                        "" if version == 1 else schema_checksum_sha256(version - 1),
+                        timestamp,
+                        timestamp,
+                        canonical_json({
+                            "schema_version": version,
+                            "previous_version": version - 1,
+                        }),
+                    ),
+                )
+                _assert_application_schema(connection, expected_version=version)
+                applied_versions.append(version)
             _assert_application_schema(connection)
             _assert_new_table_foreign_keys(connection)
             connection.commit()
@@ -547,11 +636,19 @@ def install_application_schema(
             connection.close()
 
     after = application_schema_status(path)
+    if applied_versions and locked_initial_version == 0:
+        action = "installed"
+    elif applied_versions:
+        action = "upgraded"
+    else:
+        action = "unchanged"
     return {
-        "action": "installed" if before["missing_tables"] else "unchanged",
+        "action": action,
         "authorized": True,
         "current_version": after["current_version"],
         "target_version": APPLICATION_SCHEMA_VERSION,
+        "applied_versions": applied_versions,
+        "pending_versions": after["pending_versions"],
         "missing_tables": after["missing_tables"],
         "issues": after["issues"],
     }
@@ -564,16 +661,9 @@ def _schema_status_from_connection(connection, *, exists: bool) -> Dict[str, obj
             "SELECT name FROM sqlite_master WHERE type = 'table'"
         ).fetchall()
     }
-    missing = sorted(REQUIRED_APPLICATION_TABLES.difference(table_names))
     issues = []
-    for table_name in sorted(REQUIRED_APPLICATION_TABLES.intersection(table_names)):
-        columns = _table_columns(connection, table_name)
-        missing_columns = sorted(_REQUIRED_COLUMNS[table_name].difference(columns))
-        if missing_columns:
-            issues.append("%s:missing_columns" % table_name)
-    if "accounts" in table_names and "user_id" in _table_columns(connection, "accounts"):
-        issues.append("accounts:forbidden_user_id_column")
     current_version = None
+    stored_checksum = ""
     checksum_matches = False
     if "schema_versions" in table_names:
         try:
@@ -583,31 +673,96 @@ def _schema_status_from_connection(connection, *, exists: bool) -> Dict[str, obj
             ).fetchone()
             if row:
                 current_version = int(row["version"])
-                checksum_matches = row["checksum_sha256"] == schema_checksum_sha256()
+                stored_checksum = str(row["checksum_sha256"])
         except (sqlite3.Error, TypeError, ValueError):
             issues.append("schema_versions:unreadable")
-    available = not missing and not issues and current_version == APPLICATION_SCHEMA_VERSION
+
+    reserved_tables = REQUIRED_APPLICATION_TABLES.intersection(table_names)
+    if current_version is None and reserved_tables:
+        issues.append("schema_versions:missing_version")
+    elif current_version is not None and current_version not in _REQUIRED_COLUMNS_BY_VERSION:
+        issues.append("schema_versions:unsupported_version")
+
+    column_version = (
+        current_version
+        if current_version in _REQUIRED_COLUMNS_BY_VERSION
+        else APPLICATION_SCHEMA_VERSION
+    )
+    required_columns = _REQUIRED_COLUMNS_BY_VERSION[column_version]
+    missing = sorted(REQUIRED_APPLICATION_TABLES.difference(table_names))
+    for table_name in sorted(reserved_tables):
+        columns = _table_columns(connection, table_name)
+        if required_columns[table_name].difference(columns):
+            issues.append("%s:missing_columns" % table_name)
+    if "accounts" in table_names and "user_id" in _table_columns(connection, "accounts"):
+        issues.append("accounts:forbidden_user_id_column")
+    if "share_links" in table_names and "token" in _table_columns(connection, "share_links"):
+        issues.append("share_links:forbidden_token_column")
+    if current_version == 1 and "share_links" in table_names:
+        future_columns = _REQUIRED_COLUMNS["share_links"].difference(
+            _V1_REQUIRED_COLUMNS["share_links"]
+        )
+        if future_columns.intersection(_table_columns(connection, "share_links")):
+            issues.append("share_links:unexpected_future_columns")
+
+    expected_checksum = ""
+    if current_version in _EXPECTED_SCHEMA_CHECKSUMS:
+        expected_checksum = schema_checksum_sha256(current_version)
+        checksum_matches = stored_checksum == expected_checksum
+        if not checksum_matches:
+            issues.append("schema_versions:checksum_mismatch")
+    if current_version is None:
+        compatible = not issues and not reserved_tables
+    else:
+        compatible = (
+            not issues
+            and not missing
+            and current_version <= APPLICATION_SCHEMA_VERSION
+        )
+    pending_versions = (
+        list(range(int(current_version or 0) + 1, APPLICATION_SCHEMA_VERSION + 1))
+        if compatible
+        else []
+    )
+    available = (
+        compatible
+        and current_version == APPLICATION_SCHEMA_VERSION
+        and checksum_matches
+        and not pending_versions
+    )
     return {
         "exists": exists,
         "available": available,
-        "compatible": not issues and (current_version in (None, APPLICATION_SCHEMA_VERSION)),
+        "compatible": compatible,
         "current_version": current_version,
         "target_version": APPLICATION_SCHEMA_VERSION,
         "checksum_matches": checksum_matches,
+        "expected_checksum": expected_checksum or schema_checksum_sha256(),
+        "pending_versions": pending_versions,
         "missing_tables": missing,
         "issues": sorted(set(issues)),
     }
 
 
-def _assert_application_schema(connection, *, require_version: bool = True) -> None:
+def _assert_application_schema(
+    connection,
+    *,
+    require_version: bool = True,
+    expected_version: Optional[int] = None,
+) -> None:
     status = _schema_status_from_connection(connection, exists=True)
-    if status["missing_tables"] or status["issues"]:
+    if status["missing_tables"] or status["issues"] or not status["checksum_matches"]:
         raise ApplicationSchemaUnavailableError(
             "Application-data schema is missing or incompatible."
         )
-    if require_version and status["current_version"] != APPLICATION_SCHEMA_VERSION:
+    required_version = (
+        APPLICATION_SCHEMA_VERSION if expected_version is None else expected_version
+    )
+    if require_version and (
+        status["current_version"] != required_version
+    ):
         raise ApplicationSchemaUnavailableError(
-            "Application-data schema version is not installed."
+            "Application-data schema version or checksum is not installed."
         )
 
 
@@ -785,6 +940,132 @@ def _read_operation(connection=None, db_path=None):
             yield owned
 
 
+def _connection_has_table(connection, table_name: str) -> bool:
+    """Return whether an exact table exists without installing any schema."""
+
+    row = connection.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+        (table_name,),
+    ).fetchone()
+    return row is not None
+
+
+def _guest_workspace_write_is_fenced_on_connection(
+    connection,
+    workspace_id: str,
+    *,
+    workspace_type: str = "",
+    external_id: str = "",
+    guest_session_id: str = "",
+) -> bool:
+    """Check exact workspace/guest tombstones on an already-open connection."""
+
+    if not _connection_has_table(connection, "guest_tombstones"):
+        return False
+    tombstone_columns = {
+        str(row["name"])
+        for row in connection.execute("PRAGMA table_info(guest_tombstones)").fetchall()
+    }
+    if not {"guest_session_id", "workspace_id"}.issubset(tombstone_columns):
+        raise ApplicationDataIntegrityError("Guest tombstone schema is incomplete.")
+
+    exact_guest_id = guest_session_id
+    explicit_guest = workspace_type == "guest" or bool(guest_session_id)
+    if explicit_guest and not exact_guest_id:
+        exact_guest_id = external_id
+
+    # Generic repository primitives know only a workspace ID.  Resolve an
+    # existing guest mapping when possible, while the tombstone workspace ID
+    # still fences writes after the workspace row itself has been deleted.
+    if _connection_has_table(connection, "workspaces"):
+        workspace = connection.execute(
+            "SELECT workspace_type, external_id FROM workspaces WHERE id = ?",
+            (workspace_id,),
+        ).fetchone()
+        if workspace is not None and str(workspace["workspace_type"]) == "guest":
+            explicit_guest = True
+            exact_guest_id = str(workspace["external_id"])
+
+    clauses = ["workspace_id = ?"]
+    parameters = [workspace_id]
+    if explicit_guest and exact_guest_id:
+        clauses.append("guest_session_id = ?")
+        parameters.append(exact_guest_id)
+    row = connection.execute(
+        "SELECT 1 FROM guest_tombstones WHERE " + " OR ".join(clauses) + " LIMIT 1",
+        tuple(parameters),
+    ).fetchone()
+    return row is not None
+
+
+def guest_workspace_write_is_fenced(
+    workspace_id: str,
+    *,
+    workspace_type: str = "",
+    external_id: str = "",
+    guest_session_id: str = "",
+    connection=None,
+    db_path=None,
+) -> bool:
+    """Read an exact guest purge fence without creating a DB or schema.
+
+    Callers that already resolved a guest identity should pass
+    ``workspace_type='guest'`` and its unmodified external/session ID.  A
+    missing database or tombstone table means no migration fence exists yet.
+    Malformed or unreadable persisted fence state raises instead of allowing a
+    potentially destructive late write.
+    """
+
+    workspace_id = _validate_opaque_text(workspace_id, "workspace_id")
+    workspace_type = _validate_optional_text(workspace_type, "workspace_type")
+    external_id = _validate_optional_text(external_id, "external_id")
+    guest_session_id = _validate_optional_text(guest_session_id, "guest_session_id")
+
+    try:
+        if connection is not None:
+            return _guest_workspace_write_is_fenced_on_connection(
+                connection,
+                workspace_id,
+                workspace_type=workspace_type,
+                external_id=external_id,
+                guest_session_id=guest_session_id,
+            )
+        with existing_application_read_connection(db_path) as database:
+            if database is None:
+                return False
+            return _guest_workspace_write_is_fenced_on_connection(
+                database,
+                workspace_id,
+                workspace_type=workspace_type,
+                external_id=external_id,
+                guest_session_id=guest_session_id,
+            )
+    except ApplicationDataError:
+        raise
+    except sqlite3.Error as exc:
+        raise ApplicationDataIntegrityError(
+            "Guest workspace purge fence could not be read."
+        ) from exc
+
+
+def _assert_workspace_write_not_fenced(
+    connection,
+    workspace_id: str,
+    *,
+    workspace_type: str = "",
+    external_id: str = "",
+) -> None:
+    if guest_workspace_write_is_fenced(
+        workspace_id,
+        workspace_type=workspace_type,
+        external_id=external_id,
+        connection=connection,
+    ):
+        raise ApplicationDataLifecycleError(
+            "Guest workspace is fenced by an irreversible purge tombstone."
+        )
+
+
 def _workspace_result(row, action: str) -> Dict[str, object]:
     result = dict(row)
     result["metadata"] = _parse_stored_json(
@@ -822,6 +1103,12 @@ def ensure_workspace(
     requested_metadata = None if metadata is None else _canonical_mapping(metadata, "metadata")
 
     with _write_operation(connection, db_path) as database:
+        _assert_workspace_write_not_fenced(
+            database,
+            workspace_id,
+            workspace_type=workspace_type,
+            external_id=external_id,
+        )
         row = database.execute("SELECT * FROM workspaces WHERE id = ?", (workspace_id,)).fetchone()
         mapped = database.execute(
             "SELECT id FROM workspaces WHERE workspace_type = ? AND external_id = ?",
@@ -965,6 +1252,7 @@ def upsert_durable_document(
     _validate_opaque_text(resolved_id, "document_id")
 
     with _write_operation(connection, db_path) as database:
+        _assert_workspace_write_not_fenced(database, workspace_id)
         row = database.execute(
             """
             SELECT * FROM durable_documents
@@ -1057,6 +1345,336 @@ def get_durable_document(
         return _document_result(row, "read") if row else None
 
 
+def _artifact_result(row, action: str) -> Dict[str, object]:
+    result = dict(row)
+    result["exclusive_owner"] = bool(result["exclusive_owner"])
+    result["metadata"] = _parse_stored_json(
+        result.pop("metadata_json"), "artifact metadata", require_mapping=True
+    )
+    result["action"] = action
+    return result
+
+
+def _validate_artifact_lifecycle_transition(current: str, requested: str) -> None:
+    if current == requested:
+        return
+    allowed = {
+        "active": {"pending_delete", "failed"},
+        "pending_delete": {"deleted", "failed"},
+        "failed": {"pending_delete", "deleted"},
+        "deleted": set(),
+    }
+    if requested not in allowed.get(current, set()):
+        raise ApplicationDataLifecycleError(
+            "Artifact lifecycle transition would resurrect deleted storage."
+        )
+
+
+def upsert_artifact(
+    artifact_id: str,
+    workspace_id: str,
+    artifact_kind: str,
+    storage_backend: str,
+    storage_key: str,
+    *,
+    exact_path: str = "",
+    content_sha256: str = "",
+    byte_count: int = 0,
+    exclusive_owner: bool = False,
+    lifecycle_state: str = "active",
+    metadata: object = None,
+    created_at: str = "",
+    updated_at: str = "",
+    allow_update: bool = False,
+    connection=None,
+    db_path=None,
+) -> Dict[str, object]:
+    """Register an artifact while keeping ownership and storage identity immutable."""
+
+    artifact_id = _validate_opaque_text(artifact_id, "artifact_id")
+    workspace_id = _validate_opaque_text(workspace_id, "workspace_id")
+    artifact_kind = _validate_safe_code(artifact_kind, "artifact_kind")
+    storage_backend = _validate_safe_code(storage_backend, "storage_backend")
+    storage_key = _validate_opaque_text(storage_key, "storage_key")
+    exact_path = _validate_optional_text(exact_path, "exact_path")
+    content_sha256 = _validate_sha256(content_sha256, "content_sha256", optional=True)
+    if not isinstance(byte_count, int) or isinstance(byte_count, bool) or byte_count < 0:
+        raise ApplicationDataValidationError("byte_count must be a non-negative integer.")
+    if not isinstance(exclusive_owner, bool):
+        raise ApplicationDataValidationError("exclusive_owner must be boolean.")
+    if lifecycle_state not in ARTIFACT_LIFECYCLE_STATES:
+        raise ApplicationDataValidationError("Unknown artifact lifecycle state.")
+    metadata_json = _canonical_mapping(metadata, "artifact metadata")
+    if created_at:
+        created_at = _validate_timestamp(created_at, "created_at")
+    if updated_at:
+        updated_at = _validate_timestamp(updated_at, "updated_at")
+
+    identity_fields = ("workspace_id", "storage_backend", "storage_key")
+    mutable_fields = (
+        "artifact_kind", "exact_path", "content_sha256", "byte_count",
+        "exclusive_owner", "lifecycle_state", "metadata_json",
+    )
+    mutable_values = (
+        artifact_kind,
+        exact_path,
+        content_sha256,
+        byte_count,
+        int(exclusive_owner),
+        lifecycle_state,
+        metadata_json,
+    )
+    with _write_operation(connection, db_path) as database:
+        _assert_workspace_write_not_fenced(database, workspace_id)
+        row = database.execute(
+            "SELECT * FROM artifacts WHERE id = ?", (artifact_id,)
+        ).fetchone()
+        storage_row = database.execute(
+            "SELECT id FROM artifacts WHERE storage_backend = ? AND storage_key = ?",
+            (storage_backend, storage_key),
+        ).fetchone()
+        if storage_row is not None and storage_row["id"] != artifact_id:
+            raise ApplicationDataCollisionError("Artifact storage identity is already registered.")
+        if row is None:
+            now = _utc_timestamp()
+            created = created_at or now
+            changed_at = updated_at or created
+            try:
+                database.execute(
+                    """
+                    INSERT INTO artifacts (
+                        id, workspace_id, artifact_kind, storage_backend, storage_key,
+                        exact_path, content_sha256, byte_count, exclusive_owner,
+                        lifecycle_state, created_at, updated_at, metadata_json
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        artifact_id,
+                        workspace_id,
+                        artifact_kind,
+                        storage_backend,
+                        storage_key,
+                        exact_path,
+                        content_sha256,
+                        byte_count,
+                        int(exclusive_owner),
+                        lifecycle_state,
+                        created,
+                        changed_at,
+                        metadata_json,
+                    ),
+                )
+            except sqlite3.IntegrityError as exc:
+                raise ApplicationDataCollisionError(
+                    "Artifact ownership or storage identity collides."
+                ) from exc
+            inserted = database.execute(
+                "SELECT * FROM artifacts WHERE id = ?", (artifact_id,)
+            ).fetchone()
+            return _artifact_result(inserted, "inserted")
+
+        if tuple(row[field] for field in identity_fields) != (
+            workspace_id,
+            storage_backend,
+            storage_key,
+        ):
+            raise ApplicationDataCollisionError(
+                "Artifact ID belongs to another workspace or storage identity."
+            )
+        if tuple(row[field] for field in mutable_fields) == mutable_values:
+            return _artifact_result(row, "unchanged")
+        if not allow_update:
+            raise ApplicationDataCollisionError("Artifact ID already has different durable data.")
+        _validate_artifact_lifecycle_transition(row["lifecycle_state"], lifecycle_state)
+        assignments = ", ".join("%s = ?" % field for field in mutable_fields)
+        database.execute(
+            "UPDATE artifacts SET %s, updated_at = ?, row_version = row_version + 1 WHERE id = ?"
+            % assignments,
+            mutable_values + (updated_at or _utc_timestamp(), artifact_id),
+        )
+        changed = database.execute(
+            "SELECT * FROM artifacts WHERE id = ?", (artifact_id,)
+        ).fetchone()
+        return _artifact_result(changed, "updated")
+
+
+def get_artifact(
+    artifact_id: str,
+    workspace_id: str,
+    *,
+    connection=None,
+    db_path=None,
+) -> Optional[Dict[str, object]]:
+    artifact_id = _validate_opaque_text(artifact_id, "artifact_id")
+    workspace_id = _validate_opaque_text(workspace_id, "workspace_id")
+    with _read_operation(connection, db_path) as database:
+        if database is None:
+            return None
+        row = database.execute(
+            "SELECT * FROM artifacts WHERE id = ? AND workspace_id = ?",
+            (artifact_id, workspace_id),
+        ).fetchone()
+        return _artifact_result(row, "read") if row else None
+
+
+def get_artifact_by_storage_key(
+    workspace_id: str,
+    storage_backend: str,
+    storage_key: str,
+    *,
+    connection=None,
+    db_path=None,
+) -> Optional[Dict[str, object]]:
+    workspace_id = _validate_opaque_text(workspace_id, "workspace_id")
+    storage_backend = _validate_safe_code(storage_backend, "storage_backend")
+    storage_key = _validate_opaque_text(storage_key, "storage_key")
+    with _read_operation(connection, db_path) as database:
+        if database is None:
+            return None
+        row = database.execute(
+            """
+            SELECT * FROM artifacts
+            WHERE workspace_id = ? AND storage_backend = ? AND storage_key = ?
+            """,
+            (workspace_id, storage_backend, storage_key),
+        ).fetchone()
+        return _artifact_result(row, "read") if row else None
+
+
+def list_workspace_artifacts(
+    workspace_id: str,
+    *,
+    lifecycle_state: str = "",
+    connection=None,
+    db_path=None,
+) -> list:
+    workspace_id = _validate_opaque_text(workspace_id, "workspace_id")
+    if lifecycle_state and lifecycle_state not in ARTIFACT_LIFECYCLE_STATES:
+        raise ApplicationDataValidationError("Unknown artifact lifecycle state.")
+    with _read_operation(connection, db_path) as database:
+        if database is None:
+            return []
+        if lifecycle_state:
+            rows = database.execute(
+                """
+                SELECT * FROM artifacts
+                WHERE workspace_id = ? AND lifecycle_state = ?
+                ORDER BY storage_backend, storage_key, id
+                """,
+                (workspace_id, lifecycle_state),
+            ).fetchall()
+        else:
+            rows = database.execute(
+                """
+                SELECT * FROM artifacts
+                WHERE workspace_id = ?
+                ORDER BY storage_backend, storage_key, id
+                """,
+                (workspace_id,),
+            ).fetchall()
+        return [_artifact_result(row, "read") for row in rows]
+
+
+def update_artifact_lifecycle(
+    artifact_id: str,
+    workspace_id: str,
+    lifecycle_state: str,
+    *,
+    updated_at: str = "",
+    expected_row_version: Optional[int] = None,
+    connection=None,
+    db_path=None,
+) -> Optional[Dict[str, object]]:
+    artifact_id = _validate_opaque_text(artifact_id, "artifact_id")
+    workspace_id = _validate_opaque_text(workspace_id, "workspace_id")
+    if lifecycle_state not in ARTIFACT_LIFECYCLE_STATES:
+        raise ApplicationDataValidationError("Unknown artifact lifecycle state.")
+    if updated_at:
+        updated_at = _validate_timestamp(updated_at, "updated_at")
+    if expected_row_version is not None and (
+        not isinstance(expected_row_version, int)
+        or isinstance(expected_row_version, bool)
+        or expected_row_version < 1
+    ):
+        raise ApplicationDataValidationError("expected_row_version must be positive.")
+    with _write_operation(connection, db_path) as database:
+        row = database.execute(
+            "SELECT * FROM artifacts WHERE id = ? AND workspace_id = ?",
+            (artifact_id, workspace_id),
+        ).fetchone()
+        if row is None:
+            return None
+        if expected_row_version is not None and row["row_version"] != expected_row_version:
+            raise ApplicationDataCollisionError("Artifact changed concurrently.")
+        _validate_artifact_lifecycle_transition(row["lifecycle_state"], lifecycle_state)
+        if row["lifecycle_state"] == lifecycle_state:
+            return _artifact_result(row, "unchanged")
+        parameters = (
+            lifecycle_state,
+            updated_at or _utc_timestamp(),
+            artifact_id,
+            workspace_id,
+        )
+        sql = """
+            UPDATE artifacts
+            SET lifecycle_state = ?, updated_at = ?, row_version = row_version + 1
+            WHERE id = ? AND workspace_id = ?
+        """
+        if expected_row_version is not None:
+            sql += " AND row_version = ?"
+            parameters += (expected_row_version,)
+        cursor = database.execute(sql, parameters)
+        if cursor.rowcount != 1:
+            raise ApplicationDataCollisionError("Artifact changed concurrently.")
+        changed = database.execute(
+            "SELECT * FROM artifacts WHERE id = ? AND workspace_id = ?",
+            (artifact_id, workspace_id),
+        ).fetchone()
+        return _artifact_result(changed, "updated")
+
+
+def delete_artifact_record(
+    artifact_id: str,
+    workspace_id: str,
+    *,
+    expected_row_version: Optional[int] = None,
+    connection=None,
+    db_path=None,
+) -> Optional[Dict[str, object]]:
+    """Delete registry metadata only after the owned artifact is marked deleted."""
+
+    artifact_id = _validate_opaque_text(artifact_id, "artifact_id")
+    workspace_id = _validate_opaque_text(workspace_id, "workspace_id")
+    if expected_row_version is not None and (
+        not isinstance(expected_row_version, int)
+        or isinstance(expected_row_version, bool)
+        or expected_row_version < 1
+    ):
+        raise ApplicationDataValidationError("expected_row_version must be positive.")
+    with _write_operation(connection, db_path) as database:
+        row = database.execute(
+            "SELECT * FROM artifacts WHERE id = ? AND workspace_id = ?",
+            (artifact_id, workspace_id),
+        ).fetchone()
+        if row is None:
+            return None
+        if row["lifecycle_state"] != "deleted":
+            raise ApplicationDataLifecycleError(
+                "Artifact registry rows can be removed only after storage deletion."
+            )
+        if expected_row_version is not None and row["row_version"] != expected_row_version:
+            raise ApplicationDataCollisionError("Artifact changed concurrently.")
+        parameters = (artifact_id, workspace_id)
+        sql = "DELETE FROM artifacts WHERE id = ? AND workspace_id = ?"
+        if expected_row_version is not None:
+            sql += " AND row_version = ?"
+            parameters += (expected_row_version,)
+        cursor = database.execute(sql, parameters)
+        if cursor.rowcount != 1:
+            raise ApplicationDataCollisionError("Artifact changed concurrently.")
+        return _artifact_result(row, "deleted")
+
+
 def _coverage_result(row, action: str) -> Dict[str, object]:
     result = dict(row)
     result["summary"] = _parse_stored_json(
@@ -1091,6 +1709,7 @@ def upsert_source_coverage(
     covered_at = covered_at or _utc_timestamp()
 
     with _write_operation(connection, db_path) as database:
+        _assert_workspace_write_not_fenced(database, workspace_id)
         row = database.execute(
             """
             SELECT * FROM application_source_coverage
@@ -1243,6 +1862,7 @@ def upsert_account(
         "auth_metadata_json", "encrypted_secrets_json", "encryption_key_id", "source_sha256",
     )
     with _write_operation(connection, db_path) as database:
+        _assert_workspace_write_not_fenced(database, workspace_id)
         row = database.execute("SELECT * FROM accounts WHERE id = ?", (account_id,)).fetchone()
         now = _utc_timestamp()
         created = created_at or (row["created_at"] if row is not None else now)
@@ -1396,6 +2016,265 @@ def record_application_migration_run(
         return _migration_run_result(changed, "updated")
 
 
+def _encrypted_envelope_json(value: object, encryption_key_id: str) -> str:
+    encoded = _canonical_mapping(value, "encrypted_token")
+    parsed = json.loads(encoded)
+    if set(parsed) != {"algorithm", "key_id", "nonce", "ciphertext"}:
+        raise ApplicationDataValidationError("Encrypted token envelope has invalid fields.")
+    if any(not isinstance(parsed.get(key), str) or not parsed.get(key) for key in parsed):
+        raise ApplicationDataValidationError("Encrypted token envelope is incomplete.")
+    if parsed["key_id"] != encryption_key_id:
+        raise ApplicationDataValidationError("Encrypted token key ID does not match its envelope.")
+    return encoded
+
+
+def _share_link_result(row, action: str) -> Dict[str, object]:
+    result = dict(row)
+    result["encrypted_token"] = _parse_stored_json(
+        result.pop("encrypted_token_json"), "encrypted share token", require_mapping=True
+    )
+    result["allow_download"] = bool(result["allow_download"])
+    result["revoked"] = bool(result["revoked"])
+    result["action"] = action
+    return result
+
+
+def upsert_share_link(
+    token_digest: str,
+    encrypted_token: object,
+    encryption_key_id: str,
+    *,
+    workspace_id: str = "",
+    created_by_account_id: str = "",
+    created_by_user_id: str = "",
+    created_by_email: str = "",
+    artifact_id: str = "",
+    pdf_filename: str,
+    pdf_path: str = "",
+    original_filename: str = "",
+    created_at: str,
+    expires_at: str,
+    allow_download: bool = True,
+    revoked: bool = False,
+    access_count: int = 0,
+    last_accessed_at: str = "",
+    updated_at: str = "",
+    source_version: str = "1",
+    source_sha256: str = "",
+    allow_update: bool = False,
+    connection=None,
+    db_path=None,
+) -> Dict[str, object]:
+    token_digest = _validate_sha256(token_digest, "token_digest")
+    encryption_key_id = _validate_opaque_text(encryption_key_id, "encryption_key_id")
+    encrypted_json = _encrypted_envelope_json(encrypted_token, encryption_key_id)
+    workspace_value = None if not workspace_id else _validate_opaque_text(workspace_id, "workspace_id")
+    account_value = (
+        None
+        if not created_by_account_id
+        else _validate_opaque_text(created_by_account_id, "created_by_account_id")
+    )
+    artifact_value = None if not artifact_id else _validate_opaque_text(artifact_id, "artifact_id")
+    created_by_user_id = _validate_optional_text(created_by_user_id, "created_by_user_id")
+    created_by_email = _validate_optional_text(created_by_email, "created_by_email")
+    pdf_filename = _validate_source_name(pdf_filename)
+    if not pdf_filename or Path(pdf_filename).suffix.lower() != ".pdf":
+        raise ApplicationDataValidationError("pdf_filename must be a PDF basename.")
+    pdf_path = _validate_optional_text(pdf_path, "pdf_path")
+    original_filename = _validate_source_name(original_filename or pdf_filename)
+    created_at = _validate_timestamp(created_at, "created_at")
+    expires_at = _validate_timestamp(expires_at, "expires_at")
+    if not isinstance(allow_download, bool) or not isinstance(revoked, bool):
+        raise ApplicationDataValidationError("Share flags must be boolean.")
+    if not isinstance(access_count, int) or isinstance(access_count, bool) or access_count < 0:
+        raise ApplicationDataValidationError("access_count must be a non-negative integer.")
+    last_accessed_at = _validate_timestamp(
+        last_accessed_at, "last_accessed_at", optional=True
+    )
+    updated_at = _validate_timestamp(updated_at or created_at, "updated_at")
+    source_version = _validate_opaque_text(source_version, "source_version")
+    source_sha256 = _validate_sha256(source_sha256, "source_sha256", optional=True)
+
+    fields = (
+        "digest_algorithm", "encrypted_token_json", "encryption_key_id", "workspace_id",
+        "created_by_account_id", "created_by_user_id", "created_by_email", "artifact_id",
+        "pdf_filename", "pdf_path", "original_filename", "created_at", "expires_at",
+        "allow_download", "revoked", "access_count", "last_accessed_at", "updated_at",
+        "source_version", "source_sha256",
+    )
+    values = (
+        "sha256",
+        encrypted_json,
+        encryption_key_id,
+        workspace_value,
+        account_value,
+        created_by_user_id,
+        created_by_email,
+        artifact_value,
+        pdf_filename,
+        pdf_path,
+        original_filename,
+        created_at,
+        expires_at,
+        int(allow_download),
+        int(revoked),
+        access_count,
+        last_accessed_at,
+        updated_at,
+        source_version,
+        source_sha256,
+    )
+    with _write_operation(connection, db_path) as database:
+        row = database.execute(
+            "SELECT * FROM share_links WHERE token_digest = ?", (token_digest,)
+        ).fetchone()
+        owner_workspace_id = (
+            str(row["workspace_id"] or "") if row is not None else str(workspace_value or "")
+        )
+        if owner_workspace_id:
+            _assert_workspace_write_not_fenced(database, owner_workspace_id)
+        if row is not None:
+            if row["workspace_id"] != workspace_value:
+                raise ApplicationDataCollisionError(
+                    "Share-link ownership cannot be reassigned."
+                )
+            if tuple(row[field] for field in fields) == values:
+                return _share_link_result(row, "unchanged")
+            if not allow_update:
+                raise ApplicationDataCollisionError("Share-token digest already has different data.")
+            assignments = ", ".join("%s = ?" % field for field in fields)
+            try:
+                database.execute(
+                    "UPDATE share_links SET %s, row_version = row_version + 1 WHERE token_digest = ?"
+                    % assignments,
+                    values + (token_digest,),
+                )
+            except sqlite3.IntegrityError as exc:
+                raise ApplicationDataCollisionError("Share-link identity collides.") from exc
+            changed = database.execute(
+                "SELECT * FROM share_links WHERE token_digest = ?", (token_digest,)
+            ).fetchone()
+            return _share_link_result(changed, "updated")
+        placeholders = ",".join("?" for _ in range(len(fields) + 1))
+        try:
+            database.execute(
+                "INSERT INTO share_links (token_digest, %s) VALUES (%s)"
+                % (", ".join(fields), placeholders),
+                (token_digest,) + values,
+            )
+        except sqlite3.IntegrityError as exc:
+            raise ApplicationDataCollisionError("Share-link identity collides.") from exc
+        inserted = database.execute(
+            "SELECT * FROM share_links WHERE token_digest = ?", (token_digest,)
+        ).fetchone()
+        return _share_link_result(inserted, "inserted")
+
+
+def get_share_link(
+    token_digest: str,
+    *,
+    connection=None,
+    db_path=None,
+) -> Optional[Dict[str, object]]:
+    token_digest = _validate_sha256(token_digest, "token_digest")
+    with _read_operation(connection, db_path) as database:
+        if database is None:
+            return None
+        row = database.execute(
+            "SELECT * FROM share_links WHERE token_digest = ?", (token_digest,)
+        ).fetchone()
+        return _share_link_result(row, "read") if row else None
+
+
+def list_share_links(*, workspace_id: str = "", connection=None, db_path=None) -> list:
+    if workspace_id:
+        workspace_id = _validate_opaque_text(workspace_id, "workspace_id")
+    with _read_operation(connection, db_path) as database:
+        if database is None:
+            return []
+        if workspace_id:
+            rows = database.execute(
+                """
+                SELECT * FROM share_links
+                WHERE workspace_id = ?
+                ORDER BY created_at, token_digest
+                """,
+                (workspace_id,),
+            ).fetchall()
+        else:
+            rows = database.execute(
+                "SELECT * FROM share_links ORDER BY created_at, token_digest"
+            ).fetchall()
+        return [_share_link_result(row, "read") for row in rows]
+
+
+def update_share_link_state(
+    token_digest: str,
+    *,
+    revoked: object = _UNSET,
+    access_count: object = _UNSET,
+    last_accessed_at: object = _UNSET,
+    updated_at: str = "",
+    expected_row_version: Optional[int] = None,
+    connection=None,
+    db_path=None,
+) -> Optional[Dict[str, object]]:
+    token_digest = _validate_sha256(token_digest, "token_digest")
+    if expected_row_version is not None and (
+        not isinstance(expected_row_version, int) or expected_row_version < 1
+    ):
+        raise ApplicationDataValidationError("expected_row_version must be positive.")
+    with _write_operation(connection, db_path) as database:
+        row = database.execute(
+            "SELECT * FROM share_links WHERE token_digest = ?", (token_digest,)
+        ).fetchone()
+        if row is None:
+            return None
+        if row["workspace_id"]:
+            _assert_workspace_write_not_fenced(database, str(row["workspace_id"]))
+        if expected_row_version is not None and row["row_version"] != expected_row_version:
+            raise ApplicationDataCollisionError("Share link changed concurrently.")
+        new_revoked = bool(row["revoked"]) if revoked is _UNSET else revoked
+        if not isinstance(new_revoked, bool):
+            raise ApplicationDataValidationError("revoked must be boolean.")
+        new_count = row["access_count"] if access_count is _UNSET else access_count
+        if not isinstance(new_count, int) or isinstance(new_count, bool) or new_count < 0:
+            raise ApplicationDataValidationError("access_count must be non-negative.")
+        new_last = (
+            row["last_accessed_at"]
+            if last_accessed_at is _UNSET
+            else _validate_timestamp(last_accessed_at, "last_accessed_at", optional=True)
+        )
+        if (bool(row["revoked"]), row["access_count"], row["last_accessed_at"]) == (
+            new_revoked,
+            new_count,
+            new_last,
+        ):
+            return _share_link_result(row, "unchanged")
+        parameters = (
+            int(new_revoked),
+            new_count,
+            new_last,
+            _validate_timestamp(updated_at, "updated_at") if updated_at else _utc_timestamp(),
+            token_digest,
+        )
+        sql = """
+            UPDATE share_links SET revoked = ?, access_count = ?, last_accessed_at = ?,
+                updated_at = ?, row_version = row_version + 1
+            WHERE token_digest = ?
+        """
+        if expected_row_version is not None:
+            sql += " AND row_version = ?"
+            parameters += (expected_row_version,)
+        cursor = database.execute(sql, parameters)
+        if cursor.rowcount != 1:
+            raise ApplicationDataCollisionError("Share link changed concurrently.")
+        changed = database.execute(
+            "SELECT * FROM share_links WHERE token_digest = ?", (token_digest,)
+        ).fetchone()
+        return _share_link_result(changed, "updated")
+
+
 def _guest_result(row, action: str) -> Dict[str, object]:
     result = dict(row)
     result["is_active"] = bool(result["is_active"])
@@ -1443,7 +2322,10 @@ def insert_guest_session(
         ended_at = record.get("ended_at", ended_at)
         updated_at = record.get("updated_at", updated_at or used_at)
         is_active = record.get("is_active", is_active)
-        lifecycle_state = record.get("lifecycle_state", lifecycle_state)
+        lifecycle_state = record.get(
+            "lifecycle_state",
+            "active" if is_active else "inactive",
+        )
         temporary_data = record.get(
             "temporary_data_json",
             record.get("temporary_data", temporary_data),
@@ -1611,6 +2493,7 @@ def update_guest_session(
     is_active: object = _UNSET,
     lifecycle_state: object = _UNSET,
     temporary_data: object = _UNSET,
+    source_version: object = _UNSET,
     source_sha256: object = _UNSET,
     expected_row_version: Optional[int] = None,
     connection=None,
@@ -1624,7 +2507,7 @@ def update_guest_session(
             raise ApplicationDataValidationError("Guest changes must be a mapping.")
         allowed = {
             "used_at", "expires_at", "ended_at", "is_active", "lifecycle_state",
-            "temporary_data", "temporary_data_json", "source_sha256",
+            "temporary_data", "temporary_data_json", "source_version", "source_sha256",
         }
         if set(changes).difference(allowed):
             raise ApplicationDataValidationError("Guest changes contain an unknown field.")
@@ -1635,6 +2518,7 @@ def update_guest_session(
             "is_active": is_active,
             "lifecycle_state": lifecycle_state,
             "temporary_data": temporary_data,
+            "source_version": source_version,
             "source_sha256": source_sha256,
         }
         mapping = dict(changes)
@@ -1651,6 +2535,7 @@ def update_guest_session(
         is_active = supplied["is_active"]
         lifecycle_state = supplied["lifecycle_state"]
         temporary_data = supplied["temporary_data"]
+        source_version = supplied["source_version"]
         source_sha256 = supplied["source_sha256"]
     if expected_row_version is not None and (
         not isinstance(expected_row_version, int) or expected_row_version < 1
@@ -1691,9 +2576,7 @@ def update_guest_session(
             new_active = False
         if is_active is not _UNSET and not new_active and lifecycle_state is _UNSET:
             new_lifecycle = "inactive"
-        _validate_lifecycle_transition(
-            row["lifecycle_state"], new_lifecycle, field_name="guest session"
-        )
+        _validate_guest_lifecycle_transition(row["lifecycle_state"], new_lifecycle)
         if new_active != (new_lifecycle == "active"):
             raise ApplicationDataValidationError("Guest activity and lifecycle state disagree.")
         if new_active and database.execute(
@@ -1711,32 +2594,44 @@ def update_guest_session(
             if source_sha256 is _UNSET
             else _validate_sha256(source_sha256, "source_sha256", optional=True)
         )
+        new_source_version = (
+            row["source_version"]
+            if source_version is _UNSET
+            else _validate_opaque_text(source_version, "source_version")
+        )
+        new_updated = _utc_timestamp()
         values = (
             new_used,
             new_expires,
             new_ended,
+            new_updated,
             int(new_active),
             new_lifecycle,
             new_temporary,
+            new_source_version,
             new_source,
         )
         fields = (
-            "used_at", "expires_at", "ended_at", "is_active", "lifecycle_state",
-            "temporary_data_json", "source_sha256",
+            "used_at", "expires_at", "ended_at", "updated_at", "is_active",
+            "lifecycle_state", "temporary_data_json", "source_version", "source_sha256",
         )
-        if tuple(row[field] for field in fields) == values:
+        comparison_fields = tuple(field for field in fields if field != "updated_at")
+        comparison_values = tuple(
+            value for field, value in zip(fields, values) if field != "updated_at"
+        )
+        if tuple(row[field] for field in comparison_fields) == comparison_values:
             return _guest_result(row, "unchanged")
         ensure_workspace(
             row["workspace_id"],
             "guest",
             guest_session_id,
-            lifecycle_state=new_lifecycle,
+            lifecycle_state=_workspace_state_for_guest(new_lifecycle),
             connection=database,
         )
         sql = """
             UPDATE guest_sessions SET
-                used_at = ?, expires_at = ?, ended_at = ?, is_active = ?,
-                lifecycle_state = ?, temporary_data_json = ?, source_sha256 = ?,
+                used_at = ?, expires_at = ?, ended_at = ?, updated_at = ?, is_active = ?,
+                lifecycle_state = ?, temporary_data_json = ?, source_version = ?, source_sha256 = ?,
                 row_version = row_version + 1
             WHERE id = ?
         """
@@ -1770,7 +2665,7 @@ def deactivate_guest_session(
         ).fetchone()
         if row is None:
             return None
-        if row["lifecycle_state"] in {"inactive", "purging", "purged"}:
+        if row["lifecycle_state"] in {"inactive", "purging", "purged", "failed"}:
             return _guest_result(row, "unchanged")
         return update_guest_session(
             guest_session_id,
@@ -1786,6 +2681,7 @@ __all__ = [
     "APPLICATION_DATA_LOCK",
     "APPLICATION_SCHEMA_COMPONENT",
     "APPLICATION_SCHEMA_VERSION",
+    "ARTIFACT_LIFECYCLE_STATES",
     "ApplicationDataCollisionError",
     "ApplicationDataError",
     "ApplicationDataIntegrityError",
@@ -1802,20 +2698,31 @@ __all__ = [
     "application_schema_status",
     "canonical_json",
     "deactivate_guest_session",
+    "delete_artifact_record",
     "ensure_workspace",
     "existing_application_read_connection",
     "get_account",
+    "get_artifact",
+    "get_artifact_by_storage_key",
     "get_durable_document",
     "get_guest_session",
+    "guest_workspace_write_is_fenced",
+    "get_share_link",
     "get_source_coverage",
     "insert_guest_session",
     "install_application_schema",
     "list_guest_sessions",
+    "list_share_links",
+    "list_workspace_artifacts",
     "record_application_migration_run",
     "schema_checksum_sha256",
     "sha256_json",
+    "update_artifact_lifecycle",
     "update_guest_session",
+    "update_share_link_state",
     "upsert_account",
+    "upsert_artifact",
     "upsert_durable_document",
     "upsert_source_coverage",
+    "upsert_share_link",
 ]

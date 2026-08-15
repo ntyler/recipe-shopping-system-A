@@ -1033,6 +1033,10 @@ def _run_failure_injector(failure_injector, stage: str, **context) -> None:
 def _coverage_is_current(
     connection,
     account: _PreparedAccount,
+    *,
+    migration_run_id: str = "",
+    registry_source_sha256: str = "",
+    registry_manifest_sha256: str = "",
 ) -> bool:
     coverage = application_data.get_source_coverage(
         account.workspace_id,
@@ -1040,10 +1044,89 @@ def _coverage_is_current(
         SOURCE_KIND,
         connection=connection,
     )
-    return bool(
+    if not bool(
         isinstance(coverage, Mapping)
         and coverage.get("source_sha256") == account.record_sha256
         and coverage.get("status") == "covered"
+    ):
+        return False
+    if migration_run_id and coverage.get("migration_run_id") != migration_run_id:
+        return False
+    if registry_source_sha256 or registry_manifest_sha256:
+        summary = coverage.get("summary")
+        if not isinstance(summary, Mapping):
+            return False
+        if (
+            summary.get("registry_source_sha256") != registry_source_sha256
+            or summary.get("registry_manifest_sha256")
+            != registry_manifest_sha256
+        ):
+            return False
+    return True
+
+
+def _account_source_manifest_sha256(
+    prepared: Sequence[_PreparedAccount],
+) -> str:
+    """Hash the exact account IDs and record hashes represented by a run."""
+
+    material = sorted(
+        (account.account_id, account.record_sha256) for account in prepared
+    )
+    return hashlib.sha256(
+        application_data.canonical_json(material).encode("utf-8")
+    ).hexdigest()
+
+
+def _registry_marker_is_current(
+    connection,
+    prepared: Sequence[_PreparedAccount],
+    *,
+    registry_source_sha256: str,
+    registry_manifest_sha256: str,
+) -> bool:
+    """Verify the completed run and every row-level coverage marker."""
+
+    latest = connection.execute(
+        """
+        SELECT id, source_sha256, summary_json
+          FROM migration_runs
+         WHERE migration_kind = ? AND status = 'succeeded'
+         ORDER BY rowid DESC
+         LIMIT 1
+        """,
+        (SOURCE_KIND,),
+    ).fetchone()
+    if latest is None or str(latest["source_sha256"] or "") != registry_source_sha256:
+        return False
+    try:
+        summary = json.loads(str(latest["summary_json"] or "{}"))
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return False
+    if not isinstance(summary, Mapping) or (
+        summary.get("account_count") != len(prepared)
+        or summary.get("account_manifest_sha256") != registry_manifest_sha256
+    ):
+        return False
+    run_id = str(latest["id"] or "")
+    coverage_count = int(
+        connection.execute(
+            """
+            SELECT COUNT(*) FROM application_source_coverage
+             WHERE domain = ? AND source_key = ? AND status = 'covered'
+            """,
+            (MIGRATION_DOMAIN, SOURCE_KIND),
+        ).fetchone()[0]
+    )
+    return coverage_count == len(prepared) and all(
+        _coverage_is_current(
+            connection,
+            account,
+            migration_run_id=run_id,
+            registry_source_sha256=registry_source_sha256,
+            registry_manifest_sha256=registry_manifest_sha256,
+        )
+        for account in prepared
     )
 
 
@@ -1094,6 +1177,8 @@ def apply_account_data_migration(
     _install_schema(resolved_db_path)
 
     applied_at = _timestamp(clock)
+    registry_source_sha256 = preview.source_sha256 or ""
+    registry_manifest_sha256 = _account_source_manifest_sha256(prepared)
     migration_run_id: Optional[str] = None
     account_actions = {"inserted": 0, "unchanged": 0}
     workspace_actions = {"inserted": 0, "updated": 0, "unchanged": 0}
@@ -1115,6 +1200,7 @@ def apply_account_data_migration(
                 resolved_source,
                 clock=clock,
             )
+            registry_manifest_sha256 = _account_source_manifest_sha256(prepared)
 
             for index, account in enumerate(prepared):
                 try:
@@ -1195,11 +1281,18 @@ def apply_account_data_migration(
                     account_index=index,
                 )
 
+            marker_is_current = _registry_marker_is_current(
+                connection,
+                prepared,
+                registry_source_sha256=registry_source_sha256,
+                registry_manifest_sha256=registry_manifest_sha256,
+            )
             changed = bool(
                 account_actions["inserted"]
                 or workspace_actions.get("inserted", 0)
                 or workspace_actions.get("updated", 0)
                 or coverage_updates
+                or not marker_is_current
             )
             if changed:
                 migration_run_id = uuid.uuid4().hex
@@ -1210,6 +1303,7 @@ def apply_account_data_migration(
                     source_sha256=preview.source_sha256 or "",
                     summary={
                         "account_count": len(prepared),
+                        "account_manifest_sha256": registry_manifest_sha256,
                         "accounts_requiring_encryption": (
                             preview.accounts_requiring_encryption
                         ),
@@ -1223,7 +1317,9 @@ def apply_account_data_migration(
                 if isinstance(run_result, Mapping) and run_result.get("id"):
                     migration_run_id = str(run_result["id"])
 
-                for account in coverage_updates:
+                # A new registry marker supersedes the prior one, so bind every
+                # account coverage row to this exact completed run atomically.
+                for account in prepared:
                     application_data.upsert_source_coverage(
                         account.workspace_id,
                         MIGRATION_DOMAIN,
@@ -1233,6 +1329,8 @@ def apply_account_data_migration(
                         status="covered",
                         summary={
                             "encrypted": bool(account.secret_payload),
+                            "registry_source_sha256": registry_source_sha256,
+                            "registry_manifest_sha256": registry_manifest_sha256,
                             "schema_version": SCHEMA_VERSION,
                         },
                         covered_at=applied_at,
@@ -1254,11 +1352,27 @@ def apply_account_data_migration(
                         "Account migration validation failed before commit."
                     )
                 validated_accounts += 1
-                if not _coverage_is_current(connection, account):
+                if not _coverage_is_current(
+                    connection,
+                    account,
+                    migration_run_id=(migration_run_id or ""),
+                    registry_source_sha256=registry_source_sha256,
+                    registry_manifest_sha256=registry_manifest_sha256,
+                ):
                     raise AccountDataMigrationError(
                         "Account source coverage validation failed before commit."
                     )
                 validated_coverage += 1
+
+            if not _registry_marker_is_current(
+                connection,
+                prepared,
+                registry_source_sha256=registry_source_sha256,
+                registry_manifest_sha256=registry_manifest_sha256,
+            ):
+                raise AccountDataMigrationError(
+                    "Account registry migration marker validation failed before commit."
+                )
 
             _run_failure_injector(failure_injector, "before_commit")
             _scan_unchanged_source(
@@ -1288,6 +1402,7 @@ def apply_account_data_migration(
             or workspace_actions.get("inserted", 0)
             or workspace_actions.get("updated", 0)
             or coverage_updates
+            or migration_run_id
         ),
         validation={
             "accounts": validated_accounts,

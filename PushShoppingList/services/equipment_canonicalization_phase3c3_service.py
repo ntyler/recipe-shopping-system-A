@@ -13,6 +13,7 @@ import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 
+from PushShoppingList.services import recipe_master_data_service as master_data
 from PushShoppingList.services import recipe_equipment_requirement_service as requirements
 from PushShoppingList.services.equipment_canonicalization_phase3c1_service import (
     _baseline_equipment_rows,
@@ -789,6 +790,7 @@ def apply_phase3c3_owner_decisions(
     connection = sqlite3.connect(db_path, timeout=60)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON")
+    master_data.install_recipe_master_connection_guest_write_fences(connection)
     try:
         connection.execute("BEGIN IMMEDIATE")
         if _staged_fingerprint(connection) != staged_before:

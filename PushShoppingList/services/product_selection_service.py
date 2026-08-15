@@ -51,6 +51,7 @@ from PushShoppingList.services.shopping_list_service import load_items
 from PushShoppingList.services.store_settings_service import load_store_settings
 from PushShoppingList.services.storage_service import active_user_id
 from PushShoppingList.services.storage_service import scoped_extractor_data_path
+from PushShoppingList.services import durable_document_runtime_service as durable_runtime
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -1045,13 +1046,21 @@ def product_progress_percent(done_count, total):
 
 
 def load_product_choices():
-    if not PRODUCT_CHOICES_FILE.exists():
-        return {"items": {}}
+    def legacy_loader():
+        if not PRODUCT_CHOICES_FILE.exists():
+            return {"items": {}}
+        try:
+            return json.loads(PRODUCT_CHOICES_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            return {"items": {}}
 
-    try:
-        data = json.loads(PRODUCT_CHOICES_FILE.read_text(encoding="utf-8"))
-    except Exception:
-        return {"items": {}}
+    data = durable_runtime.load_json_document(
+        legacy_loader,
+        domain="shopping",
+        document_key="product_choices",
+        source_key="shopping_product_choices",
+        source_ref="recipe-extractor/data/product_choices.json",
+    )
 
     if not isinstance(data, dict):
         return {"items": {}}
@@ -1216,12 +1225,18 @@ def save_product_results(data):
 
 def save_product_choices(data):
     data = compact_product_state_for_storage(data)
-    PRODUCT_CHOICES_FILE.write_text(
-        json.dumps(data, indent=2, ensure_ascii=False),
-        encoding="utf-8",
+    saved = durable_runtime.save_json_document(
+        data,
+        lambda value: durable_runtime.atomic_write_json(
+            PRODUCT_CHOICES_FILE, value, newline=False
+        ),
+        domain="shopping",
+        document_key="product_choices",
+        source_key="shopping_product_choices",
+        source_ref="recipe-extractor/data/product_choices.json",
     )
     save_product_results(data)
-    return data
+    return saved
 
 
 def clear_product_choices():

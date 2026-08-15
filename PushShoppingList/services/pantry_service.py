@@ -12,6 +12,7 @@ from pathlib import Path
 from werkzeug.utils import secure_filename
 
 from PushShoppingList.services import storage_service
+from PushShoppingList.services import durable_document_runtime_service as durable_runtime
 from PushShoppingList.services.image_variant_service import ensure_webp_variants
 from PushShoppingList.services.image_variant_service import local_static_image_variants
 from PushShoppingList.services.openai_throttle_service import throttled_image_generation
@@ -250,16 +251,48 @@ def pantry_inventory_path(user_id=None, guest_session_id=None):
     return PANTRY_INVENTORY_FILE
 
 
+def pantry_runtime_identity(user_id=None, guest_session_id=None):
+    raw_user_id = str(user_id or "")
+    raw_guest_id = str(guest_session_id or "")
+    if raw_user_id:
+        return {
+            "workspace_id": raw_user_id,
+            "workspace_type": "user",
+            "subject_id": raw_user_id,
+        }
+    if raw_guest_id:
+        return {
+            "workspace_id": "guest:%s" % raw_guest_id,
+            "workspace_type": "guest",
+            "subject_id": raw_guest_id,
+        }
+    return {}
+
+
+def pantry_new_artifact_write_kwargs(path_or_url):
+    if durable_runtime.durable_backend_mode() == "json":
+        return {}
+    return {"new_artifact_paths": (path_or_url,)}
+
+
 def load_pantry_inventory(user_id=None, guest_session_id=None):
     inventory_path = pantry_inventory_path(user_id=user_id, guest_session_id=guest_session_id)
+    def legacy_loader():
+        if not inventory_path.exists():
+            return {"items": []}
+        try:
+            return json.loads(inventory_path.read_text(encoding="utf-8-sig"))
+        except Exception:
+            return {"items": []}
 
-    if not inventory_path.exists():
-        return {"items": []}
-
-    try:
-        payload = json.loads(inventory_path.read_text(encoding="utf-8-sig"))
-    except Exception:
-        return {"items": []}
+    payload = durable_runtime.load_json_document(
+        legacy_loader,
+        domain="pantry",
+        document_key="inventory",
+        source_key="pantry_inventory",
+        source_ref="pantry_inventory.json",
+        **pantry_runtime_identity(user_id, guest_session_id),
+    )
 
     if not isinstance(payload, dict):
         return {"items": []}
@@ -277,7 +310,13 @@ def load_pantry_inventory(user_id=None, guest_session_id=None):
     }
 
 
-def save_pantry_inventory(payload, user_id=None, guest_session_id=None):
+def save_pantry_inventory(
+    payload,
+    user_id=None,
+    guest_session_id=None,
+    *,
+    new_artifact_paths=(),
+):
     inventory_path = pantry_inventory_path(user_id=user_id, guest_session_id=guest_session_id)
     normalized = {
         "items": [
@@ -290,11 +329,16 @@ def save_pantry_inventory(payload, user_id=None, guest_session_id=None):
             include_defaults=True,
         ),
     }
-    inventory_path.write_text(
-        json.dumps(normalized, indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
+    return durable_runtime.save_json_document(
+        normalized,
+        lambda value: durable_runtime.atomic_write_json(inventory_path, value),
+        domain="pantry",
+        document_key="inventory",
+        source_key="pantry_inventory",
+        source_ref="pantry_inventory.json",
+        new_artifact_paths=new_artifact_paths,
+        **pantry_runtime_identity(user_id, guest_session_id),
     )
-    return normalized
 
 
 def normalize_pantry_item(item):
@@ -969,7 +1013,11 @@ def update_pantry_item(item_id, updates, user_id=None, guest_session_id=None, su
             item.update(apply_lifecycle_suggestions(item))
 
         item["last_updated"] = now_iso()
-        save_pantry_inventory(payload, user_id=user_id, guest_session_id=guest_session_id)
+        save_pantry_inventory(
+            payload,
+            user_id=user_id,
+            guest_session_id=guest_session_id,
+        )
         return {"ok": True, "item": item}
 
     return {"ok": False, "error": "Pantry item was not found."}
@@ -1042,7 +1090,11 @@ def delete_pantry_items(item_ids, user_id=None, guest_session_id=None):
     deleted_count = before_count - len(payload["items"])
 
     if deleted_count:
-        save_pantry_inventory(payload, user_id=user_id, guest_session_id=guest_session_id)
+        save_pantry_inventory(
+            payload,
+            user_id=user_id,
+            guest_session_id=guest_session_id,
+        )
 
     return {
         "ok": deleted_count > 0,
@@ -1162,7 +1214,20 @@ def save_pantry_item_image_upload(item_id, uploaded_file, user_id=None, guest_se
     item["image_generated_at"] = generated_at
     item["last_updated"] = generated_at
     payload["items"][item_index] = item
-    save_pantry_inventory(payload, user_id=user_id, guest_session_id=guest_session_id)
+    try:
+        save_pantry_inventory(
+            payload,
+            user_id=user_id,
+            guest_session_id=guest_session_id,
+            **pantry_new_artifact_write_kwargs(image_url),
+        )
+    except Exception:
+        from PushShoppingList.services.artifact_ownership_service import (
+            remove_new_local_artifact_family,
+        )
+
+        remove_new_local_artifact_family(image_url)
+        raise
 
     return pantry_item_image_response(item, image_url, generated_at)
 
@@ -1199,7 +1264,20 @@ def generate_pantry_item_image(item_id, user_id=None, guest_session_id=None):
     item["image_generated_at"] = generated_at
     item["last_updated"] = generated_at
     payload["items"][item_index] = item
-    save_pantry_inventory(payload, user_id=user_id, guest_session_id=guest_session_id)
+    try:
+        save_pantry_inventory(
+            payload,
+            user_id=user_id,
+            guest_session_id=guest_session_id,
+            **pantry_new_artifact_write_kwargs(image_url),
+        )
+    except Exception:
+        from PushShoppingList.services.artifact_ownership_service import (
+            remove_new_local_artifact_family,
+        )
+
+        remove_new_local_artifact_family(image_url)
+        raise
 
     return pantry_item_image_response(item, image_url, generated_at)
 
@@ -2443,13 +2521,23 @@ def extract_pdf_text(path):
 
 
 def load_receipt_history():
-    if not PANTRY_RECEIPT_HISTORY_FILE.exists():
-        return {"receipts": []}
+    def legacy_loader():
+        if not PANTRY_RECEIPT_HISTORY_FILE.exists():
+            return {"receipts": []}
+        try:
+            return json.loads(
+                PANTRY_RECEIPT_HISTORY_FILE.read_text(encoding="utf-8-sig")
+            )
+        except Exception:
+            return {"receipts": []}
 
-    try:
-        payload = json.loads(PANTRY_RECEIPT_HISTORY_FILE.read_text(encoding="utf-8-sig"))
-    except Exception:
-        return {"receipts": []}
+    payload = durable_runtime.load_json_document(
+        legacy_loader,
+        domain="pantry",
+        document_key="receipt_history",
+        source_key="pantry_receipt_history",
+        source_ref="pantry_receipt_history.json",
+    )
 
     if not isinstance(payload, dict):
         return {"receipts": []}
@@ -2484,9 +2572,16 @@ def update_receipt_history_status(receipt_id, status, added_count=0):
 
 
 def save_receipt_history(payload):
-    PANTRY_RECEIPT_HISTORY_FILE.write_text(
-        json.dumps({"receipts": payload.get("receipts", [])}, indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
+    normalized = {"receipts": payload.get("receipts", [])}
+    return durable_runtime.save_json_document(
+        normalized,
+        lambda value: durable_runtime.atomic_write_json(
+            PANTRY_RECEIPT_HISTORY_FILE, value
+        ),
+        domain="pantry",
+        document_key="receipt_history",
+        source_key="pantry_receipt_history",
+        source_ref="pantry_receipt_history.json",
     )
 
 
