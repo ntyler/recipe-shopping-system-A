@@ -647,6 +647,39 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     assert ".recipe-edit-summary-selectors .recipe-edit-price-control:not(:focus-within):not(:has(" in hierarchy_css
 
 
+def test_recipe_summary_selectors_are_borderless_with_accessible_state_feedback():
+    css = read_text("PushShoppingList/static/css/app.css")
+    marker = "/* Borderless summary controls: preserve the control box while letting it merge with the dark panel. */"
+    controls = css[css.index(marker):css.index(
+        "body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-description-row {",
+        css.index(marker),
+    )]
+
+    for field_id in ("#recipeEditCookbookField", "#recipeEditCategoryMenuSectionField"):
+        assert field_id in controls
+    assert "> .recipe-edit-cookbook-value" in controls
+    assert "> .recipe-edit-cookbook-value:focus-within" in controls
+    assert '> .recipe-edit-cookbook-value:has(> .recipe-edit-cookbook-select[aria-expanded="true"])' in controls
+    assert "> .recipe-edit-cookbook-select:disabled" in controls
+    assert ".recipe-edit-price-control:focus-within:not(:has(" in controls
+    assert ".recipe-edit-price-control:has(#recipeEditMenuPrice:disabled)" in controls
+
+    for declaration in (
+        "border: 1px solid transparent;",
+        "border-color: transparent;",
+        "background: transparent;",
+        "box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-primary-hover) 34%, transparent);",
+    ):
+        assert declaration in controls
+
+    price_rule_start = controls.index(
+        ".recipe-edit-summary-selectors .recipe-edit-price-control {"
+    )
+    price_rule = controls[price_rule_start:controls.index("}", price_rule_start)]
+    for preserved_dimension in ("height: 40px;", "min-height: 40px;"):
+        assert preserved_dimension in price_rule
+
+
 def test_recipe_metadata_strip_uses_spacing_without_internal_separators():
     css = read_text("PushShoppingList/static/css/app.css")
     phase_two_start = css.index(
@@ -915,7 +948,10 @@ def test_recipe_metadata_fields_have_accessible_tooltips():
 def test_recipe_editor_standard_fields_are_quiet_until_active():
     css = read_text("PushShoppingList/static/css/app.css")
     marker = "/* Recipe workspace: keep standard fields quiet until they are active or invalid. */"
-    quiet_fields = css[css.index(marker):]
+    targeted_summary_marker = (
+        "/* Borderless summary controls: preserve the control box while letting it merge with the dark panel. */"
+    )
+    quiet_fields = css[css.index(marker):css.index(targeted_summary_marker)]
 
     assert css.rindex(marker) > css.rindex("/* Ingredient editor v25:")
     assert ".recipe-edit-info-panel:not(.recipe-edit-categories-panel)" in quiet_fields

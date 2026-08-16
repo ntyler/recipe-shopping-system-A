@@ -76246,14 +76246,72 @@ body.recipe-edit-standalone-page .recipe-edit-summary-selectors {
     padding-top: 0;
 }
 
+/* Borderless summary controls: preserve the control box while letting it merge with the dark panel. */
+body.recipe-edit-standalone-page #recipeEditForm
+    .recipe-edit-summary-selectors :is(
+        #recipeEditCookbookField,
+        #recipeEditCategoryMenuSectionField
+    ) > .recipe-edit-cookbook-value {
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+}
+
+body.recipe-edit-standalone-page #recipeEditForm
+    .recipe-edit-summary-selectors :is(
+        #recipeEditCookbookField,
+        #recipeEditCategoryMenuSectionField
+    ) > .recipe-edit-cookbook-value:has(> .recipe-edit-cookbook-select:not(:disabled)):hover:not(:focus-within):not(:has(
+        > .recipe-edit-cookbook-select[aria-expanded="true"]
+    )) {
+    border-color: transparent;
+    background: color-mix(in srgb, var(--app-primary-soft) 32%, transparent);
+    box-shadow: none;
+}
+
+body.recipe-edit-standalone-page #recipeEditForm
+    .recipe-edit-summary-selectors :is(
+        #recipeEditCookbookField,
+        #recipeEditCategoryMenuSectionField
+    ) > .recipe-edit-cookbook-value:focus-within,
+body.recipe-edit-standalone-page #recipeEditForm
+    .recipe-edit-summary-selectors :is(
+        #recipeEditCookbookField,
+        #recipeEditCategoryMenuSectionField
+    ) > .recipe-edit-cookbook-value:has(> .recipe-edit-cookbook-select[aria-expanded="true"]) {
+    border-color: transparent;
+    background: color-mix(in srgb, var(--app-primary-soft) 48%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-primary-hover) 34%, transparent);
+}
+
+body.recipe-edit-standalone-page #recipeEditForm
+    .recipe-edit-summary-selectors :is(
+        #recipeEditCookbookField,
+        #recipeEditCategoryMenuSectionField
+    ) > .recipe-edit-cookbook-value > .recipe-edit-cookbook-select:is(:hover, :focus, :focus-visible) {
+    outline: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+body.recipe-edit-standalone-page #recipeEditForm
+    .recipe-edit-summary-selectors :is(
+        #recipeEditCookbookField,
+        #recipeEditCategoryMenuSectionField
+    ) > .recipe-edit-cookbook-value:has(> .recipe-edit-cookbook-select:disabled) {
+    border-color: transparent;
+    background: color-mix(in srgb, var(--app-surface-soft) 52%, transparent);
+    box-shadow: none;
+}
+
 body.recipe-edit-standalone-page #recipeEditForm
     .recipe-edit-summary-selectors .recipe-edit-price-control {
     width: 100%;
     height: 40px;
     min-height: 40px;
-    border: 1px solid var(--recipe-editor-border);
+    border: 1px solid transparent;
     border-radius: 8px;
-    background: var(--recipe-editor-surface-soft);
+    background: transparent;
     box-shadow: none;
 }
 
@@ -76261,8 +76319,8 @@ body.recipe-edit-standalone-page #recipeEditForm
     .recipe-edit-summary-selectors .recipe-edit-price-control:not(:focus-within):not(:has(
         #recipeEditMenuPrice:is([aria-invalid="true"], [data-recipe-edit-validation-invalid="true"])
     )) {
-    border-color: var(--recipe-editor-border);
-    background: var(--recipe-editor-surface-soft);
+    border-color: transparent;
+    background: transparent;
     box-shadow: none;
 }
 
@@ -76280,16 +76338,25 @@ body.recipe-edit-standalone-page #recipeEditForm
     .recipe-edit-summary-selectors .recipe-edit-price-control:hover:not(:focus-within):not(:has(
         #recipeEditMenuPrice:is([aria-invalid="true"], [data-recipe-edit-validation-invalid="true"])
     )) {
-    border-color: color-mix(in srgb, var(--app-primary-hover) 72%, var(--app-border-strong));
-    background: color-mix(in srgb, var(--app-bg) 76%, var(--app-surface-soft));
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--app-primary-hover) 18%, transparent);
+    border-color: transparent;
+    background: color-mix(in srgb, var(--app-primary-soft) 32%, transparent);
+    box-shadow: none;
 }
 
 body.recipe-edit-standalone-page #recipeEditForm
-    .recipe-edit-summary-selectors .recipe-edit-price-control:focus-within {
-    border-color: var(--app-primary-hover);
-    background: color-mix(in srgb, var(--app-bg) 82%, var(--app-surface-soft));
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-primary-hover) 24%, transparent);
+    .recipe-edit-summary-selectors .recipe-edit-price-control:focus-within:not(:has(
+        #recipeEditMenuPrice:is([aria-invalid="true"], [data-recipe-edit-validation-invalid="true"])
+    )) {
+    border-color: transparent;
+    background: color-mix(in srgb, var(--app-primary-soft) 48%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-primary-hover) 34%, transparent);
+}
+
+body.recipe-edit-standalone-page #recipeEditForm
+    .recipe-edit-summary-selectors .recipe-edit-price-control:has(#recipeEditMenuPrice:disabled) {
+    border-color: transparent;
+    background: color-mix(in srgb, var(--app-surface-soft) 52%, transparent);
+    box-shadow: none;
 }
 
 body.recipe-edit-standalone-page #recipeEditForm
