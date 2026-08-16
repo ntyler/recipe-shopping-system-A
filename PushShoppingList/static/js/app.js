@@ -26617,11 +26617,7 @@ function createRecipeEditCurrencyControl() {
     code.className = "recipe-edit-price-currency-code";
     code.dataset.recipeEditCurrencyCode = "";
     code.hidden = true;
-    const chevron = document.createElement("span");
-    chevron.className = "recipe-edit-price-currency-chevron";
-    chevron.setAttribute("aria-hidden", "true");
-    chevron.textContent = "▾";
-    trigger.append(symbol, code, chevron);
+    trigger.append(symbol, code);
 
     const menu = document.createElement("div");
     menu.id = "recipeEditMenuPriceCurrencyMenu";

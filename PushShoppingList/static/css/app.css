@@ -40091,8 +40091,7 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
 }
 
 .recipe-edit-standalone-page .recipe-edit-price-control {
-    display: grid;
-    grid-template-columns: max-content minmax(0, 1fr);
+    display: flex;
     align-items: center;
     gap: 2px;
     min-height: 36px;
@@ -40104,7 +40103,10 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
 
 .recipe-edit-standalone-page .recipe-edit-price-currency-select {
     position: relative;
-    display: block;
+    display: flex;
+    align-items: center;
+    flex: 0 0 auto;
+    height: 100%;
     min-width: 0;
 }
 
@@ -40112,13 +40114,14 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
     appearance: none;
     display: inline-flex;
     align-items: center;
-    justify-content: flex-start;
-    gap: 4px;
+    justify-content: center;
+    flex: 0 0 auto;
     width: auto;
-    min-width: 54px;
-    height: 34px;
-    min-height: 34px;
-    padding: 0 7px 0 8px;
+    min-width: 38px;
+    height: 100%;
+    min-height: 0;
+    margin: 0;
+    padding: 0 8px;
     border: 0;
     border-radius: 6px;
     outline: 0;
@@ -40131,24 +40134,17 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
 }
 
 .recipe-edit-standalone-page .recipe-edit-price-currency-symbol {
-    min-width: 1.7em;
-    text-align: right;
+    min-width: 0;
+    text-align: center;
 }
 
 .recipe-edit-standalone-page .recipe-edit-price-currency-code {
     display: none;
 }
 
+/* Also hide a chevron from a template rendered before this control was updated. */
 .recipe-edit-standalone-page .recipe-edit-price-currency-chevron {
-    margin-left: auto;
-    color: var(--app-muted);
-    font-size: 10px;
-    transition: transform 120ms ease;
-}
-
-.recipe-edit-standalone-page .recipe-edit-price-currency[aria-expanded="true"]
-    .recipe-edit-price-currency-chevron {
-    transform: rotate(180deg);
+    display: none;
 }
 
 .recipe-edit-standalone-page .recipe-edit-price-currency-menu {
@@ -40243,6 +40239,8 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
 }
 
 .recipe-edit-standalone-page .recipe-edit-price-control #recipeEditMenuPrice {
+    flex: 1 1 0;
+    min-width: 0;
     height: 34px;
     min-height: 34px;
     padding-left: 4px;

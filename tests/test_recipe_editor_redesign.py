@@ -664,7 +664,7 @@ def test_recipe_information_card_matches_compact_mockup_structure():
             ".recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-source-files-details {"
         )
     ]
-    assert "grid-template-columns: max-content minmax(0, 1fr);" in price_styles
+    assert "display: flex;" in price_styles
     assert "border-right" not in price_styles
     assert ".recipe-edit-tag-chip {" in css
     assert ".recipe-edit-description-count {" in css
