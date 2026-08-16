@@ -76227,13 +76227,13 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-
 }
 
 body.recipe-edit-standalone-page .recipe-edit-summary-identity {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr);
     align-items: center;
-    gap: 10px 18px;
+    gap: 10px;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-summary-identity .recipe-edit-header-rating {
-    justify-self: end;
+    justify-self: start;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-primary-fields > .recipe-image-mobile-slot {

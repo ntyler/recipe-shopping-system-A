@@ -570,6 +570,7 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     organizer_start = script.index("function organizeRecipeEditInformationCard()")
     organizer_end = script.index("function organizeRecipeEditAiAssistant()", organizer_start)
     organizer = script[organizer_start:organizer_end]
+    hierarchy_css = css[css.index("/* Edit Recipe hierarchy, borderless cooking summary, and AI Image Prompt dialog. */"):]
 
     assert 'primaryRow.className = "recipe-edit-primary-fields"' in organizer
     assert 'tagRow.className = "recipe-edit-tag-row"' in organizer
@@ -599,6 +600,20 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     assert 'recipeEditSvgIcon("edit")' not in organizer
     assert 'const mobileImageSlot = document.querySelector("[data-recipe-edit-mobile-image-slot]")' in organizer
     assert "appendRecipeEditWorkspaceChildren(identity, [nameLine, ratingField])" in organizer
+    identity_rule_start = hierarchy_css.index(
+        "body.recipe-edit-standalone-page .recipe-edit-summary-identity {"
+    )
+    identity_rule = hierarchy_css[
+        identity_rule_start:hierarchy_css.index("}", identity_rule_start)
+    ]
+    rating_rule_start = hierarchy_css.index(
+        "body.recipe-edit-standalone-page .recipe-edit-summary-identity .recipe-edit-header-rating {"
+    )
+    rating_rule = hierarchy_css[
+        rating_rule_start:hierarchy_css.index("}", rating_rule_start)
+    ]
+    assert "grid-template-columns: minmax(0, 1fr);" in identity_rule
+    assert "justify-self: start;" in rating_rule
     assert "appendRecipeEditWorkspaceChildren(selectors, [cookbookField, sectionField, priceField])" in organizer
     assert "appendRecipeEditWorkspaceChildren(primaryRow, [identity, selectors, mobileImageSlot])" in organizer
     assert "appendRecipeEditWorkspaceChildren(descriptionRow, [descriptionField])" in organizer
@@ -612,7 +627,6 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     assert final_order in organizer
     assert "if (infoActions) infoActions.hidden = true;" in organizer
     assert "technicalDetails.open = false;" in organizer
-    hierarchy_css = css[css.index("/* Edit Recipe hierarchy, borderless cooking summary, and AI Image Prompt dialog. */"):]
     assert "grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(130px, .62fr);" in hierarchy_css
     assert ".recipe-edit-info-panel-organized .recipe-edit-metadata-heading {" in css
     assert ".recipe-edit-description-row {\n    grid-template-columns: minmax(0, 1fr);" in hierarchy_css
