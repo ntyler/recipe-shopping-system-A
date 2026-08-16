@@ -40096,18 +40096,29 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
     align-items: center;
     gap: 2px;
     min-height: 36px;
-    overflow: hidden;
+    overflow: visible;
     border: 1px solid transparent;
     border-radius: 7px;
     background: var(--app-surface-soft);
 }
 
+.recipe-edit-standalone-page .recipe-edit-price-currency-select {
+    position: relative;
+    display: block;
+    min-width: 0;
+}
+
 .recipe-edit-standalone-page .recipe-edit-price-currency {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 4px;
     width: auto;
-    min-width: 62px;
+    min-width: 78px;
     height: 34px;
     min-height: 34px;
-    padding: 0 22px 0 8px;
+    padding: 0 7px 0 8px;
     border: 0;
     border-radius: 6px;
     outline: 0;
@@ -40116,6 +40127,119 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
     font-size: 12px;
     font-weight: 800;
     box-shadow: none;
+    cursor: pointer;
+}
+
+.recipe-edit-standalone-page .recipe-edit-price-currency-symbol {
+    min-width: 1.1em;
+    text-align: right;
+}
+
+.recipe-edit-standalone-page .recipe-edit-price-currency-code {
+    letter-spacing: .03em;
+}
+
+.recipe-edit-standalone-page .recipe-edit-price-currency-chevron {
+    margin-left: auto;
+    color: var(--app-muted);
+    font-size: 10px;
+    transition: transform 120ms ease;
+}
+
+.recipe-edit-standalone-page .recipe-edit-price-currency[aria-expanded="true"]
+    .recipe-edit-price-currency-chevron {
+    transform: rotate(180deg);
+}
+
+.recipe-edit-standalone-page .recipe-edit-price-currency-menu {
+    position: absolute;
+    z-index: 1200;
+    top: calc(100% + 5px);
+    right: 0;
+    width: min(282px, calc(100vw - 32px));
+    min-width: min(282px, calc(100vw - 32px));
+    max-width: calc(100vw - 32px);
+    max-height: min(340px, 62vh);
+    padding: 5px;
+    overflow-y: auto;
+    border: 1px solid color-mix(in srgb, var(--app-primary-hover) 30%, var(--app-border-strong));
+    border-radius: 9px;
+    background: color-mix(in srgb, var(--app-bg) 94%, #07110c);
+    box-shadow: 0 16px 36px rgba(0, 0, 0, .42),
+        0 0 0 1px color-mix(in srgb, var(--app-primary-hover) 8%, transparent);
+}
+
+.recipe-edit-standalone-page .recipe-edit-price-currency-menu[hidden] {
+    display: none;
+}
+
+.recipe-edit-standalone-page .recipe-edit-price-currency-option {
+    display: grid;
+    grid-template-columns: minmax(82px, auto) minmax(0, 1fr) 16px;
+    align-items: center;
+    gap: 10px;
+    min-height: 36px;
+    padding: 7px 9px;
+    border-radius: 6px;
+    outline: 0;
+    background: transparent;
+    color: var(--app-text);
+    cursor: pointer;
+}
+
+.recipe-edit-standalone-page .recipe-edit-price-currency-option:is(:hover, :focus-visible) {
+    background: color-mix(in srgb, var(--app-primary-soft) 58%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-primary-hover) 30%, transparent);
+}
+
+.recipe-edit-standalone-page .recipe-edit-price-currency-option[aria-selected="true"] {
+    background: color-mix(in srgb, var(--app-primary-soft) 76%, transparent);
+    color: var(--app-primary-hover);
+}
+
+.recipe-edit-standalone-page .recipe-edit-price-currency-option-identity {
+    display: grid;
+    grid-template-columns: minmax(24px, auto) 1fr;
+    align-items: baseline;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.recipe-edit-standalone-page .recipe-edit-price-currency-option-symbol {
+    min-width: 24px;
+    text-align: right;
+}
+
+.recipe-edit-standalone-page .recipe-edit-price-currency-option-code {
+    letter-spacing: .035em;
+}
+
+.recipe-edit-standalone-page .recipe-edit-price-currency-option-name {
+    overflow: hidden;
+    color: var(--app-muted);
+    font-size: 11px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.recipe-edit-standalone-page .recipe-edit-price-currency-option[aria-selected="true"]
+    .recipe-edit-price-currency-option-name {
+    color: color-mix(in srgb, var(--app-primary-hover) 58%, var(--app-muted));
+}
+
+.recipe-edit-standalone-page .recipe-edit-price-currency-option-check {
+    color: var(--app-primary-hover);
+    font-size: 12px;
+    font-weight: 900;
+    opacity: 0;
+}
+
+.recipe-edit-standalone-page .recipe-edit-price-currency-option[aria-selected="true"]
+    .recipe-edit-price-currency-option-check {
+    opacity: 1;
 }
 
 .recipe-edit-standalone-page .recipe-edit-price-control #recipeEditMenuPrice {
@@ -40130,7 +40254,7 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
 }
 
 .recipe-edit-standalone-page .recipe-edit-price-control :is(
-    #recipeEditMenuPriceCurrency,
+    .recipe-edit-price-currency,
     #recipeEditMenuPrice
 ):focus-visible {
     background: color-mix(in srgb, var(--app-primary-soft) 42%, transparent);
@@ -76360,7 +76484,7 @@ body.recipe-edit-standalone-page #recipeEditForm
 
 body.recipe-edit-standalone-page #recipeEditForm
     .recipe-edit-summary-selectors .recipe-edit-price-control :is(
-        #recipeEditMenuPriceCurrency,
+        .recipe-edit-price-currency,
         #recipeEditMenuPrice
     ) {
     height: 38px;
@@ -76373,7 +76497,7 @@ body.recipe-edit-standalone-page #recipeEditForm
 
 body.recipe-edit-standalone-page #recipeEditForm
     .recipe-edit-summary-selectors .recipe-edit-price-control :is(
-        #recipeEditMenuPriceCurrency,
+        .recipe-edit-price-currency,
         #recipeEditMenuPrice
     ):is(:hover, :focus, :focus-visible) {
     border: 0;
@@ -76383,7 +76507,7 @@ body.recipe-edit-standalone-page #recipeEditForm
 
 body.recipe-edit-standalone-page #recipeEditForm
     .recipe-edit-summary-selectors .recipe-edit-price-control :is(
-        #recipeEditMenuPriceCurrency,
+        .recipe-edit-price-currency,
         #recipeEditMenuPrice
     ):focus-visible {
     background: color-mix(in srgb, var(--app-primary-soft) 42%, transparent);
@@ -76761,6 +76885,11 @@ body.recipe-image-prompt-modal-open [data-app-content] {
 @media (max-width: 560px) {
     body.recipe-edit-standalone-page .recipe-edit-summary-selectors {
         grid-template-columns: minmax(0, 1fr);
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-price-currency-menu {
+        right: auto;
+        left: 0;
     }
 }
 

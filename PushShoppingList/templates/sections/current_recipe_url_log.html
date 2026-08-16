@@ -1402,11 +1402,33 @@
                                 <span class="recipe-edit-price-control"
                                       role="group"
                                       aria-labelledby="recipeEditMenuPriceLabel">
-                                    <select id="recipeEditMenuPriceCurrency"
-                                            class="recipe-edit-price-currency"
-                                            aria-label="Menu price currency">
-                                        <option value="USD" selected>USD</option>
-                                    </select>
+                                    <span class="recipe-edit-price-currency-select"
+                                          data-recipe-edit-currency-select>
+                                        <input type="hidden"
+                                               id="recipeEditMenuPriceCurrency"
+                                               value="USD">
+                                        <button type="button"
+                                                id="recipeEditMenuPriceCurrencyTrigger"
+                                                class="recipe-edit-price-currency"
+                                                data-recipe-edit-currency-trigger
+                                                aria-label="Menu price currency, $ USD, US Dollar"
+                                                aria-haspopup="listbox"
+                                                aria-expanded="false"
+                                                aria-controls="recipeEditMenuPriceCurrencyMenu">
+                                            <span class="recipe-edit-price-currency-symbol"
+                                                  data-recipe-edit-currency-symbol>$</span>
+                                            <span class="recipe-edit-price-currency-code"
+                                                  data-recipe-edit-currency-code>USD</span>
+                                            <span class="recipe-edit-price-currency-chevron"
+                                                  aria-hidden="true">&#9662;</span>
+                                        </button>
+                                        <div id="recipeEditMenuPriceCurrencyMenu"
+                                             class="recipe-edit-price-currency-menu"
+                                             data-recipe-edit-currency-menu
+                                             role="listbox"
+                                             aria-label="Menu price currency options"
+                                             hidden></div>
+                                    </span>
                                     <input type="text"
                                            id="recipeEditMenuPrice"
                                            inputmode="decimal"

@@ -217,62 +217,182 @@ def test_recipe_editor_persists_menu_price_amount_and_currency_separately(monkey
     assert result["recipe"]["menu_price_currency"] == "USD"
 
 
-def test_recipe_editor_price_control_defaults_to_usd_and_collects_edited_amount():
+def test_recipe_editor_persists_non_usd_menu_price_currency(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    url = "https://example.test/euro-menu-price"
+    recipe_edit_service.save_recipe_output(url, {
+        "source_url": url,
+        "source_type": "menu_item_inferred",
+        "recipe_title": "Euro Menu Item",
+        "menu_price": "$8.50",
+        "ingredients": [],
+        "instructions": [],
+    })
+
+    result = recipe_edit_service.save_editable_recipe(
+        url,
+        editable_payload(
+            url,
+            menu_price_amount="12.75",
+            menu_price_currency="EUR",
+        ),
+    )
+    saved = recipe_edit_service.load_recipe_output(url)
+    reloaded = recipe_edit_service.load_editable_recipe(url)["recipe"]
+
+    assert result["ok"] is True
+    assert saved["menu_price"] == "EUR 12.75"
+    assert saved["menu_price_amount"] == "12.75"
+    assert saved["menu_price_currency"] == "EUR"
+    assert reloaded["menu_price_amount"] == "12.75"
+    assert reloaded["menu_price_currency"] == "EUR"
+
+
+def test_recipe_editor_currency_catalog_and_dark_accessible_menu_are_config_driven():
+    script = read_text("PushShoppingList/static/js/app.js")
+    template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    css = read_text("PushShoppingList/static/css/app.css")
+    expected_currencies = (
+        ("USD", "$", "US Dollar"),
+        ("EUR", "€", "Euro"),
+        ("GBP", "£", "British Pound"),
+        ("INR", "₹", "Indian Rupee"),
+        ("JPY", "¥", "Japanese Yen"),
+        ("KRW", "₩", "South Korean Won"),
+        ("CAD", "C$", "Canadian Dollar"),
+        ("AUD", "A$", "Australian Dollar"),
+        ("NZD", "NZ$", "New Zealand Dollar"),
+        ("CHF", "CHF", "Swiss Franc"),
+        ("VND", "₫", "Vietnamese Dong"),
+        ("LAK", "₭", "Lao Kip"),
+    )
+
+    for code, symbol, name in expected_currencies:
+        assert f'{{ code: "{code}", symbol: "{symbol}", name: "{name}" }}' in script
+
+    assert 'data-recipe-edit-currency-trigger' in template
+    assert 'aria-label="Menu price currency, $ USD, US Dollar"' in template
+    assert 'data-recipe-edit-currency-symbol>$</span>' in template
+    assert 'data-recipe-edit-currency-code>USD</span>' in template
+    assert 'role="listbox"' in template
+    assert 'option.setAttribute("aria-selected", "false")' in script
+    assert 'option.setAttribute("aria-selected", selected ? "true" : "false")' in script
+    assert 'event.key === "ArrowDown" || event.key === "ArrowUp"' in script
+    assert 'event.key === "Home" || event.key === "End"' in script
+    assert ".recipe-edit-price-currency-option[aria-selected=\"true\"]" in css
+    assert ".recipe-edit-price-currency-option:is(:hover, :focus-visible)" in css
+    assert "background: color-mix(in srgb, var(--app-bg) 94%, #07110c);" in css
+
+
+def test_recipe_editor_price_control_defaults_to_usd_and_selects_non_usd_currency():
     node = shutil.which("node")
     if not node:
         pytest.skip("Node.js is required for the menu price editor regression")
 
     script = read_text("PushShoppingList/static/js/app.js")
+    currency_config_start = script.index("const DEFAULT_RECIPE_EDIT_MENU_PRICE_CURRENCY")
+    currency_config_end = script.index("const RECIPE_EDIT_MENU_RELATION_INPUT_IDS", currency_config_start)
     price_helpers_start = script.index("function recipeMenuMetadataText(value)")
     price_helpers_end = script.index("function recipeMenuSourceOptionValue(", price_helpers_start)
-    normalize_start = script.index("function normalizeRecipeEditPriceDisplay(")
+    normalize_start = script.index("function createRecipeEditCurrencyControl(")
     normalize_end = script.index("function setRecipeEditDifficultyValue(", normalize_start)
     collect_start = script.index("function recipeMenuMetadataStateAvailable()")
     collect_end = script.index("function currentRecipeEditorPdfFieldValues()", collect_start)
     harness = f"""
-const DEFAULT_RECIPE_EDIT_MENU_PRICE_CURRENCY = "USD";
+{script[currency_config_start:currency_config_end]}
 const RECIPE_EDIT_MENU_METADATA_INPUT_IDS = {{
     menu_price_amount: "recipeEditMenuPrice",
     menu_price_currency: "recipeEditMenuPriceCurrency",
 }};
 const RECIPE_EDIT_MENU_RELATION_INPUT_IDS = {{}};
 const amountInput = {{ value: "" }};
-const currencySelect = {{
+const currencyInput = {{
     value: "",
-    options: [{{ value: "USD" }}],
-    appendChild(option) {{ this.options.push(option); }},
+    closest() {{ return null; }},
 }};
 const elements = new Map([
     ["recipeEditMenuPrice", amountInput],
-    ["recipeEditMenuPriceCurrency", currencySelect],
+    ["recipeEditMenuPriceCurrency", currencyInput],
     ["recipeEditRestaurantMenuSourceDetails", {{ dataset: {{ recipeMenuMetadataAvailable: "true" }} }}],
 ]);
 global.document = {{
     getElementById(id) {{ return elements.get(id) || null; }},
-    createElement() {{ return {{ value: "", textContent: "" }}; }},
+    addEventListener() {{}},
 }};
 {script[price_helpers_start:price_helpers_end]}
 {script[normalize_start:normalize_end]}
 {script[collect_start:collect_end]}
 normalizeRecipeEditPriceDisplay({{ menu_price: "$5.99" }});
-const defaultState = {{ amount: amountInput.value, currency: currencySelect.value }};
+const defaultState = {{
+    amount: amountInput.value,
+    currency: currencyInput.value,
+    label: recipeMenuPriceCurrencyShortLabel(currencyInput.value),
+}};
+
+const symbolNode = {{ textContent: "" }};
+const codeNode = {{ textContent: "" }};
+const optionNodes = RECIPE_EDIT_MENU_PRICE_CURRENCIES.map(currency => ({{
+    dataset: {{ currencyCode: currency.code }},
+    selected: false,
+    getAttribute(name) {{ return name === "aria-selected" && this.selected ? "true" : "false"; }},
+    setAttribute(name, value) {{ if (name === "aria-selected") this.selected = value === "true"; }},
+}}));
+const listbox = {{
+    hidden: true,
+    dataset: {{ currencyOptionSignature: RECIPE_EDIT_MENU_PRICE_CURRENCIES.map(currency => currency.code).join("|") }},
+    querySelectorAll() {{ return optionNodes; }},
+}};
+const trigger = {{
+    attributes: {{}},
+    title: "",
+    querySelector(selector) {{
+        if (selector === "[data-recipe-edit-currency-symbol]") return symbolNode;
+        if (selector === "[data-recipe-edit-currency-code]") return codeNode;
+        return null;
+    }},
+    setAttribute(name, value) {{ this.attributes[name] = value; }},
+    focus() {{}},
+}};
+const control = {{
+    querySelector(selector) {{
+        if (selector === "[data-recipe-edit-currency-trigger]") return trigger;
+        if (selector === "[data-recipe-edit-currency-menu]") return listbox;
+        return null;
+    }},
+}};
+currencyInput.closest = () => control;
+const parts = {{ control, valueInput: currencyInput, trigger, listbox }};
+selectRecipeEditCurrency(parts, "EUR", {{ dispatchChange: false }});
+const selectedState = {{
+    currency: currencyInput.value,
+    label: `${{symbolNode.textContent}} ${{codeNode.textContent}}`,
+    selected: optionNodes.find(option => option.dataset.currencyCode === "EUR").selected,
+    expanded: trigger.attributes["aria-expanded"],
+}};
 amountInput.value = "12.75";
 const payload = collectRecipeMenuMetadataPayload();
-process.stdout.write(JSON.stringify({{ defaultState, payload }}));
+process.stdout.write(JSON.stringify({{ defaultState, selectedState, payload }}));
 """
     completed = subprocess.run(
         [node],
         input=harness,
         text=True,
+        encoding="utf-8",
         capture_output=True,
         check=True,
     )
     result = json.loads(completed.stdout)
 
-    assert result["defaultState"] == {"amount": "5.99", "currency": "USD"}
+    assert result["defaultState"] == {"amount": "5.99", "currency": "USD", "label": "$ USD"}
+    assert result["selectedState"] == {
+        "currency": "EUR",
+        "label": "€ EUR",
+        "selected": True,
+        "expanded": "false",
+    }
     assert result["payload"]["menu_price_amount"] == "12.75"
-    assert result["payload"]["menu_price_currency"] == "USD"
-    assert result["payload"]["menu_price"] == "$12.75"
+    assert result["payload"]["menu_price_currency"] == "EUR"
+    assert result["payload"]["menu_price"] == "EUR 12.75"
 
 
 def test_recipe_editor_loads_and_saves_recipe_notes(monkeypatch, tmp_path):

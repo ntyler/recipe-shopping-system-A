@@ -612,8 +612,10 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     assert "recipe-edit-price-control" in organizer
     assert template.count('class="recipe-edit-price-control"') == 1
     assert 'id="recipeEditMenuPriceCurrency"' in template
-    assert 'aria-label="Menu price currency"' in template
-    assert '<option value="USD" selected>USD</option>' in template
+    assert 'id="recipeEditMenuPriceCurrencyTrigger"' in template
+    assert 'aria-label="Menu price currency, $ USD, US Dollar"' in template
+    assert 'aria-haspopup="listbox"' in template
+    assert 'data-recipe-edit-currency-code>USD</span>' in template
     assert 'id="recipeEditMenuPrice"' in template
     assert 'aria-label="Menu price amount"' in template
     assert 'ratingField.classList.add("recipe-edit-header-rating")' in organizer

@@ -23425,7 +23425,18 @@ const RECIPE_EDIT_MENU_METADATA_INPUT_IDS = {
 };
 const DEFAULT_RECIPE_EDIT_MENU_PRICE_CURRENCY = "USD";
 const RECIPE_EDIT_MENU_PRICE_CURRENCIES = [
-    { code: "USD", label: "USD" },
+    { code: "USD", symbol: "$", name: "US Dollar" },
+    { code: "EUR", symbol: "€", name: "Euro" },
+    { code: "GBP", symbol: "£", name: "British Pound" },
+    { code: "INR", symbol: "₹", name: "Indian Rupee" },
+    { code: "JPY", symbol: "¥", name: "Japanese Yen" },
+    { code: "KRW", symbol: "₩", name: "South Korean Won" },
+    { code: "CAD", symbol: "C$", name: "Canadian Dollar" },
+    { code: "AUD", symbol: "A$", name: "Australian Dollar" },
+    { code: "NZD", symbol: "NZ$", name: "New Zealand Dollar" },
+    { code: "CHF", symbol: "CHF", name: "Swiss Franc" },
+    { code: "VND", symbol: "₫", name: "Vietnamese Dong" },
+    { code: "LAK", symbol: "₭", name: "Lao Kip" },
 ];
 const RECIPE_EDIT_MENU_RELATION_INPUT_IDS = {
     restaurant_id: "recipeEditRestaurantId",
@@ -24990,14 +25001,32 @@ function normalizeRecipeMenuPriceCurrency(value) {
     return /^[A-Z]{3}$/.test(currency) ? currency : DEFAULT_RECIPE_EDIT_MENU_PRICE_CURRENCY;
 }
 
+function recipeMenuPriceCurrencyDefinition(value) {
+    const code = normalizeRecipeMenuPriceCurrency(value);
+    return RECIPE_EDIT_MENU_PRICE_CURRENCIES.find(currency => currency.code === code) || {
+        code,
+        symbol: "¤",
+        name: "Other currency",
+    };
+}
+
+function recipeMenuPriceCurrencyShortLabel(value) {
+    const currency = recipeMenuPriceCurrencyDefinition(value);
+    return `${currency.symbol} ${currency.code}`;
+}
+
 function recipeMenuPriceAmountValue(value, currency = DEFAULT_RECIPE_EDIT_MENU_PRICE_CURRENCY) {
     let amount = recipeMenuMetadataText(value);
     if (!amount) return "";
 
     const normalizedCurrency = normalizeRecipeMenuPriceCurrency(currency);
-    const prefixes = normalizedCurrency === "USD"
-        ? ["$ USD", "$USD", "$", normalizedCurrency]
-        : [normalizedCurrency];
+    const currencyDefinition = recipeMenuPriceCurrencyDefinition(normalizedCurrency);
+    const prefixes = Array.from(new Set([
+        recipeMenuPriceCurrencyShortLabel(normalizedCurrency),
+        `${currencyDefinition.symbol}${normalizedCurrency}`,
+        currencyDefinition.symbol,
+        normalizedCurrency,
+    ])).filter(Boolean);
     const prefix = prefixes.find(candidate => amount.toUpperCase().startsWith(candidate.toUpperCase()));
     if (prefix) amount = amount.slice(prefix.length).trim();
     return amount;
@@ -26562,21 +26591,242 @@ document.addEventListener("pointerdown", event => {
 document.addEventListener("scroll", () => closeRecipeEditMetadataTooltips(), true);
 window.addEventListener("resize", () => closeRecipeEditMetadataTooltips(), { passive: true });
 
+function createRecipeEditCurrencyControl() {
+    const control = document.createElement("span");
+    control.className = "recipe-edit-price-currency-select";
+    control.dataset.recipeEditCurrencySelect = "";
+
+    const valueInput = document.createElement("input");
+    valueInput.type = "hidden";
+    valueInput.id = "recipeEditMenuPriceCurrency";
+    valueInput.value = DEFAULT_RECIPE_EDIT_MENU_PRICE_CURRENCY;
+
+    const trigger = document.createElement("button");
+    trigger.type = "button";
+    trigger.id = "recipeEditMenuPriceCurrencyTrigger";
+    trigger.className = "recipe-edit-price-currency";
+    trigger.dataset.recipeEditCurrencyTrigger = "";
+    trigger.setAttribute("aria-haspopup", "listbox");
+    trigger.setAttribute("aria-expanded", "false");
+    trigger.setAttribute("aria-controls", "recipeEditMenuPriceCurrencyMenu");
+
+    const symbol = document.createElement("span");
+    symbol.className = "recipe-edit-price-currency-symbol";
+    symbol.dataset.recipeEditCurrencySymbol = "";
+    const code = document.createElement("span");
+    code.className = "recipe-edit-price-currency-code";
+    code.dataset.recipeEditCurrencyCode = "";
+    const chevron = document.createElement("span");
+    chevron.className = "recipe-edit-price-currency-chevron";
+    chevron.setAttribute("aria-hidden", "true");
+    chevron.textContent = "▾";
+    trigger.append(symbol, code, chevron);
+
+    const menu = document.createElement("div");
+    menu.id = "recipeEditMenuPriceCurrencyMenu";
+    menu.className = "recipe-edit-price-currency-menu";
+    menu.dataset.recipeEditCurrencyMenu = "";
+    menu.setAttribute("role", "listbox");
+    menu.setAttribute("aria-label", "Menu price currency options");
+    menu.hidden = true;
+
+    control.append(valueInput, trigger, menu);
+    return control;
+}
+
+function recipeEditCurrencyOptionId(code) {
+    return `recipeEditMenuPriceCurrencyOption${normalizeRecipeMenuPriceCurrency(code)}`;
+}
+
+function renderRecipeEditCurrencyOptions(listbox, selectedCurrency) {
+    if (!listbox) return;
+    const selectedCode = normalizeRecipeMenuPriceCurrency(selectedCurrency);
+    const definitions = [...RECIPE_EDIT_MENU_PRICE_CURRENCIES];
+    if (!definitions.some(currency => currency.code === selectedCode)) {
+        definitions.push(recipeMenuPriceCurrencyDefinition(selectedCode));
+    }
+    const signature = definitions.map(currency => currency.code).join("|");
+    if (listbox.dataset.currencyOptionSignature === signature) return;
+
+    const options = definitions.map(currency => {
+        const option = document.createElement("div");
+        option.id = recipeEditCurrencyOptionId(currency.code);
+        option.className = "recipe-edit-price-currency-option";
+        option.dataset.currencyCode = currency.code;
+        option.setAttribute("role", "option");
+        option.setAttribute("aria-selected", "false");
+        option.tabIndex = -1;
+
+        const identity = document.createElement("span");
+        identity.className = "recipe-edit-price-currency-option-identity";
+        const symbol = document.createElement("span");
+        symbol.className = "recipe-edit-price-currency-option-symbol";
+        symbol.textContent = currency.symbol;
+        const code = document.createElement("span");
+        code.className = "recipe-edit-price-currency-option-code";
+        code.textContent = currency.code;
+        identity.append(symbol, code);
+
+        const name = document.createElement("span");
+        name.className = "recipe-edit-price-currency-option-name";
+        name.textContent = currency.name;
+        const selected = document.createElement("span");
+        selected.className = "recipe-edit-price-currency-option-check";
+        selected.setAttribute("aria-hidden", "true");
+        selected.textContent = "✓";
+
+        option.append(identity, name, selected);
+        return option;
+    });
+    listbox.replaceChildren(...options);
+    listbox.dataset.currencyOptionSignature = signature;
+}
+
+function recipeEditCurrencyControlParts(valueInput = document.getElementById("recipeEditMenuPriceCurrency")) {
+    const control = valueInput?.closest?.("[data-recipe-edit-currency-select]");
+    if (!control) return null;
+    const trigger = control.querySelector("[data-recipe-edit-currency-trigger]");
+    const listbox = control.querySelector("[data-recipe-edit-currency-menu]");
+    if (!trigger || !listbox) return null;
+    return { control, valueInput, trigger, listbox };
+}
+
+function closeRecipeEditCurrencyMenu(parts, options = {}) {
+    if (!parts) return;
+    parts.listbox.hidden = true;
+    parts.trigger.setAttribute("aria-expanded", "false");
+    if (options.focusTrigger === true) {
+        parts.trigger.focus({ preventScroll: true });
+    }
+}
+
+function openRecipeEditCurrencyMenu(parts, options = {}) {
+    if (!parts) return;
+    parts.listbox.hidden = false;
+    parts.trigger.setAttribute("aria-expanded", "true");
+    const currencyOptions = Array.from(parts.listbox.querySelectorAll("[role='option']"));
+    let target = currencyOptions.find(option => option.getAttribute("aria-selected") === "true");
+    if (options.edge === "last") target = currencyOptions[currencyOptions.length - 1];
+    if (options.edge === "first") target = currencyOptions[0];
+    target?.focus({ preventScroll: true });
+}
+
+function syncRecipeEditCurrencyControl(valueInput, currency) {
+    const normalizedCurrency = normalizeRecipeMenuPriceCurrency(currency);
+    valueInput.value = normalizedCurrency;
+    const parts = recipeEditCurrencyControlParts(valueInput);
+    if (!parts) return normalizedCurrency;
+
+    const definition = recipeMenuPriceCurrencyDefinition(normalizedCurrency);
+    renderRecipeEditCurrencyOptions(parts.listbox, normalizedCurrency);
+    const symbol = parts.trigger.querySelector("[data-recipe-edit-currency-symbol]");
+    const code = parts.trigger.querySelector("[data-recipe-edit-currency-code]");
+    if (symbol) symbol.textContent = definition.symbol;
+    if (code) code.textContent = definition.code;
+    parts.trigger.setAttribute(
+        "aria-label",
+        `Menu price currency, ${recipeMenuPriceCurrencyShortLabel(normalizedCurrency)}, ${definition.name}`,
+    );
+    parts.trigger.title = `${recipeMenuPriceCurrencyShortLabel(normalizedCurrency)} — ${definition.name}`;
+    Array.from(parts.listbox.querySelectorAll("[role='option']")).forEach(option => {
+        const selected = option.dataset.currencyCode === normalizedCurrency;
+        option.setAttribute("aria-selected", selected ? "true" : "false");
+    });
+    return normalizedCurrency;
+}
+
+function selectRecipeEditCurrency(parts, currency, options = {}) {
+    if (!parts) return;
+    syncRecipeEditCurrencyControl(parts.valueInput, currency);
+    closeRecipeEditCurrencyMenu(parts, { focusTrigger: options.focusTrigger !== false });
+    if (options.dispatchChange !== false && typeof parts.valueInput.dispatchEvent === "function") {
+        parts.valueInput.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+}
+
+function moveRecipeEditCurrencyOptionFocus(parts, currentOption, offset) {
+    const options = Array.from(parts.listbox.querySelectorAll("[role='option']"));
+    if (!options.length) return;
+    const currentIndex = Math.max(0, options.indexOf(currentOption));
+    const nextIndex = (currentIndex + offset + options.length) % options.length;
+    options[nextIndex].focus({ preventScroll: true });
+}
+
+function bindRecipeEditCurrencyControl(parts) {
+    if (!parts || parts.control.dataset.recipeEditCurrencyBound === "true") return;
+    parts.control.dataset.recipeEditCurrencyBound = "true";
+
+    parts.trigger.addEventListener("click", () => {
+        if (parts.trigger.getAttribute("aria-expanded") === "true") {
+            closeRecipeEditCurrencyMenu(parts);
+        } else {
+            openRecipeEditCurrencyMenu(parts);
+        }
+    });
+    parts.trigger.addEventListener("keydown", event => {
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            openRecipeEditCurrencyMenu(parts, { edge: event.key === "ArrowUp" ? "last" : undefined });
+        } else if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            if (parts.trigger.getAttribute("aria-expanded") === "true") {
+                closeRecipeEditCurrencyMenu(parts);
+            } else {
+                openRecipeEditCurrencyMenu(parts);
+            }
+        } else if (event.key === "Escape") {
+            closeRecipeEditCurrencyMenu(parts);
+        }
+    });
+    parts.listbox.addEventListener("click", event => {
+        const option = event.target.closest?.("[role='option'][data-currency-code]");
+        if (option) selectRecipeEditCurrency(parts, option.dataset.currencyCode);
+    });
+    parts.listbox.addEventListener("keydown", event => {
+        const option = event.target.closest?.("[role='option'][data-currency-code]");
+        if (!option) return;
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            moveRecipeEditCurrencyOptionFocus(parts, option, event.key === "ArrowDown" ? 1 : -1);
+        } else if (event.key === "Home" || event.key === "End") {
+            event.preventDefault();
+            const options = Array.from(parts.listbox.querySelectorAll("[role='option']"));
+            options[event.key === "Home" ? 0 : options.length - 1]?.focus({ preventScroll: true });
+        } else if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            selectRecipeEditCurrency(parts, option.dataset.currencyCode);
+        } else if (event.key === "Escape") {
+            event.preventDefault();
+            closeRecipeEditCurrencyMenu(parts, { focusTrigger: true });
+        } else if (event.key === "Tab") {
+            closeRecipeEditCurrencyMenu(parts);
+        }
+    });
+    document.addEventListener("pointerdown", event => {
+        if (!parts.control.contains(event.target)) closeRecipeEditCurrencyMenu(parts);
+    });
+}
+
+function initializeRecipeEditCurrencyControl() {
+    const valueInput = document.getElementById("recipeEditMenuPriceCurrency");
+    const parts = recipeEditCurrencyControlParts(valueInput);
+    if (!parts) return null;
+    renderRecipeEditCurrencyOptions(parts.listbox, valueInput.value);
+    bindRecipeEditCurrencyControl(parts);
+    syncRecipeEditCurrencyControl(valueInput, valueInput.value);
+    return parts;
+}
+
 function normalizeRecipeEditPriceDisplay(recipe = {}) {
     const input = document.getElementById("recipeEditMenuPrice");
-    const currencySelect = document.getElementById("recipeEditMenuPriceCurrency");
-    if (!input || !currencySelect) return;
+    const currencyInput = document.getElementById("recipeEditMenuPriceCurrency");
+    if (!input || !currencyInput) return;
+    initializeRecipeEditCurrencyControl();
 
     const currency = normalizeRecipeMenuPriceCurrency(
-        recipe.menu_price_currency || currencySelect.value,
+        recipe.menu_price_currency || currencyInput.value,
     );
-    if (!Array.from(currencySelect.options || []).some(option => option.value === currency)) {
-        const option = document.createElement("option");
-        option.value = currency;
-        option.textContent = currency;
-        currencySelect.appendChild(option);
-    }
-    currencySelect.value = currency;
+    syncRecipeEditCurrencyControl(currencyInput, currency);
     const amountSource = Object.prototype.hasOwnProperty.call(recipe, "menu_price_amount")
         ? recipe.menu_price_amount
         : recipe.menu_price || input.value;
@@ -27021,19 +27271,10 @@ function organizeRecipeEditInformationCard() {
             priceControl.setAttribute("role", "group");
             priceControl.setAttribute("aria-label", "Menu price");
             priceInput.parentNode.insertBefore(priceControl, priceInput);
-            const currencySelect = document.createElement("select");
-            currencySelect.id = "recipeEditMenuPriceCurrency";
-            currencySelect.className = "recipe-edit-price-currency";
-            currencySelect.setAttribute("aria-label", "Menu price currency");
-            RECIPE_EDIT_MENU_PRICE_CURRENCIES.forEach(currency => {
-                const option = document.createElement("option");
-                option.value = currency.code;
-                option.textContent = currency.label;
-                currencySelect.appendChild(option);
-            });
-            priceControl.appendChild(currencySelect);
+            priceControl.appendChild(createRecipeEditCurrencyControl());
             priceControl.appendChild(priceInput);
         }
+        initializeRecipeEditCurrencyControl();
         normalizeRecipeEditPriceDisplay();
     }
 
