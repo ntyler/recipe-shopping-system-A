@@ -57509,6 +57509,44 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-
     font-size: 9px;
 }
 
+body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+    .recipe-edit-scale-field .recipe-edit-metadata-value {
+    position: relative;
+    width: 94px;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+    .recipe-edit-scale-field #recipeEditScaleMultiplier {
+    width: 100%;
+    padding-right: 24px;
+    font-variant-numeric: lining-nums tabular-nums;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-scale-suffix {
+    position: absolute;
+    top: 50%;
+    right: 7px;
+    color: var(--app-muted);
+    font-size: 13px;
+    font-weight: 750;
+    line-height: 1;
+    pointer-events: none;
+    transform: translateY(-50%);
+}
+
+body.recipe-edit-standalone-page .recipe-edit-scale-error[hidden] {
+    display: none !important;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-scale-error {
+    width: 112px;
+    margin-top: -4px;
+    color: var(--app-warning);
+    font-size: 10px;
+    font-weight: 650;
+    line-height: 1.3;
+}
+
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-description-row {
     display: grid;
     grid-template-columns: minmax(0, 2.2fr) minmax(180px, 1fr);

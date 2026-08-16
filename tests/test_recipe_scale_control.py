@@ -1,0 +1,307 @@
+import json
+from pathlib import Path
+import shutil
+import subprocess
+
+import pytest
+
+
+ROOT = Path(__file__).resolve().parents[1]
+TEMPLATE_PATH = ROOT / "PushShoppingList/templates/sections/current_recipe_url_log.html"
+SCRIPT_PATH = ROOT / "PushShoppingList/static/js/app.js"
+CSS_PATH = ROOT / "PushShoppingList/static/css/app.css"
+
+
+def run_node(source):
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for the recipe scale control regression")
+    completed = subprocess.run(
+        [node],
+        input=source,
+        text=True,
+        encoding="utf-8",
+        capture_output=True,
+        check=False,
+        timeout=10,
+    )
+    assert completed.returncode == 0, completed.stderr
+    return json.loads(completed.stdout)
+
+
+def scale_control_script(script):
+    return script[
+        script.index("function populateRecipeScalingControls"):
+        script.index("function firstRecipeEditorFoodReviewMarker")
+    ]
+
+
+def test_recipe_scale_is_an_always_visible_accessible_text_input():
+    template = TEMPLATE_PATH.read_text(encoding="utf-8")
+    script = SCRIPT_PATH.read_text(encoding="utf-8")
+    css = CSS_PATH.read_text(encoding="utf-8")
+    field_start = template.index('<label class="recipe-edit-scale-field">')
+    field_end = template.index("</label>", field_start)
+    field = template[field_start:field_end]
+
+    assert '<input type="text"' in field
+    assert 'id="recipeEditScaleMultiplier"' in field
+    assert 'name="scaling_multiplier"' in field
+    assert 'aria-label="Scale"' in field
+    assert 'aria-describedby="recipeEditScaleError"' in field
+    assert 'oninput="applyRecipeScaleMultiplier(this)"' in field
+    assert '<span class="recipe-edit-scale-suffix" aria-hidden="true">&times;</span>' in field
+    assert 'id="recipeEditScaleError"' in field
+    assert 'role="alert"' in field
+    assert 'aria-live="polite"' in field
+    assert "<select" not in field
+    assert "<option" not in field
+    assert "Custom" not in field
+    assert "onblur=" not in field
+    assert "onkeydown=" not in field
+    assert all(glyph not in field for glyph in ("¼", "½", "¾"))
+
+    assert "RECIPE_EDIT_SCALE_PRESETS" not in script
+    assert "RECIPE_EDIT_CUSTOM_SCALE_VALUE" not in script
+    assert "organizeRecipeEditScaleControl(scaleField)" in script
+    assert ".recipe-edit-scale-field .recipe-edit-metadata-value" in css
+    assert ".recipe-edit-scale-field #recipeEditScaleMultiplier" in css
+    assert ".recipe-edit-scale-suffix" in css
+    assert ".recipe-edit-scale-error" in css
+    assert "var(--app-primary-hover)" in css
+
+
+def test_recipe_scale_parser_accepts_decimals_fractions_and_mixed_fractions():
+    script = SCRIPT_PATH.read_text(encoding="utf-8")
+    parser = script[
+        script.index("function parseRecipeScaleMultiplier"):
+        script.index("function formatRecipeScaleInputValue")
+    ]
+    values = [
+        "0.5",
+        "1/2",
+        "3/4",
+        "1.5",
+        "1 1/2",
+        "2",
+        "  1 / 2  ",
+        ".25",
+    ]
+    result = run_node(
+        parser
+        + f"\nconst values = {json.dumps(values)};"
+        + "\nprocess.stdout.write(JSON.stringify(values.map(value => validateRecipeEditScaleMultiplier(value))));"
+    )
+
+    assert result == [0.5, 0.5, 0.75, 1.5, 1.5, 2, 0.5, 0.25]
+
+
+def test_recipe_scale_parser_rejects_invalid_entries():
+    script = SCRIPT_PATH.read_text(encoding="utf-8")
+    parser = script[
+        script.index("function parseRecipeScaleMultiplier"):
+        script.index("function formatRecipeScaleInputValue")
+    ]
+    values = [
+        "",
+        "   ",
+        "0",
+        "0.0",
+        "-1",
+        "-1/2",
+        "1/0",
+        "1 1/0",
+        "1//2",
+        "1/2/3",
+        "1  /",
+        "one",
+        "1x",
+        "NaN",
+        "Infinity",
+    ]
+    result = run_node(
+        parser
+        + f"\nconst values = {json.dumps(values)};"
+        + "\nprocess.stdout.write(JSON.stringify(values.map(value => validateRecipeEditScaleMultiplier(value))));"
+    )
+
+    assert result == [None] * len(values)
+
+
+def test_recipe_scale_keeps_typed_text_and_normalizes_calculations_and_payload():
+    script = SCRIPT_PATH.read_text(encoding="utf-8")
+    control = scale_control_script(script)
+    calculations = script[
+        script.index("function scaleServingsForDisplay"):
+        script.index("function cssEscape")
+    ]
+    harness = r"""
+const RECIPE_EDIT_SCALE_ERROR_MESSAGE = "Scale must be a positive number, decimal, or fraction.";
+const fieldClasses = new Set();
+const field = {
+    classList: {
+        remove(name) { fieldClasses.delete(name); },
+    },
+};
+const scaleInput = {
+    value: "",
+    dataset: {},
+    attributes: {},
+    setAttribute(name, value) { this.attributes[name] = String(value); },
+    removeAttribute(name) { delete this.attributes[name]; delete this.dataset[name]; },
+    closest(selector) { return selector === "label" ? field : null; },
+};
+const scaleError = { hidden: true, textContent: "" };
+const servingsInput = { value: "4", dataset: {} };
+const quantityInput = { value: "1/2" };
+const baseQuantityInput = { value: "1/2" };
+const unitInput = { value: "cup" };
+const baseUnitInput = { value: "cup" };
+const ingredientRow = {
+    querySelector(selector) {
+        return {
+            '[data-field="quantity"]': quantityInput,
+            '[data-field="base_quantity"]': baseQuantityInput,
+            '[data-field="unit"]': unitInput,
+            '[data-field="base_unit"]': baseUnitInput,
+        }[selector] || null;
+    },
+    querySelectorAll() { return []; },
+};
+const elements = {
+    recipeEditScaleMultiplier: scaleInput,
+    recipeEditScaleError: scaleError,
+    recipeEditServings: servingsInput,
+};
+const document = {
+    getElementById(id) { return elements[id] || null; },
+};
+function recipeMultipliersMatch(left, right) {
+    return Math.abs(Number(left) - Number(right)) < 0.000001;
+}
+function recipeEditIngredientRows() { return [ingredientRow]; }
+let recipeEditScalingOptions = [];
+""" + control + calculations + r"""
+
+function snapshot() {
+    return {
+        text: scaleInput.value,
+        active: scaleInput.dataset.activeMultiplier,
+        servings: servingsInput.value,
+        quantity: quantityInput.value,
+        errorVisible: !scaleError.hidden,
+        payload: collectRecipeScalingPayload(),
+    };
+}
+
+populateRecipeScalingControls({ selected_multiplier: 1, base_servings: "4" }, "4");
+const initial = snapshot();
+
+scaleInput.value = "1/2";
+applyRecipeScaleMultiplier(scaleInput);
+const fraction = snapshot();
+
+scaleInput.value = "1 1/2";
+applyRecipeScaleMultiplier(scaleInput);
+const mixed = snapshot();
+
+scaleInput.value = "1//2";
+applyRecipeScaleMultiplier(scaleInput);
+const invalidDraft = snapshot();
+
+process.stdout.write(JSON.stringify({ initial, fraction, mixed, invalidDraft }));
+"""
+    result = run_node(harness)
+
+    assert result["initial"]["text"] == "1"
+    assert result["fraction"]["text"] == "1/2"
+    assert result["fraction"]["active"] == "0.5"
+    assert result["fraction"]["servings"] == "2"
+    assert result["fraction"]["quantity"] == "1/4"
+    assert result["fraction"]["payload"]["selected_multiplier"] == 0.5
+
+    assert result["mixed"]["text"] == "1 1/2"
+    assert result["mixed"]["active"] == "1.5"
+    assert result["mixed"]["servings"] == "6"
+    assert result["mixed"]["quantity"] == "3/4"
+    assert result["mixed"]["payload"]["selected_multiplier"] == 1.5
+
+    assert result["invalidDraft"]["text"] == "1//2"
+    assert result["invalidDraft"]["active"] == "1.5"
+    assert result["invalidDraft"]["servings"] == "6"
+    assert result["invalidDraft"]["quantity"] == "3/4"
+    assert result["invalidDraft"]["errorVisible"] is False
+    assert result["invalidDraft"]["payload"]["selected_multiplier"] is None
+
+
+def test_recipe_scale_validation_runs_only_on_save_and_keeps_invalid_text():
+    script = SCRIPT_PATH.read_text(encoding="utf-8")
+    control = scale_control_script(script)
+    validation_helper = script[
+        script.index("function validateRecipeEditScaleField"):
+        script.index("function validateRecipeEditor")
+    ]
+    validator = script[
+        script.index("function validateRecipeEditor(form, payload)"):
+        script.index("function applyRecipeEditorServerFieldErrors")
+    ]
+    reveal = script[
+        script.index("function showRecipeEditorValidationErrors"):
+        script.index("function validateRecipeEditScaleField")
+    ]
+    harness = r"""
+const RECIPE_EDIT_SCALE_ERROR_MESSAGE = "Scale must be a positive number, decimal, or fraction.";
+const field = { classList: { remove() {} } };
+const scaleInput = {
+    value: "1//2",
+    dataset: {},
+    attributes: {},
+    setAttribute(name, value) { this.attributes[name] = String(value); },
+    removeAttribute(name) { delete this.attributes[name]; },
+    closest(selector) { return selector === "label" ? field : null; },
+};
+const scaleError = { hidden: true, textContent: "" };
+const document = {
+    getElementById(id) {
+        return { recipeEditScaleMultiplier: scaleInput, recipeEditScaleError: scaleError }[id] || null;
+    },
+};
+function addRecipeEditorValidationError(errors, message, control, fieldName) {
+    control.setAttribute("aria-invalid", "true");
+    control.dataset.recipeEditValidationInvalid = "true";
+    errors.push({ message, control, field: fieldName });
+}
+function recipeMultipliersMatch(left, right) { return Number(left) === Number(right); }
+function recipeEditIngredientRows() { return []; }
+let recipeEditScalingOptions = [];
+""" + control + validation_helper + r"""
+const errors = [];
+const valid = validateRecipeEditScaleField(errors);
+process.stdout.write(JSON.stringify({
+    valid,
+    value: scaleInput.value,
+    errorCount: errors.length,
+    message: scaleError.textContent,
+    errorVisible: !scaleError.hidden,
+    invalid: scaleInput.attributes["aria-invalid"],
+    field: errors[0] && errors[0].field,
+}));
+"""
+    result = run_node(harness)
+
+    assert result == {
+        "valid": False,
+        "value": "1//2",
+        "errorCount": 1,
+        "message": "Scale must be a positive number, decimal, or fraction.",
+        "errorVisible": True,
+        "invalid": "true",
+        "field": "scaling.selected_multiplier",
+    }
+    assert validator.index("validateRecipeEditScaleField(errors)") < validator.index(
+        'document.getElementById("recipeEditTitleInput")'
+    )
+    assert "showRecipeEditorValidationErrors(errors)" in validator
+    assert 'firstControl.focus({ preventScroll: true })' in reveal
+    assert "validateRecipeEditScaleField" not in control
+    assert "setRecipeScaleValidationMessage(\"\")" in control

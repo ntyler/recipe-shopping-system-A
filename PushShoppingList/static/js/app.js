@@ -23217,6 +23217,7 @@ let recipeEditAiInsightSource = {};
 let recipeEditAiQualityReport = null;
 let recipeEditAiQualityReportRequest = null;
 let recipeEditScalingOptions = [];
+const RECIPE_EDIT_SCALE_ERROR_MESSAGE = "Scale must be a positive number, decimal, or fraction.";
 let recipeEditInferenceContext = {};
 let activeFoodReviewRow = null;
 let activeFoodReviewAlternatives = [];
@@ -24796,7 +24797,9 @@ function populateRecipeEditor(recipe, originalUrl, options = {}) {
     setRecipeRating(recipe.rating || 0);
     setRecipeEditorCookbook(recipe, originalUrl);
     populateRecipeEditCategories(recipe);
-    populateRecipeScalingControls(recipe.scaling || {}, recipe.servings || "");
+    populateRecipeScalingControls(recipe.scaling || {}, recipe.servings || "", {
+        inputText: options.scaleInputText,
+    });
     updateRecipeEditorPdfControls(recipe);
     syncRecipeEditSourceFilesDetails();
     populateRecipeMenuMetadata(recipe);
@@ -26384,6 +26387,15 @@ function organizeRecipeEditMetadataField(field) {
     }
 }
 
+function organizeRecipeEditScaleControl(field) {
+    if (!field) return;
+    const valueWrap = field.querySelector(":scope > .recipe-edit-metadata-value");
+    const suffix = field.querySelector(":scope > .recipe-edit-scale-suffix");
+    if (valueWrap && suffix && suffix.parentElement !== valueWrap) {
+        valueWrap.appendChild(suffix);
+    }
+}
+
 function closeRecipeEditMetadataTooltips(options = {}) {
     document.querySelectorAll("[data-recipe-edit-metadata-tooltip-trigger]").forEach(trigger => {
         if (trigger === options.except) return;
@@ -26863,6 +26875,7 @@ function organizeRecipeEditInformationCard() {
     addRecipeEditMetadataIcon(scaleField, "scale");
     [servingsField, totalField, prepField, cookField, inactiveField, levelField, scaleField]
         .forEach(organizeRecipeEditMetadataField);
+    organizeRecipeEditScaleControl(scaleField);
     [
         [servingsField, "Servings", "Number of people or portions the recipe makes at the selected scale."],
         [totalField, "Total Time", "Total elapsed time from start to finish, typically including prep, cooking, and inactive time."],
@@ -40552,6 +40565,7 @@ function clearRecipeEditorValidation(form = document.getElementById("recipeEditF
         return;
     }
 
+    setRecipeScaleValidationMessage("");
     form.querySelectorAll("[data-recipe-edit-validation-invalid]").forEach(control => {
         control.removeAttribute("data-recipe-edit-validation-invalid");
         if (!control.validationMessage) {
@@ -40637,6 +40651,9 @@ function recipeEditorControlForFieldPath(path, form = document.getElementById("r
     }
 
     const normalized = String(path || "").replace(/\[(\d+)\]/g, ".$1");
+    if (normalized === "scaling.selected_multiplier") {
+        return document.getElementById("recipeEditScaleMultiplier");
+    }
     const parts = normalized.split(".").filter(Boolean);
     const topLevelIds = {
         display_name: "recipeEditDisplayName",
@@ -40747,9 +40764,25 @@ function showRecipeEditorValidationErrors(errors, options = {}) {
     }
 }
 
+function validateRecipeEditScaleField(errors) {
+    const input = document.getElementById("recipeEditScaleMultiplier");
+    if (validateRecipeEditScaleMultiplier(input ? input.value : null) !== null) {
+        return true;
+    }
+    setRecipeScaleValidationMessage(RECIPE_EDIT_SCALE_ERROR_MESSAGE);
+    addRecipeEditorValidationError(
+        errors,
+        RECIPE_EDIT_SCALE_ERROR_MESSAGE,
+        input,
+        "scaling.selected_multiplier",
+    );
+    return false;
+}
+
 function validateRecipeEditor(form, payload) {
     clearRecipeEditorValidation(form);
     const errors = [];
+    validateRecipeEditScaleField(errors);
     const recipe = payload && payload.recipe && typeof payload.recipe === "object" ? payload.recipe : {};
     const title = document.getElementById("recipeEditTitleInput");
     if (!String(recipe.recipe_title || "").trim()) {
@@ -41954,35 +41987,36 @@ async function removeRecipeCoverImage(button) {
     return false;
 }
 
-function populateRecipeScalingControls(scaling = {}, servings = "") {
-    const select = document.getElementById("recipeEditScaleMultiplier");
+function populateRecipeScalingControls(scaling = {}, servings = "", options = {}) {
+    const input = document.getElementById("recipeEditScaleMultiplier");
 
-    if (!select) {
+    if (!input) {
         return;
     }
 
-    const options = normalizeRecipeScalingOptions(
+    const scalingOptions = normalizeRecipeScalingOptions(
         scaling.available_multipliers
             || scaling.multipliers
             || scaling.scaling_multipliers
             || []
     );
-    const selectedMultiplier = parseRecipeScaleMultiplier(
-        scaling.selected_multiplier !== undefined
-            ? scaling.selected_multiplier
-            : scaling.scaling_multiplier
-    ) || 1;
+    const selectedValue = scaling.selected_multiplier !== undefined
+        ? scaling.selected_multiplier
+        : scaling.scaling_multiplier;
+    const selectedMultiplier = parseRecipeScaleMultiplier(selectedValue) || 1;
     const baseServings = String(scaling.base_servings || servings || "").trim();
+    const requestedText = typeof options.inputText === "string"
+        ? options.inputText
+        : (typeof selectedValue === "string" ? selectedValue : "");
+    const requestedMultiplier = validateRecipeEditScaleMultiplier(requestedText);
 
-    recipeEditScalingOptions = options;
-    select.innerHTML = options
-        .map(option => {
-            const value = String(option.value);
-            const selected = Math.abs(option.value - selectedMultiplier) < 0.000001 ? " selected" : "";
-            return `<option value="${escapeAttribute(value)}"${selected}>${escapeHtml(option.label)}</option>`;
-        })
-        .join("");
-    select.dataset.baseServings = baseServings;
+    recipeEditScalingOptions = scalingOptions;
+    input.value = requestedMultiplier !== null && recipeMultipliersMatch(requestedMultiplier, selectedMultiplier)
+        ? requestedText
+        : formatRecipeScaleInputValue(selectedMultiplier);
+    input.dataset.baseServings = baseServings;
+    input.dataset.activeMultiplier = formatRecipeScaleInputValue(selectedMultiplier);
+    setRecipeScaleValidationMessage("");
 
     const servingsInput = document.getElementById("recipeEditServings");
     if (servingsInput) {
@@ -42034,52 +42068,90 @@ function parseRecipeScaleMultiplier(value) {
     }
 
     if (typeof value === "number") {
-        return value > 0 ? value : null;
+        return Number.isFinite(value) && value > 0 ? value : null;
     }
 
-    let text = String(value || "").trim().toLowerCase().replace("×", "x");
-    const xMatch = text.match(/(\d+(?:\.\d+)?|\d+\s*\/\s*\d+)\s*x\b/);
-
-    if (xMatch) {
-        text = xMatch[1];
-    } else {
-        text = text.replace(/x$/, "").trim();
+    const text = String(value || "")
+        .trim()
+        .replace(/\s*(?:x|×)\s*$/i, "")
+        .trim();
+    const mixedFraction = text.match(/^(\d+)\s+(\d+)\s*\/\s*(\d+)$/);
+    if (mixedFraction) {
+        const whole = Number(mixedFraction[1]);
+        const numerator = Number(mixedFraction[2]);
+        const denominator = Number(mixedFraction[3]);
+        const multiplier = denominator ? whole + (numerator / denominator) : NaN;
+        return Number.isFinite(multiplier) && multiplier > 0 ? multiplier : null;
     }
 
-    text = text.replace(/\s+/g, "");
-    const fractionMatch = text.match(/^(\d+)\/(\d+)$/);
+    const fraction = text.match(/^(\d+)\s*\/\s*(\d+)$/);
+    if (fraction) {
+        const numerator = Number(fraction[1]);
+        const denominator = Number(fraction[2]);
+        const multiplier = denominator ? numerator / denominator : NaN;
+        return Number.isFinite(multiplier) && multiplier > 0 ? multiplier : null;
+    }
 
-    if (fractionMatch) {
-        const denominator = Number(fractionMatch[2]);
-        return denominator ? Number(fractionMatch[1]) / denominator : null;
+    if (!/^(?:\d+(?:\.\d+)?|\.\d+)$/.test(text)) {
+        return null;
     }
 
     const multiplier = Number(text);
     return Number.isFinite(multiplier) && multiplier > 0 ? multiplier : null;
 }
 
-function formatRecipeScaleMultiplierLabel(value) {
-    const multiplier = parseRecipeScaleMultiplier(value) || 1;
-
-    if (Math.abs(multiplier - 0.5) < 0.000001) {
-        return "1/2x";
+function validateRecipeEditScaleMultiplier(value) {
+    if (typeof value === "string" && /[x×]/i.test(value)) {
+        return null;
     }
-
-    if (Number.isInteger(multiplier)) {
-        return `${multiplier}x`;
-    }
-
-    return `${multiplier}x`;
+    return parseRecipeScaleMultiplier(value);
 }
 
-function applyRecipeScaleMultiplier(select) {
-    const multiplier = parseRecipeScaleMultiplier(select ? select.value : null) || 1;
+function formatRecipeScaleInputValue(value) {
+    const multiplier = parseRecipeScaleMultiplier(value) || 1;
+    return String(Number(multiplier.toPrecision(12)));
+}
+
+function formatRecipeScaleMultiplierLabel(value) {
+    const multiplier = parseRecipeScaleMultiplier(value) || 1;
+    return multiplier === 0.5 ? "1/2x" : `${formatRecipeScaleInputValue(multiplier)}x`;
+}
+
+function setRecipeScaleValidationMessage(message = "") {
+    const input = document.getElementById("recipeEditScaleMultiplier");
+    const error = document.getElementById("recipeEditScaleError");
+    const hasError = Boolean(message);
+    if (input) {
+        if (hasError) {
+            input.setAttribute("aria-invalid", "true");
+        } else {
+            input.removeAttribute("aria-invalid");
+            input.removeAttribute("data-recipe-edit-validation-invalid");
+            input.closest("label")?.classList.remove("recipe-edit-has-validation-error");
+        }
+    }
+    if (error) {
+        error.textContent = message || RECIPE_EDIT_SCALE_ERROR_MESSAGE;
+        error.hidden = !hasError;
+    }
+}
+
+function applyRecipeScaleMultiplier(input) {
+    if (!input) return;
+    setRecipeScaleValidationMessage("");
+    const multiplier = validateRecipeEditScaleMultiplier(input.value);
+    if (multiplier === null) return;
+    applyRecipeScaleValue(input, multiplier);
+}
+
+function applyRecipeScaleValue(input, multiplier) {
+    input.dataset.activeMultiplier = formatRecipeScaleInputValue(multiplier);
     const servingsInput = document.getElementById("recipeEditServings");
 
     if (servingsInput) {
         const baseServings = (
-            select && select.dataset.baseServings
-                ? select.dataset.baseServings
+            input && input.dataset.baseServings
+                ? input.dataset.baseServings
                 : servingsInput.dataset.baseServings || servingsInput.value
         );
 
@@ -42126,12 +42198,12 @@ function applyRecipeScaleToIngredientRow(row, multiplier) {
 }
 
 function collectRecipeScalingPayload() {
-    const select = document.getElementById("recipeEditScaleMultiplier");
+    const input = document.getElementById("recipeEditScaleMultiplier");
     const servingsInput = document.getElementById("recipeEditServings");
-    const selectedMultiplier = parseRecipeScaleMultiplier(select ? select.value : null) || 1;
+    const selectedMultiplier = validateRecipeEditScaleMultiplier(input ? input.value : null);
     const baseServings = (
-        select && select.dataset.baseServings
-            ? select.dataset.baseServings
+        input && input.dataset.baseServings
+            ? input.dataset.baseServings
             : servingsInput && servingsInput.dataset.baseServings
                 ? servingsInput.dataset.baseServings
                 : servingsInput
@@ -52106,8 +52178,10 @@ function updateRecipeIngredientBaseFromManualEdit(row) {
 }
 
 function currentRecipeEditScaleMultiplier() {
-    const select = document.getElementById("recipeEditScaleMultiplier");
-    return parseRecipeScaleMultiplier(select ? select.value : null) || 1;
+    const input = document.getElementById("recipeEditScaleMultiplier");
+    return validateRecipeEditScaleMultiplier(input ? input.value : null)
+        || validateRecipeEditScaleMultiplier(input ? input.dataset.activeMultiplier : null)
+        || 1;
 }
 
 function bindRecipeIngredientFoodRuleWarning(row) {
@@ -54410,6 +54484,7 @@ async function saveRecipeEditor(event) {
     let savedIdentityApplied = false;
     let savedBaselineSnapshot = "";
     const previousSavedSnapshot = recipeEditSavedFormSnapshots.get(form) || "";
+    const submittedScaleText = document.getElementById("recipeEditScaleMultiplier")?.value || "";
 
     try {
         payload = collectRecipeEditorPayload();
@@ -54598,7 +54673,9 @@ async function saveRecipeEditor(event) {
                 }
             }
             if (recipeForEditor) {
-                populateRecipeEditor(recipeForEditor, recipeForEditor.source_url || sourceUrl);
+                populateRecipeEditor(recipeForEditor, recipeForEditor.source_url || sourceUrl, {
+                    scaleInputText: submittedScaleText,
+                });
             }
             updateRecipeSaveProgressItem(refreshProgressIndex, "done", "Refreshed");
         }
@@ -55286,6 +55363,7 @@ async function createRecipeEditorPdf(button) {
     let submittedSnapshot = "";
     let savedBaselineSnapshot = "";
     const previousSavedSnapshot = form ? recipeEditSavedFormSnapshots.get(form) || "" : "";
+    const submittedScaleText = document.getElementById("recipeEditScaleMultiplier")?.value || "";
     const existingPdfFields = currentRecipeEditorPdfFieldValues();
     const regenerateExistingPdf = Boolean(
         existingPdfFields.generated_pdf_path || existingPdfFields.generated_cloudflare_pdf_url
@@ -55373,7 +55451,9 @@ async function createRecipeEditorPdf(button) {
 
         const changedDuringSave = recipeEditorCurrentSaveSnapshot(form) !== savedBaselineSnapshot;
         if (saveData.recipe && !changedDuringSave) {
-            populateRecipeEditor(responseRecipe, sourceUrl);
+            populateRecipeEditor(responseRecipe, sourceUrl, {
+                scaleInputText: submittedScaleText,
+            });
         }
 
         setRecipeEditStatus("Generating PDF...");
@@ -56994,7 +57074,7 @@ function scaleServingsForDisplay(servings, multiplier) {
 
     return value.replace(/\d+(?:\.\d+)?/, match => {
         const scaled = Number(match) * multiplier;
-        return Number.isInteger(scaled) ? String(scaled) : String(scaled);
+        return formatRecipeScaledNumber(scaled);
     });
 }
 
@@ -57021,10 +57101,33 @@ function scaleQuantityPart(value, multiplier) {
         return value;
     }
 
-    return formatQuantityFraction({
-        numerator: fraction.numerator * multiplier,
-        denominator: fraction.denominator,
+    const multiplierFraction = recipeScaleMultiplierFraction(multiplier);
+    if (!multiplierFraction) {
+        return formatRecipeScaledNumber((fraction.numerator / fraction.denominator) * multiplier);
+    }
+    const scaledFraction = reduceFraction({
+        numerator: fraction.numerator * multiplierFraction.numerator,
+        denominator: fraction.denominator * multiplierFraction.denominator,
     });
+    return scaledFraction.denominator <= 1000
+        ? formatQuantityFraction(scaledFraction)
+        : formatRecipeScaledNumber(scaledFraction.numerator / scaledFraction.denominator);
+}
+
+function formatRecipeScaledNumber(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return "";
+    return String(Number(numeric.toPrecision(12)));
+}
+
+function recipeScaleMultiplierFraction(multiplier) {
+    const numeric = parseRecipeScaleMultiplier(multiplier);
+    if (numeric === null) return null;
+    const fixed = numeric.toFixed(9).replace(/0+$/, "").replace(/\.$/, "");
+    const decimalPlaces = fixed.includes(".") ? fixed.length - fixed.indexOf(".") - 1 : 0;
+    const denominator = 10 ** decimalPlaces;
+    const numerator = Math.round(numeric * denominator);
+    return numerator > 0 ? reduceFraction({ numerator, denominator }) : null;
 }
 
 function parseQuantityFraction(value) {

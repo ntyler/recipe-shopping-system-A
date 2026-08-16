@@ -136,6 +136,56 @@ def test_recipe_save_route_round_trips_encoded_source_url(monkeypatch, tmp_path)
     assert loaded_recipe["rating"] == 4
 
 
+def test_recipe_save_route_round_trips_freeform_scale_without_new_schema(monkeypatch, tmp_path):
+    configure_recipe_save_storage(monkeypatch, tmp_path)
+    url = "https://example.test/freeform-scale"
+    seed_recipe(url)
+    scaling = {
+        "selected_multiplier": 1.25,
+        "base_multiplier": 1,
+        "base_servings": "4",
+        "available_multipliers": [
+            {"label": "1/2x", "value": 0.5},
+            {"label": "1x", "value": 1},
+            {"label": "2x", "value": 2},
+            {"label": "3x", "value": 3},
+        ],
+    }
+    payload = editable_payload(
+        url,
+        servings="5",
+        scaling=scaling,
+        ingredients=[{
+            "ingredient": "broth",
+            "quantity": "5/8",
+            "unit": "cup",
+            "base_quantity": "1/2",
+            "base_unit": "cup",
+        }],
+    )
+
+    client = recipe_route_client()
+    response = client.post(
+        "/api/recipe",
+        json={"original_url": url, "recipe": payload},
+    )
+
+    assert response.status_code == 200
+    saved = recipe_edit_service.load_recipe_output(url)
+    assert saved["scaling"]["selected_multiplier"] == 1.25
+    assert saved["scaling"]["base_multiplier"] == 1
+    assert saved["scaling"]["base_servings"] == "4"
+    assert saved["ingredients"][0]["quantity"] == "5/8"
+    assert saved["ingredients"][0]["base_quantity"] == "1/2"
+
+    loaded = client.get("/api/recipe", query_string={"url": url})
+    assert loaded.status_code == 200
+    loaded_recipe = loaded.get_json()["recipe"]
+    assert loaded_recipe["scaling"]["selected_multiplier"] == 1.25
+    assert loaded_recipe["scaling"]["base_servings"] == "4"
+    assert loaded_recipe["ingredients"][0]["base_quantity"] == "1/2"
+
+
 def test_recipe_get_route_preserves_database_bytes_and_store_section_sequence(
     monkeypatch, tmp_path
 ):

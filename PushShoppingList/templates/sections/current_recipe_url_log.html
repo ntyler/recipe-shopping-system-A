@@ -1410,14 +1410,25 @@
                             </label>
                         </div>
                     </div>
-                    <label>
+                    <label class="recipe-edit-scale-field">
                         <span class="recipe-edit-label-line">
                             <span>Recipe Amount</span>
                             <span class="recipe-edit-label-description">&mdash; Servings, yield, or portions the recipe makes.</span>
                         </span>
-                        <select name="scaling_multiplier"
-                                id="recipeEditScaleMultiplier"
-                                onchange="applyRecipeScaleMultiplier(this)"></select>
+                        <input type="text"
+                               name="scaling_multiplier"
+                               id="recipeEditScaleMultiplier"
+                               autocomplete="off"
+                               spellcheck="false"
+                               aria-label="Scale"
+                               aria-describedby="recipeEditScaleError"
+                               oninput="applyRecipeScaleMultiplier(this)">
+                        <span class="recipe-edit-scale-suffix" aria-hidden="true">&times;</span>
+                        <span class="recipe-edit-scale-error"
+                              id="recipeEditScaleError"
+                              role="alert"
+                              aria-live="polite"
+                              hidden>Scale must be a positive number, decimal, or fraction.</span>
                     </label>
                     <label>
                         <span class="recipe-edit-label-line">
