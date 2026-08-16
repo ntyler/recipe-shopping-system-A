@@ -57948,8 +57948,22 @@ body.recipe-edit-standalone-page .recipe-edit-restaurant-actions a {
     min-width: 0;
     min-height: 32px;
     padding: 0 6px;
+    border-color: transparent;
+    background: transparent;
     color: var(--app-text);
     font-size: 9px;
+    transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-restaurant-actions a:is(:hover, :focus-visible) {
+    border-color: color-mix(in srgb, var(--app-primary-hover) 58%, transparent);
+    background: color-mix(in srgb, var(--app-primary-soft) 58%, transparent);
+    color: var(--app-primary-hover);
+}
+
+body.recipe-edit-standalone-page .recipe-edit-restaurant-actions a:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--app-primary-hover) 72%, transparent);
+    outline-offset: 2px;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-ai-assistant-card {

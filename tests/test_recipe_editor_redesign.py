@@ -562,6 +562,27 @@ def test_restaurant_source_card_uses_compact_identity_details_and_actions():
     assert ".recipe-edit-standalone-page .recipe-edit-restaurant-details {" in css
 
 
+def test_restaurant_source_actions_are_borderless_until_hover_or_focus():
+    css = read_text("PushShoppingList/static/css/app.css")
+    base_rule = """body.recipe-edit-standalone-page .recipe-edit-restaurant-actions a {
+    min-width: 0;
+    min-height: 32px;
+    padding: 0 6px;
+    border-color: transparent;
+    background: transparent;"""
+    interaction_rule = """body.recipe-edit-standalone-page .recipe-edit-restaurant-actions a:is(:hover, :focus-visible) {
+    border-color: color-mix(in srgb, var(--app-primary-hover) 58%, transparent);
+    background: color-mix(in srgb, var(--app-primary-soft) 58%, transparent);
+    color: var(--app-primary-hover);"""
+    focus_rule = """body.recipe-edit-standalone-page .recipe-edit-restaurant-actions a:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--app-primary-hover) 72%, transparent);
+    outline-offset: 2px;"""
+
+    assert base_rule in css
+    assert interaction_rule in css
+    assert focus_rule in css
+
+
 def test_recipe_information_card_matches_compact_mockup_structure():
     script = read_text("PushShoppingList/static/js/app.js")
     css = read_text("PushShoppingList/static/css/app.css")
