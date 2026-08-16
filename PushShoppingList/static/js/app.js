@@ -26928,7 +26928,7 @@ function organizeRecipeEditInformationCard() {
     totalField?.classList.add("recipe-edit-total-time-field");
     (totalTimeHeading || totalField)?.appendChild(timeBreakdownControl);
     appendRecipeEditWorkspaceChildren(timeBreakdownGroup, [prepField, cookField, inactiveField]);
-    appendRecipeEditWorkspaceChildren(metadataRow, [servingsField, totalField, timeBreakdownGroup, levelField, scaleField]);
+    appendRecipeEditWorkspaceChildren(metadataRow, [servingsField, scaleField, totalField, timeBreakdownGroup, levelField]);
 
     const descriptionRow = document.createElement("div");
     descriptionRow.className = "recipe-edit-description-row";

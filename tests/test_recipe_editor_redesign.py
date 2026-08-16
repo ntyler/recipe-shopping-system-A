@@ -749,7 +749,7 @@ def test_recipe_time_breakdown_is_one_accessible_persisted_disclosure():
     assert "recipe-edit-total-time-cluster" not in organizer
     assert (
         "appendRecipeEditWorkspaceChildren(metadataRow, "
-        "[servingsField, totalField, timeBreakdownGroup, levelField, scaleField])"
+        "[servingsField, scaleField, totalField, timeBreakdownGroup, levelField])"
     ) in organizer
 
 
