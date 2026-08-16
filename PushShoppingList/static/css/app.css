@@ -76532,7 +76532,7 @@ body.recipe-edit-standalone-page #recipeEditForm
     min-height: 40px;
     border: 1px solid transparent;
     border-radius: 8px;
-    background: transparent;
+    background: var(--recipe-editor-surface-soft);
     box-shadow: none;
 }
 
@@ -76541,7 +76541,7 @@ body.recipe-edit-standalone-page #recipeEditForm
         #recipeEditMenuPrice:is([aria-invalid="true"], [data-recipe-edit-validation-invalid="true"])
     )) {
     border-color: transparent;
-    background: transparent;
+    background: var(--recipe-editor-surface-soft);
     box-shadow: none;
 }
 
@@ -76581,9 +76581,9 @@ body.recipe-edit-standalone-page #recipeEditForm
     .recipe-edit-summary-selectors .recipe-edit-price-control:hover:not(:focus-within):not(:has(
         #recipeEditMenuPrice:is([aria-invalid="true"], [data-recipe-edit-validation-invalid="true"])
     )) {
-    border-color: transparent;
+    border-color: color-mix(in srgb, var(--app-primary-hover) 72%, var(--app-border-strong));
     background: color-mix(in srgb, var(--app-bg) 76%, var(--app-surface-soft));
-    box-shadow: none;
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--app-primary-hover) 18%, transparent);
 }
 
 body.recipe-edit-standalone-page #recipeEditForm

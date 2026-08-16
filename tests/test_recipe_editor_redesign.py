@@ -683,7 +683,7 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     assert ".recipe-edit-summary-selectors .recipe-edit-price-control:not(:focus-within):not(:has(" in hierarchy_css
 
 
-def test_recipe_summary_selectors_are_borderless_with_accessible_state_feedback():
+def test_recipe_summary_selectors_share_accessible_state_feedback():
     css = read_text("PushShoppingList/static/css/app.css")
     marker = "/* Borderless summary controls: preserve the control box while letting it merge with the dark panel. */"
     controls = css[css.index(marker):css.index(
@@ -712,7 +712,7 @@ def test_recipe_summary_selectors_are_borderless_with_accessible_state_feedback(
         "border-color: color-mix(in srgb, var(--app-primary-hover) 72%, var(--app-border-strong));",
         "box-shadow: 0 0 0 1px color-mix(in srgb, var(--app-primary-hover) 18%, transparent);",
     ):
-        assert controls.count(hover_declaration) == 1
+        assert controls.count(hover_declaration) == 2
 
     price_rule_start = controls.index(
         ".recipe-edit-summary-selectors .recipe-edit-price-control {"
@@ -720,6 +720,16 @@ def test_recipe_summary_selectors_are_borderless_with_accessible_state_feedback(
     price_rule = controls[price_rule_start:controls.index("}", price_rule_start)]
     for preserved_dimension in ("height: 40px;", "min-height: 40px;"):
         assert preserved_dimension in price_rule
+    assert "background: var(--recipe-editor-surface-soft);" in price_rule
+
+    price_hover_rule_start = controls.index(
+        ".recipe-edit-summary-selectors .recipe-edit-price-control:hover:not(:focus-within):not(:has("
+    )
+    price_hover_rule = controls[
+        price_hover_rule_start:controls.index("}", price_hover_rule_start)
+    ]
+    assert "border-color: color-mix(in srgb, var(--app-primary-hover) 72%, var(--app-border-strong));" in price_hover_rule
+    assert "box-shadow: 0 0 0 1px color-mix(in srgb, var(--app-primary-hover) 18%, transparent);" in price_hover_rule
 
 
 def test_recipe_metadata_strip_uses_spacing_without_internal_separators():
