@@ -1397,13 +1397,23 @@
                                        title="Open Menu Order URL">&#8599;</a>
                                 </span>
                             </label>
-                            <label class="recipe-edit-file-field">
-                                <span>Menu Price</span>
-                                <span class="recipe-edit-price-control">
-                                    <span class="recipe-edit-price-prefix" aria-hidden="true">$</span>
-                                    <input type="text" id="recipeEditMenuPrice" inputmode="decimal">
+                            <div class="recipe-edit-file-field">
+                                <span id="recipeEditMenuPriceLabel">Menu Price</span>
+                                <span class="recipe-edit-price-control"
+                                      role="group"
+                                      aria-labelledby="recipeEditMenuPriceLabel">
+                                    <select id="recipeEditMenuPriceCurrency"
+                                            class="recipe-edit-price-currency"
+                                            aria-label="Menu price currency">
+                                        <option value="USD" selected>USD</option>
+                                    </select>
+                                    <input type="text"
+                                           id="recipeEditMenuPrice"
+                                           inputmode="decimal"
+                                           autocomplete="off"
+                                           aria-label="Menu price amount">
                                 </span>
-                            </label>
+                            </div>
                             <label class="recipe-edit-file-field recipe-edit-menu-metadata-wide">
                                 <span>Menu Description</span>
                                 <textarea id="recipeEditMenuDescription" rows="3"></textarea>

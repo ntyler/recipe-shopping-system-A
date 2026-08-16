@@ -1,5 +1,9 @@
 import json
+import shutil
+import subprocess
 from pathlib import Path
+
+import pytest
 
 from flask import Flask
 from flask import session
@@ -162,6 +166,113 @@ def empty_menu_metadata_payload():
         "menu_price": "",
         "menu_description": "",
     }
+
+
+def test_recipe_editor_defaults_legacy_menu_price_currency_to_usd(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    url = "https://example.test/legacy-menu-price"
+    recipe_edit_service.save_recipe_output(url, {
+        "source_url": url,
+        "source_type": "menu_item_inferred",
+        "recipe_title": "Legacy Menu Item",
+        "menu_price": "$5.99",
+        "ingredients": [],
+        "instructions": [],
+    })
+
+    loaded = recipe_edit_service.load_editable_recipe(url)["recipe"]
+
+    assert loaded["menu_price"] == "$5.99"
+    assert loaded["menu_price_amount"] == "5.99"
+    assert loaded["menu_price_currency"] == "USD"
+
+
+def test_recipe_editor_persists_menu_price_amount_and_currency_separately(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    url = "https://example.test/editable-menu-price"
+    recipe_edit_service.save_recipe_output(url, {
+        "source_url": url,
+        "source_type": "menu_item_inferred",
+        "recipe_title": "Editable Menu Item",
+        "menu_price": "$8.50",
+        "ingredients": [],
+        "instructions": [],
+    })
+
+    result = recipe_edit_service.save_editable_recipe(
+        url,
+        editable_payload(
+            url,
+            menu_price_amount="12.75",
+            menu_price_currency="USD",
+        ),
+    )
+    saved = recipe_edit_service.load_recipe_output(url)
+
+    assert result["ok"] is True
+    assert saved["menu_price_amount"] == "12.75"
+    assert saved["menu_price_currency"] == "USD"
+    assert saved["menu_price"] == "$12.75"
+    assert result["recipe"]["menu_price_amount"] == "12.75"
+    assert result["recipe"]["menu_price_currency"] == "USD"
+
+
+def test_recipe_editor_price_control_defaults_to_usd_and_collects_edited_amount():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for the menu price editor regression")
+
+    script = read_text("PushShoppingList/static/js/app.js")
+    price_helpers_start = script.index("function recipeMenuMetadataText(value)")
+    price_helpers_end = script.index("function recipeMenuSourceOptionValue(", price_helpers_start)
+    normalize_start = script.index("function normalizeRecipeEditPriceDisplay(")
+    normalize_end = script.index("function setRecipeEditDifficultyValue(", normalize_start)
+    collect_start = script.index("function recipeMenuMetadataStateAvailable()")
+    collect_end = script.index("function currentRecipeEditorPdfFieldValues()", collect_start)
+    harness = f"""
+const DEFAULT_RECIPE_EDIT_MENU_PRICE_CURRENCY = "USD";
+const RECIPE_EDIT_MENU_METADATA_INPUT_IDS = {{
+    menu_price_amount: "recipeEditMenuPrice",
+    menu_price_currency: "recipeEditMenuPriceCurrency",
+}};
+const RECIPE_EDIT_MENU_RELATION_INPUT_IDS = {{}};
+const amountInput = {{ value: "" }};
+const currencySelect = {{
+    value: "",
+    options: [{{ value: "USD" }}],
+    appendChild(option) {{ this.options.push(option); }},
+}};
+const elements = new Map([
+    ["recipeEditMenuPrice", amountInput],
+    ["recipeEditMenuPriceCurrency", currencySelect],
+    ["recipeEditRestaurantMenuSourceDetails", {{ dataset: {{ recipeMenuMetadataAvailable: "true" }} }}],
+]);
+global.document = {{
+    getElementById(id) {{ return elements.get(id) || null; }},
+    createElement() {{ return {{ value: "", textContent: "" }}; }},
+}};
+{script[price_helpers_start:price_helpers_end]}
+{script[normalize_start:normalize_end]}
+{script[collect_start:collect_end]}
+normalizeRecipeEditPriceDisplay({{ menu_price: "$5.99" }});
+const defaultState = {{ amount: amountInput.value, currency: currencySelect.value }};
+amountInput.value = "12.75";
+const payload = collectRecipeMenuMetadataPayload();
+process.stdout.write(JSON.stringify({{ defaultState, payload }}));
+"""
+    completed = subprocess.run(
+        [node],
+        input=harness,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    result = json.loads(completed.stdout)
+
+    assert result["defaultState"] == {"amount": "5.99", "currency": "USD"}
+    assert result["payload"]["menu_price_amount"] == "12.75"
+    assert result["payload"]["menu_price_currency"] == "USD"
+    assert result["payload"]["menu_price"] == "$12.75"
 
 
 def test_recipe_editor_loads_and_saves_recipe_notes(monkeypatch, tmp_path):

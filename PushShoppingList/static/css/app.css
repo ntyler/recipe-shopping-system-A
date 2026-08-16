@@ -40092,29 +40092,49 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
 
 .recipe-edit-standalone-page .recipe-edit-price-control {
     display: grid;
-    grid-template-columns: 32px minmax(0, 1fr);
+    grid-template-columns: max-content minmax(0, 1fr);
+    align-items: center;
+    gap: 2px;
     min-height: 36px;
     overflow: hidden;
-    border: 1px solid var(--app-border);
+    border: 1px solid transparent;
     border-radius: 7px;
     background: var(--app-surface-soft);
 }
 
-.recipe-edit-standalone-page .recipe-edit-price-prefix {
-    display: grid;
-    place-items: center;
-    border-right: 1px solid var(--app-border);
-    color: var(--app-muted);
+.recipe-edit-standalone-page .recipe-edit-price-currency {
+    width: auto;
+    min-width: 62px;
+    height: 34px;
+    min-height: 34px;
+    padding: 0 22px 0 8px;
+    border: 0;
+    border-radius: 6px;
+    outline: 0;
+    background-color: transparent;
+    color: var(--app-text);
     font-size: 12px;
     font-weight: 800;
+    box-shadow: none;
 }
 
 .recipe-edit-standalone-page .recipe-edit-price-control #recipeEditMenuPrice {
     height: 34px;
     min-height: 34px;
+    padding-left: 4px;
     border: 0;
-    border-radius: 0;
+    border-radius: 6px;
+    outline: 0;
     background: transparent;
+    box-shadow: none;
+}
+
+.recipe-edit-standalone-page .recipe-edit-price-control :is(
+    #recipeEditMenuPriceCurrency,
+    #recipeEditMenuPrice
+):focus-visible {
+    background: color-mix(in srgb, var(--app-primary-soft) 42%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-primary-hover) 26%, transparent);
 }
 
 .recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-source-files-details {
@@ -63391,9 +63411,9 @@ body.recipe-edit-standalone-page #recipeEditForm .recipe-edit-price-control:not(
 body.recipe-edit-standalone-page #recipeEditForm .recipe-edit-price-control:hover:not(:focus-within):not(:has(
     #recipeEditMenuPrice:is([aria-invalid="true"], [data-recipe-edit-validation-invalid="true"])
 )) {
-    border-color: color-mix(in srgb, var(--app-primary-hover) 72%, var(--app-border-strong));
+    border-color: transparent;
     background-color: color-mix(in srgb, var(--app-bg) 76%, var(--app-surface-soft));
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--app-primary-hover) 18%, transparent);
+    box-shadow: none;
 }
 
 body.recipe-edit-standalone-page #recipeEditForm :is(
@@ -76264,9 +76284,9 @@ body.recipe-edit-standalone-page #recipeEditForm
     ) > .recipe-edit-cookbook-value:has(> .recipe-edit-cookbook-select:not(:disabled)):hover:not(:focus-within):not(:has(
         > .recipe-edit-cookbook-select[aria-expanded="true"]
     )) {
-    border-color: transparent;
-    background: color-mix(in srgb, var(--app-primary-soft) 32%, transparent);
-    box-shadow: none;
+    border-color: color-mix(in srgb, var(--app-primary-hover) 72%, var(--app-border-strong));
+    background: color-mix(in srgb, var(--app-bg) 76%, var(--app-surface-soft));
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--app-primary-hover) 18%, transparent);
 }
 
 body.recipe-edit-standalone-page #recipeEditForm
@@ -76325,7 +76345,10 @@ body.recipe-edit-standalone-page #recipeEditForm
 }
 
 body.recipe-edit-standalone-page #recipeEditForm
-    .recipe-edit-summary-selectors .recipe-edit-price-control #recipeEditMenuPrice {
+    .recipe-edit-summary-selectors .recipe-edit-price-control :is(
+        #recipeEditMenuPriceCurrency,
+        #recipeEditMenuPrice
+    ) {
     height: 38px;
     min-height: 38px;
     border: 0;
@@ -76335,11 +76358,30 @@ body.recipe-edit-standalone-page #recipeEditForm
 }
 
 body.recipe-edit-standalone-page #recipeEditForm
+    .recipe-edit-summary-selectors .recipe-edit-price-control :is(
+        #recipeEditMenuPriceCurrency,
+        #recipeEditMenuPrice
+    ):is(:hover, :focus, :focus-visible) {
+    border: 0;
+    outline: 0;
+    box-shadow: none;
+}
+
+body.recipe-edit-standalone-page #recipeEditForm
+    .recipe-edit-summary-selectors .recipe-edit-price-control :is(
+        #recipeEditMenuPriceCurrency,
+        #recipeEditMenuPrice
+    ):focus-visible {
+    background: color-mix(in srgb, var(--app-primary-soft) 42%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-primary-hover) 26%, transparent);
+}
+
+body.recipe-edit-standalone-page #recipeEditForm
     .recipe-edit-summary-selectors .recipe-edit-price-control:hover:not(:focus-within):not(:has(
         #recipeEditMenuPrice:is([aria-invalid="true"], [data-recipe-edit-validation-invalid="true"])
     )) {
     border-color: transparent;
-    background: color-mix(in srgb, var(--app-primary-soft) 32%, transparent);
+    background: color-mix(in srgb, var(--app-bg) 76%, var(--app-surface-soft));
     box-shadow: none;
 }
 

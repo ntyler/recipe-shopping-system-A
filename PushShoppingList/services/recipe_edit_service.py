@@ -1560,6 +1560,12 @@ RESTAURANT_MENU_METADATA_FIELDS = (
     "menu_description",
 )
 
+DEFAULT_MENU_PRICE_CURRENCY = "USD"
+RESTAURANT_MENU_PRICE_FIELDS = (
+    "menu_price_amount",
+    "menu_price_currency",
+)
+
 RESTAURANT_MENU_RELATION_FIELDS = (
     "restaurant_id",
     "menu_id",
@@ -1570,6 +1576,63 @@ RESTAURANT_MENU_RELATION_FIELDS = (
 
 def clean_pdf_asset_value(value):
     return str(value or "").strip()
+
+
+def clean_menu_price_currency(value):
+    currency = str(value or "").strip().upper()
+    return currency if re.fullmatch(r"[A-Z]{3}", currency) else DEFAULT_MENU_PRICE_CURRENCY
+
+
+def clean_menu_price_amount(value, currency=DEFAULT_MENU_PRICE_CURRENCY):
+    amount = str(value or "").strip()
+    if not amount:
+        return ""
+
+    currency = clean_menu_price_currency(currency)
+    prefixes = [currency]
+    if currency == "USD":
+        prefixes = ["$ USD", "$USD", "$", currency]
+    for prefix in prefixes:
+        if amount.upper().startswith(prefix.upper()):
+            return amount[len(prefix):].strip()
+    return amount
+
+
+def format_menu_price(amount, currency=DEFAULT_MENU_PRICE_CURRENCY):
+    currency = clean_menu_price_currency(currency)
+    amount = clean_menu_price_amount(amount, currency)
+    if not amount:
+        return ""
+    return f"${amount}" if currency == "USD" else f"{currency} {amount}"
+
+
+def normalize_recipe_menu_price_payload(recipe_data, payload):
+    recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
+    payload = payload if isinstance(payload, dict) else {}
+    if not any(field in payload for field in ("menu_price", *RESTAURANT_MENU_PRICE_FIELDS)):
+        return payload
+
+    currency = clean_menu_price_currency(
+        payload.get("menu_price_currency")
+        if "menu_price_currency" in payload
+        else recipe_data.get("menu_price_currency")
+    )
+    if "menu_price_amount" in payload:
+        amount = clean_menu_price_amount(payload.get("menu_price_amount"), currency)
+    elif "menu_price" in payload:
+        amount = clean_menu_price_amount(payload.get("menu_price"), currency)
+    else:
+        amount = clean_menu_price_amount(
+            recipe_data.get("menu_price_amount") or recipe_data.get("menu_price"),
+            currency,
+        )
+
+    return {
+        **payload,
+        "menu_price": format_menu_price(amount, currency),
+        "menu_price_amount": amount,
+        "menu_price_currency": currency,
+    }
 
 
 def first_pdf_asset_value(*values):
@@ -4185,6 +4248,9 @@ def recipe_has_menu_metadata(recipe_data):
     if any(recipe_menu_relation_value(recipe_data, field) for field in RESTAURANT_MENU_RELATION_FIELDS):
         return True
 
+    if clean_recipe_menu_text(recipe_data.get("menu_price_amount")):
+        return True
+
     for field in RESTAURANT_MENU_METADATA_FIELDS:
         value = recipe_data.get(field)
         if field == "source_menu_url":
@@ -4249,6 +4315,29 @@ def editable_recipe_menu_metadata(recipe_data):
             ),
         )
         or raw_menu_order_url
+    )
+    raw_menu_price = first_recipe_menu_text(
+        recipe_data.get("menu_price"),
+        metadata.get("menu_price"),
+        metadata.get("price"),
+        item.get("menu_price"),
+        snapshot_item_fields.get("menu_price"),
+    )
+    menu_price_currency = clean_menu_price_currency(first_recipe_menu_text(
+        recipe_data.get("menu_price_currency"),
+        metadata.get("menu_price_currency"),
+        item.get("menu_price_currency"),
+        snapshot_item_fields.get("menu_price_currency"),
+    ))
+    explicit_menu_price_amount = first_recipe_menu_text(
+        recipe_data.get("menu_price_amount"),
+        metadata.get("menu_price_amount"),
+        item.get("menu_price_amount"),
+        snapshot_item_fields.get("menu_price_amount"),
+    )
+    menu_price_amount = clean_menu_price_amount(
+        explicit_menu_price_amount or raw_menu_price,
+        menu_price_currency,
     )
     fields = {
         "restaurant_name": first_recipe_menu_text(
@@ -4328,13 +4417,13 @@ def editable_recipe_menu_metadata(recipe_data):
             snapshot_item_fields.get("menu_item_name"),
         ),
         "menu_order_url": menu_order_url,
-        "menu_price": first_recipe_menu_text(
-            recipe_data.get("menu_price"),
-            metadata.get("menu_price"),
-            metadata.get("price"),
-            item.get("menu_price"),
-            snapshot_item_fields.get("menu_price"),
+        "menu_price": (
+            format_menu_price(menu_price_amount, menu_price_currency)
+            if explicit_menu_price_amount
+            else raw_menu_price or format_menu_price(menu_price_amount, menu_price_currency)
         ),
+        "menu_price_amount": menu_price_amount,
+        "menu_price_currency": menu_price_currency,
         "menu_description": first_recipe_menu_text(
             recipe_data.get("menu_description"),
             metadata.get("menu_description"),
@@ -4382,7 +4471,11 @@ def recipe_with_menu_metadata(recipe_data):
 
 def payload_includes_menu_metadata(payload):
     payload = payload if isinstance(payload, dict) else {}
-    return any(field in payload for field in (*RESTAURANT_MENU_METADATA_FIELDS, *RESTAURANT_MENU_RELATION_FIELDS))
+    return any(field in payload for field in (
+        *RESTAURANT_MENU_METADATA_FIELDS,
+        *RESTAURANT_MENU_PRICE_FIELDS,
+        *RESTAURANT_MENU_RELATION_FIELDS,
+    ))
 
 
 def apply_recipe_menu_metadata_to_store(recipe_data, payload):
@@ -4451,6 +4544,8 @@ def apply_recipe_menu_metadata_to_store(recipe_data, payload):
                 "menu_item_name": "item_name",
                 "menu_order_url": "menu_order_url",
                 "menu_price": "menu_price",
+                "menu_price_amount": "menu_price_amount",
+                "menu_price_currency": "menu_price_currency",
                 "menu_description": "menu_description",
             }
             for payload_key, store_key in item_field_map.items():
@@ -4472,6 +4567,7 @@ def apply_recipe_menu_metadata_to_store(recipe_data, payload):
 def apply_recipe_menu_metadata_payload(recipe_data, payload):
     recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
     payload = payload if isinstance(payload, dict) else {}
+    payload = normalize_recipe_menu_price_payload(recipe_data, payload)
 
     if not payload_includes_menu_metadata(payload):
         return recipe_data
@@ -4522,7 +4618,16 @@ def apply_recipe_menu_metadata_payload(recipe_data, payload):
     if has_normalized_link:
         apply_recipe_menu_metadata_to_store(recipe_data, payload)
 
-    for field in ("menu_section", "menu_item_name", "menu_order_url", "menu_price", "menu_description", "source_menu_url"):
+    for field in (
+        "menu_section",
+        "menu_item_name",
+        "menu_order_url",
+        "menu_price",
+        "menu_price_amount",
+        "menu_price_currency",
+        "menu_description",
+        "source_menu_url",
+    ):
         if field in payload:
             recipe_data[field] = clean_recipe_menu_text(payload.get(field))
 
@@ -4534,6 +4639,9 @@ def apply_recipe_menu_metadata_payload(recipe_data, payload):
                 parsed = parse_recipe_menu_bool(payload.get(field))
                 recipe_data[field] = "" if parsed is None else parsed
             else:
+                recipe_data[field] = clean_recipe_menu_text(payload.get(field))
+        for field in RESTAURANT_MENU_PRICE_FIELDS:
+            if field in payload:
                 recipe_data[field] = clean_recipe_menu_text(payload.get(field))
 
     if recipe_data.get("source_menu_url") and not recipe_data.get("menu_source_url"):

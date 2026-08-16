@@ -23419,9 +23419,14 @@ const RECIPE_EDIT_MENU_METADATA_INPUT_IDS = {
     menu_section: "recipeEditCategoryMenuSection",
     menu_item_name: "recipeEditMenuItemName",
     menu_order_url: "recipeEditMenuOrderUrl",
-    menu_price: "recipeEditMenuPrice",
+    menu_price_amount: "recipeEditMenuPrice",
+    menu_price_currency: "recipeEditMenuPriceCurrency",
     menu_description: "recipeEditMenuDescription",
 };
+const DEFAULT_RECIPE_EDIT_MENU_PRICE_CURRENCY = "USD";
+const RECIPE_EDIT_MENU_PRICE_CURRENCIES = [
+    { code: "USD", label: "USD" },
+];
 const RECIPE_EDIT_MENU_RELATION_INPUT_IDS = {
     restaurant_id: "recipeEditRestaurantId",
     menu_id: "recipeEditMenuId",
@@ -24980,6 +24985,33 @@ function recipeMenuMetadataText(value) {
     return String(value || "").trim();
 }
 
+function normalizeRecipeMenuPriceCurrency(value) {
+    const currency = recipeMenuMetadataText(value).toUpperCase();
+    return /^[A-Z]{3}$/.test(currency) ? currency : DEFAULT_RECIPE_EDIT_MENU_PRICE_CURRENCY;
+}
+
+function recipeMenuPriceAmountValue(value, currency = DEFAULT_RECIPE_EDIT_MENU_PRICE_CURRENCY) {
+    let amount = recipeMenuMetadataText(value);
+    if (!amount) return "";
+
+    const normalizedCurrency = normalizeRecipeMenuPriceCurrency(currency);
+    const prefixes = normalizedCurrency === "USD"
+        ? ["$ USD", "$USD", "$", normalizedCurrency]
+        : [normalizedCurrency];
+    const prefix = prefixes.find(candidate => amount.toUpperCase().startsWith(candidate.toUpperCase()));
+    if (prefix) amount = amount.slice(prefix.length).trim();
+    return amount;
+}
+
+function recipeMenuPriceLegacyValue(amount, currency = DEFAULT_RECIPE_EDIT_MENU_PRICE_CURRENCY) {
+    const normalizedCurrency = normalizeRecipeMenuPriceCurrency(currency);
+    const normalizedAmount = recipeMenuPriceAmountValue(amount, normalizedCurrency);
+    if (!normalizedAmount) return "";
+    return normalizedCurrency === "USD"
+        ? `$${normalizedAmount}`
+        : `${normalizedCurrency} ${normalizedAmount}`;
+}
+
 function recipeMenuSourceOptionValue(restaurantId = "", menuId = "") {
     return `${recipeMenuMetadataText(restaurantId)}|${recipeMenuMetadataText(menuId)}`;
 }
@@ -25154,6 +25186,7 @@ function recipeHasMenuMetadata(recipe = {}) {
     }
 
     return Object.keys(RECIPE_EDIT_MENU_METADATA_INPUT_IDS).some(field => {
+        if (field === "menu_price_currency") return false;
         return recipeMenuMetadataText(recipe[field]);
     });
 }
@@ -25224,6 +25257,7 @@ function populateRecipeMenuMetadata(recipe = {}) {
     setRecipeMenuMetadataPanelVisibility(recipe);
     setRecipeMenuRelationFields(recipe);
     Object.entries(RECIPE_EDIT_MENU_METADATA_INPUT_IDS).forEach(([field, inputId]) => {
+        if (field === "menu_price_amount" || field === "menu_price_currency") return;
         const input = document.getElementById(inputId);
         if (input) {
             input.value = recipeMenuMetadataText(recipe[field]);
@@ -25231,7 +25265,7 @@ function populateRecipeMenuMetadata(recipe = {}) {
     });
     populateRecipeMenuSourceSelect(recipe);
     bindRecipeMenuMetadataUrlLinks();
-    normalizeRecipeEditPriceDisplay();
+    normalizeRecipeEditPriceDisplay(recipe);
 }
 
 function recipeMenuMetadataStateAvailable() {
@@ -25251,8 +25285,17 @@ function collectRecipeMenuMetadataPayload() {
     Object.entries(RECIPE_EDIT_MENU_METADATA_INPUT_IDS).forEach(([field, inputId]) => {
         const input = document.getElementById(inputId);
         const value = input ? String(input.value || "").trim() : "";
-        payload[field] = field === "menu_price" && value ? `$${value.replace(/^\$\s*/, "")}` : value;
+        payload[field] = value;
     });
+    payload.menu_price_currency = normalizeRecipeMenuPriceCurrency(payload.menu_price_currency);
+    payload.menu_price_amount = recipeMenuPriceAmountValue(
+        payload.menu_price_amount,
+        payload.menu_price_currency,
+    );
+    payload.menu_price = recipeMenuPriceLegacyValue(
+        payload.menu_price_amount,
+        payload.menu_price_currency,
+    );
     Object.entries(RECIPE_EDIT_MENU_RELATION_INPUT_IDS).forEach(([field, inputId]) => {
         const input = document.getElementById(inputId);
         payload[field] = input ? String(input.value || "").trim() : "";
@@ -26255,7 +26298,7 @@ function recipeEditInputValue(id) {
 
 function recipeEditFieldContainer(id) {
     const input = document.getElementById(id);
-    return input ? input.closest("label, .recipe-edit-cookbook-field") : null;
+    return input ? input.closest("label, .recipe-edit-file-field, .recipe-edit-cookbook-field") : null;
 }
 
 function setRecipeEditFieldLabel(field, text) {
@@ -26519,11 +26562,25 @@ document.addEventListener("pointerdown", event => {
 document.addEventListener("scroll", () => closeRecipeEditMetadataTooltips(), true);
 window.addEventListener("resize", () => closeRecipeEditMetadataTooltips(), { passive: true });
 
-function normalizeRecipeEditPriceDisplay() {
+function normalizeRecipeEditPriceDisplay(recipe = {}) {
     const input = document.getElementById("recipeEditMenuPrice");
-    if (!input) return;
-    const value = String(input.value || "").trim();
-    if (value.startsWith("$")) input.value = value.slice(1).trim();
+    const currencySelect = document.getElementById("recipeEditMenuPriceCurrency");
+    if (!input || !currencySelect) return;
+
+    const currency = normalizeRecipeMenuPriceCurrency(
+        recipe.menu_price_currency || currencySelect.value,
+    );
+    if (!Array.from(currencySelect.options || []).some(option => option.value === currency)) {
+        const option = document.createElement("option");
+        option.value = currency;
+        option.textContent = currency;
+        currencySelect.appendChild(option);
+    }
+    currencySelect.value = currency;
+    const amountSource = Object.prototype.hasOwnProperty.call(recipe, "menu_price_amount")
+        ? recipe.menu_price_amount
+        : recipe.menu_price || input.value;
+    input.value = recipeMenuPriceAmountValue(amountSource, currency);
 }
 
 function setRecipeEditDifficultyValue(value) {
@@ -26961,8 +27018,20 @@ function organizeRecipeEditInformationCard() {
             priceInput.setAttribute("inputmode", "decimal");
             const priceControl = document.createElement("span");
             priceControl.className = "recipe-edit-price-control";
+            priceControl.setAttribute("role", "group");
+            priceControl.setAttribute("aria-label", "Menu price");
             priceInput.parentNode.insertBefore(priceControl, priceInput);
-            priceControl.innerHTML = '<span class="recipe-edit-price-prefix" aria-hidden="true">$</span>';
+            const currencySelect = document.createElement("select");
+            currencySelect.id = "recipeEditMenuPriceCurrency";
+            currencySelect.className = "recipe-edit-price-currency";
+            currencySelect.setAttribute("aria-label", "Menu price currency");
+            RECIPE_EDIT_MENU_PRICE_CURRENCIES.forEach(currency => {
+                const option = document.createElement("option");
+                option.value = currency.code;
+                option.textContent = currency.label;
+                currencySelect.appendChild(option);
+            });
+            priceControl.appendChild(currencySelect);
             priceControl.appendChild(priceInput);
         }
         normalizeRecipeEditPriceDisplay();

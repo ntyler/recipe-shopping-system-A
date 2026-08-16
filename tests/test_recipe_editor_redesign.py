@@ -590,8 +590,11 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     assert "renderRecipeEditCuisineChips" in script
     assert "recipe-edit-price-control" in organizer
     assert template.count('class="recipe-edit-price-control"') == 1
-    assert 'class="recipe-edit-price-prefix" aria-hidden="true">$</span>' in template
-    assert 'id="recipeEditMenuPrice" inputmode="decimal"' in template
+    assert 'id="recipeEditMenuPriceCurrency"' in template
+    assert 'aria-label="Menu price currency"' in template
+    assert '<option value="USD" selected>USD</option>' in template
+    assert 'id="recipeEditMenuPrice"' in template
+    assert 'aria-label="Menu price amount"' in template
     assert 'ratingField.classList.add("recipe-edit-header-rating")' in organizer
     assert 'ratingField.classList.remove("recipe-edit-wide")' in organizer
     assert 'bindRecipeEditNameInput(nameInput)' in organizer
@@ -630,7 +633,16 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     assert "grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(130px, .62fr);" in hierarchy_css
     assert ".recipe-edit-info-panel-organized .recipe-edit-metadata-heading {" in css
     assert ".recipe-edit-description-row {\n    grid-template-columns: minmax(0, 1fr);" in hierarchy_css
-    assert ".recipe-edit-price-prefix {" in css
+    assert ".recipe-edit-price-currency {" in css
+    assert ".recipe-edit-price-prefix {" not in css
+    price_styles = css[
+        css.index(".recipe-edit-standalone-page .recipe-edit-price-control {"):
+        css.index(
+            ".recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-source-files-details {"
+        )
+    ]
+    assert "grid-template-columns: max-content minmax(0, 1fr);" in price_styles
+    assert "border-right" not in price_styles
     assert ".recipe-edit-tag-chip {" in css
     assert ".recipe-edit-description-count {" in css
     assert 'event.target.id === "recipeEditDescription"' in script
@@ -671,6 +683,12 @@ def test_recipe_summary_selectors_are_borderless_with_accessible_state_feedback(
         "box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-primary-hover) 34%, transparent);",
     ):
         assert declaration in controls
+
+    for hover_declaration in (
+        "border-color: color-mix(in srgb, var(--app-primary-hover) 72%, var(--app-border-strong));",
+        "box-shadow: 0 0 0 1px color-mix(in srgb, var(--app-primary-hover) 18%, transparent);",
+    ):
+        assert controls.count(hover_declaration) == 1
 
     price_rule_start = controls.index(
         ".recipe-edit-summary-selectors .recipe-edit-price-control {"
@@ -1009,8 +1027,8 @@ def test_recipe_editor_standard_fields_are_quiet_until_active():
     assert ".recipe-edit-price-control:not(:focus-within):not(:has(" in quiet_fields
     price_hover_start = quiet_fields.index(".recipe-edit-price-control:hover:not(:focus-within):not(:has(")
     price_hover_rule = quiet_fields[price_hover_start:quiet_fields.index("}", price_hover_start)]
-    assert "border-color: color-mix(in srgb, var(--app-primary-hover) 72%, var(--app-border-strong));" in price_hover_rule
-    assert "box-shadow: 0 0 0 1px color-mix(in srgb, var(--app-primary-hover) 18%, transparent);" in price_hover_rule
+    assert "border-color: transparent;" in price_hover_rule
+    assert "box-shadow: none;" in price_hover_rule
     assert ".recipe-edit-price-control:focus-within" in quiet_fields
     assert ".recipe-edit-price-control:has(" in quiet_fields
     assert "#recipeEditMenuPrice:is([aria-invalid=\"true\"], [data-recipe-edit-validation-invalid=\"true\"])" in quiet_fields
