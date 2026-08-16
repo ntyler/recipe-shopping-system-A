@@ -187,6 +187,25 @@ def test_recipe_editor_defaults_legacy_menu_price_currency_to_usd(monkeypatch, t
     assert loaded["menu_price_currency"] == "USD"
 
 
+def test_recipe_editor_infers_existing_legacy_alphabetic_currency(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    url = "https://example.test/legacy-euro-menu-price"
+    recipe_edit_service.save_recipe_output(url, {
+        "source_url": url,
+        "source_type": "menu_item_inferred",
+        "recipe_title": "Legacy Euro Menu Item",
+        "menu_price": "EUR 5.99",
+        "ingredients": [],
+        "instructions": [],
+    })
+
+    loaded = recipe_edit_service.load_editable_recipe(url)["recipe"]
+
+    assert loaded["menu_price"] == "EUR 5.99"
+    assert loaded["menu_price_amount"] == "5.99"
+    assert loaded["menu_price_currency"] == "EUR"
+
+
 def test_recipe_editor_persists_menu_price_amount_and_currency_separately(monkeypatch, tmp_path):
     configure_editor_recipe_storage(monkeypatch, tmp_path)
     url = "https://example.test/editable-menu-price"
@@ -250,38 +269,35 @@ def test_recipe_editor_persists_non_usd_menu_price_currency(monkeypatch, tmp_pat
 
 def test_recipe_editor_currency_catalog_and_dark_accessible_menu_are_config_driven():
     script = read_text("PushShoppingList/static/js/app.js")
+    currency_data = read_text("PushShoppingList/static/js/currency-data.js")
+    layout = read_text("PushShoppingList/templates/layouts/app_layout.html")
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     css = read_text("PushShoppingList/static/css/app.css")
-    expected_currencies = (
-        ("USD", "$", "US Dollar"),
-        ("EUR", "€", "Euro"),
-        ("GBP", "£", "British Pound"),
-        ("INR", "₹", "Indian Rupee"),
-        ("JPY", "¥", "Japanese Yen"),
-        ("KRW", "₩", "South Korean Won"),
-        ("CAD", "C$", "Canadian Dollar"),
-        ("AUD", "A$", "Australian Dollar"),
-        ("NZD", "NZ$", "New Zealand Dollar"),
-        ("CHF", "CHF", "Swiss Franc"),
-        ("VND", "₫", "Vietnamese Dong"),
-        ("LAK", "₭", "Lao Kip"),
-    )
 
-    for code, symbol, name in expected_currencies:
-        assert f'{{ code: "{code}", symbol: "{symbol}", name: "{name}" }}' in script
-
+    assert "iso_4217_currency_symbols_2026-01-01.csv" in currency_data
+    assert 'currency.classification === "Currency"' in currency_data
+    assert "function getCurrencyByNumericCode(input)" in currency_data
+    assert "function searchCurrencies(query" in currency_data
+    assert layout.index("js/currency-data.js") < layout.index("js/app.js")
+    assert "RECIPE_EDIT_CURRENCY_CATALOG.spendableCurrencies" in script
     assert 'data-recipe-edit-currency-trigger' in template
     assert 'aria-label="Menu price currency, $ USD, US Dollar"' in template
     assert 'data-recipe-edit-currency-symbol>$</span>' in template
-    assert 'data-recipe-edit-currency-code\n                                                  hidden>USD</span>' in template
-    assert 'code.hidden = true' in script
+    assert 'data-recipe-edit-currency-code>USD</span>' in template
+    assert 'data-recipe-edit-currency-search' in template
+    assert 'placeholder="Search currency, code, country…"' in template
+    assert 'data-recipe-edit-currency-options' in template
+    assert 'code.hidden = !RECIPE_EDIT_CURRENCY_CATALOG.isCurrencySymbolShared(definition)' in script
     assert 'role="listbox"' in template
     assert 'option.setAttribute("aria-selected", "false")' in script
     assert 'option.setAttribute("aria-selected", selected ? "true" : "false")' in script
+    assert 'name.textContent = `— ${currency.name}`' in script
     assert 'event.key === "ArrowDown" || event.key === "ArrowUp"' in script
     assert 'event.key === "Home" || event.key === "End"' in script
     assert ".recipe-edit-price-currency-option[aria-selected=\"true\"]" in css
     assert ".recipe-edit-price-currency-option:is(:hover, :focus-visible)" in css
+    assert ".recipe-edit-price-currency-search:focus-visible" in css
+    assert ".recipe-edit-price-currency-options" in css
     assert "background: color-mix(in srgb, var(--app-bg) 94%, #07110c);" in css
 
 
@@ -291,6 +307,7 @@ def test_recipe_editor_price_control_defaults_to_usd_and_selects_non_usd_currenc
         pytest.skip("Node.js is required for the menu price editor regression")
 
     script = read_text("PushShoppingList/static/js/app.js")
+    currency_data = read_text("PushShoppingList/static/js/currency-data.js")
     currency_config_start = script.index("const DEFAULT_RECIPE_EDIT_MENU_PRICE_CURRENCY")
     currency_config_end = script.index("const RECIPE_EDIT_MENU_RELATION_INPUT_IDS", currency_config_start)
     price_helpers_start = script.index("function recipeMenuMetadataText(value)")
@@ -300,6 +317,7 @@ def test_recipe_editor_price_control_defaults_to_usd_and_selects_non_usd_currenc
     collect_start = script.index("function recipeMenuMetadataStateAvailable()")
     collect_end = script.index("function currentRecipeEditorPdfFieldValues()", collect_start)
     harness = f"""
+{currency_data}
 {script[currency_config_start:currency_config_end]}
 const RECIPE_EDIT_MENU_METADATA_INPUT_IDS = {{
     menu_price_amount: "recipeEditMenuPrice",
@@ -336,14 +354,21 @@ const codeNode = {{ textContent: "" }};
 const optionNodes = RECIPE_EDIT_MENU_PRICE_CURRENCIES.map(currency => ({{
     dataset: {{ currencyCode: currency.code }},
     selected: false,
-    getAttribute(name) {{ return name === "aria-selected" && this.selected ? "true" : "false"; }},
+    hidden: false,
+    getAttribute(name) {{
+        if (name === "aria-selected") return this.selected ? "true" : "false";
+        if (name === "aria-label") return currency.name;
+        return null;
+    }},
     setAttribute(name, value) {{ if (name === "aria-selected") this.selected = value === "true"; }},
 }}));
 const listbox = {{
-    hidden: true,
     dataset: {{ currencyOptionSignature: RECIPE_EDIT_MENU_PRICE_CURRENCIES.map(currency => currency.code).join("|") }},
     querySelectorAll() {{ return optionNodes; }},
 }};
+const menu = {{ hidden: true }};
+const search = {{ value: "", focus() {{}}, select() {{}} }};
+const empty = {{ hidden: true }};
 const trigger = {{
     attributes: {{}},
     title: "",
@@ -358,12 +383,15 @@ const trigger = {{
 const control = {{
     querySelector(selector) {{
         if (selector === "[data-recipe-edit-currency-trigger]") return trigger;
-        if (selector === "[data-recipe-edit-currency-menu]") return listbox;
+        if (selector === "[data-recipe-edit-currency-menu]") return menu;
+        if (selector === "[data-recipe-edit-currency-search]") return search;
+        if (selector === "[data-recipe-edit-currency-options]") return listbox;
+        if (selector === "[data-recipe-edit-currency-empty]") return empty;
         return null;
     }},
 }};
 currencyInput.closest = () => control;
-const parts = {{ control, valueInput: currencyInput, trigger, listbox }};
+const parts = {{ control, valueInput: currencyInput, trigger, menu, search, listbox, empty }};
 selectRecipeEditCurrency(parts, "EUR", {{ dispatchChange: false }});
 const selectedState = {{
     currency: currencyInput.value,
@@ -402,6 +430,124 @@ process.stdout.write(JSON.stringify({{ defaultState, selectedState, payload }}))
     assert result["payload"]["menu_price_amount"] == "12.75"
     assert result["payload"]["menu_price_currency"] == "EUR"
     assert result["payload"]["menu_price"] == "EUR 12.75"
+
+
+def test_recipe_editor_currency_keyboard_search_selection_and_escape():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for the currency keyboard regression")
+
+    script = read_text("PushShoppingList/static/js/app.js")
+    currency_data = read_text("PushShoppingList/static/js/currency-data.js")
+    currency_config_start = script.index("const DEFAULT_RECIPE_EDIT_MENU_PRICE_CURRENCY")
+    currency_config_end = script.index("const RECIPE_EDIT_MENU_RELATION_INPUT_IDS", currency_config_start)
+    price_helpers_start = script.index("function recipeMenuMetadataText(value)")
+    price_helpers_end = script.index("function recipeMenuSourceOptionValue(", price_helpers_start)
+    control_start = script.index("function recipeEditCurrencyOptionId(")
+    control_end = script.index("function normalizeRecipeEditPriceDisplay(", control_start)
+    harness = f"""
+{currency_data}
+{script[currency_config_start:currency_config_end]}
+{script[price_helpers_start:price_helpers_end]}
+global.document = {{ addEventListener() {{}} }};
+{script[control_start:control_end]}
+
+const handlers = {{ trigger: {{}}, search: {{}}, listbox: {{}} }};
+let focused = "";
+let changes = 0;
+const symbolNode = {{ textContent: "" }};
+const codeNode = {{ textContent: "", hidden: false }};
+const optionNodes = RECIPE_EDIT_MENU_PRICE_CURRENCIES.map(currency => ({{
+    dataset: {{ currencyCode: currency.code }},
+    hidden: false,
+    attributes: {{
+        "aria-selected": currency.code === "USD" ? "true" : "false",
+        "aria-label": `${{currency.symbol}} ${{currency.code}} — ${{currency.name}}`,
+    }},
+    getAttribute(name) {{ return this.attributes[name] || null; }},
+    setAttribute(name, value) {{ this.attributes[name] = value; }},
+    focus() {{ focused = currency.code; }},
+    closest() {{ return this; }},
+}}));
+const listbox = {{
+    dataset: {{ currencyOptionSignature: RECIPE_EDIT_MENU_PRICE_CURRENCIES.map(currency => currency.code).join("|") }},
+    querySelectorAll() {{ return optionNodes; }},
+    addEventListener(type, handler) {{ handlers.listbox[type] = handler; }},
+}};
+const menu = {{ hidden: true }};
+const search = {{
+    value: "",
+    addEventListener(type, handler) {{ handlers.search[type] = handler; }},
+    focus() {{ focused = "search"; }},
+    select() {{}},
+}};
+const empty = {{ hidden: true }};
+const trigger = {{
+    attributes: {{ "aria-expanded": "false" }},
+    title: "",
+    addEventListener(type, handler) {{ handlers.trigger[type] = handler; }},
+    getAttribute(name) {{ return this.attributes[name] || null; }},
+    setAttribute(name, value) {{ this.attributes[name] = value; }},
+    querySelector(selector) {{
+        if (selector === "[data-recipe-edit-currency-symbol]") return symbolNode;
+        if (selector === "[data-recipe-edit-currency-code]") return codeNode;
+        return null;
+    }},
+    focus() {{ focused = "trigger"; }},
+}};
+const control = {{
+    dataset: {{}},
+    contains() {{ return true; }},
+}};
+const valueInput = {{
+    value: "USD",
+    dispatchEvent() {{ changes += 1; }},
+}};
+const parts = {{ control, valueInput, trigger, menu, search, listbox, empty }};
+bindRecipeEditCurrencyControl(parts);
+
+const keyEvent = (key, target = null) => ({{
+    key,
+    target,
+    ctrlKey: false,
+    metaKey: false,
+    altKey: false,
+    preventDefault() {{}},
+}});
+handlers.trigger.keydown(keyEvent("Enter"));
+search.value = "978";
+handlers.search.input();
+handlers.search.keydown(keyEvent("ArrowDown"));
+const focusedOption = optionNodes.find(option => option.dataset.currencyCode === focused);
+handlers.listbox.keydown(keyEvent("Enter", focusedOption));
+const selectionState = {{
+    currency: valueInput.value,
+    menuHidden: menu.hidden,
+    focused,
+    changes,
+}};
+handlers.trigger.keydown(keyEvent("Enter"));
+handlers.search.keydown(keyEvent("Escape"));
+const escapeState = {{ menuHidden: menu.hidden, focused }};
+process.stdout.write(JSON.stringify({{ selectionState, escapeState }}));
+"""
+    completed = subprocess.run(
+        [node],
+        input=harness,
+        text=True,
+        encoding="utf-8",
+        capture_output=True,
+        check=True,
+    )
+    result = json.loads(completed.stdout)
+
+    assert result["selectionState"] == {
+        "currency": "EUR",
+        "menuHidden": True,
+        "focused": "trigger",
+        "changes": 1,
+    }
+    assert result["escapeState"] == {"menuHidden": True, "focused": "trigger"}
 
 
 def test_recipe_editor_loads_and_saves_recipe_notes(monkeypatch, tmp_path):

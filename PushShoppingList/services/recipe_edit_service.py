@@ -31,6 +31,9 @@ from flask import has_request_context
 from PushShoppingList.services import cloudflare_r2_storage
 from PushShoppingList.services import durable_document_runtime_service as durable_runtime
 from PushShoppingList.services import menu_store_service
+from PushShoppingList.services.currency_catalog_service import get_currency_by_alphabetic_code
+from PushShoppingList.services.currency_catalog_service import infer_currency_code_from_price
+from PushShoppingList.services.currency_catalog_service import resolve_currency_code
 from PushShoppingList.services.food_rules_service import load_food_rules
 from PushShoppingList.services.menu_mega_json_service import load_menu_mega_json_snapshot
 from PushShoppingList.services.menu_mega_json_service import load_snapshot_index
@@ -1579,8 +1582,7 @@ def clean_pdf_asset_value(value):
 
 
 def clean_menu_price_currency(value):
-    currency = str(value or "").strip().upper()
-    return currency if re.fullmatch(r"[A-Z]{3}", currency) else DEFAULT_MENU_PRICE_CURRENCY
+    return resolve_currency_code(value) or DEFAULT_MENU_PRICE_CURRENCY
 
 
 def clean_menu_price_amount(value, currency=DEFAULT_MENU_PRICE_CURRENCY):
@@ -1589,9 +1591,11 @@ def clean_menu_price_amount(value, currency=DEFAULT_MENU_PRICE_CURRENCY):
         return ""
 
     currency = clean_menu_price_currency(currency)
+    definition = get_currency_by_alphabetic_code(currency)
+    symbol = str((definition or {}).get("symbol") or "").strip()
     prefixes = [currency]
-    if currency == "USD":
-        prefixes = ["$ USD", "$USD", "$", currency]
+    if symbol:
+        prefixes = [f"{symbol} {currency}", f"{symbol}{currency}", symbol, currency]
     for prefix in prefixes:
         if amount.upper().startswith(prefix.upper()):
             return amount[len(prefix):].strip()
@@ -1612,10 +1616,14 @@ def normalize_recipe_menu_price_payload(recipe_data, payload):
     if not any(field in payload for field in ("menu_price", *RESTAURANT_MENU_PRICE_FIELDS)):
         return payload
 
-    currency = clean_menu_price_currency(
+    raw_price = payload.get("menu_price") if "menu_price" in payload else recipe_data.get("menu_price")
+    currency_source = (
         payload.get("menu_price_currency")
         if "menu_price_currency" in payload
         else recipe_data.get("menu_price_currency")
+    )
+    currency = clean_menu_price_currency(
+        currency_source or infer_currency_code_from_price(raw_price)
     )
     if "menu_price_amount" in payload:
         amount = clean_menu_price_amount(payload.get("menu_price_amount"), currency)
@@ -4323,12 +4331,15 @@ def editable_recipe_menu_metadata(recipe_data):
         item.get("menu_price"),
         snapshot_item_fields.get("menu_price"),
     )
-    menu_price_currency = clean_menu_price_currency(first_recipe_menu_text(
+    raw_menu_price_currency = first_recipe_menu_text(
         recipe_data.get("menu_price_currency"),
         metadata.get("menu_price_currency"),
         item.get("menu_price_currency"),
         snapshot_item_fields.get("menu_price_currency"),
-    ))
+    )
+    menu_price_currency = clean_menu_price_currency(
+        raw_menu_price_currency or infer_currency_code_from_price(raw_menu_price)
+    )
     explicit_menu_price_amount = first_recipe_menu_text(
         recipe_data.get("menu_price_amount"),
         metadata.get("menu_price_amount"),

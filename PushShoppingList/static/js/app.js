@@ -23424,20 +23424,34 @@ const RECIPE_EDIT_MENU_METADATA_INPUT_IDS = {
     menu_description: "recipeEditMenuDescription",
 };
 const DEFAULT_RECIPE_EDIT_MENU_PRICE_CURRENCY = "USD";
-const RECIPE_EDIT_MENU_PRICE_CURRENCIES = [
-    { code: "USD", symbol: "$", name: "US Dollar" },
-    { code: "EUR", symbol: "€", name: "Euro" },
-    { code: "GBP", symbol: "£", name: "British Pound" },
-    { code: "INR", symbol: "₹", name: "Indian Rupee" },
-    { code: "JPY", symbol: "¥", name: "Japanese Yen" },
-    { code: "KRW", symbol: "₩", name: "South Korean Won" },
-    { code: "CAD", symbol: "C$", name: "Canadian Dollar" },
-    { code: "AUD", symbol: "A$", name: "Australian Dollar" },
-    { code: "NZD", symbol: "NZ$", name: "New Zealand Dollar" },
-    { code: "CHF", symbol: "CHF", name: "Swiss Franc" },
-    { code: "VND", symbol: "₫", name: "Vietnamese Dong" },
-    { code: "LAK", symbol: "₭", name: "Lao Kip" },
-];
+const RECIPE_EDIT_CURRENCY_CATALOG = globalThis.RecipeCurrencyCatalog || (() => {
+    const usd = Object.freeze({
+        code: "USD",
+        numericCode: "840",
+        name: "US Dollar",
+        symbol: "$",
+        minorUnit: 2,
+        classification: "Currency",
+        territories: Object.freeze(["UNITED STATES OF AMERICA (THE)"]),
+    });
+    return Object.freeze({
+        currencies: Object.freeze([usd]),
+        spendableCurrencies: Object.freeze([usd]),
+        getCurrencyByNumericCode: () => null,
+        getCurrencyByAlphabeticCode: input => (
+            String(input || "").trim().toUpperCase() === "USD" ? usd : null
+        ),
+        getCurrenciesBySymbol: input => (String(input || "").trim() === "$" ? [usd] : []),
+        isCurrencySymbolShared: () => false,
+        searchCurrencies: () => [usd],
+    });
+})();
+const RECIPE_EDIT_MENU_PRICE_CURRENCIES = RECIPE_EDIT_CURRENCY_CATALOG.spendableCurrencies;
+const RECIPE_EDIT_MENU_PRICE_SYMBOLS = Object.freeze(
+    Array.from(new Set(RECIPE_EDIT_MENU_PRICE_CURRENCIES.map(currency => currency.symbol)))
+        .filter(Boolean)
+        .sort((left, right) => right.length - left.length),
+);
 const RECIPE_EDIT_MENU_RELATION_INPUT_IDS = {
     restaurant_id: "recipeEditRestaurantId",
     menu_id: "recipeEditMenuId",
@@ -24997,22 +25011,44 @@ function recipeMenuMetadataText(value) {
 }
 
 function normalizeRecipeMenuPriceCurrency(value) {
-    const currency = recipeMenuMetadataText(value).toUpperCase();
-    return /^[A-Z]{3}$/.test(currency) ? currency : DEFAULT_RECIPE_EDIT_MENU_PRICE_CURRENCY;
+    const identity = recipeMenuMetadataText(value);
+    const numericMatch = RECIPE_EDIT_CURRENCY_CATALOG.getCurrencyByNumericCode(identity);
+    if (numericMatch) return numericMatch.code;
+
+    const currency = identity.toUpperCase();
+    if (/^[A-Z]{3}$/.test(currency)) return currency;
+
+    const symbolMatches = RECIPE_EDIT_CURRENCY_CATALOG.getCurrenciesBySymbol(identity);
+    if (symbolMatches.length === 1) return symbolMatches[0].code;
+    if (identity === "$") return DEFAULT_RECIPE_EDIT_MENU_PRICE_CURRENCY;
+    return DEFAULT_RECIPE_EDIT_MENU_PRICE_CURRENCY;
 }
 
 function recipeMenuPriceCurrencyDefinition(value) {
     const code = normalizeRecipeMenuPriceCurrency(value);
-    return RECIPE_EDIT_MENU_PRICE_CURRENCIES.find(currency => currency.code === code) || {
+    return RECIPE_EDIT_CURRENCY_CATALOG.getCurrencyByAlphabeticCode(code) || {
         code,
+        numericCode: "",
         symbol: "¤",
         name: "Other currency",
+        minorUnit: null,
+        classification: "Legacy",
+        territories: [],
     };
 }
 
 function recipeMenuPriceCurrencyShortLabel(value) {
     const currency = recipeMenuPriceCurrencyDefinition(value);
     return `${currency.symbol} ${currency.code}`;
+}
+
+function recipeMenuPriceCurrencyFromLegacyValue(value) {
+    const legacyValue = recipeMenuMetadataText(value);
+    if (!legacyValue) return "";
+    const alphabeticMatch = legacyValue.match(/^([A-Za-z]{3})(?:\s|(?=\d))/);
+    if (alphabeticMatch) return normalizeRecipeMenuPriceCurrency(alphabeticMatch[1]);
+    const symbol = RECIPE_EDIT_MENU_PRICE_SYMBOLS.find(candidate => legacyValue.startsWith(candidate));
+    return symbol ? normalizeRecipeMenuPriceCurrency(symbol) : "";
 }
 
 function recipeMenuPriceAmountValue(value, currency = DEFAULT_RECIPE_EDIT_MENU_PRICE_CURRENCY) {
@@ -26623,10 +26659,37 @@ function createRecipeEditCurrencyControl() {
     menu.id = "recipeEditMenuPriceCurrencyMenu";
     menu.className = "recipe-edit-price-currency-menu";
     menu.dataset.recipeEditCurrencyMenu = "";
-    menu.setAttribute("role", "listbox");
-    menu.setAttribute("aria-label", "Menu price currency options");
     menu.hidden = true;
 
+    const searchLabel = document.createElement("label");
+    searchLabel.className = "recipe-edit-price-currency-search-label";
+    searchLabel.htmlFor = "recipeEditMenuPriceCurrencySearch";
+    searchLabel.textContent = "Search currencies";
+    const search = document.createElement("input");
+    search.type = "search";
+    search.id = "recipeEditMenuPriceCurrencySearch";
+    search.className = "recipe-edit-price-currency-search";
+    search.dataset.recipeEditCurrencySearch = "";
+    search.placeholder = "Search currency, code, country…";
+    search.autocomplete = "off";
+    search.spellcheck = false;
+    search.setAttribute("aria-controls", "recipeEditMenuPriceCurrencyOptions");
+
+    const listbox = document.createElement("div");
+    listbox.id = "recipeEditMenuPriceCurrencyOptions";
+    listbox.className = "recipe-edit-price-currency-options";
+    listbox.dataset.recipeEditCurrencyOptions = "";
+    listbox.setAttribute("role", "listbox");
+    listbox.setAttribute("aria-label", "Menu price currency options");
+
+    const empty = document.createElement("div");
+    empty.className = "recipe-edit-price-currency-empty";
+    empty.dataset.recipeEditCurrencyEmpty = "";
+    empty.setAttribute("role", "status");
+    empty.textContent = "No currencies found";
+    empty.hidden = true;
+
+    menu.append(searchLabel, search, listbox, empty);
     control.append(valueInput, trigger, menu);
     return control;
 }
@@ -26652,6 +26715,7 @@ function renderRecipeEditCurrencyOptions(listbox, selectedCurrency) {
         option.dataset.currencyCode = currency.code;
         option.setAttribute("role", "option");
         option.setAttribute("aria-selected", "false");
+        option.setAttribute("aria-label", `${currency.symbol} ${currency.code} — ${currency.name}`);
         option.tabIndex = -1;
 
         const identity = document.createElement("span");
@@ -26666,7 +26730,7 @@ function renderRecipeEditCurrencyOptions(listbox, selectedCurrency) {
 
         const name = document.createElement("span");
         name.className = "recipe-edit-price-currency-option-name";
-        name.textContent = currency.name;
+        name.textContent = `— ${currency.name}`;
         const selected = document.createElement("span");
         selected.className = "recipe-edit-price-currency-option-check";
         selected.setAttribute("aria-hidden", "true");
@@ -26679,19 +26743,45 @@ function renderRecipeEditCurrencyOptions(listbox, selectedCurrency) {
     listbox.dataset.currencyOptionSignature = signature;
 }
 
+function visibleRecipeEditCurrencyOptions(parts) {
+    return Array.from(parts.listbox.querySelectorAll("[role='option']"))
+        .filter(option => !option.hidden);
+}
+
+function filterRecipeEditCurrencyOptions(parts, query) {
+    if (!parts) return [];
+    const matchingCodes = new Set(
+        RECIPE_EDIT_CURRENCY_CATALOG.searchCurrencies(query).map(currency => currency.code),
+    );
+    const normalizedQuery = recipeMenuMetadataText(query).toLocaleLowerCase();
+    Array.from(parts.listbox.querySelectorAll("[role='option']")).forEach(option => {
+        const isLegacyMatch = !matchingCodes.has(option.dataset.currencyCode)
+            && option.getAttribute("aria-label")?.toLocaleLowerCase().includes(normalizedQuery);
+        option.hidden = Boolean(normalizedQuery) && !matchingCodes.has(option.dataset.currencyCode) && !isLegacyMatch;
+    });
+    const visibleOptions = visibleRecipeEditCurrencyOptions(parts);
+    if (parts.empty) parts.empty.hidden = visibleOptions.length > 0;
+    return visibleOptions;
+}
+
 function recipeEditCurrencyControlParts(valueInput = document.getElementById("recipeEditMenuPriceCurrency")) {
     const control = valueInput?.closest?.("[data-recipe-edit-currency-select]");
     if (!control) return null;
     const trigger = control.querySelector("[data-recipe-edit-currency-trigger]");
-    const listbox = control.querySelector("[data-recipe-edit-currency-menu]");
-    if (!trigger || !listbox) return null;
-    return { control, valueInput, trigger, listbox };
+    const menu = control.querySelector("[data-recipe-edit-currency-menu]");
+    const search = control.querySelector("[data-recipe-edit-currency-search]");
+    const listbox = control.querySelector("[data-recipe-edit-currency-options]");
+    const empty = control.querySelector("[data-recipe-edit-currency-empty]");
+    if (!trigger || !menu || !search || !listbox) return null;
+    return { control, valueInput, trigger, menu, search, listbox, empty };
 }
 
 function closeRecipeEditCurrencyMenu(parts, options = {}) {
     if (!parts) return;
-    parts.listbox.hidden = true;
+    parts.menu.hidden = true;
     parts.trigger.setAttribute("aria-expanded", "false");
+    parts.search.value = "";
+    filterRecipeEditCurrencyOptions(parts, "");
     if (options.focusTrigger === true) {
         parts.trigger.focus({ preventScroll: true });
     }
@@ -26699,13 +26789,18 @@ function closeRecipeEditCurrencyMenu(parts, options = {}) {
 
 function openRecipeEditCurrencyMenu(parts, options = {}) {
     if (!parts) return;
-    parts.listbox.hidden = false;
+    parts.menu.hidden = false;
     parts.trigger.setAttribute("aria-expanded", "true");
-    const currencyOptions = Array.from(parts.listbox.querySelectorAll("[role='option']"));
+    const currencyOptions = filterRecipeEditCurrencyOptions(parts, parts.search.value);
     let target = currencyOptions.find(option => option.getAttribute("aria-selected") === "true");
     if (options.edge === "last") target = currencyOptions[currencyOptions.length - 1];
     if (options.edge === "first") target = currencyOptions[0];
-    target?.focus({ preventScroll: true });
+    if (options.edge) {
+        target?.focus({ preventScroll: true });
+    } else {
+        parts.search.focus({ preventScroll: true });
+        parts.search.select?.();
+    }
 }
 
 function syncRecipeEditCurrencyControl(valueInput, currency) {
@@ -26721,7 +26816,7 @@ function syncRecipeEditCurrencyControl(valueInput, currency) {
     if (symbol) symbol.textContent = definition.symbol;
     if (code) {
         code.textContent = definition.code;
-        code.hidden = true;
+        code.hidden = !RECIPE_EDIT_CURRENCY_CATALOG.isCurrencySymbolShared(definition);
     }
     parts.trigger.setAttribute(
         "aria-label",
@@ -26745,7 +26840,7 @@ function selectRecipeEditCurrency(parts, currency, options = {}) {
 }
 
 function moveRecipeEditCurrencyOptionFocus(parts, currentOption, offset) {
-    const options = Array.from(parts.listbox.querySelectorAll("[role='option']"));
+    const options = visibleRecipeEditCurrencyOptions(parts);
     if (!options.length) return;
     const currentIndex = Math.max(0, options.indexOf(currentOption));
     const nextIndex = (currentIndex + offset + options.length) % options.length;
@@ -26766,7 +26861,7 @@ function bindRecipeEditCurrencyControl(parts) {
     parts.trigger.addEventListener("keydown", event => {
         if (event.key === "ArrowDown" || event.key === "ArrowUp") {
             event.preventDefault();
-            openRecipeEditCurrencyMenu(parts, { edge: event.key === "ArrowUp" ? "last" : undefined });
+            openRecipeEditCurrencyMenu(parts, { edge: event.key === "ArrowUp" ? "last" : "first" });
         } else if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
             if (parts.trigger.getAttribute("aria-expanded") === "true") {
@@ -26775,6 +26870,27 @@ function bindRecipeEditCurrencyControl(parts) {
                 openRecipeEditCurrencyMenu(parts);
             }
         } else if (event.key === "Escape") {
+            closeRecipeEditCurrencyMenu(parts);
+        }
+    });
+    parts.search.addEventListener("input", () => {
+        filterRecipeEditCurrencyOptions(parts, parts.search.value);
+    });
+    parts.search.addEventListener("keydown", event => {
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            const options = visibleRecipeEditCurrencyOptions(parts);
+            options[event.key === "ArrowDown" ? 0 : options.length - 1]?.focus({ preventScroll: true });
+        } else if (event.key === "Enter") {
+            const firstOption = visibleRecipeEditCurrencyOptions(parts)[0];
+            if (firstOption) {
+                event.preventDefault();
+                selectRecipeEditCurrency(parts, firstOption.dataset.currencyCode);
+            }
+        } else if (event.key === "Escape") {
+            event.preventDefault();
+            closeRecipeEditCurrencyMenu(parts, { focusTrigger: true });
+        } else if (event.key === "Tab") {
             closeRecipeEditCurrencyMenu(parts);
         }
     });
@@ -26790,7 +26906,7 @@ function bindRecipeEditCurrencyControl(parts) {
             moveRecipeEditCurrencyOptionFocus(parts, option, event.key === "ArrowDown" ? 1 : -1);
         } else if (event.key === "Home" || event.key === "End") {
             event.preventDefault();
-            const options = Array.from(parts.listbox.querySelectorAll("[role='option']"));
+            const options = visibleRecipeEditCurrencyOptions(parts);
             options[event.key === "Home" ? 0 : options.length - 1]?.focus({ preventScroll: true });
         } else if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
@@ -26798,6 +26914,10 @@ function bindRecipeEditCurrencyControl(parts) {
         } else if (event.key === "Escape") {
             event.preventDefault();
             closeRecipeEditCurrencyMenu(parts, { focusTrigger: true });
+        } else if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+            parts.search.focus({ preventScroll: true });
+            parts.search.value += event.key;
+            filterRecipeEditCurrencyOptions(parts, parts.search.value);
         } else if (event.key === "Tab") {
             closeRecipeEditCurrencyMenu(parts);
         }
@@ -26824,7 +26944,9 @@ function normalizeRecipeEditPriceDisplay(recipe = {}) {
     initializeRecipeEditCurrencyControl();
 
     const currency = normalizeRecipeMenuPriceCurrency(
-        recipe.menu_price_currency || currencyInput.value,
+        recipe.menu_price_currency
+            || recipeMenuPriceCurrencyFromLegacyValue(recipe.menu_price)
+            || currencyInput.value,
     );
     syncRecipeEditCurrencyControl(currencyInput, currency);
     const amountSource = Object.prototype.hasOwnProperty.call(recipe, "menu_price_amount")

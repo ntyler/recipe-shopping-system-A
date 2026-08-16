@@ -1,0 +1,180 @@
+ISO_4217_alpha,ISO_4217_numeric,currency_or_fund_name,display_symbol,symbol_guidance,minor_unit,classification,entities_or_territories
+AED,784,UAE Dirham,د.إ,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,UNITED ARAB EMIRATES (THE)
+AFN,971,Afghani,؋,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,AFGHANISTAN
+ALL,008,Lek,L,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,ALBANIA
+AMD,051,Armenian Dram,֏,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,ARMENIA
+AOA,973,Kwanza,Kz,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,ANGOLA
+ARS,032,Argentine Peso,$,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,ARGENTINA
+AUD,036,Australian Dollar,$,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,AUSTRALIA; CHRISTMAS ISLAND; COCOS (KEELING) ISLANDS (THE); HEARD ISLAND AND McDONALD ISLANDS; KIRIBATI; NAURU; NORFOLK ISLAND; TUVALU
+AWG,533,Aruban Florin,ƒ,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,ARUBA
+AZN,944,Azerbaijan Manat,₼,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,AZERBAIJAN
+BAM,977,Convertible Mark,KM,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,BOSNIA AND HERZEGOVINA
+BBD,052,Barbados Dollar,$,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,BARBADOS
+BDT,050,Taka,৳,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,BANGLADESH
+BHD,048,Bahraini Dinar,د.ب,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,3,Currency,BAHRAIN
+BIF,108,Burundi Franc,FBu,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,0,Currency,BURUNDI
+BMD,060,Bermudian Dollar,$,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,BERMUDA
+BND,096,Brunei Dollar,$,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,BRUNEI DARUSSALAM
+BOB,068,Boliviano,Bs,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,BOLIVIA (PLURINATIONAL STATE OF)
+BOV,984,Mvdol,Mvdol,"Market, fund, metal, or accounting-unit abbreviation; not a universal retail symbol.",2,Fund / indexed unit,BOLIVIA (PLURINATIONAL STATE OF)
+BRL,986,Brazilian Real,R$,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,BRAZIL
+BSD,044,Bahamian Dollar,$,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,BAHAMAS (THE)
+BTN,064,Ngultrum,Nu.,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,BHUTAN
+BWP,072,Pula,P,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,BOTSWANA
+BYN,933,Belarusian Ruble,Br,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,BELARUS
+BZD,084,Belize Dollar,$,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,BELIZE
+CAD,124,Canadian Dollar,$,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,CANADA
+CDF,976,Congolese Franc,FC,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,CONGO (THE DEMOCRATIC REPUBLIC OF THE)
+CHE,947,WIR Euro,WIR €,"Market, fund, metal, or accounting-unit abbreviation; not a universal retail symbol.",2,Complementary currency,SWITZERLAND
+CHF,756,Swiss Franc,CHF,No broadly established symbol; use the ISO code.,2,Currency,LIECHTENSTEIN; SWITZERLAND
+CHW,948,WIR Franc,WIR ₣,"Market, fund, metal, or accounting-unit abbreviation; not a universal retail symbol.",2,Complementary currency,SWITZERLAND
+CLF,990,Unidad de Fomento,UF,"Market, fund, metal, or accounting-unit abbreviation; not a universal retail symbol.",4,Indexed unit,CHILE
+CLP,152,Chilean Peso,$,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,0,Currency,CHILE
+CNY,156,Yuan Renminbi,¥,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,CHINA
+COP,170,Colombian Peso,$,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,COLOMBIA
+COU,970,Unidad de Valor Real,UVR,"Market, fund, metal, or accounting-unit abbreviation; not a universal retail symbol.",2,Indexed unit,COLOMBIA
+CRC,188,Costa Rican Colon,₡,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,COSTA RICA
+CUP,192,Cuban Peso,$,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,CUBA
+CVE,132,Cabo Verde Escudo,Esc,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,CABO VERDE
+CZK,203,Czech Koruna,Kč,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,CZECHIA
+DJF,262,Djibouti Franc,Fdj,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,0,Currency,DJIBOUTI
+DKK,208,Danish Krone,kr,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,DENMARK; FAROE ISLANDS (THE); GREENLAND
+DOP,214,Dominican Peso,$,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,DOMINICAN REPUBLIC (THE)
+DZD,012,Algerian Dinar,د.ج,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,ALGERIA
+EGP,818,Egyptian Pound,E£,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,EGYPT
+ERN,232,Nakfa,Nfk,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,ERITREA
+ETB,230,Ethiopian Birr,Br,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,ETHIOPIA
+EUR,978,Euro,€,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,ANDORRA; AUSTRIA; BELGIUM; BULGARIA; CROATIA; CYPRUS; ESTONIA; EUROPEAN UNION; FINLAND; FRANCE; FRENCH GUIANA; FRENCH SOUTHERN TERRITORIES (THE); GERMANY; GREECE; GUADELOUPE; HOLY SEE (THE); IRELAND; ITALY; LATVIA; LITHUANIA; LUXEMBOURG; MALTA; MARTINIQUE; MAYOTTE; MONACO; MONTENEGRO; NETHERLANDS (THE); PORTUGAL; RÉUNION; SAINT BARTHÉLEMY; SAINT MARTIN (FRENCH PART); SAINT PIERRE AND MIQUELON; SAN MARINO; SLOVAKIA; SLOVENIA; SPAIN; ÅLAND ISLANDS
+FJD,242,Fiji Dollar,$,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,FIJI
+FKP,238,Falkland Islands Pound,£,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,FALKLAND ISLANDS (THE) [MALVINAS]
+GBP,826,Pound Sterling,£,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,GUERNSEY; ISLE OF MAN; JERSEY; UNITED KINGDOM OF GREAT BRITAIN AND NORTHERN IRELAND (THE)
+GEL,981,Lari,₾,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,GEORGIA
+GHS,936,Ghana Cedi,GH₵,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,GHANA
+GIP,292,Gibraltar Pound,£,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,GIBRALTAR
+GMD,270,Dalasi,D,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,GAMBIA (THE)
+GNF,324,Guinean Franc,FG,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,0,Currency,GUINEA
+GTQ,320,Quetzal,Q,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,GUATEMALA
+GYD,328,Guyana Dollar,$,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,GUYANA
+HKD,344,Hong Kong Dollar,$,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,HONG KONG
+HNL,340,Lempira,L,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,HONDURAS
+HTG,332,Gourde,G,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,HAITI
+HUF,348,Forint,Ft,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,HUNGARY
+IDR,360,Rupiah,Rp,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,INDONESIA
+ILS,376,New Israeli Sheqel,₪,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,ISRAEL
+INR,356,Indian Rupee,₹,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,BHUTAN; INDIA
+IQD,368,Iraqi Dinar,ع.د,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,3,Currency,IRAQ
+IRR,364,Iranian Rial,﷼,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,IRAN (ISLAMIC REPUBLIC OF)
+ISK,352,Iceland Krona,kr,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,0,Currency,ICELAND
+JMD,388,Jamaican Dollar,$,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,JAMAICA
+JOD,400,Jordanian Dinar,د.ا,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,3,Currency,JORDAN
+JPY,392,Yen,¥,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,0,Currency,JAPAN
+KES,404,Kenyan Shilling,KSh,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,KENYA
+KGS,417,Som,⃀,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,KYRGYZSTAN
+KHR,116,Riel,៛,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,CAMBODIA
+KMF,174,Comorian Franc,CF,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,0,Currency,COMOROS (THE)
+KPW,408,North Korean Won,₩,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,KOREA (THE DEMOCRATIC PEOPLE’S REPUBLIC OF)
+KRW,410,Won,₩,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,0,Currency,KOREA (THE REPUBLIC OF)
+KWD,414,Kuwaiti Dinar,د.ك,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,3,Currency,KUWAIT
+KYD,136,Cayman Islands Dollar,$,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,CAYMAN ISLANDS (THE)
+KZT,398,Tenge,₸,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,KAZAKHSTAN
+LAK,418,Lao Kip,₭,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,LAO PEOPLE’S DEMOCRATIC REPUBLIC (THE)
+LBP,422,Lebanese Pound,L£,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,LEBANON
+LKR,144,Sri Lanka Rupee,Rs,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,SRI LANKA
+LRD,430,Liberian Dollar,$,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,LIBERIA
+LSL,426,Loti,L,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,LESOTHO
+LYD,434,Libyan Dinar,ل.د,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,3,Currency,LIBYA
+MAD,504,Moroccan Dirham,د.م.,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,MOROCCO; WESTERN SAHARA
+MDL,498,Moldovan Leu,L,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,MOLDOVA (THE REPUBLIC OF)
+MGA,969,Malagasy Ariary,Ar,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,MADAGASCAR
+MKD,807,Denar,ден,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,NORTH MACEDONIA
+MMK,104,Kyat,K,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,MYANMAR
+MNT,496,Tugrik,₮,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,MONGOLIA
+MOP,446,Pataca,MOP$,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,MACAO
+MRU,929,Ouguiya,UM,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,MAURITANIA
+MUR,480,Mauritius Rupee,Rs,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,MAURITIUS
+MVR,462,Rufiyaa,Rf,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,MALDIVES
+MWK,454,Malawi Kwacha,MK,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,MALAWI
+MXN,484,Mexican Peso,$,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,MEXICO
+MXV,979,Mexican Unidad de Inversion (UDI),UDI,"Market, fund, metal, or accounting-unit abbreviation; not a universal retail symbol.",2,Indexed unit,MEXICO
+MYR,458,Malaysian Ringgit,RM,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,MALAYSIA
+MZN,943,Mozambique Metical,MT,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,MOZAMBIQUE
+NAD,516,Namibia Dollar,$,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,NAMIBIA
+NGN,566,Naira,₦,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,NIGERIA
+NIO,558,Cordoba Oro,C$,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,NICARAGUA
+NOK,578,Norwegian Krone,kr,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,BOUVET ISLAND; NORWAY; SVALBARD AND JAN MAYEN
+NPR,524,Nepalese Rupee,Rs,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,NEPAL
+NZD,554,New Zealand Dollar,$,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,COOK ISLANDS (THE); NEW ZEALAND; NIUE; PITCAIRN; TOKELAU
+OMR,512,Rial Omani,ر.ع.,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,3,Currency,OMAN
+PAB,590,Balboa,B/.,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,PANAMA
+PEN,604,Sol,S/,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,PERU
+PGK,598,Kina,K,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,PAPUA NEW GUINEA
+PHP,608,Philippine Peso,₱,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,PHILIPPINES (THE)
+PKR,586,Pakistan Rupee,Rs,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,PAKISTAN
+PLN,985,Zloty,zł,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,POLAND
+PYG,600,Guarani,₲,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,0,Currency,PARAGUAY
+QAR,634,Qatari Rial,ر.ق,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,QATAR
+RON,946,Romanian Leu,lei,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,ROMANIA
+RSD,941,Serbian Dinar,дин.,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,SERBIA
+RUB,643,Russian Ruble,₽,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,RUSSIAN FEDERATION (THE)
+RWF,646,Rwanda Franc,RF,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,0,Currency,RWANDA
+SAR,682,Saudi Riyal,ر.س,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,SAUDI ARABIA
+SBD,090,Solomon Islands Dollar,$,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,SOLOMON ISLANDS
+SCR,690,Seychelles Rupee,₨,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,SEYCHELLES
+SDG,938,Sudanese Pound,ج.س,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,SUDAN (THE)
+SEK,752,Swedish Krona,kr,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,SWEDEN
+SGD,702,Singapore Dollar,$,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,SINGAPORE
+SHP,654,Saint Helena Pound,£,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,"SAINT HELENA, ASCENSION AND TRISTAN DA CUNHA"
+SLE,925,Leone,Le,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,SIERRA LEONE
+SOS,706,Somali Shilling,Sh,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,SOMALIA
+SRD,968,Surinam Dollar,$,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,SURINAME
+SSP,728,South Sudanese Pound,£,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,SOUTH SUDAN
+STN,930,Dobra,Db,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,SAO TOME AND PRINCIPE
+SVC,222,El Salvador Colon,₡,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,EL SALVADOR
+SYP,760,Syrian Pound,£,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,SYRIAN ARAB REPUBLIC
+SZL,748,Lilangeni,L,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,ESWATINI
+THB,764,Baht,฿,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,THAILAND
+TJS,972,Somoni,ЅМ,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,TAJIKISTAN
+TMT,934,Turkmenistan New Manat,m,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,TURKMENISTAN
+TND,788,Tunisian Dinar,د.ت,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,3,Currency,TUNISIA
+TOP,776,Pa’anga,T$,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,TONGA
+TRY,949,Turkish Lira,₺,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,TÜRKİYE
+TTD,780,Trinidad and Tobago Dollar,$,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,TRINIDAD AND TOBAGO
+TWD,901,New Taiwan Dollar,$,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,TAIWAN (PROVINCE OF CHINA)
+TZS,834,Tanzanian Shilling,TSh,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,"TANZANIA, UNITED REPUBLIC OF"
+UAH,980,Hryvnia,₴,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,UKRAINE
+UGX,800,Uganda Shilling,USh,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,0,Currency,UGANDA
+USD,840,US Dollar,$,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,"AMERICAN SAMOA; BONAIRE, SINT EUSTATIUS AND SABA; BRITISH INDIAN OCEAN TERRITORY (THE); ECUADOR; EL SALVADOR; GUAM; HAITI; MARSHALL ISLANDS (THE); MICRONESIA (FEDERATED STATES OF); NORTHERN MARIANA ISLANDS (THE); PALAU; PANAMA; PUERTO RICO; TIMOR-LESTE; TURKS AND CAICOS ISLANDS (THE); UNITED STATES MINOR OUTLYING ISLANDS (THE); UNITED STATES OF AMERICA (THE); VIRGIN ISLANDS (BRITISH); VIRGIN ISLANDS (U.S.)"
+USN,997,US Dollar (Next day),USN,"Market, fund, metal, or accounting-unit abbreviation; not a universal retail symbol.",2,Fund code,UNITED STATES OF AMERICA (THE)
+UYI,940,Uruguay Peso en Unidades Indexadas (UI),UI,"Market, fund, metal, or accounting-unit abbreviation; not a universal retail symbol.",0,Indexed unit,URUGUAY
+UYU,858,Peso Uruguayo,$,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,URUGUAY
+UYW,927,Unidad Previsional,UP,"Market, fund, metal, or accounting-unit abbreviation; not a universal retail symbol.",4,Indexed unit,URUGUAY
+UZS,860,Uzbekistan Sum,soʻm,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,UZBEKISTAN
+VED,926,Bolívar Soberano,Bs.,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,VENEZUELA (BOLIVARIAN REPUBLIC OF)
+VES,928,Bolívar Soberano,Bs.,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,VENEZUELA (BOLIVARIAN REPUBLIC OF)
+VND,704,Dong,₫,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,0,Currency,VIET NAM
+VUV,548,Vatu,VT,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,0,Currency,VANUATU
+WST,882,Tala,WS$,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,SAMOA
+XAD,396,Arab Accounting Dinar,XAD,"Market, fund, metal, or accounting-unit abbreviation; not a universal retail symbol.",2,Accounting unit,ARAB MONETARY FUND
+XAF,950,CFA Franc BEAC,FCFA,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,0,Currency,CAMEROON; CENTRAL AFRICAN REPUBLIC (THE); CHAD; CONGO (THE); EQUATORIAL GUINEA; GABON
+XAG,961,Silver,Ag,"Market, fund, metal, or accounting-unit abbreviation; not a universal retail symbol.",N.A.,Precious metal,ZZ11_Silver
+XAU,959,Gold,Au,"Market, fund, metal, or accounting-unit abbreviation; not a universal retail symbol.",N.A.,Precious metal,ZZ08_Gold
+XBA,955,Bond Markets Unit European Composite Unit (EURCO),XBA,"Market, fund, metal, or accounting-unit abbreviation; not a universal retail symbol.",N.A.,Bond-market unit,ZZ01_Bond Markets Unit European_EURCO
+XBB,956,Bond Markets Unit European Monetary Unit (E.M.U.-6),XBB,"Market, fund, metal, or accounting-unit abbreviation; not a universal retail symbol.",N.A.,Bond-market unit,ZZ02_Bond Markets Unit European_EMU-6
+XBC,957,Bond Markets Unit European Unit of Account 9 (E.U.A.-9),XBC,"Market, fund, metal, or accounting-unit abbreviation; not a universal retail symbol.",N.A.,Bond-market unit,ZZ03_Bond Markets Unit European_EUA-9
+XBD,958,Bond Markets Unit European Unit of Account 17 (E.U.A.-17),XBD,"Market, fund, metal, or accounting-unit abbreviation; not a universal retail symbol.",N.A.,Bond-market unit,ZZ04_Bond Markets Unit European_EUA-17
+XCD,951,East Caribbean Dollar,$,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,ANGUILLA; ANTIGUA AND BARBUDA; DOMINICA; GRENADA; MONTSERRAT; SAINT KITTS AND NEVIS; SAINT LUCIA; SAINT VINCENT AND THE GRENADINES
+XCG,532,Caribbean Guilder,Cg,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,CURAÇAO; SINT MAARTEN (DUTCH PART)
+XDR,960,SDR (Special Drawing Right),SDR,"Market, fund, metal, or accounting-unit abbreviation; not a universal retail symbol.",N.A.,International reserve asset,INTERNATIONAL MONETARY FUND (IMF)
+XOF,952,CFA Franc BCEAO,F CFA,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,0,Currency,BENIN; BURKINA FASO; CÔTE D'IVOIRE; GUINEA-BISSAU; MALI; NIGER (THE); SENEGAL; TOGO
+XPD,964,Palladium,Pd,"Market, fund, metal, or accounting-unit abbreviation; not a universal retail symbol.",N.A.,Precious metal,ZZ09_Palladium
+XPF,953,CFP Franc,CFPF,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,0,Currency,FRENCH POLYNESIA; NEW CALEDONIA; WALLIS AND FUTUNA
+XPT,962,Platinum,Pt,"Market, fund, metal, or accounting-unit abbreviation; not a universal retail symbol.",N.A.,Precious metal,ZZ10_Platinum
+XSU,994,Sucre,XSU,"Market, fund, metal, or accounting-unit abbreviation; not a universal retail symbol.",N.A.,Regional payment unit,"SISTEMA UNITARIO DE COMPENSACION REGIONAL DE PAGOS ""SUCRE"""
+XTS,963,Codes specifically reserved for testing purposes,XTS,Not a spendable currency; use the ISO code.,N.A.,Testing code,ZZ06_Testing_Code
+XUA,965,ADB Unit of Account,XUA,"Market, fund, metal, or accounting-unit abbreviation; not a universal retail symbol.",N.A.,Accounting unit,MEMBER COUNTRIES OF THE AFRICAN DEVELOPMENT BANK GROUP
+XXX,999,The codes assigned for transactions where no currency is involved,XXX,Not a spendable currency; use the ISO code.,N.A.,No-currency code,ZZ07_No_Currency
+YER,886,Yemeni Rial,﷼,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,YEMEN
+ZAR,710,Rand,R,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,LESOTHO; NAMIBIA; SOUTH AFRICA
+ZMW,967,Zambian Kwacha,ZK,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,ZAMBIA
+ZWG,924,Zimbabwe Gold,ZiG,Conventional display symbol or local abbreviation; pair it with the ISO code when ambiguity matters.,2,Currency,ZIMBABWE
+

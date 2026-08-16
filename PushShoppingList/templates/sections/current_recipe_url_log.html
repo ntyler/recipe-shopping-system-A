@@ -1418,15 +1418,32 @@
                                             <span class="recipe-edit-price-currency-symbol"
                                                   data-recipe-edit-currency-symbol>$</span>
                                             <span class="recipe-edit-price-currency-code"
-                                                  data-recipe-edit-currency-code
-                                                  hidden>USD</span>
+                                                  data-recipe-edit-currency-code>USD</span>
                                         </button>
                                         <div id="recipeEditMenuPriceCurrencyMenu"
                                              class="recipe-edit-price-currency-menu"
                                              data-recipe-edit-currency-menu
-                                             role="listbox"
-                                             aria-label="Menu price currency options"
-                                             hidden></div>
+                                             hidden>
+                                            <label class="recipe-edit-price-currency-search-label"
+                                                   for="recipeEditMenuPriceCurrencySearch">Search currencies</label>
+                                            <input type="search"
+                                                   id="recipeEditMenuPriceCurrencySearch"
+                                                   class="recipe-edit-price-currency-search"
+                                                   data-recipe-edit-currency-search
+                                                   placeholder="Search currency, code, country…"
+                                                   autocomplete="off"
+                                                   spellcheck="false"
+                                                   aria-controls="recipeEditMenuPriceCurrencyOptions">
+                                            <div id="recipeEditMenuPriceCurrencyOptions"
+                                                 class="recipe-edit-price-currency-options"
+                                                 data-recipe-edit-currency-options
+                                                 role="listbox"
+                                                 aria-label="Menu price currency options"></div>
+                                            <div class="recipe-edit-price-currency-empty"
+                                                 data-recipe-edit-currency-empty
+                                                 role="status"
+                                                 hidden>No currencies found</div>
+                                        </div>
                                     </span>
                                     <input type="text"
                                            id="recipeEditMenuPrice"

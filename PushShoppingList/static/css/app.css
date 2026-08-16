@@ -40115,6 +40115,7 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    gap: 4px;
     flex: 0 0 auto;
     width: auto;
     min-width: 38px;
@@ -40139,6 +40140,12 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
 }
 
 .recipe-edit-standalone-page .recipe-edit-price-currency-code {
+    color: var(--app-muted);
+    font-size: 10px;
+    letter-spacing: .04em;
+}
+
+.recipe-edit-standalone-page .recipe-edit-price-currency-code[hidden] {
     display: none;
 }
 
@@ -40152,12 +40159,14 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
     z-index: 1200;
     top: calc(100% + 5px);
     right: 0;
-    width: min(282px, calc(100vw - 32px));
-    min-width: min(282px, calc(100vw - 32px));
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    width: min(360px, calc(100vw - 32px));
+    min-width: min(320px, calc(100vw - 32px));
     max-width: calc(100vw - 32px);
     max-height: min(340px, 62vh);
     padding: 5px;
-    overflow-y: auto;
+    overflow: hidden;
     border: 1px solid color-mix(in srgb, var(--app-primary-hover) 30%, var(--app-border-strong));
     border-radius: 9px;
     background: color-mix(in srgb, var(--app-bg) 94%, #07110c);
@@ -40166,6 +40175,58 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
 }
 
 .recipe-edit-standalone-page .recipe-edit-price-currency-menu[hidden] {
+    display: none;
+}
+
+.recipe-edit-standalone-page .recipe-edit-price-currency-search-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.recipe-edit-standalone-page .recipe-edit-price-currency-search {
+    width: 100%;
+    min-height: 34px;
+    margin: 0 0 5px;
+    padding: 6px 9px;
+    border: 1px solid var(--app-border-strong);
+    border-radius: 6px;
+    outline: 0;
+    background: var(--app-surface-soft);
+    color: var(--app-text);
+    font: inherit;
+    font-size: 12px;
+}
+
+.recipe-edit-standalone-page .recipe-edit-price-currency-search:focus-visible {
+    border-color: color-mix(in srgb, var(--app-primary-hover) 60%, var(--app-border-strong));
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-primary-hover) 18%, transparent);
+}
+
+.recipe-edit-standalone-page .recipe-edit-price-currency-search::placeholder {
+    color: var(--app-muted);
+}
+
+.recipe-edit-standalone-page .recipe-edit-price-currency-options {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+}
+
+.recipe-edit-standalone-page .recipe-edit-price-currency-empty {
+    padding: 16px 9px;
+    color: var(--app-muted);
+    font-size: 12px;
+    text-align: center;
+}
+
+.recipe-edit-standalone-page .recipe-edit-price-currency-empty[hidden] {
     display: none;
 }
 
@@ -40181,6 +40242,10 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
     background: transparent;
     color: var(--app-text);
     cursor: pointer;
+}
+
+.recipe-edit-standalone-page .recipe-edit-price-currency-option[hidden] {
+    display: none;
 }
 
 .recipe-edit-standalone-page .recipe-edit-price-currency-option:is(:hover, :focus-visible) {
