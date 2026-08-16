@@ -40115,7 +40115,7 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
     justify-content: flex-start;
     gap: 4px;
     width: auto;
-    min-width: 78px;
+    min-width: 54px;
     height: 34px;
     min-height: 34px;
     padding: 0 7px 0 8px;
@@ -40131,12 +40131,12 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
 }
 
 .recipe-edit-standalone-page .recipe-edit-price-currency-symbol {
-    min-width: 1.1em;
+    min-width: 1.7em;
     text-align: right;
 }
 
 .recipe-edit-standalone-page .recipe-edit-price-currency-code {
-    letter-spacing: .03em;
+    display: none;
 }
 
 .recipe-edit-standalone-page .recipe-edit-price-currency-chevron {

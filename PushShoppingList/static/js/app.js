@@ -26616,6 +26616,7 @@ function createRecipeEditCurrencyControl() {
     const code = document.createElement("span");
     code.className = "recipe-edit-price-currency-code";
     code.dataset.recipeEditCurrencyCode = "";
+    code.hidden = true;
     const chevron = document.createElement("span");
     chevron.className = "recipe-edit-price-currency-chevron";
     chevron.setAttribute("aria-hidden", "true");
@@ -26722,7 +26723,10 @@ function syncRecipeEditCurrencyControl(valueInput, currency) {
     const symbol = parts.trigger.querySelector("[data-recipe-edit-currency-symbol]");
     const code = parts.trigger.querySelector("[data-recipe-edit-currency-code]");
     if (symbol) symbol.textContent = definition.symbol;
-    if (code) code.textContent = definition.code;
+    if (code) {
+        code.textContent = definition.code;
+        code.hidden = true;
+    }
     parts.trigger.setAttribute(
         "aria-label",
         `Menu price currency, ${recipeMenuPriceCurrencyShortLabel(normalizedCurrency)}, ${definition.name}`,

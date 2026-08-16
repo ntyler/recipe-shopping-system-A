@@ -273,7 +273,8 @@ def test_recipe_editor_currency_catalog_and_dark_accessible_menu_are_config_driv
     assert 'data-recipe-edit-currency-trigger' in template
     assert 'aria-label="Menu price currency, $ USD, US Dollar"' in template
     assert 'data-recipe-edit-currency-symbol>$</span>' in template
-    assert 'data-recipe-edit-currency-code>USD</span>' in template
+    assert 'data-recipe-edit-currency-code\n                                                  hidden>USD</span>' in template
+    assert 'code.hidden = true' in script
     assert 'role="listbox"' in template
     assert 'option.setAttribute("aria-selected", "false")' in script
     assert 'option.setAttribute("aria-selected", selected ? "true" : "false")' in script
@@ -326,7 +327,8 @@ normalizeRecipeEditPriceDisplay({{ menu_price: "$5.99" }});
 const defaultState = {{
     amount: amountInput.value,
     currency: currencyInput.value,
-    label: recipeMenuPriceCurrencyShortLabel(currencyInput.value),
+    visibleLabel: "$",
+    accessibleLabel: recipeMenuPriceCurrencyShortLabel(currencyInput.value),
 }};
 
 const symbolNode = {{ textContent: "" }};
@@ -365,7 +367,8 @@ const parts = {{ control, valueInput: currencyInput, trigger, listbox }};
 selectRecipeEditCurrency(parts, "EUR", {{ dispatchChange: false }});
 const selectedState = {{
     currency: currencyInput.value,
-    label: `${{symbolNode.textContent}} ${{codeNode.textContent}}`,
+    visibleLabel: symbolNode.textContent,
+    accessibleLabel: `${{symbolNode.textContent}} ${{codeNode.textContent}}`,
     selected: optionNodes.find(option => option.dataset.currencyCode === "EUR").selected,
     expanded: trigger.attributes["aria-expanded"],
 }};
@@ -383,10 +386,16 @@ process.stdout.write(JSON.stringify({{ defaultState, selectedState, payload }}))
     )
     result = json.loads(completed.stdout)
 
-    assert result["defaultState"] == {"amount": "5.99", "currency": "USD", "label": "$ USD"}
+    assert result["defaultState"] == {
+        "amount": "5.99",
+        "currency": "USD",
+        "visibleLabel": "$",
+        "accessibleLabel": "$ USD",
+    }
     assert result["selectedState"] == {
         "currency": "EUR",
-        "label": "€ EUR",
+        "visibleLabel": "€",
+        "accessibleLabel": "€ EUR",
         "selected": True,
         "expanded": "false",
     }
