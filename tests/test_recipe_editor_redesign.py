@@ -810,7 +810,7 @@ def test_recipe_detail_metadata_fields_are_transparent_with_accessible_active_st
     assert "background-color: color-mix" not in styles
 
 
-def test_recipe_metadata_strip_uses_spacing_without_internal_separators():
+def test_recipe_metadata_strip_uses_equal_responsive_columns_without_internal_separators():
     css = read_text("PushShoppingList/static/css/app.css")
     phase_two_start = css.index(
         "/* Phase 2 recipe editor redesign using the AI Pantry shell tokens. */"
@@ -823,11 +823,10 @@ def test_recipe_metadata_strip_uses_spacing_without_internal_separators():
     strip_rule = css[strip_start : css.index("}", strip_start)]
 
     for declaration in (
-        "display: flex;",
-        "flex-wrap: wrap;",
-        "align-items: flex-start;",
-        "column-gap: clamp(32px, 2.5vw, 48px);",
-        "row-gap: 12px;",
+        "display: grid;",
+        "grid-template-columns: repeat(4, minmax(0, 1fr));",
+        "align-items: stretch;",
+        "gap: 16px;",
         "border: 0;",
         "border-radius: 0;",
         "outline: 0;",
@@ -836,27 +835,26 @@ def test_recipe_metadata_strip_uses_spacing_without_internal_separators():
     ):
         assert declaration in strip_rule
 
-    assert "grid-template-columns" not in strip_rule
-
     metric_rule_start = css.index(
         f"{strip_selector[:-1]}> label,",
         strip_start,
     )
     metric_rule = css[metric_rule_start : css.index("}", metric_rule_start)]
-    assert "flex: 0 0 112px;" in metric_rule
-    assert "width: 112px;" in metric_rule
+    assert "width: 100%;" in metric_rule
+    assert "min-height: 84px;" in metric_rule
+    assert "justify-items: start;" in metric_rule
+    assert "text-align: left;" in metric_rule
     assert "border: 0;" in metric_rule
 
-    total_metric_selector = (
-        "body.recipe-edit-standalone-page .recipe-edit-info-panel-organized\n"
-        "    .recipe-edit-metadata-strip > .recipe-edit-total-time-field {"
-    )
-    total_metric_start = css.index(total_metric_selector, strip_start)
-    total_metric_rule = css[total_metric_start : css.index("}", total_metric_start)]
-    assert "flex-basis: 160px;" in total_metric_rule
-    assert "width: 160px;" in total_metric_rule
-    assert ".recipe-edit-total-time-field .recipe-edit-metadata-heading" in css
-    assert "gap: 3px;" in css[total_metric_start:]
+    medium_start = css.index("@media (max-width: 1099px)", strip_start)
+    medium_rule_start = css.index(strip_selector, medium_start)
+    medium_rule = css[medium_rule_start : css.index("}", medium_rule_start)]
+    assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in medium_rule
+
+    narrow_start = css.index("@media (max-width: 767px)", medium_rule_start)
+    narrow_rule_start = css.index(strip_selector, narrow_start)
+    narrow_rule = css[narrow_rule_start : css.index("}", narrow_rule_start)]
+    assert "grid-template-columns: minmax(0, 1fr);" in narrow_rule
 
     assert ".recipe-edit-metadata-strip::before" not in css
     assert ".recipe-edit-metadata-strip::after" not in css
@@ -869,6 +867,47 @@ def test_recipe_metadata_strip_uses_spacing_without_internal_separators():
     for _, declarations in metric_label_rules:
         for border_side in ("border-left", "border-right", "border-top", "border-bottom"):
             assert border_side not in declarations
+
+
+def test_recipe_metadata_controls_are_full_width_left_aligned_and_untruncated():
+    css = read_text("PushShoppingList/static/css/app.css")
+    phase_two_start = css.index(
+        "/* Phase 2 recipe editor redesign using the AI Pantry shell tokens. */"
+    )
+    styles = css[phase_two_start:]
+
+    value_start = styles.index(".recipe-edit-metadata-value {")
+    value_rule = styles[value_start:styles.index("}", value_start)]
+    assert "width: 100%;" in value_rule
+    assert "justify-content: flex-start;" in value_rule
+    assert "text-align: left;" in value_rule
+
+    control_start = styles.index(".recipe-edit-metadata-value :is(input, select) {")
+    control_rule = styles[control_start:styles.index("}", control_start)]
+    for declaration in (
+        "width: 100%;",
+        "max-width: none;",
+        "min-height: 36px;",
+        "text-align: left;",
+    ):
+        assert declaration in control_rule
+
+    input_start = styles.index(".recipe-edit-metadata-value input {")
+    input_rule = styles[input_start:styles.index("}", input_start)]
+    assert "width: 80px;" in input_rule
+    assert "max-width: 100%;" in input_rule
+    assert "flex: 0 1 80px;" in input_rule
+
+    category_marker = "/* Edit Recipe: inline category metadata and reusable custom-category tags. */"
+    category_styles = css[css.index(category_marker):]
+    select_start = category_styles.rindex(
+        ".recipe-edit-category-metadata-strip .recipe-edit-metadata-value select {"
+    )
+    select_rule = category_styles[select_start:category_styles.index("}", select_start)]
+    assert "overflow: visible;" in select_rule
+    assert "text-overflow: clip;" in select_rule
+    assert "white-space: normal;" in select_rule
+    assert "ellipsis" not in select_rule
 
 
 def test_recipe_time_breakdown_is_one_accessible_persisted_disclosure():
@@ -1167,9 +1206,9 @@ def test_recipe_category_fields_use_the_compact_metadata_visual_hierarchy():
         ".recipe-edit-category-metadata-strip .recipe-edit-metadata-value select {"
     )
     select_rule = category_styles[select_start:category_styles.index("}", select_start)]
-    assert "overflow: hidden;" in select_rule
-    assert "text-overflow: ellipsis;" in select_rule
-    assert "white-space: nowrap;" in select_rule
+    assert "overflow: visible;" in select_rule
+    assert "text-overflow: clip;" in select_rule
+    assert "white-space: normal;" in select_rule
 
     custom_start = category_styles.index(
         "> .recipe-edit-custom-categories-field {"
@@ -1188,21 +1227,14 @@ def test_mobile_recipe_category_fields_wrap_without_horizontal_overflow():
 
     row_start = mobile.index(".recipe-edit-category-metadata-strip {")
     row_rule = mobile[row_start:mobile.index("}", row_start)]
-    assert "column-gap: 16px;" in row_rule
-    assert "row-gap: 12px;" in row_rule
+    assert "gap: 16px;" in row_rule
 
     custom_start = mobile.index(".recipe-edit-custom-category-tag-row {")
     custom_rule = mobile[custom_start:mobile.index("}", custom_start)]
     assert "align-items: flex-start;" in custom_rule
     assert "padding-inline: 0;" in custom_rule
 
-    phone = category_styles[category_styles.index("@media (max-width: 380px)"):]
-    field_start = phone.index(
-        ".recipe-edit-category-metadata-strip > .recipe-edit-category-metadata-field {"
-    )
-    field_rule = phone[field_start:phone.index("}", field_start)]
-    assert "flex-basis: 100%;" in field_rule
-    assert "width: 100%;" in field_rule
+    assert "@media (max-width: 380px)" not in category_styles
 
 
 def test_recipe_image_has_explicit_mobile_view_below_rating_at_narrow_widths():

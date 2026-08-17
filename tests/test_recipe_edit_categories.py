@@ -135,10 +135,8 @@ def test_recipe_editor_includes_inline_category_controls_above_ingredients():
     assert "flex-wrap: wrap;" in category_css
     mobile_css = category_css[category_css.index("@media (max-width: 767px)"):]
     assert ".recipe-edit-category-metadata-strip" in mobile_css
-    assert "column-gap: 16px;" in mobile_css
-    phone_css = category_css[category_css.index("@media (max-width: 380px)"):]
-    assert "flex-basis: 100%;" in phone_css
-    assert "width: 100%;" in phone_css
+    assert "gap: 16px;" in mobile_css
+    assert "@media (max-width: 380px)" not in category_css
 
     assert 'cuisine_tags: recipeEditCuisineTagValues(),' in script
     assert '"cuisine_tags": split_recipe_menu_text_list(' in read_text(
