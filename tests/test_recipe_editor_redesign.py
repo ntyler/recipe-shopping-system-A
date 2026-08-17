@@ -2361,6 +2361,101 @@ def test_recipe_editor_redesign_css_uses_app_tokens_and_mobile_breakpoints():
     assert "@media (max-width: 767px)" in css
 
 
+def test_recipe_editor_uses_the_recipes_page_light_card_visual_system():
+    css = read_text("PushShoppingList/static/css/app.css")
+    v15_start = css.index("/* Recipe workspace v15: accepted two-column Edit Recipe mockup. */")
+    v16_start = css.index("/* Recipe workspace v16: native-zoom readability and container-aware context rail. */")
+    workspace = css[v15_start:v16_start]
+
+    theme_start = workspace.index(
+        "body.recipe-edit-standalone-page :is(\n"
+        "    .recipe-edit-standalone-shell,\n"
+        "    .recipe-edit-floating-menu,\n"
+        "    .recipe-edit-ingredient-action-tooltip"
+    )
+    theme_rule = workspace[theme_start:workspace.index("}", theme_start)]
+    for declaration in (
+        "--app-bg: #f8faf9;",
+        "--app-surface: #ffffff;",
+        "--app-text: #17233a;",
+        "--app-text-strong: #08162b;",
+        "--app-text-soft: #526176;",
+        "--app-muted: #66738a;",
+        "--app-primary: #07852f;",
+        "--recipe-editor-bg: #f8faf9;",
+        "--recipe-editor-surface: #ffffff;",
+        "--recipe-editor-border: #dfe6e2;",
+        "--recipe-editor-border-soft: #e8eeeb;",
+        "color-scheme: light;",
+    ):
+        assert declaration in theme_rule
+
+    for declaration in (
+        "--submenu-bg: #ffffff;",
+        "--submenu-border: #dfe6e2;",
+        "--submenu-divider: #e8eeeb;",
+        "--submenu-text: #17233a;",
+    ):
+        assert declaration in theme_rule
+
+    shell_start = workspace.index(
+        "body.recipe-edit-standalone-page .recipe-edit-standalone-shell {",
+        theme_start,
+    )
+    shell_rule = workspace[shell_start:workspace.index("}", shell_start)]
+    assert "background: var(--recipe-editor-bg);" in shell_rule
+    assert "color: var(--app-text);" in shell_rule
+
+    card_start = workspace.index(
+        "body.recipe-edit-standalone-page :is(\n"
+        "    .recipe-edit-info-panel,\n"
+        "    .recipe-edit-tabs-card,\n"
+        "    .recipe-edit-context-card,\n"
+        "    .recipe-edit-ai-assistant-card"
+    )
+    card_rule = workspace[card_start:workspace.index("}", card_start)]
+    for declaration in (
+        "border: 1px solid var(--recipe-editor-border);",
+        "border-radius: 12px;",
+        "background: var(--recipe-editor-surface);",
+        "color: var(--app-text);",
+        "box-shadow: 0 1px 2px rgba(16, 29, 49, .02);",
+    ):
+        assert declaration in card_rule
+    assert "linear-gradient" not in card_rule
+    assert "0 10px 30px" not in card_rule
+
+    categories_start = workspace.index(
+        "body.recipe-edit-standalone-page .recipe-edit-categories-panel {"
+    )
+    categories_rule = workspace[categories_start:workspace.index("}", categories_start)]
+    assert "background: var(--recipe-editor-surface);" in categories_rule
+    assert "box-shadow: 0 1px 2px rgba(16, 29, 49, .02);" in categories_rule
+
+    view_menu_start = workspace.index(
+        "body.recipe-edit-standalone-page .recipe-edit-ingredient-view-menu {"
+    )
+    view_menu_rule = workspace[view_menu_start:workspace.index("}", view_menu_start)]
+    assert "background: var(--recipe-editor-surface);" in view_menu_rule
+    assert "color: var(--app-text);" in view_menu_rule
+    assert "linear-gradient" not in view_menu_rule
+
+    assert (
+        "body.recipe-edit-standalone-page .recipe-edit-ingredient-action-tooltip {"
+        in workspace
+    )
+    assert (
+        "body.recipe-edit-standalone-page .recipe-edit-standalone-shell :is(\n"
+        "    input,\n"
+        "    select,\n"
+        "    textarea,\n"
+        "    button\n"
+        "):disabled {"
+        in workspace
+    )
+    assert "opacity: 1 !important;" in workspace
+
+
 def test_recipe_editor_is_readable_at_native_desktop_zoom():
     css = read_text("PushShoppingList/static/css/app.css")
     marker = "/* Recipe workspace v16: native-zoom readability and container-aware context rail. */"
