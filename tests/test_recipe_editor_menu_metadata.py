@@ -299,6 +299,13 @@ def test_recipe_editor_currency_catalog_and_dark_accessible_menu_are_config_driv
     assert ".recipe-edit-price-currency-search:focus-visible" in css
     assert ".recipe-edit-price-currency-options" in css
     assert "background: color-mix(in srgb, var(--app-bg) 94%, #07110c);" in css
+    currency_menu_start = css.index(
+        ".recipe-edit-standalone-page .recipe-edit-price-currency-menu {"
+    )
+    currency_menu_rule = css[currency_menu_start:css.index("}", currency_menu_start)]
+    assert "font-size: 14px;" in currency_menu_rule
+    assert "font-weight: 400;" in currency_menu_rule
+    assert "text-transform: none;" in currency_menu_rule
 
 
 def test_recipe_editor_price_control_defaults_to_usd_and_selects_non_usd_currency():

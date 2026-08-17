@@ -630,7 +630,7 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     assert "data-recipe-edit-cuisine-chips" in script
     assert "renderRecipeEditCuisineChips" in script
     assert "recipe-edit-price-control" in organizer
-    assert template.count('class="recipe-edit-price-control"') == 1
+    assert template.count('class="recipe-edit-price-control recipe-edit-cookbook-value"') == 1
     assert 'id="recipeEditMenuPriceCurrency"' in template
     assert 'id="recipeEditMenuPriceCurrencyTrigger"' in template
     assert 'aria-label="Menu price currency, $ USD, US Dollar"' in template
@@ -699,30 +699,35 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     assert "if (clear) clear.hidden = normalizedRating <= 0;" in script
     assert "border-color: transparent;" in hierarchy_css
     assert "background-color: transparent;" in hierarchy_css
-    assert ".recipe-edit-summary-selectors .recipe-edit-price-control" in hierarchy_css
-    assert ".recipe-edit-summary-selectors .recipe-edit-price-control:not(:focus-within):not(:has(" in hierarchy_css
+    assert ".recipe-edit-summary-selectors > .recipe-edit-cookbook-field > .recipe-edit-cookbook-value" in hierarchy_css
+    assert 'class="recipe-edit-file-field recipe-edit-cookbook-field"' in template
+    assert 'class="recipe-edit-cookbook-label">Menu Price</span>' in template
+    assert 'class="recipe-edit-price-control recipe-edit-cookbook-value"' in template
 
 
 def test_recipe_summary_selectors_share_accessible_state_feedback():
     css = read_text("PushShoppingList/static/css/app.css")
-    marker = "/* Borderless summary controls: preserve the control box while letting it merge with the dark panel. */"
+    marker = "/* Summary selector fields use the Cookbook field structure and state feedback. */"
     controls = css[css.index(marker):css.index(
         "body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-description-row {",
         css.index(marker),
     )]
 
-    for field_id in ("#recipeEditCookbookField", "#recipeEditCategoryMenuSectionField"):
-        assert field_id in controls
+    shared_value_selector = (
+        ".recipe-edit-summary-selectors > .recipe-edit-cookbook-field > "
+        ".recipe-edit-cookbook-value"
+    )
+    assert shared_value_selector in controls
     assert "> .recipe-edit-cookbook-value" in controls
     assert "> .recipe-edit-cookbook-value:focus-within" in controls
-    assert '> .recipe-edit-cookbook-value:has(> .recipe-edit-cookbook-select[aria-expanded="true"])' in controls
-    assert "> .recipe-edit-cookbook-select:disabled" in controls
-    assert ".recipe-edit-price-control:focus-within:not(:has(" in controls
-    assert ".recipe-edit-price-control:has(#recipeEditMenuPrice:disabled)" in controls
+    assert '.recipe-edit-cookbook-select[aria-expanded="true"]' in controls
+    assert '.recipe-edit-price-currency[aria-expanded="true"]' in controls
+    assert ".recipe-edit-cookbook-select:disabled" in controls
+    assert "#recipeEditMenuPrice:disabled" in controls
 
     for declaration in (
-        "border: 1px solid transparent;",
         "border-color: transparent;",
+        "background: var(--app-surface-soft);",
         "background: transparent;",
         "box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-primary-hover) 34%, transparent);",
     ):
@@ -732,24 +737,23 @@ def test_recipe_summary_selectors_share_accessible_state_feedback():
         "border-color: color-mix(in srgb, var(--app-primary-hover) 72%, var(--app-border-strong));",
         "box-shadow: 0 0 0 1px color-mix(in srgb, var(--app-primary-hover) 18%, transparent);",
     ):
-        assert controls.count(hover_declaration) == 2
+        assert controls.count(hover_declaration) == 1
 
-    price_rule_start = controls.index(
-        ".recipe-edit-summary-selectors .recipe-edit-price-control {"
-    )
-    price_rule = controls[price_rule_start:controls.index("}", price_rule_start)]
-    for preserved_dimension in ("height: 40px;", "min-height: 40px;"):
-        assert preserved_dimension in price_rule
-    assert "background: var(--recipe-editor-surface-soft);" in price_rule
+    cookbook_value_start = css.index(".recipe-edit-cookbook-value {")
+    cookbook_value_rule = css[cookbook_value_start:css.index("}", cookbook_value_start)]
+    for shared_declaration in (
+        "width: 100%;",
+        "min-height: 40px;",
+        "padding: 0;",
+        "border: 1px solid #263447;",
+        "border-radius: 7px;",
+    ):
+        assert shared_declaration in cookbook_value_rule
 
-    price_hover_rule_start = controls.index(
-        ".recipe-edit-summary-selectors .recipe-edit-price-control:hover:not(:focus-within):not(:has("
-    )
-    price_hover_rule = controls[
-        price_hover_rule_start:controls.index("}", price_hover_rule_start)
-    ]
-    assert "border-color: color-mix(in srgb, var(--app-primary-hover) 72%, var(--app-border-strong));" in price_hover_rule
-    assert "box-shadow: 0 0 0 1px color-mix(in srgb, var(--app-primary-hover) 18%, transparent);" in price_hover_rule
+    assert ".recipe-edit-price-control:hover:not(:focus-within)" not in controls
+    assert ".recipe-edit-price-control:focus-within:not(:has(" not in controls
+    assert ".recipe-edit-price-control:has(#recipeEditMenuPrice:disabled)" not in controls
+    assert ".recipe-edit-price-control:has(" in controls
 
 
 def test_recipe_metadata_strip_uses_spacing_without_internal_separators():
@@ -1021,7 +1025,7 @@ def test_recipe_editor_standard_fields_are_quiet_until_active():
     css = read_text("PushShoppingList/static/css/app.css")
     marker = "/* Recipe workspace: keep standard fields quiet until they are active or invalid. */"
     targeted_summary_marker = (
-        "/* Borderless summary controls: preserve the control box while letting it merge with the dark panel. */"
+        "/* Summary selector fields use the Cookbook field structure and state feedback. */"
     )
     quiet_fields = css[css.index(marker):css.index(targeted_summary_marker)]
 
@@ -1078,12 +1082,12 @@ def test_recipe_editor_standard_fields_are_quiet_until_active():
     assert "background-color: color-mix(in srgb, var(--app-danger, #ef4444) 9%, var(--app-bg));" in invalid_rule
     assert "box-shadow: 0 0 0 2px" in invalid_rule
     assert ".recipe-edit-cookbook-select" not in quiet_fields
-    assert ".recipe-edit-price-control:not(:focus-within):not(:has(" in quiet_fields
-    price_hover_start = quiet_fields.index(".recipe-edit-price-control:hover:not(:focus-within):not(:has(")
+    assert ".recipe-edit-price-control:not(.recipe-edit-cookbook-value):not(:focus-within):not(:has(" in quiet_fields
+    price_hover_start = quiet_fields.index(".recipe-edit-price-control:not(.recipe-edit-cookbook-value):hover:not(:focus-within):not(:has(")
     price_hover_rule = quiet_fields[price_hover_start:quiet_fields.index("}", price_hover_start)]
     assert "border-color: transparent;" in price_hover_rule
     assert "box-shadow: none;" in price_hover_rule
-    assert ".recipe-edit-price-control:focus-within" in quiet_fields
+    assert ".recipe-edit-price-control:not(.recipe-edit-cookbook-value):focus-within" in quiet_fields
     assert ".recipe-edit-price-control:has(" in quiet_fields
     assert "#recipeEditMenuPrice:is([aria-invalid=\"true\"], [data-recipe-edit-validation-invalid=\"true\"])" in quiet_fields
 
