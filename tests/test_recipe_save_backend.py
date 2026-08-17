@@ -136,8 +136,14 @@ def test_recipe_save_route_round_trips_encoded_source_url(monkeypatch, tmp_path)
     assert loaded_recipe["rating"] == 4
 
 
-def test_recipe_save_route_round_trips_freeform_scale_without_new_schema(monkeypatch, tmp_path):
+def test_recipe_save_route_canonicalizes_legacy_materialized_scale(monkeypatch, tmp_path):
     configure_recipe_save_storage(monkeypatch, tmp_path)
+    saved_scales = []
+    monkeypatch.setattr(
+        recipe_edit_service,
+        "save_recipe_url_quantity",
+        lambda _url, quantity: saved_scales.append(quantity),
+    )
     url = "https://example.test/freeform-scale"
     seed_recipe(url)
     scaling = {
@@ -172,17 +178,21 @@ def test_recipe_save_route_round_trips_freeform_scale_without_new_schema(monkeyp
 
     assert response.status_code == 200
     saved = recipe_edit_service.load_recipe_output(url)
-    assert saved["scaling"]["selected_multiplier"] == 1.25
+    assert saved["scaling"]["selected_multiplier"] == 1
     assert saved["scaling"]["base_multiplier"] == 1
     assert saved["scaling"]["base_servings"] == "4"
-    assert saved["ingredients"][0]["quantity"] == "5/8"
+    assert saved["servings"] == "4"
+    assert saved["ingredients"][0]["quantity"] == "1/2"
     assert saved["ingredients"][0]["base_quantity"] == "1/2"
+    assert saved_scales == [1.25]
 
     loaded = client.get("/api/recipe", query_string={"url": url})
     assert loaded.status_code == 200
     loaded_recipe = loaded.get_json()["recipe"]
-    assert loaded_recipe["scaling"]["selected_multiplier"] == 1.25
+    assert loaded_recipe["scaling"]["selected_multiplier"] == 1
+    assert loaded_recipe["servings"] == "4"
     assert loaded_recipe["scaling"]["base_servings"] == "4"
+    assert loaded_recipe["ingredients"][0]["quantity"] == "1/2"
     assert loaded_recipe["ingredients"][0]["base_quantity"] == "1/2"
 
 

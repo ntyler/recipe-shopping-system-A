@@ -120,7 +120,12 @@ from PushShoppingList.services.recipe_ingredient_service import remove_recipe_an
 from PushShoppingList.services.recipe_ingredient_service import save_recipe_ingredients
 from PushShoppingList.services.recipe_ingredient_service import save_ingredients_for_recipe
 from PushShoppingList.services.recipe_ingredient_service import update_saved_recipe_purchase_mapping
+from PushShoppingList.services.recipe_quantity_service import effective_recipe_quantity
 from PushShoppingList.services.recipe_quantity_service import ingredient_key
+from PushShoppingList.services.recipe_quantity_service import recipe_base_ingredient_quantity
+from PushShoppingList.services.recipe_quantity_service import recipe_base_ingredient_unit
+from PushShoppingList.services.recipe_quantity_service import recipe_base_servings
+from PushShoppingList.services.recipe_quantity_service import scaled_recipe_metadata_matches
 from PushShoppingList.services.recipe_extract_service import OUTPUT_FOLDER
 from PushShoppingList.services.recipe_extract_service import STORE_SECTION_ORDER
 from PushShoppingList.services.recipe_extract_service import recipe_archive_pdf_exists
@@ -494,10 +499,10 @@ def recipe_quantity_rows(recipe_urls):
     recipe_ingredient_data = load_recipe_ingredients()
 
     for index, recipe in enumerate(recipe_urls, start=1):
-        recipe_quantity = normalize_recipe_quantity(recipe.get("quantity") or 1)
         recipe_data = load_saved_recipe_output(recipe["url"])
+        recipe_quantity = effective_recipe_quantity(recipe.get("quantity") or 1, recipe_data)
         recipe_meta = recipe_ingredient_data.get(normalize_recipe_url_key(recipe["url"]), {})
-        use_scaled_meta = multipliers_match(recipe_meta.get("quantity", 1), recipe_quantity)
+        use_scaled_meta = scaled_recipe_metadata_matches(recipe_meta, recipe_quantity)
         scaled_ingredients = recipe_meta.get("scaled_ingredients", {}) if use_scaled_meta else {}
 
         rows.append({
@@ -754,7 +759,7 @@ def meal_plan_recipe_option_rows(recipe_urls, recipe_ingredient_data=None):
             else {}
         )
         recipe_yield = (
-            recipe_data.get("servings")
+            recipe_base_servings(recipe_data)
             or raw_scaling.get("base_servings")
             or scaling.get("base_servings")
             or recipe_meta.get("base_servings")
@@ -3346,8 +3351,8 @@ def recipe_view_rows(recipe_urls, food_rules=None, image_variants=None, include_
     recipe_ingredient_data = load_recipe_ingredients()
 
     for index, recipe in enumerate(recipe_urls, start=1):
-        recipe_quantity = normalize_recipe_quantity(recipe.get("quantity") or 1)
         recipe_data = load_saved_recipe_output(recipe["url"])
+        recipe_quantity = effective_recipe_quantity(recipe.get("quantity") or 1, recipe_data)
         recipe_meta = recipe_ingredient_data.get(normalize_recipe_url_key(recipe["url"]), {})
         cover_image = recipe_cover_image_for_view(
             recipe["url"],
@@ -3356,7 +3361,7 @@ def recipe_view_rows(recipe_urls, food_rules=None, image_variants=None, include_
             variants=image_variants,
         )
         nutrition_summary = recipe_view_nutrition_summary(recipe_data.get("nutrition", {}))
-        use_scaled_meta = multipliers_match(recipe_meta.get("quantity", 1), recipe_quantity)
+        use_scaled_meta = scaled_recipe_metadata_matches(recipe_meta, recipe_quantity)
         scaled_ingredients = recipe_meta.get("scaled_ingredients", {}) if use_scaled_meta else {}
         scaled_servings = recipe_meta.get("scaled_servings") if use_scaled_meta else None
         sections = build_recipe_sections(
@@ -3385,7 +3390,7 @@ def recipe_view_rows(recipe_urls, food_rules=None, image_variants=None, include_
             "source_pdf_public_url": recipe_pdf_public_url(recipe["url"], PDF_KIND_WEBPAGE_BACKUP),
             "cover_image": cover_image,
             "description": recipe_description_for_view(recipe_data),
-            "servings": recipe_data.get("servings", ""),
+            "servings": recipe_base_servings(recipe_data) or "",
             "level": recipe_data.get("level", ""),
             "prep_time": recipe_data.get("prep_time", ""),
             "inactive_time": recipe_data.get("inactive_time", ""),
@@ -3400,8 +3405,8 @@ def recipe_view_rows(recipe_urls, food_rules=None, image_variants=None, include_
             "rating": recipe_rating_for_view(recipe_data),
             "rating_stars": recipe_rating_stars_for_view(recipe_data),
             "favorite": bool(recipe_data.get("favorite")),
-            "base_servings": recipe_data.get("servings"),
-            "scaled_servings": scaled_servings or scale_servings(recipe_data.get("servings"), recipe_quantity),
+            "base_servings": recipe_base_servings(recipe_data),
+            "scaled_servings": scaled_servings or scale_servings(recipe_base_servings(recipe_data), recipe_quantity),
             "serving_basis": nutrition_summary["serving_basis"],
             "calories": nutrition_summary["calories"],
             "equipment_items": (
@@ -3591,8 +3596,8 @@ def recipe_url_log_rows(
         recipe_data = load_saved_recipe_output(recipe["url"])
         recipe_meta = recipe_ingredient_data.get(recipe_key, {})
         nutrition_summary = recipe_view_nutrition_summary(recipe_data.get("nutrition", {}))
-        recipe_quantity = normalize_recipe_quantity(recipe.get("quantity") or 1)
-        use_scaled_meta = multipliers_match(recipe_meta.get("quantity", 1), recipe_quantity)
+        recipe_quantity = effective_recipe_quantity(recipe.get("quantity") or 1, recipe_data)
+        use_scaled_meta = scaled_recipe_metadata_matches(recipe_meta, recipe_quantity)
         scaled_servings = recipe_meta.get("scaled_servings") if use_scaled_meta else None
         cookbook_assignment = cookbook_assignments.get(recipe_key, {})
         rows.append({
@@ -3622,7 +3627,7 @@ def recipe_url_log_rows(
                 variants=image_variants,
             ),
             "description": recipe_description_for_view(recipe_data),
-            "servings": recipe_data.get("servings", ""),
+            "servings": recipe_base_servings(recipe_data) or "",
             "level": recipe_data.get("level", ""),
             "prep_time": recipe_data.get("prep_time", ""),
             "inactive_time": recipe_data.get("inactive_time", ""),
@@ -3634,8 +3639,8 @@ def recipe_url_log_rows(
             "rating_stars": recipe_rating_stars_for_view(recipe_data),
             "favorite": bool(recipe_data.get("favorite")),
             "archive_pdf_available": recipe_archive_pdf_exists(recipe["url"]),
-            "base_servings": recipe_data.get("servings"),
-            "scaled_servings": scaled_servings or scale_servings(recipe_data.get("servings"), recipe_quantity),
+            "base_servings": recipe_base_servings(recipe_data),
+            "scaled_servings": scaled_servings or scale_servings(recipe_base_servings(recipe_data), recipe_quantity),
             "serving_basis": nutrition_summary["serving_basis"],
             "calories": nutrition_summary["calories"],
             "cookbook_id": cookbook_assignment.get("cookbook_id", ""),
@@ -4095,11 +4100,11 @@ def cookbook_view_for_render(recipe_rows, food_rules=None, image_variants=None):
         for recipe in cookbook.get("recipes", []):
             recipe_url = recipe.get("url", "")
             recipe_key = normalize_recipe_url_key(recipe_url)
-            recipe_quantity = normalize_recipe_quantity(recipe.get("quantity") or 1)
             recipe_data = load_saved_recipe_output(recipe_url)
+            recipe_quantity = effective_recipe_quantity(recipe.get("quantity") or 1, recipe_data)
             recipe_meta = recipe_ingredient_data.get(recipe_key, {})
             nutrition_summary = recipe_view_nutrition_summary(recipe_data.get("nutrition", {}))
-            use_scaled_meta = multipliers_match(recipe_meta.get("quantity", 1), recipe_quantity)
+            use_scaled_meta = scaled_recipe_metadata_matches(recipe_meta, recipe_quantity)
             scaled_servings = recipe_meta.get("scaled_servings") if use_scaled_meta else None
 
             recipe["name"] = recipe.get("name") or recipe_data.get("recipe_title") or recipe_url
@@ -4147,7 +4152,7 @@ def cookbook_view_for_render(recipe_rows, food_rules=None, image_variants=None):
             recipe["menu_mega_snapshot_id"] = recipe.get("menu_mega_snapshot_id") or recipe_menu_snapshot_id(recipe_data)
             recipe["quantity"] = recipe_quantity
             recipe["description"] = recipe.get("description") or recipe_description_for_view(recipe_data)
-            recipe["servings"] = recipe.get("servings") or recipe_data.get("servings", "")
+            recipe["servings"] = recipe_base_servings(recipe_data) or recipe.get("servings") or ""
             recipe["level"] = recipe.get("level") or recipe_data.get("level", "")
             recipe["prep_time"] = recipe.get("prep_time") or recipe_data.get("prep_time", "")
             recipe["inactive_time"] = recipe.get("inactive_time") or recipe_data.get("inactive_time", "")
@@ -4162,11 +4167,11 @@ def cookbook_view_for_render(recipe_rows, food_rules=None, image_variants=None):
             recipe["pdf_public_url"] = recipe_pdf_public_url(recipe_url)
             recipe["source_pdf_public_url"] = recipe_pdf_public_url(recipe_url, PDF_KIND_WEBPAGE_BACKUP)
             recipe["archive_pdf_available"] = recipe_archive_pdf_exists(recipe_url)
-            recipe["base_servings"] = recipe.get("base_servings") or recipe_data.get("servings")
+            recipe["base_servings"] = recipe_base_servings(recipe_data) or recipe.get("base_servings")
             recipe["scaled_servings"] = (
                 scaled_servings
                 or recipe.get("scaled_servings")
-                or scale_servings(recipe_data.get("servings"), recipe_quantity)
+                or scale_servings(recipe_base_servings(recipe_data), recipe_quantity)
             )
             recipe["serving_basis"] = recipe.get("serving_basis") or nutrition_summary["serving_basis"]
             recipe["calories"] = recipe.get("calories") or nutrition_summary["calories"]
@@ -4652,18 +4657,20 @@ def build_recipe_sections(
         if section not in sections:
             section = "MISC"
 
+        base_quantity = recipe_base_ingredient_quantity(ingredient, recipe_data)
+        base_unit = recipe_base_ingredient_unit(ingredient, recipe_data)
         scaled_value = scaled_ingredients.get(name) or scaled_ingredients.get(ingredient_key(name)) or {}
         scaled_quantity = scaled_value.get("quantity") if isinstance(scaled_value, dict) else None
         scaled_unit = scaled_value.get("unit") if isinstance(scaled_value, dict) else None
         scaled_display = scaled_value.get("display") if isinstance(scaled_value, dict) else None
-        fallback_quantity = scale_quantity(ingredient.get("quantity"), recipe_quantity)
+        fallback_quantity = scale_quantity(base_quantity, recipe_quantity)
         display_name = name
-        base_display = format_quantity_unit(ingredient.get("quantity"), ingredient.get("unit"))
-        quantity_display = scaled_display
+        base_display = format_quantity_unit(base_quantity, base_unit)
+        quantity_display = scaled_display or format_quantity_unit(fallback_quantity, base_unit)
         alternative = parse_quantity_alternative(
             name,
-            ingredient.get("quantity"),
-            ingredient.get("unit"),
+            base_quantity,
+            base_unit,
             recipe_quantity,
             scaled_quantity or fallback_quantity,
         )
@@ -4699,10 +4706,10 @@ def build_recipe_sections(
             "purchase_group": purchase_mapping["purchase_group"],
             "purchase_group_key": purchase_mapping["purchase_group_key"],
             "purchase_is_mapped": purchase_mapping["is_mapped"],
-            "quantity": ingredient.get("quantity"),
-            "base_quantity": ingredient.get("quantity"),
+            "quantity": base_quantity,
+            "base_quantity": base_quantity,
             "scaled_quantity": scaled_quantity or fallback_quantity,
-            "unit": scaled_unit if scaled_unit is not None else ingredient.get("unit"),
+            "unit": scaled_unit if scaled_unit is not None else base_unit,
             "base_display": base_display,
             "quantity_display": quantity_display,
             "url": recipe_data.get("source_url"),

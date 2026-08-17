@@ -136,6 +136,10 @@ from PushShoppingList.services.recipe_url_service import recipe_url_type
 from PushShoppingList.services.recipe_url_service import save_recipe_urls
 from PushShoppingList.services.recipe_url_service import save_recipe_url_name
 from PushShoppingList.services.recipe_url_service import save_recipe_url_quantity
+from PushShoppingList.services.recipe_quantity_service import effective_recipe_quantity
+from PushShoppingList.services.recipe_quantity_service import recipe_base_ingredient_quantity
+from PushShoppingList.services.recipe_quantity_service import recipe_base_ingredient_unit
+from PushShoppingList.services.recipe_quantity_service import recipe_base_servings
 from PushShoppingList.services.recipe_quantity_service import update_recipe_quantity
 from PushShoppingList.services.recipe_image_progress_service import finish_recipe_image_progress
 from PushShoppingList.services.recipe_image_progress_service import start_recipe_image_progress
@@ -4821,6 +4825,62 @@ def backfill_editable_restaurant_sources():
     return summary
 
 
+def canonical_recipe_ingredient_for_scale(item, recipe_data):
+    if not isinstance(item, dict):
+        return item
+
+    canonical = dict(item)
+    quantity = recipe_base_ingredient_quantity(item, recipe_data)
+    unit = recipe_base_ingredient_unit(item, recipe_data)
+    canonical["quantity"] = quantity
+    canonical["recipe_qty"] = quantity
+    canonical["unit"] = unit
+    canonical["base_quantity"] = quantity
+    canonical["base_unit"] = unit
+
+    substitutions = canonical.get("substitutions")
+    if isinstance(substitutions, list):
+        canonical["substitutions"] = [
+            canonical_recipe_ingredient_for_scale(option, recipe_data)
+            for option in substitutions
+        ]
+    return canonical
+
+
+def canonicalize_recipe_scale_payload(payload):
+    """Convert old materialized Scale payloads into a base recipe plus one multiplier."""
+    canonical = deepcopy(payload) if isinstance(payload, dict) else {}
+    original_scale_state = {
+        "scaling": canonical.get("scaling") if isinstance(canonical.get("scaling"), dict) else {},
+        "servings": canonical.get("servings"),
+    }
+    quantity = effective_recipe_quantity(canonical.get("quantity", 1), original_scale_state)
+    servings = recipe_base_servings(original_scale_state)
+
+    if "ingredients" in canonical and isinstance(canonical.get("ingredients"), list):
+        canonical["ingredients"] = [
+            canonical_recipe_ingredient_for_scale(item, original_scale_state)
+            for item in canonical["ingredients"]
+        ]
+
+    scaling = normalize_recipe_scaling_metadata(canonical.get("scaling"))
+    scaling["selected_multiplier"] = 1
+    scaling["base_multiplier"] = 1
+    scaling["base_servings"] = str(servings or "").strip()
+    canonical["quantity"] = quantity
+    canonical["servings"] = str(servings or "").strip()
+    canonical["scaling"] = scaling
+    return canonical
+
+
+def canonicalize_edit_ingredients_for_scale(ingredients, recipe_data):
+    return [
+        canonical_recipe_ingredient_for_scale(item, recipe_data)
+        for item in (ingredients or [])
+        if isinstance(item, dict)
+    ]
+
+
 def load_editable_recipe(url):
     url = str(url or "").strip()
     loaded_recipe_data = load_recipe_output(url, equipment_consumer="editor_api")
@@ -4843,7 +4903,7 @@ def load_editable_recipe(url):
     cookbook_assignment = cookbook_recipe_assignment_for_url(url)
     pdf = editable_recipe_pdf_info(source_url, recipe_data)
     scaling = normalize_recipe_scaling_metadata(recipe_data.get("scaling"))
-    recipe_data_servings = recipe_info_clean_value(recipe_data.get("servings"), "servings")
+    recipe_data_servings = recipe_info_clean_value(recipe_base_servings(recipe_data), "servings")
     if recipe_data_servings and not scaling.get("base_servings"):
         scaling["base_servings"] = recipe_data_servings
     recipe_info = recipe_information_fields(recipe_data, url)
@@ -4877,6 +4937,12 @@ def load_editable_recipe(url):
         recipe_notes,
     )
     recipe_data = migrate_recipe_ingredient_options(recipe_data)
+    quantity = effective_recipe_quantity(meta.get("quantity", 1), recipe_data)
+    scaling["selected_multiplier"] = quantity
+    scaling["base_multiplier"] = 1
+    scaling["base_servings"] = servings or ""
+    edit_ingredients = normalize_edit_ingredients(recipe_data.get("ingredients", []), recipe_url=source_url)
+    edit_ingredients = canonicalize_edit_ingredients_for_scale(edit_ingredients, recipe_data)
     result = {
         "ok": True,
         "recipe": {
@@ -4889,7 +4955,7 @@ def load_editable_recipe(url):
             "source_display_url": editable_recipe_source_display_url(recipe_data.get("source_url") or url),
             "type": recipe_url_type(url),
             "display_name": meta.get("name") or recipe_data.get("display_name") or recipe_data.get("recipe_title") or "",
-            "quantity": normalize_recipe_quantity(meta.get("quantity", 1)),
+            "quantity": quantity,
             "cookbook_id": cookbook_assignment.get("cookbook_id", ""),
             "cookbook_name": cookbook_assignment.get("cookbook_name", ""),
             "cookbook_is_unclassified": cookbook_assignment.get("cookbook_is_unclassified", False),
@@ -4903,9 +4969,7 @@ def load_editable_recipe(url):
             "cover_image_prompt": cover_image_prompt,
             **recipe_info,
             "scaling": scaling,
-            "ingredients": annotate_ingredients_for_food_review(
-                normalize_edit_ingredients(recipe_data.get("ingredients", []), recipe_url=source_url)
-            ),
+            "ingredients": annotate_ingredients_for_food_review(edit_ingredients),
             "equipment": normalize_equipment_records(recipe_data.get("equipment", [])),
             "instructions": normalize_instruction_rows(recipe_data.get("instructions", [])),
             "nutrition": normalize_nutrition_rows(
@@ -7554,6 +7618,8 @@ def save_editable_recipe(original_url, payload, require_existing=False):
             status_code=422,
         )
 
+    payload = canonicalize_recipe_scale_payload(payload)
+
     submitted_recipe_id = str(payload.get("recipe_id") or "").strip()
     existing_data = load_recipe_output(original_url)
     if (
@@ -7742,8 +7808,9 @@ def save_editable_recipe(original_url, payload, require_existing=False):
         recipe_data["cover_image"] = cover_image
     else:
         recipe_data.pop("cover_image", None)
-    if recipe_data["servings"] and not recipe_data["scaling"].get("base_servings"):
-        recipe_data["scaling"]["base_servings"] = recipe_data["servings"]
+    recipe_data["scaling"]["selected_multiplier"] = 1
+    recipe_data["scaling"]["base_multiplier"] = 1
+    recipe_data["scaling"]["base_servings"] = recipe_data["servings"]
 
     substitution_metadata = [
         deepcopy(item.get("substitutions") or []) if isinstance(item, dict) else []

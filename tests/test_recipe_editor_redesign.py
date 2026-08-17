@@ -975,13 +975,13 @@ def test_recipe_metadata_fields_have_accessible_tooltips():
     organizer = script[organizer_start:organizer_end]
 
     expected_tooltips = {
-        "Servings": "Number of people or portions the recipe makes at the selected scale.",
+        "Servings": "Number of people or portions the base recipe serves. Scale does not change this saved value.",
         "Total Time": "Total elapsed time from start to finish, typically including prep, cooking, and inactive time.",
         "Prep Time": "Hands-on preparation time.",
         "Cook Time": "Time the food is actively cooking.",
         "Inactive Time": "Hands-off waiting time, such as resting, marinating, chilling, rising, or cooling.",
         "Difficulty": "Overall complexity based on skill, steps, timing, and equipment.",
-        "Scale": "Multiplier applied to the base recipe; updates servings and ingredient amounts.",
+        "Scale": "Shopping multiplier and ingredient preview. It does not rewrite the recipe's saved Servings or base amounts.",
     }
     for label, help_text in expected_tooltips.items():
         assert f'"{label}", "{help_text}"' in organizer

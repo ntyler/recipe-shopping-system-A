@@ -27306,13 +27306,13 @@ function organizeRecipeEditInformationCard() {
         .forEach(organizeRecipeEditMetadataField);
     organizeRecipeEditScaleControl(scaleField);
     [
-        [servingsField, "Servings", "Number of people or portions the recipe makes at the selected scale."],
+        [servingsField, "Servings", "Number of people or portions the base recipe serves. Scale does not change this saved value."],
         [totalField, "Total Time", "Total elapsed time from start to finish, typically including prep, cooking, and inactive time."],
         [prepField, "Prep Time", "Hands-on preparation time."],
         [cookField, "Cook Time", "Time the food is actively cooking."],
         [inactiveField, "Inactive Time", "Hands-off waiting time, such as resting, marinating, chilling, rising, or cooling."],
         [levelField, "Difficulty", "Overall complexity based on skill, steps, timing, and equipment."],
-        [scaleField, "Scale", "Multiplier applied to the base recipe; updates servings and ingredient amounts."],
+        [scaleField, "Scale", "Shopping multiplier and ingredient preview. It does not rewrite the recipe's saved Servings or base amounts."],
     ].forEach(([field, label, helpText]) => addRecipeEditMetadataTooltip(field, label, helpText));
 
     if (infoActions) infoActions.hidden = true;
@@ -42432,11 +42432,16 @@ function populateRecipeScalingControls(scaling = {}, servings = "", options = {}
             || scaling.scaling_multipliers
             || []
     );
-    const selectedValue = scaling.selected_multiplier !== undefined
+    const scalingSelectedValue = scaling.selected_multiplier !== undefined
         ? scaling.selected_multiplier
         : scaling.scaling_multiplier;
+    const legacyQuantityInput = document.getElementById("recipeEditQuantity");
+    const legacyQuantity = parseRecipeScaleMultiplier(legacyQuantityInput ? legacyQuantityInput.value : null) || 1;
+    const selectedValue = recipeMultipliersMatch(legacyQuantity, 1)
+        ? scalingSelectedValue
+        : legacyQuantity;
     const selectedMultiplier = parseRecipeScaleMultiplier(selectedValue) || 1;
-    const baseServings = String(scaling.base_servings || servings || "").trim();
+    const baseServings = String(servings || scaling.base_servings || "").trim();
     const requestedText = typeof options.inputText === "string"
         ? options.inputText
         : (typeof selectedValue === "string" ? selectedValue : "");
@@ -42448,6 +42453,9 @@ function populateRecipeScalingControls(scaling = {}, servings = "", options = {}
         : formatRecipeScaleInputValue(selectedMultiplier);
     input.dataset.baseServings = baseServings;
     input.dataset.activeMultiplier = formatRecipeScaleInputValue(selectedMultiplier);
+    if (legacyQuantityInput) {
+        legacyQuantityInput.value = formatRecipeScaleInputValue(selectedMultiplier);
+    }
     setRecipeScaleValidationMessage("");
 
     const servingsInput = document.getElementById("recipeEditServings");
@@ -42578,20 +42586,9 @@ function applyRecipeScaleMultiplier(input) {
 
 function applyRecipeScaleValue(input, multiplier) {
     input.dataset.activeMultiplier = formatRecipeScaleInputValue(multiplier);
-    const servingsInput = document.getElementById("recipeEditServings");
-
-    if (servingsInput) {
-        const baseServings = (
-            input && input.dataset.baseServings
-                ? input.dataset.baseServings
-                : servingsInput.dataset.baseServings || servingsInput.value
-        );
-
-        if (!servingsInput.dataset.baseServings) {
-            servingsInput.dataset.baseServings = String(baseServings || "").trim();
-        }
-
-        servingsInput.value = scaleServingsForDisplay(baseServings, multiplier);
+    const legacyQuantityInput = document.getElementById("recipeEditQuantity");
+    if (legacyQuantityInput) {
+        legacyQuantityInput.value = formatRecipeScaleInputValue(multiplier);
     }
 
     recipeEditIngredientRows().forEach(row => {
@@ -42630,21 +42627,11 @@ function applyRecipeScaleToIngredientRow(row, multiplier) {
 }
 
 function collectRecipeScalingPayload() {
-    const input = document.getElementById("recipeEditScaleMultiplier");
     const servingsInput = document.getElementById("recipeEditServings");
-    const selectedMultiplier = validateRecipeEditScaleMultiplier(input ? input.value : null);
-    const baseServings = (
-        input && input.dataset.baseServings
-            ? input.dataset.baseServings
-            : servingsInput && servingsInput.dataset.baseServings
-                ? servingsInput.dataset.baseServings
-                : servingsInput
-                    ? servingsInput.value.trim()
-                    : ""
-    );
+    const baseServings = servingsInput ? servingsInput.value.trim() : "";
 
     return {
-        selected_multiplier: selectedMultiplier,
+        selected_multiplier: 1,
         base_multiplier: 1,
         base_servings: baseServings,
         available_multipliers: recipeEditScalingOptions.length
@@ -48273,6 +48260,7 @@ function addRecipeIngredientRow(item = {}, options = {}) {
     bindRecipeIngredientSummaryUpdates(row);
     bindRecipeIngredientInlineEditor(row);
     bindRecipeIngredientSubstitutionRows(row);
+    applyRecipeScaleToIngredientRow(row, currentRecipeEditScaleMultiplier());
     bindRecipeEditDragAndDrop(row);
     updateRecipeIngredientFoodRuleWarning(row);
     updateRecipeIngredientSummary(row);
@@ -48555,6 +48543,7 @@ function bindRecipeIngredientSubstitutionRow(optionRow) {
             updateRecipeEditorDirtyState(parentRow ? parentRow.closest("#recipeEditForm") : null);
         });
     });
+    applyRecipeScaleToIngredientRow(optionRow, currentRecipeEditScaleMultiplier());
 }
 
 function recipeIngredientOptionsMenuForRow(row, control = null) {
@@ -52586,10 +52575,6 @@ function bindRecipeIngredientBaseTracking(row) {
 function updateRecipeIngredientBaseFromManualEdit(row) {
     const multiplier = currentRecipeEditScaleMultiplier();
 
-    if (Math.abs(multiplier - 1) > 0.000001) {
-        return;
-    }
-
     const quantityInput = row.querySelector('[data-field="quantity"]');
     const unitInput = row.querySelector('[data-field="unit"]');
     const baseQuantityInput = row.querySelector('[data-field="base_quantity"]');
@@ -52597,11 +52582,16 @@ function updateRecipeIngredientBaseFromManualEdit(row) {
     const recipeQtyInput = row.querySelector('[data-field="recipe_qty"]');
 
     if (quantityInput && baseQuantityInput) {
-        baseQuantityInput.value = quantityInput.value.trim();
+        baseQuantityInput.value = scaleQuantityForDisplay(
+            quantityInput.value.trim(),
+            1 / multiplier,
+        );
     }
 
     if (quantityInput && recipeQtyInput) {
-        recipeQtyInput.value = quantityInput.value.trim();
+        recipeQtyInput.value = baseQuantityInput
+            ? baseQuantityInput.value
+            : scaleQuantityForDisplay(quantityInput.value.trim(), 1 / multiplier);
     }
 
     if (unitInput && baseUnitInput) {
@@ -56419,7 +56409,7 @@ function buildRecipeSaveProgressItems(recipe) {
         ["Recipe title", "recipe_title"],
         ["Description", "description"],
         ["Source URL", "source_url"],
-        ["Quantity", "quantity"],
+        ["Scale", "quantity"],
         ["Servings", "servings"],
         ["Rating", "rating"],
         ["Level", "level"],
@@ -56449,10 +56439,6 @@ function buildRecipeSaveProgressItems(recipe) {
             detailLines.push(`${label}: ${previousValue || "(blank)"} -> ${nextValue || "(blank)"}`);
         }
     });
-
-    if (previous.scaling.selected_multiplier !== next.scaling.selected_multiplier) {
-        detailLines.push(`Recipe amount: ${previous.scaling.selected_multiplier || "1"}x -> ${next.scaling.selected_multiplier || "1"}x`);
-    }
 
     if (JSON.stringify(previous.cover_image) !== JSON.stringify(next.cover_image)) {
         detailLines.push("Recipe title image updated.");
@@ -56497,8 +56483,8 @@ function buildRecipeSaveProgressItems(recipe) {
             detail: detailLines.length ? detailLines.slice(0, 8).join("; ") : "Saving current recipe values.",
         },
         {
-            label: "Source Recipe Qty values",
-            detail: "Recalculating ingredient quantities from the saved recipe numbers.",
+            label: "Shopping-list scale",
+            detail: "Recalculating shopping quantities once from the base recipe amounts.",
         },
         {
             label: "Visible page sections",
@@ -56829,14 +56815,12 @@ function collectRecipeIngredientSubstitutionRows(row) {
             option.alternative_order = String(option.alternative_order ?? "").trim();
             option.alternative_component_order = String(option.alternative_component_order ?? "").trim();
             option.inferred = recipeIngredientInferredValue(option) === "true";
-            return option;
+            return canonicalRecipeIngredientAmountForSave(option);
         })
         .filter(option => recipeIngredientSubstitutionHasIdentity(option));
 }
 
 function collectRecipeIngredientRows() {
-    const selectedMultiplier = currentRecipeEditScaleMultiplier();
-
     return recipeEditIngredientRows()
         .map(row => {
             const item = fieldValuesFromRow(row);
@@ -56847,10 +56831,7 @@ function collectRecipeIngredientRows() {
             item.substitutions = collectRecipeIngredientSubstitutionRows(row);
             delete item.substitutions_text;
 
-            if (Math.abs(selectedMultiplier - 1) < 0.000001) {
-                item.base_quantity = item.quantity || "";
-                item.base_unit = item.unit || "";
-            }
+            canonicalRecipeIngredientAmountForSave(item);
 
             if (foodReview) {
                 item.food_review = foodReview;
@@ -56859,6 +56840,17 @@ function collectRecipeIngredientRows() {
             return item;
         })
         .filter(item => item.ingredient || item.original_text);
+}
+
+function canonicalRecipeIngredientAmountForSave(item) {
+    const baseQuantity = String(item.base_quantity || item.quantity || "").trim();
+    const baseUnit = String(item.base_unit || item.unit || "").trim();
+    item.quantity = baseQuantity;
+    item.recipe_qty = baseQuantity;
+    item.unit = baseUnit;
+    item.base_quantity = baseQuantity;
+    item.base_unit = baseUnit;
+    return item;
 }
 
 function collectRecipeNutritionRows() {
@@ -57013,7 +57005,7 @@ async function saveRecipeQuantity(input, options = {}) {
                 url,
                 formatRecipeScaleMultiplierLabel(quantity),
                 input.dataset.recipeNumber || "",
-                `${input.dataset.recipeNumber ? `Recipe ${input.dataset.recipeNumber} ` : ""}amount updated to ${formatRecipeScaleMultiplierLabel(quantity)}.`
+                `${input.dataset.recipeNumber ? `Recipe ${input.dataset.recipeNumber} ` : ""}scale updated to ${formatRecipeScaleMultiplierLabel(quantity)}.`
             );
         }
 

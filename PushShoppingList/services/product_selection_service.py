@@ -40,9 +40,13 @@ from PushShoppingList.services.purchase_mapping_service import purchase_mapping_
 from PushShoppingList.services.purchase_mapping_service import purchase_mapping_for_recipe_ingredient
 from PushShoppingList.services.recipe_ingredient_service import load_recipe_ingredients
 from PushShoppingList.services.openai_model_service import supports_custom_temperature
+from PushShoppingList.services.recipe_quantity_service import effective_recipe_quantity
 from PushShoppingList.services.recipe_quantity_service import format_quantity_display
 from PushShoppingList.services.recipe_quantity_service import load_saved_recipe_output
+from PushShoppingList.services.recipe_quantity_service import recipe_base_ingredient_quantity
+from PushShoppingList.services.recipe_quantity_service import recipe_base_ingredient_unit
 from PushShoppingList.services.recipe_quantity_service import scale_quantity
+from PushShoppingList.services.recipe_quantity_service import scaled_recipe_metadata_matches
 from PushShoppingList.services.recipe_url_service import normalize_recipe_quantity
 from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
 from PushShoppingList.services.recipe_url_service import recipe_url_rows
@@ -380,13 +384,13 @@ def load_item_quantity_context(items=None):
     recipe_meta = load_recipe_ingredients()
 
     for recipe in recipe_url_rows():
-        recipe_quantity = normalize_recipe_quantity(recipe.get("quantity") or 1)
         recipe_data = load_saved_recipe_output(recipe.get("url", ""))
         if not recipe_data:
             continue
+        recipe_quantity = effective_recipe_quantity(recipe.get("quantity") or 1, recipe_data)
 
         meta = recipe_meta.get(normalize_recipe_url_key(recipe.get("url", "")), {})
-        use_scaled_meta = quantities_match(meta.get("quantity", 1), recipe_quantity)
+        use_scaled_meta = scaled_recipe_metadata_matches(meta, recipe_quantity)
         scaled_ingredients = meta.get("scaled_ingredients", {}) if use_scaled_meta else {}
         recipe_label = recipe.get("name") or recipe_data.get("recipe_title") or "Recipe"
 
@@ -413,11 +417,13 @@ def load_item_quantity_context(items=None):
             scaled_quantity = scaled_value.get("quantity") if isinstance(scaled_value, dict) else None
             scaled_unit = scaled_value.get("unit") if isinstance(scaled_value, dict) else None
             display = clean_text(scaled_value.get("display") if isinstance(scaled_value, dict) else "")
-            unit = scaled_unit if scaled_unit is not None else ingredient.get("unit")
+            base_quantity = recipe_base_ingredient_quantity(ingredient, recipe_data)
+            base_unit = recipe_base_ingredient_unit(ingredient, recipe_data)
+            unit = scaled_unit if scaled_unit is not None else base_unit
 
             if not display:
                 display = format_quantity_display(
-                    scaled_quantity or scale_quantity(ingredient.get("quantity"), recipe_quantity),
+                    scaled_quantity or scale_quantity(base_quantity, recipe_quantity),
                     unit,
                 )
 

@@ -128,7 +128,7 @@ def test_recipe_scale_parser_rejects_invalid_entries():
     assert result == [None] * len(values)
 
 
-def test_recipe_scale_keeps_typed_text_and_normalizes_calculations_and_payload():
+def test_recipe_scale_keeps_servings_canonical_and_updates_one_shopping_multiplier():
     script = SCRIPT_PATH.read_text(encoding="utf-8")
     control = scale_control_script(script)
     calculations = script[
@@ -153,6 +153,7 @@ const scaleInput = {
 };
 const scaleError = { hidden: true, textContent: "" };
 const servingsInput = { value: "4", dataset: {} };
+const legacyQuantityInput = { value: "1" };
 const quantityInput = { value: "1/2" };
 const baseQuantityInput = { value: "1/2" };
 const unitInput = { value: "cup" };
@@ -172,6 +173,7 @@ const elements = {
     recipeEditScaleMultiplier: scaleInput,
     recipeEditScaleError: scaleError,
     recipeEditServings: servingsInput,
+    recipeEditQuantity: legacyQuantityInput,
 };
 const document = {
     getElementById(id) { return elements[id] || null; },
@@ -189,6 +191,7 @@ function snapshot() {
         active: scaleInput.dataset.activeMultiplier,
         servings: servingsInput.value,
         quantity: quantityInput.value,
+        shoppingMultiplier: legacyQuantityInput.value,
         errorVisible: !scaleError.hidden,
         payload: collectRecipeScalingPayload(),
     };
@@ -216,22 +219,26 @@ process.stdout.write(JSON.stringify({ initial, fraction, mixed, invalidDraft }))
     assert result["initial"]["text"] == "1"
     assert result["fraction"]["text"] == "1/2"
     assert result["fraction"]["active"] == "0.5"
-    assert result["fraction"]["servings"] == "2"
+    assert result["fraction"]["servings"] == "4"
     assert result["fraction"]["quantity"] == "1/4"
-    assert result["fraction"]["payload"]["selected_multiplier"] == 0.5
+    assert result["fraction"]["shoppingMultiplier"] == "0.5"
+    assert result["fraction"]["payload"]["selected_multiplier"] == 1
+    assert result["fraction"]["payload"]["base_servings"] == "4"
 
     assert result["mixed"]["text"] == "1 1/2"
     assert result["mixed"]["active"] == "1.5"
-    assert result["mixed"]["servings"] == "6"
+    assert result["mixed"]["servings"] == "4"
     assert result["mixed"]["quantity"] == "3/4"
-    assert result["mixed"]["payload"]["selected_multiplier"] == 1.5
+    assert result["mixed"]["shoppingMultiplier"] == "1.5"
+    assert result["mixed"]["payload"]["selected_multiplier"] == 1
 
     assert result["invalidDraft"]["text"] == "1//2"
     assert result["invalidDraft"]["active"] == "1.5"
-    assert result["invalidDraft"]["servings"] == "6"
+    assert result["invalidDraft"]["servings"] == "4"
     assert result["invalidDraft"]["quantity"] == "3/4"
+    assert result["invalidDraft"]["shoppingMultiplier"] == "1.5"
     assert result["invalidDraft"]["errorVisible"] is False
-    assert result["invalidDraft"]["payload"]["selected_multiplier"] is None
+    assert result["invalidDraft"]["payload"]["selected_multiplier"] == 1
 
 
 def test_recipe_scale_validation_runs_only_on_save_and_keeps_invalid_text():
@@ -305,3 +312,67 @@ process.stdout.write(JSON.stringify({
     assert 'firstControl.focus({ preventScroll: true })' in reveal
     assert "validateRecipeEditScaleField" not in control
     assert "setRecipeScaleValidationMessage(\"\")" in control
+
+
+def test_scaled_ingredient_edit_is_converted_back_to_a_canonical_base_amount():
+    script = SCRIPT_PATH.read_text(encoding="utf-8")
+    base_tracking = script[
+        script.index("function updateRecipeIngredientBaseFromManualEdit"):
+        script.index("function bindRecipeIngredientFoodRuleWarning")
+    ]
+    parser = script[
+        script.index("function parseRecipeScaleMultiplier"):
+        script.index("function formatRecipeScaleMultiplierLabel")
+    ]
+    calculations = script[
+        script.index("function scaleServingsForDisplay"):
+        script.index("function cssEscape")
+    ]
+    canonicalizer = script[
+        script.index("function canonicalRecipeIngredientAmountForSave"):
+        script.index("function collectRecipeNutritionRows")
+    ]
+    harness = r"""
+const scaleInput = { value: "2", dataset: { activeMultiplier: "2" } };
+const quantityInput = { value: "3" };
+const baseQuantityInput = { value: "1" };
+const unitInput = { value: "cups" };
+const baseUnitInput = { value: "cup" };
+const recipeQtyInput = { value: "1" };
+const row = {
+    querySelector(selector) {
+        return {
+            '[data-field="quantity"]': quantityInput,
+            '[data-field="base_quantity"]': baseQuantityInput,
+            '[data-field="unit"]': unitInput,
+            '[data-field="base_unit"]': baseUnitInput,
+            '[data-field="recipe_qty"]': recipeQtyInput,
+        }[selector] || null;
+    },
+};
+const document = {
+    getElementById(id) { return id === "recipeEditScaleMultiplier" ? scaleInput : null; },
+};
+""" + parser + base_tracking + calculations + canonicalizer + r"""
+updateRecipeIngredientBaseFromManualEdit(row);
+const saved = canonicalRecipeIngredientAmountForSave({
+    quantity: quantityInput.value,
+    unit: unitInput.value,
+    base_quantity: baseQuantityInput.value,
+    base_unit: baseUnitInput.value,
+});
+process.stdout.write(JSON.stringify({
+    baseQuantity: baseQuantityInput.value,
+    baseUnit: baseUnitInput.value,
+    recipeQty: recipeQtyInput.value,
+    saved,
+}));
+"""
+
+    result = run_node(harness)
+
+    assert result["baseQuantity"] == "1 1/2"
+    assert result["baseUnit"] == "cups"
+    assert result["recipeQty"] == "1 1/2"
+    assert result["saved"]["quantity"] == "1 1/2"
+    assert result["saved"]["base_quantity"] == "1 1/2"

@@ -19,6 +19,7 @@ from PushShoppingList.services.recipe_ingredient_service import save_recipe_ingr
 
 
 MODEL = "gpt-4o-mini"
+RECIPE_SCALING_MODEL = "base_recipe_v2"
 client = None
 
 
@@ -43,6 +44,7 @@ def update_recipe_quantity(url, quantity):
     recipe_record["quantity"] = quantity
     recipe_record["scaled_servings"] = scaled.get("servings")
     recipe_record["scaled_ingredients"] = scaled.get("ingredients", {})
+    recipe_record["scaling_model"] = RECIPE_SCALING_MODEL
     data[key] = recipe_record
     save_recipe_ingredients(data)
 
@@ -80,6 +82,8 @@ def update_recipe_ingredient_quantity(url, ingredient_name, quantity, unit):
         item["quantity"] = quantity or None
         item["recipe_qty"] = quantity or None
         item["unit"] = unit or None
+        item["base_quantity"] = quantity or None
+        item["base_unit"] = unit or None
         updated_item = item
         break
 
@@ -149,7 +153,10 @@ def repair_unscaled_api_values(recipe_data, quantity, api_scaled, local_scaled):
         if not isinstance(api_value, dict) or not isinstance(local_value, dict):
             continue
 
-        original_display = format_quantity_display(item.get("quantity"), item.get("unit"))
+        original_display = format_quantity_display(
+            recipe_base_ingredient_quantity(item, recipe_data),
+            recipe_base_ingredient_unit(item, recipe_data),
+        )
         api_display = str(api_value.get("display") or "").strip()
 
         if original_display and api_display == original_display:
@@ -163,8 +170,8 @@ def calculate_scaled_values_with_openai(recipe_data, quantity):
     ingredients = [
         {
             "ingredient": item.get("ingredient"),
-            "quantity": item.get("quantity"),
-            "unit": item.get("unit"),
+            "quantity": recipe_base_ingredient_quantity(item, recipe_data),
+            "unit": recipe_base_ingredient_unit(item, recipe_data),
         }
         for item in recipe_data.get("ingredients", [])
         if isinstance(item, dict) and item.get("ingredient")
@@ -187,7 +194,7 @@ Rules:
 - Do not remove ingredients.
 
 Original servings:
-{recipe_data.get("servings")}
+{recipe_base_servings(recipe_data)}
 
 Ingredients:
 {json.dumps(ingredients, ensure_ascii=False)}
@@ -244,8 +251,11 @@ def calculate_scaled_values_locally(recipe_data, quantity):
         if not name:
             continue
 
-        scaled_quantity = scale_quantity(item.get("quantity"), quantity)
-        unit = item.get("unit")
+        scaled_quantity = scale_quantity(
+            recipe_base_ingredient_quantity(item, recipe_data),
+            quantity,
+        )
+        unit = recipe_base_ingredient_unit(item, recipe_data)
         scaled_ingredients[name] = {
             "quantity": scaled_quantity,
             "unit": unit,
@@ -253,9 +263,84 @@ def calculate_scaled_values_locally(recipe_data, quantity):
         }
 
     return {
-        "servings": scale_servings(recipe_data.get("servings"), quantity),
+        "servings": scale_servings(recipe_base_servings(recipe_data), quantity),
         "ingredients": scaled_ingredients,
     }
+
+
+def recipe_selected_multiplier(recipe_data):
+    recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
+    scaling = recipe_data.get("scaling")
+    scaling = scaling if isinstance(scaling, dict) else {}
+    selected = (
+        scaling.get("selected_multiplier")
+        if scaling.get("selected_multiplier") is not None
+        else scaling.get("scaling_multiplier")
+    )
+    return normalize_recipe_quantity(selected or 1)
+
+
+def effective_recipe_quantity(stored_quantity, recipe_data=None):
+    """Return one shopping multiplier without composing legacy scale fields."""
+    stored = normalize_recipe_quantity(stored_quantity or 1)
+    if not multipliers_match(stored, 1):
+        return stored
+    return recipe_selected_multiplier(recipe_data)
+
+
+def recipe_base_servings(recipe_data):
+    recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
+    scaling = recipe_data.get("scaling")
+    scaling = scaling if isinstance(scaling, dict) else {}
+    servings = recipe_data.get("servings")
+    base_servings = scaling.get("base_servings")
+
+    selected_multiplier = recipe_selected_multiplier(recipe_data)
+    if not multipliers_match(selected_multiplier, 1):
+        if base_servings not in (None, ""):
+            return base_servings
+        return scale_servings(servings, 1 / selected_multiplier)
+    return servings if servings not in (None, "") else base_servings
+
+
+def recipe_base_ingredient_quantity(ingredient, recipe_data=None):
+    ingredient = ingredient if isinstance(ingredient, dict) else {}
+    current = ingredient.get("quantity")
+    base = ingredient.get("base_quantity")
+
+    selected_multiplier = recipe_selected_multiplier(recipe_data)
+    if not multipliers_match(selected_multiplier, 1):
+        if base not in (None, ""):
+            return base
+        return scale_quantity(current, 1 / selected_multiplier)
+    return current if current not in (None, "") else base
+
+
+def recipe_base_ingredient_unit(ingredient, recipe_data=None):
+    ingredient = ingredient if isinstance(ingredient, dict) else {}
+    current = ingredient.get("unit")
+    base = ingredient.get("base_unit")
+
+    if base not in (None, "") and not multipliers_match(
+        recipe_selected_multiplier(recipe_data),
+        1,
+    ):
+        return base
+    return current if current not in (None, "") else base
+
+
+def scaled_recipe_metadata_matches(recipe_meta, quantity):
+    recipe_meta = recipe_meta if isinstance(recipe_meta, dict) else {}
+    return (
+        recipe_meta.get("scaling_model") == RECIPE_SCALING_MODEL
+        and multipliers_match(recipe_meta.get("quantity", 1), quantity)
+    )
+
+
+def multipliers_match(left, right):
+    return abs(
+        float(normalize_recipe_quantity(left)) - float(normalize_recipe_quantity(right))
+    ) < 0.000001
 
 
 def normalize_scaled_values(data):
