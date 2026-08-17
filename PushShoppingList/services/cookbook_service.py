@@ -115,6 +115,7 @@ COOKBOOK_MENU_MODES = (
         "sections": (
             "🇺🇸 American",
             "🇲🇽 Mexican",
+            "🇵🇪 Peruvian",
             "🇮🇹 Italian",
             "🇯🇵 Japanese",
             "🇹🇭 Thai",
@@ -153,6 +154,7 @@ COOKBOOK_MENU_MODES = (
             "🍳 Breakfast",
             "🥪 Lunch",
             "🍽️ Dinner",
+            "🥟 Appetizer",
             "🥗 Side Dish",
             "🍰 Dessert",
             "🍹 Drink",
@@ -169,6 +171,7 @@ COOKBOOK_MENU_MODES = (
         "sections": (
             "🔥 Grilled",
             "🍳 Skillet",
+            "🍲 Stovetop / Boiled",
             "🥘 One Pot",
             "🍲 Slow Cooker",
             "♨️ Oven Baked",
@@ -208,6 +211,7 @@ COOKBOOK_MENU_MODES = (
             "🧂 Low Sodium",
             "🔥 Spicy",
             "🍬 Low Sugar",
+            "🍽️ Flexible",
         ),
         "fallback": "🍽️ Flexible",
     },
@@ -879,6 +883,14 @@ def infer_prep_time_group(recipe, text):
 
 def infer_recipe_categories(recipe):
     text = recipe_text_for_inference(recipe)
+    # Broth and stock describe a supporting ingredient, not the recipe's dominant
+    # protein. Keep those words available for dietary validation while excluding
+    # them from the main-ingredient protein pass.
+    main_ingredient_text = re.sub(
+        r"\b(?:chicken|turkey|beef|pork|fish|seafood)\s+(?:broth|stock|bouillon)\b",
+        " ",
+        text,
+    )
     metadata = {
         "meal_type": "",
         "cuisine": "",
@@ -893,6 +905,8 @@ def infer_recipe_categories(recipe):
         metadata["meal_type"] = "🍹 Drink"
     elif text_has_any(text, "cake", "cookie", "brownie", "pie", "cobbler", "muffin", "chocolate", "dessert", "ice cream"):
         metadata["meal_type"] = "🍰 Dessert"
+    elif text_has_any(text, "appetizer", "appetizers", "starter", "starters", "small plate"):
+        metadata["meal_type"] = "🥟 Appetizer"
     elif text_has_any(text, "soup", "stew", "chowder", "bisque"):
         metadata["meal_type"] = "🥣 Soup"
     elif text_has_any(text, "breakfast", "pancake", "waffle", "omelet", "frittata", "scramble"):
@@ -908,7 +922,9 @@ def infer_recipe_categories(recipe):
     else:
         metadata["meal_type"] = "🍽️ Dinner"
 
-    if text_has_any(text, "taco", "burrito", "enchilada", "fajita", "salsa", "queso", "margarita", "carnitas", "verde", "tortilla"):
+    if text_has_any(text, "peruvian", "peru", "huancaina", "huancaína", "aji amarillo", "ají amarillo", "inca pepper", "ceviche", "lomo saltado", "causa limeña"):
+        metadata["cuisine"] = "🇵🇪 Peruvian"
+    elif text_has_any(text, "taco", "burrito", "enchilada", "fajita", "salsa", "queso fresco", "margarita", "carnitas", "tortilla", "mole poblano"):
         metadata["cuisine"] = "🇲🇽 Mexican"
     elif text_has_any(text, "alfredo", "pasta", "ravioli", "lasagna", "spaghetti", "pizza", "parmesan", "risotto", "pesto"):
         metadata["cuisine"] = "🇮🇹 Italian"
@@ -927,13 +943,13 @@ def infer_recipe_categories(recipe):
     else:
         metadata["cuisine"] = "🌍 Other / Fusion"
 
-    if text_has_any(text, "chicken", "turkey"):
+    if text_has_any(main_ingredient_text, "chicken", "turkey"):
         metadata["main_ingredient"] = "🐔 Chicken"
-    elif text_has_any(text, "beef", "steak", "ground beef", "short rib", "brisket"):
+    elif text_has_any(main_ingredient_text, "beef", "steak", "ground beef", "short rib", "brisket"):
         metadata["main_ingredient"] = "🥩 Beef"
-    elif text_has_any(text, "pork", "bacon", "ham", "sausage", "prosciutto"):
+    elif text_has_any(main_ingredient_text, "pork", "bacon", "ham", "sausage", "prosciutto"):
         metadata["main_ingredient"] = "🐷 Pork"
-    elif text_has_any(text, "fish", "salmon", "tuna", "shrimp", "crab", "cod", "seafood", "lobster"):
+    elif text_has_any(main_ingredient_text, "fish", "salmon", "tuna", "shrimp", "crab", "cod", "seafood", "lobster"):
         metadata["main_ingredient"] = "🐟 Seafood"
     elif text_has_any(text, "egg", "eggs", "omelet", "frittata"):
         metadata["main_ingredient"] = "🥚 Eggs"
@@ -952,6 +968,8 @@ def infer_recipe_categories(recipe):
 
     if text_has_any(text, "grill", "grilled", "bbq", "barbecue"):
         metadata["cooking_method"] = "🔥 Grilled"
+    elif text_has_any(text, "boil", "boiled", "simmer", "simmered", "stovetop", "saucepan"):
+        metadata["cooking_method"] = "🍲 Stovetop / Boiled"
     elif text_has_any(text, "skillet", "pan fry", "pan-fry", "saute", "sauté"):
         metadata["cooking_method"] = "🍳 Skillet"
     elif text_has_any(text, "one pot", "one-pot", "dutch oven"):
@@ -984,13 +1002,27 @@ def infer_recipe_categories(recipe):
     elif metadata["meal_type"] == "🍽️ Dinner":
         metadata["occasion"] = "👨‍👩‍👧 Family Dinner"
 
+    animal_ingredient_terms = (
+        "chicken", "turkey", "beef", "pork", "bacon", "ham", "sausage",
+        "fish", "salmon", "tuna", "shrimp", "crab", "seafood", "chicken broth",
+        "beef broth", "gelatin", "lard",
+    )
+    high_carb_staples = (
+        "potato", "potatoes", "rice", "pasta", "noodle", "bread", "tortilla",
+        "corn", "flour", "sugar", "yuca", "cassava",
+    )
+    has_animal_ingredients = text_has_any(text, *animal_ingredient_terms)
+    has_high_carb_staple = text_has_any(text, *high_carb_staples)
+
     if metadata["main_ingredient"] in {"🐔 Chicken", "🥩 Beef", "🐷 Pork", "🐟 Seafood", "🥚 Eggs"} or "protein" in text:
         metadata["dietary_preference"] = "🥩 High Protein"
-    if text_has_any(text, "low carb", "keto") or (metadata["meal_type"] == "🥗 Side Dish" and "salad" in text):
+    if (text_has_any(text, "low carb", "low-carb", "keto") and not has_high_carb_staple) or (
+        metadata["meal_type"] == "🥗 Side Dish" and "salad" in text and not has_high_carb_staple
+    ):
         metadata["dietary_preference"] = "🥗 Low Carb"
-    if "vegan" in text:
+    if "vegan" in text and not has_animal_ingredients and not text_has_any(text, "milk", "cream", "cheese", "egg"):
         metadata["dietary_preference"] = "🌱 Vegan"
-    elif metadata["main_ingredient"] == "🥬 Vegetarian" or "vegetarian" in text:
+    elif (metadata["main_ingredient"] == "🥬 Vegetarian" or "vegetarian" in text) and not has_animal_ingredients:
         metadata["dietary_preference"] = "🌱 Vegetarian"
     if text_has_any(text, "gluten free", "gluten-free"):
         metadata["dietary_preference"] = "🌾 Gluten Free"
@@ -998,10 +1030,10 @@ def infer_recipe_categories(recipe):
         metadata["dietary_preference"] = "🥛 Dairy Free"
     if text_has_any(text, "low sodium", "low-sodium"):
         metadata["dietary_preference"] = "🧂 Low Sodium"
-    if text_has_any(text, "spicy", "jalapeno", "jalapeño", "buffalo", "hot sauce"):
-        metadata["dietary_preference"] = "🔥 Spicy"
     if text_has_any(text, "low sugar", "low-sugar", "sugar free", "sugar-free"):
         metadata["dietary_preference"] = "🍬 Low Sugar"
+    if not metadata["dietary_preference"]:
+        metadata["dietary_preference"] = "🍽️ Flexible"
 
     metadata["prep_time_group"] = infer_prep_time_group(recipe, text)
     metadata["restaurant_menu_category"] = infer_restaurant_menu_category(metadata, text)

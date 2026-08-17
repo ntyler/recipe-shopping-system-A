@@ -782,7 +782,8 @@ def test_recipe_detail_fields_use_bounded_accessible_controls():
     assert "flex: 1 1 auto;" in styles
     assert "outline: 2px solid color-mix" in styles
     assert ".recipe-edit-total-time-field #recipeEditTotalTime" in styles
-    assert "font-size: 20px;" in styles
+    assert "font-size: 13px;" in styles
+    assert ".recipe-edit-total-time-status" in styles
 
 
 def test_recipe_metadata_strip_uses_equal_responsive_columns_without_internal_separators():
@@ -885,7 +886,7 @@ def test_recipe_metadata_controls_are_full_width_left_aligned_and_untruncated():
     assert "ellipsis" not in select_rule
 
 
-def test_recipe_time_breakdown_is_always_visible_in_the_secondary_details_row():
+def test_recipe_time_breakdown_prioritizes_core_fields_and_collapses_optional_details():
     script = read_text("PushShoppingList/static/js/app.js")
     css = read_text("PushShoppingList/static/css/app.css")
     organizer = script[
@@ -896,12 +897,17 @@ def test_recipe_time_breakdown_is_always_visible_in_the_secondary_details_row():
     styles = css[css.index(marker):]
 
     assert 'detailsHeading.textContent = "Recipe Details"' in organizer
-    assert "appendRecipeEditWorkspaceChildren(detailsPrimaryRow, [servingsField, scaleField, totalField])" in organizer
-    assert "appendRecipeEditWorkspaceChildren(detailsSecondaryRow, [prepField, cookField, inactiveField, levelField])" in organizer
+    assert "appendRecipeEditWorkspaceChildren(detailsPrimaryRow, [servingsField, prepField, cookField, totalField])" in organizer
+    assert "appendRecipeEditWorkspaceChildren(cookingDetailsBody, [inactiveField, levelField])" in organizer
+    assert 'scaleSummary.textContent = "Scale recipe"' in organizer
+    assert "More cooking details" in organizer
+    assert "syncRecipeEditTotalTimeStatus" in organizer
     assert "timeBreakdownGroup" not in organizer
     assert "setRecipeEditTimeBreakdownExpanded" not in organizer
     assert ".recipe-edit-details-primary-grid" in styles
     assert ".recipe-edit-details-secondary-grid" in styles
+    assert ".recipe-edit-scale-disclosure" in styles
+    assert ".recipe-edit-optional-details" in styles
     assert "grid-template-columns: repeat(4, minmax(0, 1fr));" in styles
 
 
@@ -933,6 +939,7 @@ def test_recipe_total_time_calculation_preserves_manual_override_and_saved_compo
     assert "function calculateRecipeEditTimeBreakdownMinutes()" in calculation
     assert "lastCalculatedMinutes" in calculation
     assert "manualOverride" in calculation
+    assert "syncRecipeEditTotalTimeStatus();" in calculation
     assert "const totalIsBlank" in calculation
     assert "stillMatchesPreviousSum" in calculation
     assert "!state.manualOverride && stillMatchesPreviousSum" in calculation
@@ -1605,7 +1612,7 @@ def test_source_documents_card_uses_compact_rows_and_edit_modal():
     assert "recipe-edit-context-chevron" not in card
     assert '<summary class="recipe-edit-source-documents-header">' in card
     assert 'ontoggle="if (!this.open) closeRecipeSourceDocumentsHelp()"' in card
-    assert "open>" in card
+    assert "open>" not in card
     assert "recipe-edit-source-documents-toggle" not in card
     assert 'class="recipe-edit-source-documents-edit"' in card
     assert "toggleRecipeSourceDocumentsCard" not in script

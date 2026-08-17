@@ -23815,6 +23815,7 @@ function populateRecipeEditCategories(recipe = {}) {
     renderRecipeEditMultiselect("cuisine");
     renderRecipeEditMultiselect("dietary");
     renderRecipeEditMultiselect("custom");
+    refreshRecipeEditCategorySuggestions();
 }
 
 function bindRecipeEditCategorySourceTracking() {
@@ -23836,6 +23837,7 @@ function bindRecipeEditCategorySourceTracking() {
             setFormCategorySource(form, field, CATEGORY_SOURCE_USER_SELECTED);
             setRecipeEditCategorySourceLabel("Saved");
             if (field === "custom_categories") renderRecipeEditCustomCategoryChips();
+            refreshRecipeEditCategorySuggestions();
         };
 
         input.addEventListener("change", markUserSelected);
@@ -23966,6 +23968,124 @@ function setRecipeEditCategorySourceLabel(label) {
     }
 }
 
+function recipeEditCategorySuggestionControl(field) {
+    const form = document.getElementById("recipeEditForm");
+    const input = form ? form.elements[field] : null;
+    if (!input) return null;
+    if (["cuisine", "dietary_preference", "custom_categories"].includes(field)) {
+        return input.closest("[data-recipe-edit-multiselect-field]")
+            ?.querySelector("[data-recipe-edit-multiselect-search]") || input;
+    }
+    return input;
+}
+
+function refreshRecipeEditCategorySuggestions() {
+    const form = document.getElementById("recipeEditForm");
+    const summary = document.querySelector("[data-recipe-edit-ai-suggestion-summary]");
+    if (!form) return;
+    const values = collectRecipeEditorCategoryValues();
+    const sources = collectRecipeEditorCategorySources();
+    const suggestedFields = RECIPE_EDIT_CATEGORY_ALL_FIELD_NAMES.filter(field => (
+        field !== "prep_time_group"
+        &&
+        recipeEditCategorySuggestionValue(values, field)
+        && sources[field] === CATEGORY_SOURCE_AI_INFERRED
+    ));
+
+    document.querySelectorAll("[data-recipe-edit-category-field]").forEach(fieldElement => {
+        const field = fieldElement.dataset.recipeEditCategoryField || "";
+        const suggested = suggestedFields.includes(field);
+        fieldElement.classList.toggle("is-ai-suggested", suggested);
+        const actions = fieldElement.querySelector("[data-recipe-edit-ai-field-actions]");
+        if (actions) actions.hidden = !suggested;
+    });
+
+    if (summary) {
+        summary.hidden = suggestedFields.length === 0;
+        const count = summary.querySelector("[data-recipe-edit-ai-suggestion-count]");
+        if (count) count.textContent = `${suggestedFields.length} ${suggestedFields.length === 1 ? "field" : "fields"}`;
+    }
+    document.querySelectorAll("[data-recipe-edit-optional-suggestion-count]").forEach(count => {
+        const details = count.closest("details");
+        const optionalFields = Array.from(details?.querySelectorAll("[data-recipe-edit-category-field]") || [])
+            .map(item => item.dataset.recipeEditCategoryField || "");
+        const optionalCount = suggestedFields.filter(field => optionalFields.includes(field)).length;
+        count.hidden = optionalCount === 0;
+        count.textContent = optionalCount ? `${optionalCount} suggested` : "";
+    });
+    setRecipeEditCategorySourceLabel(suggestedFields.length ? "AI suggestions" : "Saved");
+}
+
+function acceptRecipeEditCategorySuggestion(button) {
+    const field = button?.closest("[data-recipe-edit-category-field]")?.dataset.recipeEditCategoryField || "";
+    const form = document.getElementById("recipeEditForm");
+    if (!field || !form) return false;
+    setFormCategorySource(form, field, CATEGORY_SOURCE_USER_SELECTED);
+    refreshRecipeEditCategorySuggestions();
+    updateRecipeEditorDirtyState(form);
+    setRecipeEditStatus("Suggestion accepted. Save Recipe to keep it.");
+    return false;
+}
+
+function editRecipeEditCategorySuggestion(button) {
+    const fieldElement = button?.closest("[data-recipe-edit-category-field]");
+    const field = fieldElement?.dataset.recipeEditCategoryField || "";
+    const disclosure = fieldElement?.closest("details");
+    if (disclosure) disclosure.open = true;
+    window.requestAnimationFrame(() => {
+        const control = recipeEditCategorySuggestionControl(field);
+        control?.focus({ preventScroll: true });
+        if (control && control.matches("[data-recipe-edit-multiselect-search]")) control.click();
+    });
+    return false;
+}
+
+function dismissRecipeEditCategorySuggestion(button) {
+    const field = button?.closest("[data-recipe-edit-category-field]")?.dataset.recipeEditCategoryField || "";
+    const form = document.getElementById("recipeEditForm");
+    if (!field || !form) return false;
+    if (field === "cuisine") {
+        setRecipeEditCuisineCategories([], { source: CATEGORY_SOURCE_BLANK });
+    } else if (field === "dietary_preference") {
+        setRecipeEditDietaryPreferences([], { source: CATEGORY_SOURCE_BLANK });
+    } else if (field === "custom_categories") {
+        setRecipeEditCustomCategories([], { source: CATEGORY_SOURCE_BLANK });
+    } else {
+        setCookbookCategoryFieldValue(form, field, "");
+        setFormCategorySource(form, field, CATEGORY_SOURCE_BLANK);
+    }
+    refreshRecipeEditCategorySuggestions();
+    updateRecipeEditorDirtyState(form);
+    setRecipeEditStatus("Suggestion dismissed. Save Recipe to keep the change.");
+    return false;
+}
+
+function prepareRecipeEditCategorySuggestionField(fieldElement, field) {
+    if (!fieldElement || fieldElement.dataset.recipeEditCategoryField) return;
+    fieldElement.dataset.recipeEditCategoryField = field;
+    const actions = document.createElement("div");
+    actions.className = "recipe-edit-ai-field-actions";
+    actions.dataset.recipeEditAiFieldActions = "";
+    actions.hidden = true;
+    actions.setAttribute("aria-label", "AI suggestion actions");
+    const status = document.createElement("span");
+    status.textContent = "Suggested";
+    const accept = document.createElement("button");
+    accept.type = "button";
+    accept.textContent = "Accept";
+    accept.addEventListener("click", () => acceptRecipeEditCategorySuggestion(accept));
+    const edit = document.createElement("button");
+    edit.type = "button";
+    edit.textContent = "Edit";
+    edit.addEventListener("click", () => editRecipeEditCategorySuggestion(edit));
+    const dismiss = document.createElement("button");
+    dismiss.type = "button";
+    dismiss.textContent = "Dismiss";
+    dismiss.addEventListener("click", () => dismissRecipeEditCategorySuggestion(dismiss));
+    actions.append(status, accept, edit, dismiss);
+    fieldElement.appendChild(actions);
+}
+
 function applyRecipeEditCategorySuggestions(categories = {}, mode = "missing") {
     const form = document.getElementById("recipeEditForm");
     const overwrite = mode === "all";
@@ -24018,10 +24138,11 @@ function applyRecipeEditCategorySuggestions(categories = {}, mode = "missing") {
     }
 
     if (applied) {
-        setRecipeEditCategorySourceLabel("AI inferred");
+        setRecipeEditCategorySourceLabel("AI suggestions");
         renderRecipeEditMultiselect("cuisine");
         renderRecipeEditMultiselect("dietary");
         renderRecipeEditMultiselect("custom");
+        refreshRecipeEditCategorySuggestions();
     }
 }
 
@@ -26819,13 +26940,6 @@ function renderRecipeEditMultiselect(kind) {
         const text = document.createElement("span");
         text.textContent = value;
         chip.appendChild(text);
-        if (aiInferred) {
-            const badge = document.createElement("span");
-            badge.className = "recipe-edit-tag-chip-ai";
-            badge.textContent = "AI";
-            badge.setAttribute("aria-label", "AI inferred");
-            chip.appendChild(badge);
-        }
         const remove = document.createElement("button");
         remove.type = "button";
         remove.dataset.recipeEditMultiselectRemove = String(index);
@@ -27717,6 +27831,7 @@ function initializeRecipeEditTotalTimeCalculation() {
             && !recipeEditDurationMinutesMatch(totalMinutes, calculatedMinutes)
         ),
     });
+    syncRecipeEditTotalTimeStatus();
 }
 
 function updateRecipeEditCalculatedTotalTime() {
@@ -27741,6 +27856,7 @@ function updateRecipeEditCalculatedTotalTime() {
     }
     state.lastCalculatedMinutes = calculatedMinutes;
     recipeEditTotalTimeCalculationStates.set(form, state);
+    syncRecipeEditTotalTimeStatus();
 }
 
 function updateRecipeEditTotalTimeOverrideState() {
@@ -27762,6 +27878,24 @@ function updateRecipeEditTotalTimeOverrideState() {
         )
     );
     recipeEditTotalTimeCalculationStates.set(form, state);
+    syncRecipeEditTotalTimeStatus();
+}
+
+function syncRecipeEditTotalTimeStatus() {
+    const form = document.getElementById("recipeEditForm");
+    const totalInput = document.getElementById("recipeEditTotalTime");
+    const status = document.querySelector("[data-recipe-edit-total-time-status]");
+    if (!form || !totalInput || !status) return;
+    const state = recipeEditTotalTimeCalculationStates.get(form) || {};
+    const calculatedMinutes = calculateRecipeEditTimeBreakdownMinutes();
+    const isCalculated = calculatedMinutes !== null
+        && !state.manualOverride
+        && recipeEditDurationMinutesMatch(parseRecipeEditDurationMinutes(totalInput.value), calculatedMinutes);
+    status.textContent = isCalculated ? "Calculated" : "Manual total";
+    status.title = isCalculated
+        ? "Calculated from prep, cook, and inactive time."
+        : "This total differs from the calculated time breakdown.";
+    status.classList.toggle("is-manual", !isCalculated);
 }
 
 function bindRecipeEditTotalTimeCalculation() {
@@ -27772,6 +27906,7 @@ function bindRecipeEditTotalTimeCalculation() {
         document.getElementById(id)?.addEventListener("input", updateRecipeEditCalculatedTotalTime);
     });
     totalInput.addEventListener("input", updateRecipeEditTotalTimeOverrideState);
+    syncRecipeEditTotalTimeStatus();
 }
 
 function bindRecipeEditNameInput(input) {
@@ -27988,11 +28123,30 @@ function organizeRecipeEditInformationCard() {
     detailsHeading.textContent = "Recipe Details";
     const detailsPrimaryRow = document.createElement("div");
     detailsPrimaryRow.className = "recipe-edit-details-primary-grid";
-    const detailsSecondaryRow = document.createElement("div");
-    detailsSecondaryRow.className = "recipe-edit-details-secondary-grid";
-    appendRecipeEditWorkspaceChildren(detailsPrimaryRow, [servingsField, scaleField, totalField]);
-    appendRecipeEditWorkspaceChildren(detailsSecondaryRow, [prepField, cookField, inactiveField, levelField]);
-    appendRecipeEditWorkspaceChildren(detailsSection, [detailsHeading, detailsPrimaryRow, detailsSecondaryRow]);
+    appendRecipeEditWorkspaceChildren(detailsPrimaryRow, [servingsField, prepField, cookField, totalField]);
+    if (totalField && !totalField.querySelector("[data-recipe-edit-total-time-status]")) {
+        const totalStatus = document.createElement("span");
+        totalStatus.className = "recipe-edit-total-time-status";
+        totalStatus.dataset.recipeEditTotalTimeStatus = "";
+        totalField.appendChild(totalStatus);
+    }
+    if (servingsField && scaleField) {
+        const scaleDisclosure = document.createElement("details");
+        scaleDisclosure.className = "recipe-edit-scale-disclosure";
+        const scaleSummary = document.createElement("summary");
+        scaleSummary.textContent = "Scale recipe";
+        scaleDisclosure.append(scaleSummary, scaleField);
+        servingsField.appendChild(scaleDisclosure);
+    }
+    const cookingDetails = document.createElement("details");
+    cookingDetails.className = "recipe-edit-optional-details recipe-edit-cooking-details";
+    const cookingSummary = document.createElement("summary");
+    cookingSummary.innerHTML = '<span>More cooking details</span><span>Inactive Time, Difficulty</span>';
+    const cookingDetailsBody = document.createElement("div");
+    cookingDetailsBody.className = "recipe-edit-details-secondary-grid";
+    appendRecipeEditWorkspaceChildren(cookingDetailsBody, [inactiveField, levelField]);
+    cookingDetails.append(cookingSummary, cookingDetailsBody);
+    appendRecipeEditWorkspaceChildren(detailsSection, [detailsHeading, detailsPrimaryRow, cookingDetails]);
 
     const classificationHeadingRow = document.createElement("div");
     classificationHeadingRow.className = "recipe-edit-form-section-heading";
@@ -28005,17 +28159,35 @@ function organizeRecipeEditInformationCard() {
     classificationPrimaryRow.className = "recipe-edit-classification-grid recipe-edit-classification-primary-grid";
     appendRecipeEditWorkspaceChildren(
         classificationPrimaryRow,
-        [mealTypeField, mainIngredientField, cookingMethodField],
+        [mealTypeField, cuisineCategoryField, dietaryPreferenceField],
     );
+    const suggestionSummary = document.createElement("div");
+    suggestionSummary.className = "recipe-edit-ai-suggestion-summary";
+    suggestionSummary.dataset.recipeEditAiSuggestionSummary = "";
+    suggestionSummary.hidden = true;
+    suggestionSummary.setAttribute("role", "status");
+    suggestionSummary.setAttribute("aria-live", "polite");
+    suggestionSummary.innerHTML = '<span>AI suggestions &mdash; review before saving</span><span data-recipe-edit-ai-suggestion-count></span>';
+    const classificationDetails = document.createElement("details");
+    classificationDetails.className = "recipe-edit-optional-details recipe-edit-classification-details";
+    const classificationDetailsSummary = document.createElement("summary");
+    classificationDetailsSummary.innerHTML = '<span>More classification details</span><span>Main Ingredient, Cooking Method, Occasion, Custom Tags</span><span data-recipe-edit-optional-suggestion-count hidden></span>';
     const classificationSecondaryRow = document.createElement("div");
     classificationSecondaryRow.className = "recipe-edit-classification-grid recipe-edit-classification-secondary-grid";
     appendRecipeEditWorkspaceChildren(
         classificationSecondaryRow,
-        [occasionField, dietaryPreferenceField, cuisineCategoryField],
+        [mainIngredientField, cookingMethodField, occasionField, customCategoriesField],
     );
-    const customCategoryRow = document.createElement("div");
-    customCategoryRow.className = "recipe-edit-custom-category-tag-row";
-    appendRecipeEditWorkspaceChildren(customCategoryRow, [customCategoriesField]);
+    classificationDetails.append(classificationDetailsSummary, classificationSecondaryRow);
+    [
+        [mealTypeField, "meal_type"],
+        [cuisineCategoryField, "cuisine"],
+        [dietaryPreferenceField, "dietary_preference"],
+        [mainIngredientField, "main_ingredient"],
+        [cookingMethodField, "cooking_method"],
+        [occasionField, "occasion"],
+        [customCategoriesField, "custom_categories"],
+    ].forEach(([fieldElement, field]) => prepareRecipeEditCategorySuggestionField(fieldElement, field));
     if (categoriesPanel) {
         categoriesPanel.classList.add("recipe-edit-form-section", "recipe-edit-classification-section");
         categoriesPanel.setAttribute("aria-labelledby", "recipeEditClassificationHeading");
@@ -28023,8 +28195,8 @@ function organizeRecipeEditInformationCard() {
         appendRecipeEditWorkspaceChildren(categoriesPanel, [
             classificationHeadingRow,
             classificationPrimaryRow,
-            classificationSecondaryRow,
-            customCategoryRow,
+            suggestionSummary,
+            classificationDetails,
             prepTimeGroupInput,
         ]);
     }
@@ -28090,9 +28262,11 @@ function organizeRecipeEditInformationCard() {
     bindRecipeEditTotalTimeCalculation();
     syncRecipeEditServingsStepper();
     syncRecipeEditScaleSegments();
+    syncRecipeEditTotalTimeStatus();
     renderRecipeEditMultiselect("cuisine");
     renderRecipeEditMultiselect("dietary");
     renderRecipeEditMultiselect("custom");
+    refreshRecipeEditCategorySuggestions();
 }
 
 function organizeRecipeEditAiAssistant() {

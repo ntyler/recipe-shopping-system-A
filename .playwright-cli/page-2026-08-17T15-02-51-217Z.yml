@@ -1,0 +1,162 @@
+- generic [active] [ref=f7e1]:
+  - link "Skip to content" [ref=f7e2] [cursor=pointer]:
+    - /url: "#appContent"
+  - generic [ref=f7e3]:
+    - complementary "Primary navigation" [ref=f7e4]:
+      - link "AI Pantry home" [ref=f7e5] [cursor=pointer]:
+        - /url: /
+        - generic [ref=f7e13]:
+          - strong [ref=f7e14]: AI Pantry
+          - generic [ref=f7e15]: Recipe Shopping List
+      - button "Collapse sidebar" [ref=f7e16] [cursor=pointer]:
+        - generic [ref=f7e17]: ‹ <
+      - navigation "App sections" [ref=f7e18]:
+        - generic [ref=f7e19]: MAIN
+        - link "Home" [ref=f7e20] [cursor=pointer]:
+          - /url: "#appPageHeader"
+        - link "Recipes" [ref=f7e26] [cursor=pointer]:
+          - /url: "#recipesPage"
+        - link "Menus" [ref=f7e31] [cursor=pointer]:
+          - /url: "#menusPage"
+        - link "Cookbooks" [ref=f7e35] [cursor=pointer]:
+          - /url: "#cookbooksCard"
+        - link "Shopping Lists" [ref=f7e40] [cursor=pointer]:
+          - /url: "#shoppingViewsSection"
+        - link "Pantry" [ref=f7e47] [cursor=pointer]:
+          - /url: "#aiPantrySection"
+        - link "Meal Planner" [ref=f7e53] [cursor=pointer]:
+          - /url: "#mealPlannerPage"
+        - generic [ref=f7e58]: SHOP
+        - link "Stores" [ref=f7e59] [cursor=pointer]:
+          - /url: "#storesPage"
+        - link "Compare Prices" [ref=f7e66] [cursor=pointer]:
+          - /url: "#priceComparisonPage"
+        - generic [ref=f7e72]: TOOLS
+        - link "Import" [ref=f7e73] [cursor=pointer]:
+          - /url: "#importPage"
+        - link "Scan Barcode" [ref=f7e79] [cursor=pointer]:
+          - /url: /pantry/coming-soon
+        - generic [ref=f7e83]: ACCOUNT
+        - link "Usage and Billing" [ref=f7e84] [cursor=pointer]:
+          - /url: "#accountUsageDashboardPanel"
+          - generic [ref=f7e88]: Usage & Billing
+        - link "Help and Support" [ref=f7e89] [cursor=pointer]:
+          - /url: "#feedbackSupportSection"
+          - generic [ref=f7e94]: Help & Support
+        - link "Settings" [ref=f7e95] [cursor=pointer]:
+          - /url: "#settingsWorkspaceSection"
+      - complementary "AI Pantry Pro" [ref=f7e101]:
+        - generic [ref=f7e105]:
+          - strong [ref=f7e106]: AI Pantry Pro
+          - generic [ref=f7e107]: Unlock more from your pantry.
+          - list "Plan benefits" [ref=f7e108]:
+            - listitem [ref=f7e109]: More imports
+            - listitem [ref=f7e110]: Advanced AI tools
+            - listitem [ref=f7e111]: Faster processing
+        - link "View AI Pantry Pro plans" [ref=f7e112] [cursor=pointer]:
+          - /url: "#accountUsageDashboardPanel"
+          - generic [ref=f7e113]: View Plans
+    - generic [ref=f7e114]:
+      - banner "App toolbar" [ref=f7e115]:
+        - search [ref=f7e117]:
+          - generic [ref=f7e118]: Search AI Pantry
+          - combobox "Search AI Pantry" [ref=f7e119]
+          - generic: Ctrl + K
+          - button "Search" [ref=f7e120] [cursor=pointer]
+        - generic "Quick actions" [ref=f7e122]:
+          - link "Import" [ref=f7e123] [cursor=pointer]:
+            - /url: "#importPage"
+          - link "Notifications" [ref=f7e126] [cursor=pointer]:
+            - /url: "#notificationsPage"
+        - link "Open Guest Demo account" [ref=f7e132] [cursor=pointer]:
+          - /url: "#userAccountSection"
+          - generic [ref=f7e133]: G
+          - generic [ref=f7e134]:
+            - strong [ref=f7e135]: Guest Demo
+            - generic [ref=f7e136]: Temporary workspace
+      - main [ref=f7e137]:
+        - generic [ref=f7e139]:
+          - heading "Welcome back, Guest!" [level=1] [ref=f7e140]: Welcome back, Guest! 👋
+          - paragraph [ref=f7e141]: Let's get cooking. Here's what's happening in your kitchen.
+        - status [ref=f7e142]:
+          - generic [ref=f7e143]:
+            - strong [ref=f7e144]: Guest Demo Mode
+            - generic [ref=f7e145]: your data is temporary and will be deleted after 24 hours.
+            - generic [ref=f7e146]:
+              - text: "Expires in:"
+              - strong [ref=f7e147]: 23:57:33
+          - generic [ref=f7e148]:
+            - link "Create a full account from this guest demo" [ref=f7e149] [cursor=pointer]:
+              - /url: "#userAccountSection"
+              - text: Create Full Account
+            - link "Sign in to an existing account from this guest demo" [ref=f7e150] [cursor=pointer]:
+              - /url: "#userAccountSection"
+              - text: Sign In
+        - region "Home dashboard" [ref=f7e151]:
+          - generic [ref=f7e152]:
+            - link "My Shopping List 0 items ready to review" [ref=f7e153] [cursor=pointer]:
+              - /url: "#shoppingViewsSection"
+              - generic [ref=f7e160]: My Shopping List
+              - strong [ref=f7e161]: "0"
+              - generic [ref=f7e162]: items ready to review
+            - link "My Recipes 0 saved recipes" [ref=f7e163] [cursor=pointer]:
+              - /url: "#recipesPage"
+              - generic [ref=f7e169]: My Recipes
+              - strong [ref=f7e170]: "0"
+              - generic [ref=f7e171]: saved recipes
+            - link "Cookbooks 0 0 assigned recipes" [ref=f7e172] [cursor=pointer]:
+              - /url: "#cookbooksCard"
+              - generic [ref=f7e177]: Cookbooks
+              - strong [ref=f7e178]: "0"
+              - generic [ref=f7e179]: 0 assigned recipes
+            - link "Pantry Items 0 inventory ready" [ref=f7e180] [cursor=pointer]:
+              - /url: "#aiPantrySection"
+              - generic [ref=f7e187]: Pantry Items
+              - strong [ref=f7e188]: "0"
+              - generic [ref=f7e189]: inventory ready
+          - generic [ref=f7e190]:
+            - region "Recent recipes" [ref=f7e191]:
+              - generic [ref=f7e192]:
+                - heading "Recent Recipes" [level=2] [ref=f7e193]
+                - link "View all" [ref=f7e194] [cursor=pointer]:
+                  - /url: "#recipesPage"
+              - generic [ref=f7e195]:
+                - strong [ref=f7e196]: No recipes yet.
+                - generic [ref=f7e197]: Import a recipe URL or create a recipe to see it here.
+                - link "Import recipe URLs" [ref=f7e198] [cursor=pointer]:
+                  - /url: "#recipeUrlsPage"
+            - region "Upcoming meal plan" [ref=f7e199]:
+              - generic [ref=f7e200]:
+                - heading "Upcoming Meal Plan" [level=2] [ref=f7e201]
+                - link "View planner" [ref=f7e202] [cursor=pointer]:
+                  - /url: "#mealPlannerPage"
+              - generic [ref=f7e203]:
+                - strong [ref=f7e204]: No meals planned for this week.
+                - generic [ref=f7e205]: Open Meal Planner to add recipes to breakfast, lunch, dinner, or snacks.
+                - button "Add a meal" [ref=f7e206] [cursor=pointer]
+          - generic [ref=f7e207]:
+            - region "Smart suggestions" [ref=f7e208]:
+              - heading "Smart Suggestions" [level=2] [ref=f7e210]
+              - generic [ref=f7e215]:
+                - strong [ref=f7e216]: Your pantry is ready to set up.
+                - generic [ref=f7e217]: Add pantry items to receive useful, data-backed suggestions.
+            - region "Price comparison" [ref=f7e218]:
+              - heading "Price Comparison" [level=2] [ref=f7e220]
+              - paragraph [ref=f7e225]: Compare current shopping items across your enabled stores. Prices appear only after a supported lookup.
+              - link "Compare prices" [ref=f7e226] [cursor=pointer]:
+                - /url: "#priceComparisonPage"
+            - region "Recent imports" [ref=f7e227]:
+              - generic [ref=f7e228]:
+                - heading "Recent Imports" [level=2] [ref=f7e229]
+                - link "View all" [ref=f7e230] [cursor=pointer]:
+                  - /url: "#jobActivitySection"
+              - generic [ref=f7e231]:
+                - strong [ref=f7e232]: No recent import jobs.
+                - generic [ref=f7e233]: Recipe and menu imports will appear here when they run.
+                - link "Start an import" [ref=f7e234] [cursor=pointer]:
+                  - /url: "#importPage"
+        - text: "> >"
+        - button "💬 Feedback & Support 0 requests" [ref=f7e236] [cursor=pointer]:
+          - generic [ref=f7e237]:
+            - generic [ref=f7e238]: 💬 Feedback & Support
+            - generic [ref=f7e239]: 0 requests

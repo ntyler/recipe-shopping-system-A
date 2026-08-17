@@ -112,9 +112,11 @@ def test_recipe_editor_consolidates_cuisine_and_custom_tags_in_classification():
         script.index("function organizeRecipeEditAiAssistant")
     ]
     assert 'classificationHeading.textContent = "Classification"' in organizer
-    assert "[mealTypeField, mainIngredientField, cookingMethodField]" in organizer
-    assert "[occasionField, dietaryPreferenceField, cuisineCategoryField]" in organizer
-    assert 'customCategoryRow.className = "recipe-edit-custom-category-tag-row"' in organizer
+    assert "[mealTypeField, cuisineCategoryField, dietaryPreferenceField]" in organizer
+    assert "[mainIngredientField, cookingMethodField, occasionField, customCategoriesField]" in organizer
+    assert "More classification details" in organizer
+    assert "AI suggestions &mdash; review before saving" in organizer
+    assert "prepareRecipeEditCategorySuggestionField" in organizer
     assert 'initializeRecipeEditMultiselectField(dietaryPreferenceField, "dietary")' in organizer
     assert 'initializeRecipeEditMultiselectField(cuisineCategoryField, "cuisine")' in organizer
     assert 'initializeRecipeEditMultiselectField(customCategoriesField, "custom")' in organizer
@@ -142,11 +144,18 @@ def test_recipe_editor_consolidates_cuisine_and_custom_tags_in_classification():
     assert 'setRecipeEditCustomCategories(mergedCustom' in script
     assert "function renderRecipeEditCategorySummary" not in script
     assert "function toggleRecipeEditCategories" not in script
+    assert "function acceptRecipeEditCategorySuggestion" in script
+    assert "function editRecipeEditCategorySuggestion" in script
+    assert "function dismissRecipeEditCategorySuggestion" in script
+    assert 'field !== "prep_time_group"' in script
+    assert "recipe-edit-tag-chip-ai" not in script
 
     marker = "/* Recipe details and classification: bounded responsive controls with consolidated tags. */"
     category_css = css[css.index(marker):]
     assert ".recipe-edit-classification-grid" in category_css
-    assert ".recipe-edit-custom-category-tag-row" in category_css
+    assert ".recipe-edit-optional-details" in category_css
+    assert ".recipe-edit-ai-suggestion-summary" in category_css
+    assert ".recipe-edit-ai-field-actions" in category_css
     assert ".recipe-edit-multiselect-control" in category_css
     assert ".recipe-edit-multiselect-options" in category_css
     assert "max-width: 100%;" in category_css
@@ -728,6 +737,66 @@ def test_recipe_category_inference_uses_total_time_and_keeps_vegan_out_of_main_i
     assert categories["prep_time_group"] == next(
         item for item in cookbook_service.cookbook_category_choices()["prep_time_group"] if "30" in item and "60" in item
     )
+
+
+def test_huancaina_inference_uses_source_evidence_and_rejects_false_dietary_labels():
+    payload = {
+        "recipe_title": "Papas a la Huancaína",
+        "description": (
+            "A classic Peruvian appetizer of tender potatoes served with a creamy, "
+            "mildly spicy huancaína cheese sauce."
+        ),
+        "menu_section": "APPETIZERS",
+        "ingredients": [
+            {"ingredient": "Yukon gold potatoes"},
+            {"ingredient": "queso fresco"},
+            {"ingredient": "evaporated milk"},
+            {"ingredient": "ají amarillo paste"},
+            {"ingredient": "chicken broth"},
+        ],
+        "instructions": [
+            {"instruction": "Boil the potatoes until tender."},
+            {"instruction": "Simmer the sauce in a saucepan."},
+        ],
+    }
+    fallback = cookbook_service.infer_recipe_categories(
+        recipe_edit_service.recipe_category_inference_record(payload)
+    )
+
+    assert "Appetizer" in fallback["meal_type"]
+    assert "Peruvian" in fallback["cuisine"]
+    assert "Potatoes" in fallback["main_ingredient"]
+    assert "Stovetop / Boiled" in fallback["cooking_method"]
+    assert "Flexible" in fallback["dietary_preference"]
+
+    normalized = recipe_edit_service.normalize_chatgpt_category_decision(
+        {
+            "meal_type": "Dinner",
+            "cuisine": "Mexican",
+            "main_ingredient": "Chicken",
+            "cooking_method": "One Pot",
+            "occasion": "Family Dinner",
+            "dietary_preference": "Low Carb",
+            "prep_time_group": "15-30 Minutes",
+            "custom_categories": ["Creamy", "Spicy", "Potato Dish"],
+        },
+        fallback,
+        payload,
+    )
+
+    assert "Appetizer" in normalized["meal_type"]
+    assert "Peruvian" in normalized["cuisine"]
+    assert "Potatoes" in normalized["main_ingredient"]
+    assert "Stovetop / Boiled" in normalized["cooking_method"]
+    assert "Flexible" in normalized["dietary_preference"]
+    assert normalized["custom_categories"] == ["Creamy", "Spicy", "Potato Dish"]
+    assert "Low Carb" not in normalized["dietary_preference"]
+    assert "Vegetarian" not in normalized["dietary_preference"]
+
+    prompt = recipe_edit_service.build_recipe_category_decision_prompt(payload)
+    assert "menu section" in prompt
+    assert "meat-based broth" in prompt
+    assert "Spicy as custom categories" in prompt
 
 
 def test_chatgpt_category_decision_logs_and_sanitizes_vegan_and_total_time(capsys):

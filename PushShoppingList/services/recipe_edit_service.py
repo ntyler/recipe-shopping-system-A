@@ -9299,6 +9299,16 @@ def recipe_category_prompt_context(payload):
     return {
         "title": category_context_text(payload.get("recipe_title") or payload.get("display_name")),
         "display_name": category_context_text(payload.get("display_name")),
+        "description": category_context_text(
+            payload.get("description")
+            or payload.get("short_description")
+            or payload.get("menu_description")
+        ),
+        "menu_section": category_context_text(payload.get("menu_section") or payload.get("section_name")),
+        "restaurant_name": category_context_text(payload.get("restaurant_name")),
+        "restaurant_cuisine": category_context_text(
+            payload.get("restaurant_cuisine") or payload.get("restaurant_cuisine_tags")
+        ),
         "servings": category_context_text(payload.get("servings")),
         "level": category_context_text(payload.get("level")),
         "total_time": category_context_text(payload.get("total_time")),
@@ -9321,7 +9331,12 @@ def recipe_category_inference_record(payload):
 
     return {
         "name": context.get("title") or context.get("display_name"),
-        "description": "",
+        "description": " ".join(filter(None, (
+            context.get("description"),
+            context.get("menu_section"),
+            context.get("restaurant_name"),
+            context.get("restaurant_cuisine"),
+        ))),
         "prep_time": context.get("prep_time"),
         "cook_time": context.get("cook_time"),
         "total_time": context.get("total_time"),
@@ -9343,10 +9358,17 @@ meal_type, cuisine, main_ingredient, cooking_method, occasion, dietary_preferenc
 
 Rules:
 - For meal_type, cuisine, main_ingredient, cooking_method, occasion, dietary_preference, and prep_time_group, choose exactly one label from the allowed options.
-- If a field is uncertain, choose the closest useful option instead of leaving it blank.
+- Use the title, description, menu section, restaurant context, ingredients, and instructions as evidence; do not guess from one ambiguous word.
+- If a field is uncertain, choose the neutral/fallback option instead of a specific unsupported label.
 - custom_categories should be an array of 0 to 3 concise user-friendly cookbook groups.
 - Re-analyze the recipe title, ingredients, equipment, times, and instructions.
 - Main ingredient must describe the dominant ingredient type. Do not choose Vegan as main_ingredient; put Vegan under dietary_preference when applicable.
+- Cuisine must reflect the named dish and culinary tradition. Do not equate all Spanish-language dish names with Mexican cuisine, and do not default to American when a specific cuisine is supported.
+- Dietary labels must be supported by the actual ingredients. Vegetarian and Vegan are invalid when meat, fish, gelatin, lard, or meat-based broth is present. Dairy Free is invalid when milk, cream, or cheese is present.
+- Low Carb requires explicit evidence and a low-starch ingredient list. Do not choose Low Carb when potatoes, rice, pasta, bread, tortillas, corn, yuca/cassava, flour, or sugar are primary ingredients.
+- Treat flavor notes such as Spicy as custom categories, not as a dietary preference, unless the source explicitly presents them as a dietary requirement.
+- Prefer a preparation method directly supported by the instructions, such as boiled/stovetop, baked, grilled, skillet, or no-cook. Do not label a recipe One Pot merely because a pot appears in the equipment.
+- Avoid redundant custom categories that simply repeat main_ingredient, cuisine, meal_type, or dietary_preference. Prefer useful sensory or style tags such as Creamy or Spicy when supported.
 - For prep_time_group, use total_time when it is available. Use prep_time only when total_time is blank.
 - Do not include markdown or explanatory text.
 
@@ -9408,11 +9430,48 @@ def recipe_category_payload_id(payload):
     )
 
 
-def normalize_chatgpt_category_decision(cleaned, fallback):
+def recipe_category_choice_for_alias(field, value):
+    key = re.sub(r"[^a-z0-9]+", " ", str(value or "").lower()).strip()
+    aliases = {
+        "meal_type": {
+            "starter": "Appetizer",
+            "starters": "Appetizer",
+            "appetizer": "Appetizer",
+        },
+        "cuisine": {
+            "us american": "American",
+            "united states": "American",
+            "peru": "Peruvian",
+        },
+        "main_ingredient": {
+            "potato": "Potatoes",
+        },
+        "cooking_method": {
+            "boil": "Stovetop / Boiled",
+            "boiled": "Stovetop / Boiled",
+            "stovetop": "Stovetop / Boiled",
+        },
+        "dietary_preference": {
+            "none": "Flexible",
+            "no restriction": "Flexible",
+        },
+    }
+    target = aliases.get(field, {}).get(key, key)
+    target_key = re.sub(r"[^a-z0-9]+", " ", target.lower()).strip()
+    for choice in cookbook_category_choices().get(field, []):
+        choice_key = re.sub(r"[^a-z0-9]+", " ", choice.lower()).strip()
+        if choice_key == target_key or choice_key.endswith(f" {target_key}"):
+            return choice
+    return ""
+
+
+def normalize_chatgpt_category_decision(cleaned, fallback, payload=None):
     cleaned = clean_category_payload(cleaned)
     fallback = clean_category_payload(fallback)
 
     for field in COOKBOOK_CATEGORY_FIELDS:
+        if cleaned.get(field):
+            cleaned[field] = recipe_category_choice_for_alias(field, cleaned[field])
         if not cleaned.get(field):
             cleaned[field] = fallback.get(field, "")
 
@@ -9427,6 +9486,44 @@ def normalize_chatgpt_category_decision(cleaned, fallback):
 
     if fallback.get("prep_time_group"):
         cleaned["prep_time_group"] = fallback["prep_time_group"]
+
+    evidence = json.dumps(recipe_category_inference_record(payload or {}), ensure_ascii=False).lower()
+    if fallback.get("cuisine") and "other / fusion" not in fallback["cuisine"].lower():
+        cleaned["cuisine"] = fallback["cuisine"]
+    if fallback.get("main_ingredient") and "other" not in fallback["main_ingredient"].lower():
+        cleaned["main_ingredient"] = fallback["main_ingredient"]
+    if fallback.get("meal_type") and any(
+        term in evidence for term in ("appetizer", "starter", "small plate")
+    ):
+        cleaned["meal_type"] = fallback["meal_type"]
+    if "stovetop / boiled" in str(fallback.get("cooking_method") or "").lower() and any(
+        term in evidence for term in ("boil", "boiled", "simmer", "saucepan", "stovetop")
+    ):
+        cleaned["cooking_method"] = fallback["cooking_method"]
+
+    high_carb_terms = (
+        "potato", "rice", "pasta", "noodle", "bread", "tortilla", "corn",
+        "flour", "sugar", "yuca", "cassava",
+    )
+    animal_terms = (
+        "chicken", "turkey", "beef", "pork", "bacon", "ham", "sausage",
+        "fish", "salmon", "tuna", "shrimp", "crab", "seafood", "meat broth",
+        "chicken broth", "beef broth", "gelatin", "lard",
+    )
+    dietary = str(cleaned.get("dietary_preference") or "").lower()
+    dietary_is_unsupported = (
+        "low carb" in dietary and any(term in evidence for term in high_carb_terms)
+    ) or (
+        any(term in dietary for term in ("vegetarian", "vegan"))
+        and any(term in evidence for term in animal_terms)
+    ) or (
+        "spicy" in dietary and "flexible" in str(fallback.get("dietary_preference") or "").lower()
+    )
+    if dietary_is_unsupported:
+        replacement = fallback.get("dietary_preference", "")
+        if not replacement or any(term in str(replacement).lower() for term in ("low carb", "vegetarian", "vegan")):
+            replacement = recipe_category_choice_for_alias("dietary_preference", "Flexible")
+        cleaned["dietary_preference"] = replacement
 
     return cleaned
 
@@ -9522,7 +9619,7 @@ def decide_recipe_categories_with_chatgpt(
 
     cleaned = clean_category_payload(categories)
     fallback = infer_recipe_categories(recipe_category_inference_record(payload))
-    cleaned = normalize_chatgpt_category_decision(cleaned, fallback)
+    cleaned = normalize_chatgpt_category_decision(cleaned, fallback, payload)
     old_values = clean_category_payload(current_categories or {})
     effective_values = recipe_category_effective_decision_values(old_values, cleaned, mode)
     fields_changed = recipe_category_changed_fields(old_values, effective_values)
