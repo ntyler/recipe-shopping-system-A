@@ -6,7 +6,6 @@
 {% block app_head %}
     <meta name="description" content="{{ legal_document.description }}">
     <link rel="canonical" href="{{ canonical_url }}">
-    {% include "includes/public_theme_head.html" %}
 {% endblock %}
 
 {% block app_body_attributes %}data-public-auth-page data-public-legal-page="{{ legal_document.slug }}"{% endblock %}

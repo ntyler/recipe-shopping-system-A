@@ -2341,7 +2341,7 @@ def test_ai_analysis_uses_saved_confidence_evidence_without_health_completeness(
 def test_recipe_editor_redesign_css_uses_app_tokens_and_mobile_breakpoints():
     css = read_text("PushShoppingList/static/css/app.css")
 
-    assert "Recipe workspace v3: editor content uses its dark tokens without restyling AppLayout chrome" in css
+    assert "Recipe workspace v3: editor content follows the shared shell tokens" in css
     assert ".recipe-edit-standalone-page .recipe-edit-layout {" in css
     assert "grid-template-columns: minmax(0, 3fr) minmax(300px, 1fr);" in css
     assert "recipe-edit-utility-column" not in css
@@ -2354,14 +2354,14 @@ def test_recipe_editor_redesign_css_uses_app_tokens_and_mobile_breakpoints():
     assert ".recipe-edit-ai-assistant-card {" in css
     assert ".recipe-edit-image-card .recipe-edit-cover-field {" in css
     assert ".recipe-edit-ai-assistant-card :is(" in css
-    assert "--app-bg: #101415;" in css
+    assert '--recipe-editor-bg: #101415;' in css
     assert ".recipe-edit-ingredient-row label.recipe-edit-section-label" in css
     assert ".recipe-edit-substitution-row-menu:not([hidden])" in css
     assert "@media (max-width: 1499px)" in css
     assert "@media (max-width: 767px)" in css
 
 
-def test_recipe_editor_uses_the_recipes_page_light_card_visual_system():
+def test_recipe_editor_uses_the_recipes_page_card_visual_system_in_both_themes():
     css = read_text("PushShoppingList/static/css/app.css")
     v15_start = css.index("/* Recipe workspace v15: accepted two-column Edit Recipe mockup. */")
     v16_start = css.index("/* Recipe workspace v16: native-zoom readability and container-aware context rail. */")
@@ -2375,20 +2375,32 @@ def test_recipe_editor_uses_the_recipes_page_light_card_visual_system():
     )
     theme_rule = workspace[theme_start:workspace.index("}", theme_start)]
     for declaration in (
-        "--app-bg: #f8faf9;",
-        "--app-surface: #ffffff;",
-        "--app-text: #17233a;",
-        "--app-text-strong: #08162b;",
-        "--app-text-soft: #526176;",
-        "--app-muted: #66738a;",
-        "--app-primary: #07852f;",
+        "--app-text-soft: color-mix(in srgb, var(--app-text) 76%, var(--app-bg));",
         "--recipe-editor-bg: #f8faf9;",
         "--recipe-editor-surface: #ffffff;",
         "--recipe-editor-border: #dfe6e2;",
         "--recipe-editor-border-soft: #e8eeeb;",
-        "color-scheme: light;",
+        "color-scheme: inherit;",
     ):
         assert declaration in theme_rule
+
+    dark_theme_start = workspace.index(
+        'html[data-public-auth-theme="dark"] body.recipe-edit-standalone-page :is('
+    )
+    dark_theme_rule = workspace[dark_theme_start:workspace.index("}", dark_theme_start)]
+    for declaration in (
+        "--recipe-editor-bg: #101415;",
+        "--recipe-editor-surface: #171c1e;",
+        "--recipe-editor-surface-soft: #1c2325;",
+        "--recipe-editor-border: #343b3d;",
+        "--recipe-editor-border-soft: #2a3234;",
+        "--submenu-bg: #171c1e;",
+        "--submenu-text: #e7eae8;",
+    ):
+        assert declaration in dark_theme_rule
+
+    assert 'html:not([data-public-auth-theme="light"]) body.recipe-edit-standalone-page :is(' in workspace
+    assert "Keep editor content color-locked" not in css
 
     for declaration in (
         "--submenu-bg: #ffffff;",

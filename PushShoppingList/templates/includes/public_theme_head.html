@@ -1,12 +1,152 @@
 <script>
-    (function applySavedPublicTheme() {
-        try {
-            var theme = localStorage.getItem("ai-pantry-public-theme") || "system";
-            if (theme === "light" || theme === "dark") {
-                document.documentElement.dataset.publicAuthTheme = theme;
+    (function initializeSharedAppearance() {
+        "use strict";
+
+        var STORAGE_KEY = "ai-pantry-public-theme";
+        var VALUES = ["system", "light", "dark"];
+        var LABELS = {
+            system: "System",
+            light: "Light",
+            dark: "Dark"
+        };
+        var root = document.documentElement;
+        var systemQuery = window.matchMedia
+            ? window.matchMedia("(prefers-color-scheme: dark)")
+            : null;
+        var selectedTheme = readStoredTheme();
+
+        function normalizeTheme(theme) {
+            return VALUES.indexOf(theme) >= 0 ? theme : "system";
+        }
+
+        function readStoredTheme() {
+            try {
+                return normalizeTheme(localStorage.getItem(STORAGE_KEY) || "system");
+            } catch (error) {
+                return "system";
             }
-        } catch (error) {
-            // The system theme remains available when storage is restricted.
+        }
+
+        function resolvedTheme(theme) {
+            var preference = normalizeTheme(theme);
+            if (preference !== "system") {
+                return preference;
+            }
+            return systemQuery && systemQuery.matches ? "dark" : "light";
+        }
+
+        function syncControls() {
+            document.querySelectorAll("[data-app-theme-choice]").forEach(function (control) {
+                control.checked = control.value === selectedTheme;
+            });
+
+            document.querySelectorAll("[data-public-theme-menu]").forEach(function (menu) {
+                var trigger = menu.querySelector("[data-public-theme-trigger]");
+                var label = menu.querySelector("[data-public-theme-label]");
+
+                if (trigger) {
+                    trigger.setAttribute("aria-label", "Color theme: " + LABELS[selectedTheme]);
+                }
+                if (label) {
+                    label.textContent = LABELS[selectedTheme];
+                }
+
+                menu.querySelectorAll("[data-public-theme-option]").forEach(function (option) {
+                    option.setAttribute(
+                        "aria-checked",
+                        option.dataset.publicThemeOption === selectedTheme ? "true" : "false"
+                    );
+                });
+            });
+        }
+
+        function announceThemeChange() {
+            window.dispatchEvent(new CustomEvent("ai-pantry-theme-change", {
+                detail: {
+                    preference: selectedTheme,
+                    resolvedTheme: resolvedTheme(selectedTheme)
+                }
+            }));
+        }
+
+        function applyTheme(theme, options) {
+            var settings = options || {};
+            selectedTheme = normalizeTheme(theme);
+
+            if (selectedTheme === "system") {
+                delete root.dataset.publicAuthTheme;
+            } else {
+                root.dataset.publicAuthTheme = selectedTheme;
+            }
+            root.style.colorScheme = resolvedTheme(selectedTheme);
+
+            if (settings.persist !== false) {
+                try {
+                    localStorage.setItem(STORAGE_KEY, selectedTheme);
+                } catch (error) {
+                    // The selected theme still applies for this page view.
+                }
+            }
+
+            syncControls();
+            if (settings.announce !== false) {
+                announceThemeChange();
+            }
+            return selectedTheme;
+        }
+
+        function bindAppearanceControls() {
+            document.querySelectorAll("[data-app-theme-choice]").forEach(function (control) {
+                if (control.dataset.appThemeChoiceBound === "1") {
+                    return;
+                }
+                control.dataset.appThemeChoiceBound = "1";
+                control.addEventListener("change", function () {
+                    if (control.checked) {
+                        applyTheme(control.value);
+                    }
+                });
+            });
+            syncControls();
+        }
+
+        function handleSystemThemeChange() {
+            if (selectedTheme !== "system") {
+                return;
+            }
+            root.style.colorScheme = resolvedTheme(selectedTheme);
+            announceThemeChange();
+        }
+
+        if (systemQuery) {
+            if (typeof systemQuery.addEventListener === "function") {
+                systemQuery.addEventListener("change", handleSystemThemeChange);
+            } else if (typeof systemQuery.addListener === "function") {
+                systemQuery.addListener(handleSystemThemeChange);
+            }
+        }
+
+        window.addEventListener("storage", function (event) {
+            if (event.key === STORAGE_KEY) {
+                applyTheme(event.newValue || "system", { persist: false });
+            }
+        });
+
+        window.aiPantryTheme = Object.freeze({
+            storageKey: STORAGE_KEY,
+            values: Object.freeze(VALUES.slice()),
+            getPreference: function () { return selectedTheme; },
+            getResolvedTheme: function () { return resolvedTheme(selectedTheme); },
+            setPreference: applyTheme,
+            syncControls: syncControls,
+            bindControls: bindAppearanceControls
+        });
+
+        applyTheme(selectedTheme, { persist: false, announce: false });
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", bindAppearanceControls, { once: true });
+        } else {
+            bindAppearanceControls();
         }
     }());
 </script>

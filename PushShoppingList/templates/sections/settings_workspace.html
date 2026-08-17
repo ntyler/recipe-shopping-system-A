@@ -312,7 +312,7 @@
                 <div class="settings-panel-header">
                     <div>
                         <h3>Display &amp; Accessibility</h3>
-                        <p>Screen preview and display controls.</p>
+                        <p>Choose how AI Pantry looks and manage display controls.</p>
                     </div>
                     {% if current_user and current_user.is_admin %}
                         <button type="button"
@@ -322,10 +322,48 @@
                         </button>
                     {% endif %}
                 </div>
-                <article class="settings-empty-panel">
-                    <strong>Display follows your device theme</strong>
-                    <span>Light and dark mode use the shared AI Pantry design system.</span>
-                </article>
+                <fieldset class="settings-appearance" aria-describedby="settingsAppearanceHelp">
+                    <legend>Appearance</legend>
+                    <p id="settingsAppearanceHelp">
+                        Choose a theme for every AI Pantry page. System follows your device setting automatically.
+                    </p>
+                    <div class="settings-appearance-options">
+                        <label class="settings-appearance-option">
+                            <input type="radio"
+                                   name="ai-pantry-appearance"
+                                   value="system"
+                                   data-app-theme-choice
+                                   checked>
+                            <span class="settings-appearance-indicator" aria-hidden="true"></span>
+                            <span class="settings-appearance-copy">
+                                <strong>System</strong>
+                                <small>Match this device</small>
+                            </span>
+                        </label>
+                        <label class="settings-appearance-option">
+                            <input type="radio"
+                                   name="ai-pantry-appearance"
+                                   value="light"
+                                   data-app-theme-choice>
+                            <span class="settings-appearance-indicator" aria-hidden="true"></span>
+                            <span class="settings-appearance-copy">
+                                <strong>Light</strong>
+                                <small>Always use light mode</small>
+                            </span>
+                        </label>
+                        <label class="settings-appearance-option">
+                            <input type="radio"
+                                   name="ai-pantry-appearance"
+                                   value="dark"
+                                   data-app-theme-choice>
+                            <span class="settings-appearance-indicator" aria-hidden="true"></span>
+                            <span class="settings-appearance-copy">
+                                <strong>Dark</strong>
+                                <small>Always use dark mode</small>
+                            </span>
+                        </label>
+                    </div>
+                </fieldset>
             </section>
 
             <section id="settingsRulesAutomationPanel"

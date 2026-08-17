@@ -31580,7 +31580,7 @@ img[data-deferred-src] {
     overflow: hidden;
     background: var(--app-bg);
     color: var(--app-text);
-    color-scheme: light dark;
+    color-scheme: inherit;
     font-family: var(--app-font-family);
     scrollbar-gutter: auto;
 }
@@ -33966,6 +33966,137 @@ img[data-deferred-src] {
     align-items: flex-start;
     justify-content: space-between;
     gap: 16px;
+}
+
+.settings-appearance {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.settings-appearance legend {
+    padding: 0;
+    color: var(--app-text-strong);
+    font-size: 15px;
+    font-weight: 950;
+}
+
+.settings-appearance > p {
+    margin: 5px 0 14px;
+    color: var(--app-muted);
+    font-size: 13px;
+    font-weight: 650;
+    line-height: 1.45;
+}
+
+.settings-appearance-options {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.settings-appearance-option {
+    position: relative;
+    display: grid;
+    grid-template-columns: 20px minmax(0, 1fr);
+    gap: 10px;
+    min-width: 0;
+    min-height: 74px;
+    padding: 13px;
+    align-items: center;
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-radius-md);
+    background: var(--app-surface-soft);
+    color: var(--app-text);
+    cursor: pointer;
+    transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+}
+
+.settings-appearance-option:hover {
+    border-color: color-mix(in srgb, var(--app-primary) 42%, var(--app-border));
+    background: color-mix(in srgb, var(--app-primary-soft) 46%, var(--app-surface));
+}
+
+.settings-appearance-option:has(input:checked) {
+    border-color: var(--app-primary);
+    background: var(--app-primary-soft);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-primary) 20%, transparent);
+}
+
+.settings-appearance-option:has(input:focus-visible) {
+    outline: 3px solid color-mix(in srgb, var(--app-focus) 34%, transparent);
+    outline-offset: 2px;
+}
+
+.settings-appearance-option input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.settings-appearance-indicator {
+    display: inline-flex;
+    width: 18px;
+    height: 18px;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--app-border-strong);
+    border-radius: 50%;
+    background: var(--app-surface);
+}
+
+.settings-appearance-indicator::after {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--app-primary);
+    content: "";
+    opacity: 0;
+    transform: scale(.6);
+    transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.settings-appearance-option:has(input:checked) .settings-appearance-indicator {
+    border-color: var(--app-primary);
+}
+
+.settings-appearance-option:has(input:checked) .settings-appearance-indicator::after {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.settings-appearance-copy {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+}
+
+.settings-appearance-copy strong {
+    color: var(--app-text-strong);
+    font-size: 14px;
+    font-weight: 900;
+}
+
+.settings-appearance-copy small {
+    color: var(--app-muted);
+    font-size: 11px;
+    font-weight: 650;
+    line-height: 1.3;
+}
+
+@media (max-width: 620px) {
+    .settings-appearance-options {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .settings-appearance-option {
+        min-height: 64px;
+    }
 }
 
 .settings-profile-summary {
@@ -37711,7 +37842,7 @@ img[data-deferred-src] {
     }
 }
 
-/* Standalone signed-out experience. Keep every rule scoped so the app shell is unchanged. */
+/* Shared explicit appearance tokens; signed-out page rules remain scoped below. */
 html[data-public-auth-theme="light"] {
     --app-bg: #f8faf9;
     --app-bg-soft: #f1f5f3;
@@ -37726,7 +37857,14 @@ html[data-public-auth-theme="light"] {
     --app-primary: #078a2f;
     --app-primary-hover: #057226;
     --app-primary-soft: #eaf7ed;
+    --app-success: #0f9f4a;
+    --app-danger: #c31524;
+    --app-danger-soft: #fff0f0;
+    --app-warning: #c87900;
+    --app-warning-soft: #fff6df;
     --app-focus: #2563eb;
+    --app-shadow-sm: 0 1px 2px rgba(8, 22, 43, .04), 0 10px 30px rgba(8, 22, 43, .06);
+    --app-shadow-md: 0 20px 48px rgba(8, 22, 43, .14);
     color-scheme: light;
 }
 
@@ -37744,10 +37882,74 @@ html[data-public-auth-theme="dark"] {
     --app-primary: #35b779;
     --app-primary-hover: #4ade8d;
     --app-primary-soft: #0f3328;
+    --app-success: #4ade80;
+    --app-danger: #fb7185;
+    --app-danger-soft: #3b1118;
+    --app-warning: #fbbf24;
+    --app-warning-soft: #392d15;
     --app-focus: #93c5fd;
     --app-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.28), 0 8px 24px rgba(0, 0, 0, 0.24);
     --app-shadow-md: 0 18px 40px rgba(0, 0, 0, 0.38);
     color-scheme: dark;
+}
+
+html[data-public-auth-theme="light"] .app-sidebar-promo {
+    background: linear-gradient(135deg, rgba(234, 247, 237, .94), rgba(255, 255, 255, .96));
+}
+
+html[data-public-auth-theme="light"] :is(.app-topbar, .app-mobile-bottom-nav) {
+    background: rgba(255, 255, 255, .96);
+}
+
+html[data-public-auth-theme="light"] .app-shell-body .guest-demo-banner {
+    background: #eff6ff;
+    color: #1e3a5f;
+}
+
+html[data-public-auth-theme="light"] .app-shell-body .guest-demo-banner :is(strong, .guest-demo-expiry) {
+    color: #102033;
+}
+
+html[data-public-auth-theme="dark"] .app-sidebar-promo {
+    background: linear-gradient(135deg, rgba(15, 51, 40, .72), rgba(23, 33, 43, .96));
+}
+
+html[data-public-auth-theme="dark"] .app-topbar {
+    background: rgba(23, 28, 30, .96);
+}
+
+html[data-public-auth-theme="dark"] .app-mobile-bottom-nav {
+    background: rgba(24, 33, 43, .96);
+}
+
+html[data-public-auth-theme="dark"] .app-shell-body .guest-demo-banner {
+    background: #0d253d;
+    color: #dbeafe;
+}
+
+html[data-public-auth-theme="dark"] .app-shell-body .guest-demo-banner :is(strong, .guest-demo-expiry) {
+    color: #ffffff;
+}
+
+@media (min-width: 1100px) {
+    html[data-public-auth-theme="dark"] :is(
+        .app-toolbar-primary,
+        .app-shell-body:has(.app-home-dashboard:not([hidden])) .app-home-empty-state button,
+        .app-shell-body:has(.app-home-dashboard:not([hidden])) .app-home-empty-state a
+    ) {
+        border-color: var(--app-border-strong);
+        background: var(--app-surface-soft);
+        color: var(--app-primary-hover);
+    }
+
+    html[data-public-auth-theme="dark"] .app-shell-body:has(.app-home-dashboard:not([hidden])) :is(
+        .app-home-recipe-favorite,
+        .app-home-recipe-menu-toggle
+    ) {
+        border-color: rgba(255, 255, 255, .18);
+        background: rgba(22, 27, 29, .88);
+        color: #f6f8f7;
+    }
 }
 
 body.public-auth-page {
@@ -39615,27 +39817,11 @@ html[data-public-auth-theme="dark"] .public-auth-privacy-art {
     }
 }
 
-/* Recipe workspace v3: editor content uses its dark tokens without restyling AppLayout chrome. */
+/* Recipe workspace v3: editor content follows the shared shell tokens. */
 .recipe-edit-standalone-page .recipe-edit-standalone-shell {
-    --app-bg: #101415;
-    --app-bg-soft: #151a1c;
-    --app-surface: #171c1e;
-    --app-surface-soft: #1c2325;
-    --app-surface-muted: #193126;
-    --app-text: #e7eae8;
-    --app-text-strong: #f6f8f7;
-    --app-muted: #a7b0ab;
-    --app-border: #343b3d;
-    --app-border-strong: #4a5456;
-    --app-primary: #2eb66f;
-    --app-primary-hover: #42c880;
-    --app-primary-soft: #103624;
-    --app-success: #43c77d;
-    --app-warning: #efb53a;
-    --app-warning-soft: #392d15;
     background: var(--app-bg);
     color: var(--app-text);
-    color-scheme: dark;
+    color-scheme: inherit;
 }
 
 .recipe-edit-standalone-page .recipe-edit-standalone-shell {
@@ -46045,15 +46231,6 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-column-view-empty > but
 
 /* Phase 2 recipe editor redesign using the AI Pantry shell tokens. */
 .recipe-edit-standalone-page .recipe-edit-standalone-shell {
-    --app-bg: #11171d;
-    --app-surface: #171d22;
-    --app-surface-soft: #1d252b;
-    --app-surface-muted: #222b32;
-    --app-text: #dce5e0;
-    --app-text-strong: #f4f8f5;
-    --app-muted: #93a29a;
-    --app-border: #344139;
-    --app-border-strong: #52645a;
     background: var(--app-bg);
     color: var(--app-text);
 }
@@ -46808,23 +46985,6 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-column-view-empty > but
         min-height: 44px;
         justify-content: center;
     }
-}
-
-/* Keep editor content color-locked without changing the shared sidebar or header. */
-.recipe-edit-standalone-page .recipe-edit-standalone-shell {
-    --app-bg: #101415;
-    --app-bg-soft: #151a1c;
-    --app-surface: #171c1e;
-    --app-surface-soft: #1c2325;
-    --app-surface-muted: #193126;
-    --app-text: #e7eae8;
-    --app-text-strong: #f6f8f7;
-    --app-muted: #a7b0ab;
-    --app-border: #343b3d;
-    --app-border-strong: #4a5456;
-    --app-primary: #2eb66f;
-    --app-primary-hover: #42c880;
-    --app-primary-soft: #103624;
 }
 
 .recipe-edit-standalone-page .recipe-edit-header-actions {
@@ -57225,26 +57385,7 @@ body.recipe-edit-standalone-page :is(
     .recipe-edit-floating-menu,
     .recipe-edit-ingredient-action-tooltip
 ) {
-    --app-bg: #f8faf9;
-    --app-bg-soft: #f1f5f3;
-    --app-surface: #ffffff;
-    --app-surface-soft: #fbfdfc;
-    --app-surface-muted: #eef7f1;
-    --app-text: #17233a;
-    --app-text-strong: #08162b;
-    --app-text-soft: #526176;
-    --app-muted: #66738a;
-    --app-border: #dfe6e2;
-    --app-border-strong: #b9c8c1;
-    --app-primary: #07852f;
-    --app-primary-hover: #057226;
-    --app-primary-soft: #eaf7ed;
-    --app-success: #0f9f4a;
-    --app-danger: #c31524;
-    --app-danger-soft: #fff0f0;
-    --app-warning: #a45f00;
-    --app-warning-soft: #fff5db;
-    --app-focus: #2563eb;
+    --app-text-soft: color-mix(in srgb, var(--app-text) 76%, var(--app-bg));
     --app-shadow-sm: 0 1px 2px rgba(16, 29, 49, .02);
     --recipe-editor-bg: #f8faf9;
     --recipe-editor-surface: #ffffff;
@@ -57259,7 +57400,51 @@ body.recipe-edit-standalone-page :is(
     --submenu-text: #17233a;
     --submenu-muted: #66738a;
     --submenu-shadow: 0 8px 24px rgba(16, 29, 49, .08);
-    color-scheme: light;
+    color-scheme: inherit;
+}
+
+html[data-public-auth-theme="dark"] body.recipe-edit-standalone-page :is(
+    .recipe-edit-standalone-shell,
+    .recipe-edit-floating-menu,
+    .recipe-edit-ingredient-action-tooltip
+) {
+    --app-shadow-sm: 0 1px 2px rgba(0, 0, 0, .28);
+    --recipe-editor-bg: #101415;
+    --recipe-editor-surface: #171c1e;
+    --recipe-editor-surface-soft: #1c2325;
+    --recipe-editor-border: #343b3d;
+    --recipe-editor-border-soft: #2a3234;
+    --submenu-bg: #171c1e;
+    --submenu-border: #343b3d;
+    --submenu-divider: #2a3234;
+    --submenu-hover: #103624;
+    --submenu-active: #103624;
+    --submenu-text: #e7eae8;
+    --submenu-muted: #a7b0ab;
+    --submenu-shadow: 0 12px 30px rgba(0, 0, 0, .36);
+}
+
+@media (prefers-color-scheme: dark) {
+    html:not([data-public-auth-theme="light"]) body.recipe-edit-standalone-page :is(
+        .recipe-edit-standalone-shell,
+        .recipe-edit-floating-menu,
+        .recipe-edit-ingredient-action-tooltip
+    ) {
+        --app-shadow-sm: 0 1px 2px rgba(0, 0, 0, .28);
+        --recipe-editor-bg: #101415;
+        --recipe-editor-surface: #171c1e;
+        --recipe-editor-surface-soft: #1c2325;
+        --recipe-editor-border: #343b3d;
+        --recipe-editor-border-soft: #2a3234;
+        --submenu-bg: #171c1e;
+        --submenu-border: #343b3d;
+        --submenu-divider: #2a3234;
+        --submenu-hover: #103624;
+        --submenu-active: #103624;
+        --submenu-text: #e7eae8;
+        --submenu-muted: #a7b0ab;
+        --submenu-shadow: 0 12px 30px rgba(0, 0, 0, .36);
+    }
 }
 
 body.recipe-edit-standalone-page .recipe-edit-standalone-shell {

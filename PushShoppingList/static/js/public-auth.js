@@ -1,13 +1,7 @@
 (function initializePublicAuthPage() {
     "use strict";
 
-    const THEME_STORAGE_KEY = "ai-pantry-public-theme";
     const THEME_VALUES = new Set(["system", "light", "dark"]);
-    const THEME_LABELS = {
-        system: "System",
-        light: "Light",
-        dark: "Dark",
-    };
     const AUTH_MODES = new Set(["sign-in", "create", "forgot"]);
 
     function normalizedAuthMode(mode) {
@@ -98,55 +92,18 @@
     }
 
     function storedTheme() {
-        try {
-            const value = localStorage.getItem(THEME_STORAGE_KEY) || "system";
-            return THEME_VALUES.has(value) ? value : "system";
-        } catch (error) {
-            return "system";
-        }
+        return window.aiPantryTheme?.getPreference() || "system";
     }
 
     function syncPublicThemeMenus(theme) {
-        const selectedTheme = THEME_VALUES.has(theme) ? theme : "system";
-
-        document.querySelectorAll("[data-public-theme-menu]").forEach(menu => {
-            const trigger = menu.querySelector("[data-public-theme-trigger]");
-            const label = menu.querySelector("[data-public-theme-label]");
-
-            if (trigger) {
-                trigger.setAttribute("aria-label", `Color theme: ${THEME_LABELS[selectedTheme]}`);
-            }
-            if (label) {
-                label.textContent = THEME_LABELS[selectedTheme];
-            }
-
-            menu.querySelectorAll("[data-public-theme-option]").forEach(option => {
-                option.setAttribute(
-                    "aria-checked",
-                    option.dataset.publicThemeOption === selectedTheme ? "true" : "false"
-                );
-            });
-        });
+        if (THEME_VALUES.has(theme)) {
+            window.aiPantryTheme?.syncControls();
+        }
     }
 
     function applyPublicTheme(theme, options = {}) {
         const selectedTheme = THEME_VALUES.has(theme) ? theme : "system";
-
-        if (selectedTheme === "system") {
-            delete document.documentElement.dataset.publicAuthTheme;
-        } else {
-            document.documentElement.dataset.publicAuthTheme = selectedTheme;
-        }
-
-        if (options.persist !== false) {
-            try {
-                localStorage.setItem(THEME_STORAGE_KEY, selectedTheme);
-            } catch (error) {
-                // The selected theme still applies for this page view.
-            }
-        }
-
-        syncPublicThemeMenus(selectedTheme);
+        window.aiPantryTheme?.setPreference(selectedTheme, options);
     }
 
     function publicThemeMenuIsOpen(menu) {

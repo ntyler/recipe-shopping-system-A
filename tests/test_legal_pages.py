@@ -188,7 +188,8 @@ def test_legal_pages_reuse_light_and_dark_public_theme_and_responsive_contract(m
         assert 'role="menu"' in html
         assert 'data-public-theme-option="light"' in html
         assert 'data-public-theme-option="dark"' in html
-        assert 'localStorage.getItem("ai-pantry-public-theme")' in html
+        assert 'var STORAGE_KEY = "ai-pantry-public-theme"' in html
+        assert "window.aiPantryTheme = Object.freeze" in html
 
     assert 'html[data-public-auth-theme="light"]' in css
     assert 'html[data-public-auth-theme="dark"]' in css
@@ -196,7 +197,7 @@ def test_legal_pages_reuse_light_and_dark_public_theme_and_responsive_contract(m
     assert "width: min(960px, calc(100% - 56px));" in css
     assert "scroll-margin-top: 104px;" in css
     assert "grid-template-columns: minmax(0, 1fr);" in css
-    assert "document.documentElement.dataset.publicAuthTheme = theme;" in theme_head
+    assert "root.dataset.publicAuthTheme = selectedTheme;" in theme_head
     assert '<main class="public-legal-main"' in legal_template
     assert '<article class="public-legal-article">' in legal_template
     assert '<nav class="public-legal-toc"' in legal_template

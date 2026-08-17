@@ -387,6 +387,9 @@ def test_public_auth_interactions_and_persistence_controls_are_wired():
         encoding="utf-8"
     )
     public_script = (ROOT / "PushShoppingList/static/js/public-auth.js").read_text(encoding="utf-8")
+    theme_head = (ROOT / "PushShoppingList/templates/includes/public_theme_head.html").read_text(
+        encoding="utf-8"
+    )
     app_css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
     firebase_script = (ROOT / "PushShoppingList/static/js/firebase-auth.js").read_text(encoding="utf-8")
 
@@ -398,7 +401,8 @@ def test_public_auth_interactions_and_persistence_controls_are_wired():
     assert "function bindAuthPanelModeControls()" in public_script
     assert "function bindPasswordVisibilityControls()" in public_script
     assert "function bindPublicThemeControl()" in public_script
-    assert 'localStorage.setItem(THEME_STORAGE_KEY, selectedTheme)' in public_script
+    assert 'localStorage.setItem(STORAGE_KEY, selectedTheme)' in theme_head
+    assert "window.aiPantryTheme?.setPreference(selectedTheme, options);" in public_script
     assert '<select data-public-theme-toggle' not in public_header
     assert 'aria-haspopup="menu"' in public_header
     assert 'aria-controls="publicThemeMenu"' in public_header

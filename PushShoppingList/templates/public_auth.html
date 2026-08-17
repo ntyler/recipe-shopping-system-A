@@ -4,10 +4,6 @@
 {% set app_page_title = "Sign in | AI Pantry" %}
 {% set app_body_class = "public-auth-page account-action-token" if password_reset_token|default("") or two_factor_recovery_token|default("") or account_delete_token|default("") else "public-auth-page" %}
 
-{% block app_head %}
-    {% include "includes/public_theme_head.html" %}
-{% endblock %}
-
 {% block app_body_attributes %}data-public-auth-page{% endblock %}
 
 {% block public_auth_content %}
