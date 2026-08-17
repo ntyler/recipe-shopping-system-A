@@ -771,14 +771,23 @@ def test_recipe_detail_fields_use_bounded_accessible_controls():
     styles = css[css.index(marker):]
 
     assert 'id="recipeEditServingsCount"' in template
+    assert 'min="1"' in template
+    assert 'step="1"' in template
     assert 'aria-label="Decrease servings"' in template
     assert 'aria-label="Increase servings"' in template
     assert '<span class="recipe-edit-servings-value">' in template
     assert '<span class="recipe-edit-servings-unit" aria-hidden="true">servings</span>' in template
-    assert template.count('data-recipe-edit-scale-preset=') == 4
-    assert 'aria-label="Recipe scale"' in template
+    assert 'class="recipe-edit-scale-control recipe-edit-metadata-value"' in template
+    assert '<input type="text"\n                                   name="scaling_multiplier"' in template
+    assert 'inputmode="decimal"' in template
+    assert 'aria-label="Scale multiplier"' in template
+    assert 'aria-describedby="recipeEditScaleError"' in template
+    assert '<span class="recipe-edit-scale-suffix" aria-hidden="true">&times;</span>' in template
+    assert 'data-recipe-edit-scale-preset' not in template
+    assert 'data-recipe-edit-scale-segments' not in template
     assert ".recipe-edit-servings-stepper" in styles
-    assert ".recipe-edit-scale-segments" in styles
+    assert ".recipe-edit-scale-control" in styles
+    assert ".recipe-edit-scale-segments" not in styles
     assert "border: 1px solid var(--app-border-strong);" in styles
     assert "flex: 1 1 auto;" in styles
     assert "outline: 2px solid color-mix" in styles

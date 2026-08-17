@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+import re
 import shutil
 import subprocess
 
@@ -36,7 +37,7 @@ def scale_control_script(script):
     ]
 
 
-def test_recipe_scale_is_an_accessible_four_option_segmented_control():
+def test_recipe_scale_is_an_accessible_free_entry_decimal_control():
     template = TEMPLATE_PATH.read_text(encoding="utf-8")
     script = SCRIPT_PATH.read_text(encoding="utf-8")
     css = CSS_PATH.read_text(encoding="utf-8")
@@ -44,32 +45,30 @@ def test_recipe_scale_is_an_accessible_four_option_segmented_control():
     field_end = template.index('id="recipeEditScaleError"', field_start)
     field = template[field_start:field_end]
 
-    assert '<input type="hidden"' in field
+    assert 'class="recipe-edit-scale-control recipe-edit-metadata-value"' in field
+    assert '<input type="text"' in field
     assert 'id="recipeEditScaleMultiplier"' in field
     assert 'name="scaling_multiplier"' in field
-    assert 'data-recipe-edit-scale-segments' in field
-    assert 'role="group"' in field
-    assert 'aria-label="Recipe scale"' in field
-    assert field.count('data-recipe-edit-scale-preset=') == 4
-    assert 'data-recipe-edit-scale-preset="0.5"' in field
-    assert 'data-recipe-edit-scale-preset="1"' in field
-    assert 'data-recipe-edit-scale-preset="2"' in field
-    assert 'data-recipe-edit-scale-preset="3"' in field
-    assert '&frac12;&times;' in field
-    assert 'aria-label="Scale recipe to 0.5 times"' in field
-    assert 'aria-label="Scale recipe to 1 time"' in field
-    assert 'aria-label="Scale recipe to 2 times"' in field
-    assert 'aria-label="Scale recipe to 3 times"' in field
-    assert 'onclick="return selectRecipeEditScalePreset' in field
-    assert "RECIPE_EDIT_SCALE_PRESETS" not in script
-    assert "RECIPE_EDIT_CUSTOM_SCALE_VALUE" not in script
-    assert "organizeRecipeEditScaleControl(scaleField)" in script
-    assert "function selectRecipeEditScalePreset" in script
-    assert "function syncRecipeEditScaleSegments" in script
-    assert ".recipe-edit-scale-segments" in css
-    assert "button.is-selected" in css
+    assert 'value="1"' in field
+    assert 'inputmode="decimal"' in field
+    assert 'autocomplete="off"' in field
+    assert 'spellcheck="false"' in field
+    assert 'aria-label="Scale multiplier"' in field
+    assert 'aria-describedby="recipeEditScaleError"' in field
+    assert 'oninput="return applyRecipeScaleMultiplier(this)"' in field
+    assert 'onblur="return commitRecipeEditScaleMultiplier(this)"' in field
+    assert 'onkeydown="return handleRecipeEditScaleKeydown(event, this)"' in field
+    assert '<span class="recipe-edit-scale-suffix" aria-hidden="true">&times;</span>' in field
+    assert '<input type="hidden"' not in field
+    assert 'data-recipe-edit-scale-preset' not in template
+    assert 'data-recipe-edit-scale-segments' not in template
+    assert "function selectRecipeEditScalePreset" not in script
+    assert "function syncRecipeEditScaleSegments" not in script
+    assert "organizeRecipeEditScaleControl" not in script
+    assert ".recipe-edit-scale-segments" not in css
+    assert ".recipe-edit-scale-control" in css
+    assert ".recipe-edit-scale-suffix" in css
     assert ".recipe-edit-scale-error" in css
-    assert "var(--app-primary-hover)" in css
 
 
 def test_recipe_servings_and_scale_share_a_quiet_equal_height_control_family():
@@ -78,38 +77,65 @@ def test_recipe_servings_and_scale_share_a_quiet_equal_height_control_family():
     styles_start = css.index(
         "body.recipe-edit-standalone-page .recipe-edit-info-panel-organized\n"
         "    .recipe-edit-details-primary-grid\n"
-        "    :is(.recipe-edit-servings-stepper, .recipe-edit-scale-segments) {"
+        "    :is(.recipe-edit-servings-stepper, .recipe-edit-scale-control) {"
     )
-    styles = css[styles_start:css.index("body.recipe-edit-standalone-page .recipe-edit-scale-current", styles_start)]
+    styles = css[styles_start:css.index("body.recipe-edit-standalone-page .recipe-edit-optional-details-toggle", styles_start)]
 
     assert 'aria-label="Decrease servings"' in template
     assert 'aria-label="Increase servings"' in template
+    assert 'onclick="return stepRecipeEditServings(-1)"' in template
+    assert 'onclick="return stepRecipeEditServings(1)"' in template
+    assert '&minus;' in template
+    assert '&plus;' in template
+    assert 'id="recipeEditServingsCount"' in template
+    assert 'min="1"' in template
+    assert 'step="1"' in template
+    assert 'inputmode="numeric"' in template
+    assert 'oninput="return updateRecipeEditServingsFromStepper(this)"' in template
     assert '<span class="recipe-edit-servings-value">' in template
     assert '<span class="recipe-edit-servings-unit" aria-hidden="true">servings</span>' in template
     assert "height: 42px;" in styles
-    assert "border: 1px solid var(--app-border);" in styles
-    assert "grid-template-columns: 40px minmax(0, 1fr) 40px;" in styles
-    assert "grid-template-columns: repeat(4, minmax(0, 1fr));" in styles
-    assert "button:hover:not(.is-selected)" in styles
-    assert "button.is-selected" in styles
-    assert "background: color-mix(in srgb, var(--app-primary-soft) 72%, transparent);" in styles
+    assert "border: 1px solid transparent;" in styles
+    assert "border-color: var(--app-primary-hover);" in styles
+    assert re.search(
+        r"grid-template-columns:\s*3[2-8]px\s+minmax\(0, 1fr\)\s+3[2-8]px;",
+        styles,
+    )
+    button_rule = re.search(
+        r"\.recipe-edit-servings-stepper\s*>\s*button\s*\{(?P<body>.*?)\}",
+        styles,
+        re.DOTALL,
+    )
+    assert button_rule
+    assert re.search(r"width:\s*3[2-6]px;", button_rule.group("body"))
+    assert re.search(r"height:\s*3[2-6]px;", button_rule.group("body"))
+    assert "background: transparent;" in button_rule.group("body")
+    assert ":is(.recipe-edit-servings-stepper, .recipe-edit-scale-control):focus-within" in styles
+    assert ".recipe-edit-scale-control #recipeEditScaleMultiplier" in styles
+    assert "white-space: nowrap;" in styles
     assert "box-shadow: inset 0 0 0 1px" not in styles
     assert "border-right:" not in styles
 
 
-def test_recipe_scale_parser_accepts_decimals_fractions_and_mixed_fractions():
+def test_recipe_scale_parser_accepts_required_decimal_matrix_and_existing_fractions():
     script = SCRIPT_PATH.read_text(encoding="utf-8")
     parser = script[
         script.index("function parseRecipeScaleMultiplier"):
         script.index("function formatRecipeScaleInputValue")
     ]
     values = [
+        "0.25",
         "0.5",
+        "0.75",
+        "1",
+        "1.25",
+        "1.5",
+        "2",
+        "2.5",
+        "3",
         "1/2",
         "3/4",
-        "1.5",
         "1 1/2",
-        "2",
         "  1 / 2  ",
         ".25",
     ]
@@ -119,7 +145,22 @@ def test_recipe_scale_parser_accepts_decimals_fractions_and_mixed_fractions():
         + "\nprocess.stdout.write(JSON.stringify(values.map(value => validateRecipeEditScaleMultiplier(value))));"
     )
 
-    assert result == [0.5, 0.5, 0.75, 1.5, 1.5, 2, 0.5, 0.25]
+    assert result == [
+        0.25,
+        0.5,
+        0.75,
+        1,
+        1.25,
+        1.5,
+        2,
+        2.5,
+        3,
+        0.5,
+        0.75,
+        1.5,
+        0.5,
+        0.25,
+    ]
 
 
 def test_recipe_scale_parser_rejects_invalid_entries():
@@ -140,6 +181,9 @@ def test_recipe_scale_parser_rejects_invalid_entries():
         "1//2",
         "1/2/3",
         "1  /",
+        ".",
+        "1.",
+        "1..2",
         "one",
         "1x",
         "NaN",
@@ -154,7 +198,7 @@ def test_recipe_scale_parser_rejects_invalid_entries():
     assert result == [None] * len(values)
 
 
-def test_recipe_scale_keeps_servings_canonical_and_updates_one_shopping_multiplier():
+def test_recipe_scale_decimal_matrix_is_canonical_and_never_compounds():
     script = SCRIPT_PATH.read_text(encoding="utf-8")
     control = scale_control_script(script)
     calculations = script[
@@ -166,6 +210,7 @@ const RECIPE_EDIT_SCALE_ERROR_MESSAGE = "Scale must be a positive number, decima
 const fieldClasses = new Set();
 const field = {
     classList: {
+        add(name) { fieldClasses.add(name); },
         remove(name) { fieldClasses.delete(name); },
     },
 };
@@ -176,6 +221,7 @@ const scaleInput = {
     setAttribute(name, value) { this.attributes[name] = String(value); },
     removeAttribute(name) { delete this.attributes[name]; delete this.dataset[name]; },
     closest(selector) { return selector === "label" ? field : null; },
+    dispatchEvent() { return true; },
 };
 const scaleError = { hidden: true, textContent: "" };
 const servingsInput = { value: "4", dataset: {} };
@@ -219,55 +265,235 @@ function snapshot() {
         quantity: quantityInput.value,
         shoppingMultiplier: legacyQuantityInput.value,
         errorVisible: !scaleError.hidden,
+        invalid: scaleInput.attributes["aria-invalid"] || null,
         payload: collectRecipeScalingPayload(),
     };
 }
 
 populateRecipeScalingControls({ selected_multiplier: 1, base_servings: "4" }, "4");
 const initial = snapshot();
+const values = ["0.25", "0.5", "0.75", "1", "1.25", "1.5", "2", "2.5", "3"];
+const scaled = values.map(value => {
+    scaleInput.value = value;
+    applyRecipeScaleMultiplier(scaleInput);
+    return snapshot();
+});
 
-scaleInput.value = "1/2";
-applyRecipeScaleMultiplier(scaleInput);
-const fraction = snapshot();
-
-scaleInput.value = "1 1/2";
-applyRecipeScaleMultiplier(scaleInput);
-const mixed = snapshot();
-
-scaleInput.value = "1//2";
+scaleInput.value = ".";
 applyRecipeScaleMultiplier(scaleInput);
 const invalidDraft = snapshot();
 
-process.stdout.write(JSON.stringify({ initial, fraction, mixed, invalidDraft }));
+process.stdout.write(JSON.stringify({ initial, scaled, invalidDraft }));
 """
     result = run_node(harness)
 
     assert result["initial"]["text"] == "1"
-    assert result["fraction"]["text"] == "1/2"
-    assert result["fraction"]["active"] == "0.5"
-    assert result["fraction"]["servings"] == "4"
-    assert result["fraction"]["quantity"] == "1/4"
-    assert result["fraction"]["shoppingMultiplier"] == "0.5"
-    assert result["fraction"]["payload"]["selected_multiplier"] == 1
-    assert result["fraction"]["payload"]["base_servings"] == "4"
+    assert [snapshot["text"] for snapshot in result["scaled"]] == [
+        "0.25",
+        "0.5",
+        "0.75",
+        "1",
+        "1.25",
+        "1.5",
+        "2",
+        "2.5",
+        "3",
+    ]
+    assert [snapshot["active"] for snapshot in result["scaled"]] == [
+        "0.25",
+        "0.5",
+        "0.75",
+        "1",
+        "1.25",
+        "1.5",
+        "2",
+        "2.5",
+        "3",
+    ]
+    assert [snapshot["quantity"] for snapshot in result["scaled"]] == [
+        "1/8",
+        "1/4",
+        "3/8",
+        "1/2",
+        "5/8",
+        "3/4",
+        "1",
+        "1 1/4",
+        "1 1/2",
+    ]
+    assert [snapshot["shoppingMultiplier"] for snapshot in result["scaled"]] == [
+        "0.25",
+        "0.5",
+        "0.75",
+        "1",
+        "1.25",
+        "1.5",
+        "2",
+        "2.5",
+        "3",
+    ]
+    assert all(snapshot["servings"] == "4" for snapshot in result["scaled"])
+    assert all(
+        snapshot["payload"]["selected_multiplier"] == 1
+        for snapshot in result["scaled"]
+    )
+    assert all(
+        snapshot["payload"]["base_servings"] == "4"
+        for snapshot in result["scaled"]
+    )
 
-    assert result["mixed"]["text"] == "1 1/2"
-    assert result["mixed"]["active"] == "1.5"
-    assert result["mixed"]["servings"] == "4"
-    assert result["mixed"]["quantity"] == "3/4"
-    assert result["mixed"]["shoppingMultiplier"] == "1.5"
-    assert result["mixed"]["payload"]["selected_multiplier"] == 1
-
-    assert result["invalidDraft"]["text"] == "1//2"
-    assert result["invalidDraft"]["active"] == "1.5"
+    assert result["invalidDraft"]["text"] == "."
+    assert result["invalidDraft"]["active"] == "3"
     assert result["invalidDraft"]["servings"] == "4"
-    assert result["invalidDraft"]["quantity"] == "3/4"
-    assert result["invalidDraft"]["shoppingMultiplier"] == "1.5"
+    assert result["invalidDraft"]["quantity"] == "1 1/2"
+    assert result["invalidDraft"]["shoppingMultiplier"] == "3"
     assert result["invalidDraft"]["errorVisible"] is False
+    assert result["invalidDraft"]["invalid"] is None
     assert result["invalidDraft"]["payload"]["selected_multiplier"] == 1
 
 
-def test_recipe_scale_validation_runs_only_on_save_and_keeps_invalid_text():
+def test_recipe_scale_invalid_commit_rolls_back_and_enter_commits_valid_value():
+    script = SCRIPT_PATH.read_text(encoding="utf-8")
+    control = scale_control_script(script)
+    calculations = script[
+        script.index("function scaleServingsForDisplay"):
+        script.index("function cssEscape")
+    ]
+    harness = r"""
+const RECIPE_EDIT_SCALE_ERROR_MESSAGE = "Scale must be a positive number, decimal, or fraction.";
+const fieldClasses = new Set();
+const field = {
+    classList: {
+        add(name) { fieldClasses.add(name); },
+        remove(name) { fieldClasses.delete(name); },
+    },
+};
+const scaleInput = {
+    value: "",
+    dataset: {},
+    attributes: {},
+    setAttribute(name, value) { this.attributes[name] = String(value); },
+    removeAttribute(name) { delete this.attributes[name]; delete this.dataset[name]; },
+    closest(selector) { return selector === "label" ? field : null; },
+    focus() {},
+    select() {},
+};
+const scaleError = { hidden: true, textContent: "" };
+const servingsInput = { value: "4", dataset: {} };
+const legacyQuantityInput = { value: "1" };
+const quantityInput = { value: "1/2" };
+const baseQuantityInput = { value: "1/2" };
+const unitInput = { value: "cup" };
+const baseUnitInput = { value: "cup" };
+const ingredientRow = {
+    querySelector(selector) {
+        return {
+            '[data-field="quantity"]': quantityInput,
+            '[data-field="base_quantity"]': baseQuantityInput,
+            '[data-field="unit"]': unitInput,
+            '[data-field="base_unit"]': baseUnitInput,
+        }[selector] || null;
+    },
+    querySelectorAll() { return []; },
+};
+const elements = {
+    recipeEditScaleMultiplier: scaleInput,
+    recipeEditScaleError: scaleError,
+    recipeEditServings: servingsInput,
+    recipeEditQuantity: legacyQuantityInput,
+};
+const document = {
+    getElementById(id) { return elements[id] || null; },
+};
+function recipeMultipliersMatch(left, right) {
+    return Math.abs(Number(left) - Number(right)) < 0.000001;
+}
+function recipeEditIngredientRows() { return [ingredientRow]; }
+let recipeEditScalingOptions = [];
+""" + control + calculations + r"""
+
+function snapshot() {
+    return {
+        text: scaleInput.value,
+        active: scaleInput.dataset.activeMultiplier,
+        quantity: quantityInput.value,
+        shoppingMultiplier: legacyQuantityInput.value,
+        errorVisible: !scaleError.hidden,
+        message: scaleError.textContent,
+        invalid: scaleInput.attributes["aria-invalid"] || null,
+    };
+}
+
+populateRecipeScalingControls({ selected_multiplier: 1, base_servings: "4" }, "4");
+scaleInput.value = "1.25";
+applyRecipeScaleMultiplier(scaleInput);
+commitRecipeEditScaleMultiplier(scaleInput);
+const lastValid = snapshot();
+
+const invalidValues = ["", "0", "-1", "letters", "1..2"];
+const invalidResults = invalidValues.map(value => {
+    scaleInput.value = value;
+    applyRecipeScaleMultiplier(scaleInput);
+    const draft = snapshot();
+    commitRecipeEditScaleMultiplier(scaleInput);
+    return { value, draft, committed: snapshot() };
+});
+
+scaleInput.value = "2.5";
+const enter = {
+    key: "Enter",
+    prevented: false,
+    preventDefault() { this.prevented = true; },
+};
+handleRecipeEditScaleKeydown(enter, scaleInput);
+const afterEnter = snapshot();
+
+process.stdout.write(JSON.stringify({ lastValid, invalidResults, enter, afterEnter }));
+"""
+    result = run_node(harness)
+
+    assert result["lastValid"] == {
+        "text": "1.25",
+        "active": "1.25",
+        "quantity": "5/8",
+        "shoppingMultiplier": "1.25",
+        "errorVisible": False,
+        "message": "Scale must be a positive number, decimal, or fraction.",
+        "invalid": None,
+    }
+    for invalid in result["invalidResults"]:
+        assert invalid["draft"] == {
+            "text": invalid["value"],
+            "active": "1.25",
+            "quantity": "5/8",
+            "shoppingMultiplier": "1.25",
+            "errorVisible": False,
+            "message": "Scale must be a positive number, decimal, or fraction.",
+            "invalid": None,
+        }
+        assert invalid["committed"] == {
+            "text": "1.25",
+            "active": "1.25",
+            "quantity": "5/8",
+            "shoppingMultiplier": "1.25",
+            "errorVisible": True,
+            "message": "Scale must be a positive number, decimal, or fraction.",
+            "invalid": "true",
+        }
+
+    assert result["enter"]["prevented"] is True
+    assert result["afterEnter"] == {
+        "text": "2.5",
+        "active": "2.5",
+        "quantity": "1 1/4",
+        "shoppingMultiplier": "2.5",
+        "errorVisible": False,
+        "message": "Scale must be a positive number, decimal, or fraction.",
+        "invalid": None,
+    }
+
+
+def test_recipe_scale_save_validation_catches_uncommitted_invalid_draft():
     script = SCRIPT_PATH.read_text(encoding="utf-8")
     control = scale_control_script(script)
     validation_helper = script[
@@ -338,6 +564,131 @@ process.stdout.write(JSON.stringify({
     assert 'firstControl.focus({ preventScroll: true })' in reveal
     assert "validateRecipeEditScaleField" not in control
     assert "setRecipeScaleValidationMessage(\"\")" in control
+
+
+def test_recipe_servings_stepper_updates_direct_edits_and_never_crosses_minimum():
+    script = SCRIPT_PATH.read_text(encoding="utf-8")
+    servings_control = script[
+        script.index("function recipeEditServingsParts"):
+        script.index("function closeRecipeEditMetadataTooltips")
+    ]
+    harness = r"""
+function normalizeRecipeEditTagText(value) {
+    return String(value || "").trim();
+}
+const events = [];
+let focusCount = 0;
+const servingsInput = {
+    value: "4 servings",
+    dataset: {},
+    dispatchEvent(event) { events.push(event.type); return true; },
+};
+const countInput = {
+    value: "",
+    focus() { focusCount += 1; },
+};
+const decrement = { disabled: false };
+const document = {
+    getElementById(id) {
+        return {
+            recipeEditServings: servingsInput,
+            recipeEditServingsCount: countInput,
+        }[id] || null;
+    },
+    querySelector(selector) {
+        return selector === "[data-recipe-edit-servings-decrement]" ? decrement : null;
+    },
+};
+""" + servings_control + r"""
+
+function snapshot() {
+    return {
+        stored: servingsInput.value,
+        count: countInput.value,
+        decrementDisabled: decrement.disabled,
+        events: [...events],
+        focusCount,
+    };
+}
+
+syncRecipeEditServingsStepper();
+const initial = snapshot();
+
+events.length = 0;
+stepRecipeEditServings(-1);
+const decremented = snapshot();
+
+events.length = 0;
+countInput.value = "1";
+updateRecipeEditServingsFromStepper(countInput);
+const atMinimum = snapshot();
+
+events.length = 0;
+stepRecipeEditServings(-1);
+const attemptedBelowMinimum = snapshot();
+
+events.length = 0;
+countInput.value = "12";
+updateRecipeEditServingsFromStepper(countInput);
+const directEdit = snapshot();
+
+events.length = 0;
+stepRecipeEditServings(1);
+const incremented = snapshot();
+
+process.stdout.write(JSON.stringify({
+    initial,
+    decremented,
+    atMinimum,
+    attemptedBelowMinimum,
+    directEdit,
+    incremented,
+}));
+"""
+    result = run_node(harness)
+
+    assert result["initial"] == {
+        "stored": "4 servings",
+        "count": "4",
+        "decrementDisabled": False,
+        "events": [],
+        "focusCount": 0,
+    }
+    assert result["decremented"] == {
+        "stored": "3 servings",
+        "count": "3",
+        "decrementDisabled": False,
+        "events": ["input", "change"],
+        "focusCount": 1,
+    }
+    assert result["atMinimum"] == {
+        "stored": "1 servings",
+        "count": "1",
+        "decrementDisabled": True,
+        "events": ["input", "change"],
+        "focusCount": 1,
+    }
+    assert result["attemptedBelowMinimum"] == {
+        "stored": "1 servings",
+        "count": "1",
+        "decrementDisabled": True,
+        "events": ["input", "change"],
+        "focusCount": 2,
+    }
+    assert result["directEdit"] == {
+        "stored": "12 servings",
+        "count": "12",
+        "decrementDisabled": False,
+        "events": ["input", "change"],
+        "focusCount": 2,
+    }
+    assert result["incremented"] == {
+        "stored": "13 servings",
+        "count": "13",
+        "decrementDisabled": False,
+        "events": ["input", "change"],
+        "focusCount": 3,
+    }
 
 
 def test_scaled_ingredient_edit_is_converted_back_to_a_canonical_base_amount():

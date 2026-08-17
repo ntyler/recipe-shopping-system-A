@@ -1472,29 +1472,21 @@
                             <span id="recipeEditScaleLabel">Scale</span>
                             <span class="recipe-edit-label-description">&mdash; Ingredient preview and shopping-list multiplier; saved Servings stays unchanged.</span>
                         </span>
-                        <input type="hidden"
-                               name="scaling_multiplier"
-                               id="recipeEditScaleMultiplier"
-                               value="1">
-                        <div id="recipeEditScaleSegments"
-                             class="recipe-edit-scale-segments recipe-edit-metadata-value"
-                             data-recipe-edit-scale-segments
-                             role="group"
-                             aria-label="Recipe scale">
-                            <button type="button" data-recipe-edit-scale-preset="0.5" aria-pressed="false"
-                                    aria-label="Scale recipe to 0.5 times"
-                                    onclick="return selectRecipeEditScalePreset(this, 0.5)">&frac12;&times;</button>
-                            <button type="button" data-recipe-edit-scale-preset="1" aria-pressed="true"
-                                    aria-label="Scale recipe to 1 time"
-                                    onclick="return selectRecipeEditScalePreset(this, 1)">1&times;</button>
-                            <button type="button" data-recipe-edit-scale-preset="2" aria-pressed="false"
-                                    aria-label="Scale recipe to 2 times"
-                                    onclick="return selectRecipeEditScalePreset(this, 2)">2&times;</button>
-                            <button type="button" data-recipe-edit-scale-preset="3" aria-pressed="false"
-                                    aria-label="Scale recipe to 3 times"
-                                    onclick="return selectRecipeEditScalePreset(this, 3)">3&times;</button>
+                        <div class="recipe-edit-scale-control recipe-edit-metadata-value">
+                            <input type="text"
+                                   name="scaling_multiplier"
+                                   id="recipeEditScaleMultiplier"
+                                   value="1"
+                                   inputmode="decimal"
+                                   autocomplete="off"
+                                   spellcheck="false"
+                                   aria-label="Scale multiplier"
+                                   aria-describedby="recipeEditScaleError"
+                                   oninput="return applyRecipeScaleMultiplier(this)"
+                                   onblur="return commitRecipeEditScaleMultiplier(this)"
+                                   onkeydown="return handleRecipeEditScaleKeydown(event, this)">
+                            <span class="recipe-edit-scale-suffix" aria-hidden="true">&times;</span>
                         </div>
-                        <span class="recipe-edit-scale-current" data-recipe-edit-scale-current hidden></span>
                         <span class="recipe-edit-scale-error"
                               id="recipeEditScaleError"
                               role="alert"

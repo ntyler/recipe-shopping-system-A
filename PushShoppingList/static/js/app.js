@@ -27051,42 +27051,6 @@ function organizeRecipeEditMetadataField(field) {
     }
 }
 
-function organizeRecipeEditScaleControl(field) {
-    if (typeof syncRecipeEditScaleSegments === "function") {
-        syncRecipeEditScaleSegments();
-    }
-}
-
-function syncRecipeEditScaleSegments() {
-    const input = document.getElementById("recipeEditScaleMultiplier");
-    const current = document.querySelector("[data-recipe-edit-scale-current]");
-    if (!input) return;
-    const multiplier = parseRecipeScaleMultiplier(input.value) || 1;
-    let matched = false;
-    document.querySelectorAll("[data-recipe-edit-scale-preset]").forEach(button => {
-        const selected = recipeMultipliersMatch(button.dataset.recipeEditScalePreset, multiplier);
-        button.setAttribute("aria-pressed", String(selected));
-        button.classList.toggle("is-selected", selected);
-        matched = matched || selected;
-    });
-    if (current) {
-        current.hidden = matched;
-        current.textContent = matched ? "" : `Current scale: ${formatRecipeScaleMultiplierLabel(multiplier)}`;
-    }
-}
-
-function selectRecipeEditScalePreset(button, multiplier) {
-    const input = document.getElementById("recipeEditScaleMultiplier");
-    if (!input) return false;
-    input.value = formatRecipeScaleInputValue(multiplier);
-    applyRecipeScaleMultiplier(input);
-    syncRecipeEditScaleSegments();
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    input.dispatchEvent(new Event("change", { bubbles: true }));
-    button?.focus({ preventScroll: true });
-    return false;
-}
-
 function recipeEditServingsParts(value) {
     const text = normalizeRecipeEditTagText(value);
     const match = text.match(/\d+(?:\.\d+)?/);
@@ -27107,7 +27071,7 @@ function syncRecipeEditServingsStepper() {
     input.dataset.recipeEditServingsSuffix = parts.suffix;
     count.value = parts.number === null ? "" : String(parts.number);
     const decrement = document.querySelector("[data-recipe-edit-servings-decrement]");
-    if (decrement) decrement.disabled = parts.number !== null && parts.number <= 1;
+    if (decrement) decrement.disabled = parts.number === null || parts.number <= 1;
 }
 
 function updateRecipeEditServingsFromStepper(count) {
@@ -27192,7 +27156,7 @@ function setRecipeEditMetadataTooltipOpen(trigger, open, options = {}) {
 function addRecipeEditMetadataTooltip(field, label, helpText) {
     const heading = field ? field.querySelector(".recipe-edit-metadata-heading") : null;
     const control = field
-        ? field.querySelector("input:not([type='hidden']), select, [data-recipe-edit-scale-segments]")
+        ? field.querySelector("input:not([type='hidden']), select")
         : null;
     if (!heading || !control || !control.id || heading.querySelector("[data-recipe-edit-metadata-tooltip-trigger]")) return;
     const tooltipId = `${control.id}Tooltip`;
@@ -28045,7 +28009,6 @@ function organizeRecipeEditInformationCard() {
     customCategoriesField?.classList.add("recipe-edit-detail-field");
     organizeRecipeEditMetadataField(customCategoriesField);
     initializeRecipeEditMultiselectField(customCategoriesField, "custom");
-    organizeRecipeEditScaleControl(scaleField);
     [
         [servingsField, "Servings", "Number of people or portions the base recipe serves. Scale does not change this saved value."],
         [totalField, "Total Time", "Total elapsed time from start to finish, typically including prep, cooking, and inactive time."],
@@ -28249,7 +28212,6 @@ function organizeRecipeEditInformationCard() {
     ]);
     bindRecipeEditTotalTimeCalculation();
     syncRecipeEditServingsStepper();
-    syncRecipeEditScaleSegments();
     syncRecipeEditTotalTimeStatus();
     renderRecipeEditMultiselect("cuisine");
     renderRecipeEditMultiselect("dietary");
@@ -41907,8 +41869,7 @@ function recipeEditorControlForFieldPath(path, form = document.getElementById("r
 
     const normalized = String(path || "").replace(/\[(\d+)\]/g, ".$1");
     if (normalized === "scaling.selected_multiplier") {
-        return document.querySelector("[data-recipe-edit-scale-preset][aria-pressed='true']")
-            || document.getElementById("recipeEditScaleSegments");
+        return document.getElementById("recipeEditScaleMultiplier");
     }
     const parts = normalized.split(".").filter(Boolean);
     const topLevelIds = {
@@ -42026,7 +41987,8 @@ function showRecipeEditorValidationErrors(errors, options = {}) {
 
 function validateRecipeEditScaleField(errors) {
     const input = document.getElementById("recipeEditScaleMultiplier");
-    if (validateRecipeEditScaleMultiplier(input ? input.value : null) !== null) {
+    const hasInvalidCommit = input?.dataset.recipeEditScaleInvalidCommit === "true";
+    if (!hasInvalidCommit && validateRecipeEditScaleMultiplier(input ? input.value : null) !== null) {
         return true;
     }
     setRecipeScaleValidationMessage(RECIPE_EDIT_SCALE_ERROR_MESSAGE);
@@ -42036,6 +41998,9 @@ function validateRecipeEditScaleField(errors) {
         input,
         "scaling.selected_multiplier",
     );
+    if (hasInvalidCommit) {
+        delete input.dataset.recipeEditScaleInvalidCommit;
+    }
     return false;
 }
 
@@ -43281,6 +43246,8 @@ function populateRecipeScalingControls(scaling = {}, servings = "", options = {}
         : formatRecipeScaleInputValue(selectedMultiplier);
     input.dataset.baseServings = baseServings;
     input.dataset.activeMultiplier = formatRecipeScaleInputValue(selectedMultiplier);
+    input.dataset.lastValidInput = input.value;
+    delete input.dataset.recipeEditScaleInvalidCommit;
     if (legacyQuantityInput) {
         legacyQuantityInput.value = formatRecipeScaleInputValue(selectedMultiplier);
     }
@@ -43289,9 +43256,6 @@ function populateRecipeScalingControls(scaling = {}, servings = "", options = {}
     const servingsInput = document.getElementById("recipeEditServings");
     if (servingsInput) {
         servingsInput.dataset.baseServings = baseServings;
-    }
-    if (typeof syncRecipeEditScaleSegments === "function") {
-        syncRecipeEditScaleSegments();
     }
 }
 
@@ -43398,7 +43362,7 @@ function setRecipeScaleValidationMessage(message = "") {
         } else {
             input.removeAttribute("aria-invalid");
             input.removeAttribute("data-recipe-edit-validation-invalid");
-            input.closest("label")?.classList.remove("recipe-edit-has-validation-error");
+            input.closest(".recipe-edit-detail-field")?.classList.remove("recipe-edit-has-validation-error");
         }
     }
     if (error) {
@@ -43408,11 +43372,45 @@ function setRecipeScaleValidationMessage(message = "") {
 }
 
 function applyRecipeScaleMultiplier(input) {
-    if (!input) return;
+    if (!input) return false;
     setRecipeScaleValidationMessage("");
     const multiplier = validateRecipeEditScaleMultiplier(input.value);
-    if (multiplier === null) return;
+    if (multiplier === null) return false;
+    input.dataset.lastValidInput = input.value;
+    delete input.dataset.recipeEditScaleInvalidCommit;
     applyRecipeScaleValue(input, multiplier);
+    return false;
+}
+
+function commitRecipeEditScaleMultiplier(input) {
+    if (!input) return false;
+    const multiplier = validateRecipeEditScaleMultiplier(input.value);
+
+    if (multiplier !== null) {
+        input.dataset.lastValidInput = input.value;
+        delete input.dataset.recipeEditScaleInvalidCommit;
+        setRecipeScaleValidationMessage("");
+        applyRecipeScaleValue(input, multiplier);
+        return false;
+    }
+
+    const lastValidInput = String(input.dataset.lastValidInput || "").trim();
+    const activeMultiplier = validateRecipeEditScaleMultiplier(input.dataset.activeMultiplier);
+    if (validateRecipeEditScaleMultiplier(lastValidInput) !== null) {
+        input.value = lastValidInput;
+    } else if (activeMultiplier !== null) {
+        input.value = formatRecipeScaleInputValue(activeMultiplier);
+    }
+    input.dataset.recipeEditScaleInvalidCommit = "true";
+    setRecipeScaleValidationMessage(RECIPE_EDIT_SCALE_ERROR_MESSAGE);
+    return false;
+}
+
+function handleRecipeEditScaleKeydown(event, input) {
+    if (!event || event.key !== "Enter") return true;
+    event.preventDefault();
+    commitRecipeEditScaleMultiplier(input);
+    return false;
 }
 
 function applyRecipeScaleValue(input, multiplier) {
@@ -43428,9 +43426,6 @@ function applyRecipeScaleValue(input, multiplier) {
             applyRecipeScaleToIngredientRow(optionRow, multiplier);
         });
     });
-    if (typeof syncRecipeEditScaleSegments === "function") {
-        syncRecipeEditScaleSegments();
-    }
 }
 
 function applyRecipeScaleToIngredientRow(row, multiplier) {
