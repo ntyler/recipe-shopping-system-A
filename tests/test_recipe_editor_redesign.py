@@ -886,9 +886,10 @@ def test_recipe_metadata_controls_are_full_width_left_aligned_and_untruncated():
     assert "ellipsis" not in select_rule
 
 
-def test_recipe_time_breakdown_prioritizes_core_fields_and_collapses_optional_details():
+def test_recipe_details_match_classification_layout_and_field_order():
     script = read_text("PushShoppingList/static/js/app.js")
     css = read_text("PushShoppingList/static/css/app.css")
+    template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     organizer = script[
         script.index("function organizeRecipeEditInformationCard()"):
         script.index("function organizeRecipeEditAiAssistant()")
@@ -897,18 +898,54 @@ def test_recipe_time_breakdown_prioritizes_core_fields_and_collapses_optional_de
     styles = css[css.index(marker):]
 
     assert 'detailsHeading.textContent = "Recipe Details"' in organizer
-    assert "appendRecipeEditWorkspaceChildren(detailsPrimaryRow, [servingsField, prepField, cookField, totalField])" in organizer
-    assert "appendRecipeEditWorkspaceChildren(cookingDetailsBody, [inactiveField, levelField])" in organizer
-    assert 'scaleSummary.textContent = "Scale recipe"' in organizer
-    assert "More cooking details" in organizer
+    assert 'detailsHeadingRow.className = "recipe-edit-form-section-heading"' in organizer
+    assert "appendRecipeEditWorkspaceChildren(detailsHeadingRow, [detailsHeading, detailsMenu])" in organizer
+    assert 'detailsMenuButton.setAttribute("aria-label", "Recipe detail actions")' in organizer
+    assert 'onclick="return toggleRecipeEditSectionMenu(this, event)"' in template
+    assert "appendRecipeEditWorkspaceChildren(detailsPrimaryRow, [servingsField, scaleField, totalField, levelField])" in organizer
+    assert "appendRecipeEditWorkspaceChildren(cookingDetailsBody, [prepField, cookField, inactiveField])" in organizer
+    assert 'summary: "Prep Time, Cook Time, Inactive Time"' in organizer
+    assert "recipe-edit-scale-disclosure" not in organizer
     assert "syncRecipeEditTotalTimeStatus" in organizer
     assert "timeBreakdownGroup" not in organizer
     assert "setRecipeEditTimeBreakdownExpanded" not in organizer
     assert ".recipe-edit-details-primary-grid" in styles
     assert ".recipe-edit-details-secondary-grid" in styles
-    assert ".recipe-edit-scale-disclosure" in styles
+    assert ".recipe-edit-scale-disclosure" not in styles
     assert ".recipe-edit-optional-details" in styles
     assert "grid-template-columns: repeat(4, minmax(0, 1fr));" in styles
+    assert "grid-template-columns: repeat(3, minmax(0, 1fr));" in styles
+
+
+def test_recipe_optional_detail_rows_share_accessible_button_behavior():
+    script = read_text("PushShoppingList/static/js/app.js")
+    css = read_text("PushShoppingList/static/css/app.css")
+    helper = script[
+        script.index("function setRecipeEditOptionalDetailsExpanded"):
+        script.index("function bindRecipeEditNameInput")
+    ]
+    organizer = script[
+        script.index("function organizeRecipeEditInformationCard()"):
+        script.index("function organizeRecipeEditAiAssistant()")
+    ]
+    marker = "/* Recipe details and classification: bounded responsive controls with consolidated tags. */"
+    styles = css[css.index(marker):]
+
+    assert 'button.type = "button"' in helper
+    assert 'button.setAttribute("aria-expanded", "false")' in helper
+    assert 'button.setAttribute("aria-controls", id)' in helper
+    assert 'button.addEventListener("click"' in helper
+    assert 'panel.setAttribute("aria-hidden", String(!isExpanded))' in helper
+    assert 'disclosure.classList.toggle("is-expanded", isExpanded)' in helper
+    assert 'id: "recipeEditCookingDetailsPanel"' in organizer
+    assert 'id: "recipeEditClassificationDetailsPanel"' in organizer
+    assert organizer.count("createRecipeEditOptionalDetails({") == 2
+    assert ".recipe-edit-optional-details-toggle:hover" in styles
+    assert ".recipe-edit-optional-details-toggle:focus-visible" in styles
+    assert '.recipe-edit-optional-details-toggle[aria-expanded="true"]' in styles
+    assert "grid-template-rows: 0fr;" in styles
+    assert "grid-template-rows: 1fr;" in styles
+    assert "@media (prefers-reduced-motion: reduce)" in styles
 
 
 def test_recipe_total_time_calculation_preserves_manual_override_and_saved_components():

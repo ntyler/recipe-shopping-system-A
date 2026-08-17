@@ -77660,6 +77660,7 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-
     font-weight: 750;
     line-height: 1.25;
     letter-spacing: -.01em;
+    text-align: left;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
@@ -77680,7 +77681,12 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-
 }
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
-    :is(.recipe-edit-details-secondary-grid, .recipe-edit-classification-secondary-grid) {
+    .recipe-edit-details-secondary-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+    .recipe-edit-classification-secondary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
@@ -77908,50 +77914,11 @@ body.recipe-edit-standalone-page .recipe-edit-scale-current {
     font-size: 11px;
 }
 
-body.recipe-edit-standalone-page .recipe-edit-scale-disclosure {
-    margin-top: 2px;
-}
-
-body.recipe-edit-standalone-page .recipe-edit-scale-disclosure > summary {
-    display: inline-flex;
-    min-height: 28px;
-    align-items: center;
-    padding: 2px 0;
-    color: var(--app-muted);
-    cursor: pointer;
-    font-size: 11px;
-    font-weight: 700;
-    list-style: none;
-}
-
-body.recipe-edit-standalone-page .recipe-edit-scale-disclosure > summary::before {
-    content: "+";
-    margin-right: 5px;
-    color: var(--app-primary-hover);
-}
-
-body.recipe-edit-standalone-page .recipe-edit-scale-disclosure[open] > summary::before {
-    content: "\2212";
-}
-
-body.recipe-edit-standalone-page .recipe-edit-scale-disclosure > summary::-webkit-details-marker {
-    display: none;
-}
-
-body.recipe-edit-standalone-page .recipe-edit-scale-disclosure > summary:focus-visible,
-body.recipe-edit-standalone-page .recipe-edit-optional-details > summary:focus-visible,
+body.recipe-edit-standalone-page .recipe-edit-optional-details-toggle:focus-visible,
 body.recipe-edit-standalone-page .recipe-edit-ai-assistant-summary:focus-visible {
     border-radius: 6px;
     outline: 2px solid var(--app-focus);
     outline-offset: 2px;
-}
-
-body.recipe-edit-standalone-page .recipe-edit-scale-disclosure > .recipe-edit-scale-field {
-    margin-top: 5px;
-}
-
-body.recipe-edit-standalone-page .recipe-edit-scale-disclosure .recipe-edit-metadata-heading {
-    display: none;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-optional-details {
@@ -77959,40 +77926,50 @@ body.recipe-edit-standalone-page .recipe-edit-optional-details {
     border-top: 1px solid var(--app-border);
 }
 
-body.recipe-edit-standalone-page .recipe-edit-optional-details > summary {
+body.recipe-edit-standalone-page .recipe-edit-optional-details-toggle {
     display: grid;
+    width: 100%;
     grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
     min-height: 40px;
     align-items: center;
     gap: 10px;
     padding: 7px 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
     color: var(--app-text);
     cursor: pointer;
     font-size: 12px;
     font-weight: 750;
-    list-style: none;
+    text-align: left;
+    transition: color 140ms ease;
 }
 
-body.recipe-edit-standalone-page .recipe-edit-optional-details > summary::-webkit-details-marker {
-    display: none;
+body.recipe-edit-standalone-page .recipe-edit-optional-details-toggle:hover {
+    color: var(--app-primary-hover);
 }
 
-body.recipe-edit-standalone-page .recipe-edit-optional-details > summary::after {
-    content: "";
+body.recipe-edit-standalone-page .recipe-edit-optional-details-chevron {
     width: 7px;
     height: 7px;
     border-right: 1.5px solid currentColor;
     border-bottom: 1.5px solid currentColor;
     color: var(--app-muted);
     transform: rotate(45deg) translateY(-2px);
-    transition: transform 140ms ease;
+    transition: color 140ms ease, transform 160ms ease;
 }
 
-body.recipe-edit-standalone-page .recipe-edit-optional-details[open] > summary::after {
+body.recipe-edit-standalone-page
+    .recipe-edit-optional-details-toggle:hover .recipe-edit-optional-details-chevron {
+    color: var(--app-primary-hover);
+}
+
+body.recipe-edit-standalone-page
+    .recipe-edit-optional-details-toggle[aria-expanded="true"] .recipe-edit-optional-details-chevron {
     transform: rotate(225deg) translate(-1px, -1px);
 }
 
-body.recipe-edit-standalone-page .recipe-edit-optional-details > summary > span:nth-child(2) {
+body.recipe-edit-standalone-page .recipe-edit-optional-details-summary {
     min-width: 0;
     color: var(--app-muted);
     font-size: 10px;
@@ -78002,21 +77979,56 @@ body.recipe-edit-standalone-page .recipe-edit-optional-details > summary > span:
     white-space: nowrap;
 }
 
-body.recipe-edit-standalone-page .recipe-edit-optional-details > summary
+body.recipe-edit-standalone-page .recipe-edit-optional-details-toggle
     [data-recipe-edit-optional-suggestion-count] {
     color: var(--app-primary-hover);
     font-size: 10px;
     font-weight: 700;
 }
 
-body.recipe-edit-standalone-page .recipe-edit-optional-details > summary
+body.recipe-edit-standalone-page .recipe-edit-optional-details-toggle
     [data-recipe-edit-optional-suggestion-count][hidden] {
     display: none;
 }
 
-body.recipe-edit-standalone-page .recipe-edit-optional-details > div {
+body.recipe-edit-standalone-page .recipe-edit-optional-details-panel {
+    display: grid;
+    min-width: 0;
+    grid-template-rows: 0fr;
+    visibility: hidden;
+    pointer-events: none;
+    transition: grid-template-rows 160ms ease, visibility 0s linear 160ms;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-optional-details.is-expanded
+    > .recipe-edit-optional-details-panel {
+    grid-template-rows: 1fr;
+    visibility: visible;
+    pointer-events: auto;
+    transition-delay: 0s;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-optional-details-panel > div {
+    min-height: 0;
+    padding: 0;
+    overflow: hidden;
+    transition: padding 160ms ease;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-optional-details.is-expanded
+    > .recipe-edit-optional-details-panel > div {
     padding: 9px 0 4px;
-    animation: recipe-edit-details-reveal 140ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    body.recipe-edit-standalone-page :is(
+        .recipe-edit-optional-details-toggle,
+        .recipe-edit-optional-details-chevron,
+        .recipe-edit-optional-details-panel,
+        .recipe-edit-optional-details-panel > div
+    ) {
+        transition: none;
+    }
 }
 
 body.recipe-edit-standalone-page .recipe-edit-classification-section.recipe-edit-inline-categories {
