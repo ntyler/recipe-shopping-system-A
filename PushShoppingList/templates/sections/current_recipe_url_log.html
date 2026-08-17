@@ -1482,12 +1482,16 @@
                              role="group"
                              aria-label="Recipe scale">
                             <button type="button" data-recipe-edit-scale-preset="0.5" aria-pressed="false"
+                                    aria-label="Scale recipe to 0.5 times"
                                     onclick="return selectRecipeEditScalePreset(this, 0.5)">&frac12;&times;</button>
                             <button type="button" data-recipe-edit-scale-preset="1" aria-pressed="true"
+                                    aria-label="Scale recipe to 1 time"
                                     onclick="return selectRecipeEditScalePreset(this, 1)">1&times;</button>
                             <button type="button" data-recipe-edit-scale-preset="2" aria-pressed="false"
+                                    aria-label="Scale recipe to 2 times"
                                     onclick="return selectRecipeEditScalePreset(this, 2)">2&times;</button>
                             <button type="button" data-recipe-edit-scale-preset="3" aria-pressed="false"
+                                    aria-label="Scale recipe to 3 times"
                                     onclick="return selectRecipeEditScalePreset(this, 3)">3&times;</button>
                         </div>
                         <span class="recipe-edit-scale-current" data-recipe-edit-scale-current hidden></span>
@@ -1549,14 +1553,16 @@
                                     data-recipe-edit-servings-decrement
                                     aria-label="Decrease servings"
                                     onclick="return stepRecipeEditServings(-1)">&minus;</button>
-                            <input type="number"
-                                   id="recipeEditServingsCount"
-                                   min="1"
-                                   step="1"
-                                   inputmode="numeric"
-                                   aria-labelledby="recipeEditServingsLabel"
-                                   oninput="return updateRecipeEditServingsFromStepper(this)">
-                            <span class="recipe-edit-servings-unit">people</span>
+                            <span class="recipe-edit-servings-value">
+                                <input type="number"
+                                       id="recipeEditServingsCount"
+                                       min="1"
+                                       step="1"
+                                       inputmode="numeric"
+                                       aria-label="Servings"
+                                       oninput="return updateRecipeEditServingsFromStepper(this)">
+                                <span class="recipe-edit-servings-unit" aria-hidden="true">servings</span>
+                            </span>
                             <button type="button"
                                     data-recipe-edit-servings-increment
                                     aria-label="Increase servings"

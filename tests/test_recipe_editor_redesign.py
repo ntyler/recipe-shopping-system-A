@@ -773,7 +773,8 @@ def test_recipe_detail_fields_use_bounded_accessible_controls():
     assert 'id="recipeEditServingsCount"' in template
     assert 'aria-label="Decrease servings"' in template
     assert 'aria-label="Increase servings"' in template
-    assert '<span class="recipe-edit-servings-unit">people</span>' in template
+    assert '<span class="recipe-edit-servings-value">' in template
+    assert '<span class="recipe-edit-servings-unit" aria-hidden="true">servings</span>' in template
     assert template.count('data-recipe-edit-scale-preset=') == 4
     assert 'aria-label="Recipe scale"' in template
     assert ".recipe-edit-servings-stepper" in styles

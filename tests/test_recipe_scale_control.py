@@ -56,6 +56,10 @@ def test_recipe_scale_is_an_accessible_four_option_segmented_control():
     assert 'data-recipe-edit-scale-preset="2"' in field
     assert 'data-recipe-edit-scale-preset="3"' in field
     assert '&frac12;&times;' in field
+    assert 'aria-label="Scale recipe to 0.5 times"' in field
+    assert 'aria-label="Scale recipe to 1 time"' in field
+    assert 'aria-label="Scale recipe to 2 times"' in field
+    assert 'aria-label="Scale recipe to 3 times"' in field
     assert 'onclick="return selectRecipeEditScalePreset' in field
     assert "RECIPE_EDIT_SCALE_PRESETS" not in script
     assert "RECIPE_EDIT_CUSTOM_SCALE_VALUE" not in script
@@ -66,6 +70,31 @@ def test_recipe_scale_is_an_accessible_four_option_segmented_control():
     assert "button.is-selected" in css
     assert ".recipe-edit-scale-error" in css
     assert "var(--app-primary-hover)" in css
+
+
+def test_recipe_servings_and_scale_share_a_quiet_equal_height_control_family():
+    template = TEMPLATE_PATH.read_text(encoding="utf-8")
+    css = CSS_PATH.read_text(encoding="utf-8")
+    styles_start = css.index(
+        "body.recipe-edit-standalone-page .recipe-edit-info-panel-organized\n"
+        "    .recipe-edit-details-primary-grid\n"
+        "    :is(.recipe-edit-servings-stepper, .recipe-edit-scale-segments) {"
+    )
+    styles = css[styles_start:css.index("body.recipe-edit-standalone-page .recipe-edit-scale-current", styles_start)]
+
+    assert 'aria-label="Decrease servings"' in template
+    assert 'aria-label="Increase servings"' in template
+    assert '<span class="recipe-edit-servings-value">' in template
+    assert '<span class="recipe-edit-servings-unit" aria-hidden="true">servings</span>' in template
+    assert "height: 42px;" in styles
+    assert "border: 1px solid var(--app-border);" in styles
+    assert "grid-template-columns: 40px minmax(0, 1fr) 40px;" in styles
+    assert "grid-template-columns: repeat(4, minmax(0, 1fr));" in styles
+    assert "button:hover:not(.is-selected)" in styles
+    assert "button.is-selected" in styles
+    assert "background: color-mix(in srgb, var(--app-primary-soft) 72%, transparent);" in styles
+    assert "box-shadow: inset 0 0 0 1px" not in styles
+    assert "border-right:" not in styles
 
 
 def test_recipe_scale_parser_accepts_decimals_fractions_and_mixed_fractions():
