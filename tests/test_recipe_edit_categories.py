@@ -115,7 +115,7 @@ def test_recipe_editor_consolidates_cuisine_and_custom_tags_in_classification():
     assert "[mealTypeField, cuisineCategoryField, dietaryPreferenceField]" in organizer
     assert "[mainIngredientField, cookingMethodField, occasionField, customCategoriesField]" in organizer
     assert "More classification details" in organizer
-    assert "AI suggestions &mdash; review before saving" in organizer
+    assert "AI-filled fields &mdash; edit or clear anything that looks wrong" in organizer
     assert "prepareRecipeEditCategorySuggestionField" in organizer
     assert 'initializeRecipeEditMultiselectField(dietaryPreferenceField, "dietary")' in organizer
     assert 'initializeRecipeEditMultiselectField(cuisineCategoryField, "cuisine")' in organizer
@@ -144,9 +144,14 @@ def test_recipe_editor_consolidates_cuisine_and_custom_tags_in_classification():
     assert 'setRecipeEditCustomCategories(mergedCustom' in script
     assert "function renderRecipeEditCategorySummary" not in script
     assert "function toggleRecipeEditCategories" not in script
-    assert "function acceptRecipeEditCategorySuggestion" in script
-    assert "function editRecipeEditCategorySuggestion" in script
-    assert "function dismissRecipeEditCategorySuggestion" in script
+    assert "function acceptRecipeEditCategorySuggestion" not in script
+    assert "function editRecipeEditCategorySuggestion" not in script
+    assert "function dismissRecipeEditCategorySuggestion" not in script
+    assert "recipeEditAiFieldActions" not in script
+    assert "updateRecipeEditorDirtyState(form);" in script[
+        script.index("function applyRecipeEditCategorySuggestions"):
+        script.index("async function decideRecipeEditCategoriesWithChatGPT")
+    ]
     assert 'field !== "prep_time_group"' in script
     assert "recipe-edit-tag-chip-ai" not in script
 
@@ -155,7 +160,7 @@ def test_recipe_editor_consolidates_cuisine_and_custom_tags_in_classification():
     assert ".recipe-edit-classification-grid" in category_css
     assert ".recipe-edit-optional-details" in category_css
     assert ".recipe-edit-ai-suggestion-summary" in category_css
-    assert ".recipe-edit-ai-field-actions" in category_css
+    assert ".recipe-edit-ai-field-actions" not in category_css
     assert ".recipe-edit-multiselect-control" in category_css
     assert ".recipe-edit-multiselect-options" in category_css
     assert "max-width: 100%;" in category_css

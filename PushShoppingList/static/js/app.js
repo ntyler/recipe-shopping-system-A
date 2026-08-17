@@ -23968,17 +23968,6 @@ function setRecipeEditCategorySourceLabel(label) {
     }
 }
 
-function recipeEditCategorySuggestionControl(field) {
-    const form = document.getElementById("recipeEditForm");
-    const input = form ? form.elements[field] : null;
-    if (!input) return null;
-    if (["cuisine", "dietary_preference", "custom_categories"].includes(field)) {
-        return input.closest("[data-recipe-edit-multiselect-field]")
-            ?.querySelector("[data-recipe-edit-multiselect-search]") || input;
-    }
-    return input;
-}
-
 function refreshRecipeEditCategorySuggestions() {
     const form = document.getElementById("recipeEditForm");
     const summary = document.querySelector("[data-recipe-edit-ai-suggestion-summary]");
@@ -23996,8 +23985,6 @@ function refreshRecipeEditCategorySuggestions() {
         const field = fieldElement.dataset.recipeEditCategoryField || "";
         const suggested = suggestedFields.includes(field);
         fieldElement.classList.toggle("is-ai-suggested", suggested);
-        const actions = fieldElement.querySelector("[data-recipe-edit-ai-field-actions]");
-        if (actions) actions.hidden = !suggested;
     });
 
     if (summary) {
@@ -24016,74 +24003,9 @@ function refreshRecipeEditCategorySuggestions() {
     setRecipeEditCategorySourceLabel(suggestedFields.length ? "AI suggestions" : "Saved");
 }
 
-function acceptRecipeEditCategorySuggestion(button) {
-    const field = button?.closest("[data-recipe-edit-category-field]")?.dataset.recipeEditCategoryField || "";
-    const form = document.getElementById("recipeEditForm");
-    if (!field || !form) return false;
-    setFormCategorySource(form, field, CATEGORY_SOURCE_USER_SELECTED);
-    refreshRecipeEditCategorySuggestions();
-    updateRecipeEditorDirtyState(form);
-    setRecipeEditStatus("Suggestion accepted. Save Recipe to keep it.");
-    return false;
-}
-
-function editRecipeEditCategorySuggestion(button) {
-    const fieldElement = button?.closest("[data-recipe-edit-category-field]");
-    const field = fieldElement?.dataset.recipeEditCategoryField || "";
-    const disclosure = fieldElement?.closest("details");
-    if (disclosure) disclosure.open = true;
-    window.requestAnimationFrame(() => {
-        const control = recipeEditCategorySuggestionControl(field);
-        control?.focus({ preventScroll: true });
-        if (control && control.matches("[data-recipe-edit-multiselect-search]")) control.click();
-    });
-    return false;
-}
-
-function dismissRecipeEditCategorySuggestion(button) {
-    const field = button?.closest("[data-recipe-edit-category-field]")?.dataset.recipeEditCategoryField || "";
-    const form = document.getElementById("recipeEditForm");
-    if (!field || !form) return false;
-    if (field === "cuisine") {
-        setRecipeEditCuisineCategories([], { source: CATEGORY_SOURCE_BLANK });
-    } else if (field === "dietary_preference") {
-        setRecipeEditDietaryPreferences([], { source: CATEGORY_SOURCE_BLANK });
-    } else if (field === "custom_categories") {
-        setRecipeEditCustomCategories([], { source: CATEGORY_SOURCE_BLANK });
-    } else {
-        setCookbookCategoryFieldValue(form, field, "");
-        setFormCategorySource(form, field, CATEGORY_SOURCE_BLANK);
-    }
-    refreshRecipeEditCategorySuggestions();
-    updateRecipeEditorDirtyState(form);
-    setRecipeEditStatus("Suggestion dismissed. Save Recipe to keep the change.");
-    return false;
-}
-
 function prepareRecipeEditCategorySuggestionField(fieldElement, field) {
     if (!fieldElement || fieldElement.dataset.recipeEditCategoryField) return;
     fieldElement.dataset.recipeEditCategoryField = field;
-    const actions = document.createElement("div");
-    actions.className = "recipe-edit-ai-field-actions";
-    actions.dataset.recipeEditAiFieldActions = "";
-    actions.hidden = true;
-    actions.setAttribute("aria-label", "AI suggestion actions");
-    const status = document.createElement("span");
-    status.textContent = "Suggested";
-    const accept = document.createElement("button");
-    accept.type = "button";
-    accept.textContent = "Accept";
-    accept.addEventListener("click", () => acceptRecipeEditCategorySuggestion(accept));
-    const edit = document.createElement("button");
-    edit.type = "button";
-    edit.textContent = "Edit";
-    edit.addEventListener("click", () => editRecipeEditCategorySuggestion(edit));
-    const dismiss = document.createElement("button");
-    dismiss.type = "button";
-    dismiss.textContent = "Dismiss";
-    dismiss.addEventListener("click", () => dismissRecipeEditCategorySuggestion(dismiss));
-    actions.append(status, accept, edit, dismiss);
-    fieldElement.appendChild(actions);
 }
 
 function applyRecipeEditCategorySuggestions(categories = {}, mode = "missing") {
@@ -24143,6 +24065,7 @@ function applyRecipeEditCategorySuggestions(categories = {}, mode = "missing") {
         renderRecipeEditMultiselect("dietary");
         renderRecipeEditMultiselect("custom");
         refreshRecipeEditCategorySuggestions();
+        updateRecipeEditorDirtyState(form);
     }
 }
 
@@ -28167,7 +28090,7 @@ function organizeRecipeEditInformationCard() {
     suggestionSummary.hidden = true;
     suggestionSummary.setAttribute("role", "status");
     suggestionSummary.setAttribute("aria-live", "polite");
-    suggestionSummary.innerHTML = '<span>AI suggestions &mdash; review before saving</span><span data-recipe-edit-ai-suggestion-count></span>';
+    suggestionSummary.innerHTML = '<span>AI-filled fields &mdash; edit or clear anything that looks wrong</span><span data-recipe-edit-ai-suggestion-count></span>';
     const classificationDetails = document.createElement("details");
     classificationDetails.className = "recipe-edit-optional-details recipe-edit-classification-details";
     const classificationDetailsSummary = document.createElement("summary");
