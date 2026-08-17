@@ -77832,10 +77832,12 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
     .recipe-edit-details-primary-grid .recipe-edit-servings-stepper {
-    display: grid;
-    grid-template-columns: 38px minmax(0, 1fr) 38px;
+    display: inline-flex;
+    width: 175px;
+    max-width: 100%;
     align-items: center;
-    gap: 0;
+    justify-self: start;
+    gap: 8px;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
@@ -77851,6 +77853,7 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
     min-width: 34px;
     height: 34px;
     min-height: 0;
+    flex: 0 0 34px;
     align-self: center;
     justify-self: center;
     place-items: center;
@@ -77897,6 +77900,7 @@ body.recipe-edit-standalone-page .recipe-edit-servings-value {
     display: flex;
     min-width: 0;
     height: 40px;
+    flex: 1 1 auto;
     align-items: center;
     justify-content: center;
     gap: 5px;
@@ -77908,12 +77912,12 @@ body.recipe-edit-standalone-page .recipe-edit-servings-value {
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
     .recipe-edit-details-primary-grid .recipe-edit-servings-stepper #recipeEditServingsCount {
-    width: 6ch;
-    min-width: 6ch;
-    max-width: 6ch;
+    width: 5ch;
+    min-width: 3ch;
+    max-width: 5ch;
     height: 40px;
     min-height: 0;
-    flex: 0 0 6ch;
+    flex: 1 1 5ch;
     padding: 0;
     border: 0;
     border-radius: 0;

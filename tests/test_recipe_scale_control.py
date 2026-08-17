@@ -97,19 +97,51 @@ def test_recipe_servings_and_scale_share_a_quiet_equal_height_control_family():
     assert "height: 42px;" in styles
     assert "border: 1px solid transparent;" in styles
     assert "border-color: var(--app-primary-hover);" in styles
-    assert re.search(
-        r"grid-template-columns:\s*3[2-8]px\s+minmax\(0, 1fr\)\s+3[2-8]px;",
+    stepper_rule = re.search(
+        r"\.recipe-edit-servings-stepper\s*\{(?P<body>.*?)\}",
         styles,
+        re.DOTALL,
     )
+    assert stepper_rule
+    stepper_body = stepper_rule.group("body")
+    assert "display: inline-flex;" in stepper_body
+    width = re.search(r"width:\s*(\d+)px;", stepper_body)
+    assert width and 150 <= int(width.group(1)) <= 175
+    assert "max-width: 100%;" in stepper_body
+    assert "justify-self: start;" in stepper_body
+    gap = re.search(r"gap:\s*(\d+)px;", stepper_body)
+    assert gap and 8 <= int(gap.group(1)) <= 12
+    assert "grid-template-columns:" not in stepper_body
     button_rule = re.search(
         r"\.recipe-edit-servings-stepper\s*>\s*button\s*\{(?P<body>.*?)\}",
         styles,
         re.DOTALL,
     )
     assert button_rule
-    assert re.search(r"width:\s*3[2-6]px;", button_rule.group("body"))
-    assert re.search(r"height:\s*3[2-6]px;", button_rule.group("body"))
-    assert "background: transparent;" in button_rule.group("body")
+    button_body = button_rule.group("body")
+    button_width = re.search(r"width:\s*(3[2-6])px;", button_body)
+    button_height = re.search(r"height:\s*(3[2-6])px;", button_body)
+    assert button_width and button_height
+    assert button_width.group(1) == button_height.group(1)
+    assert f"flex: 0 0 {button_width.group(1)}px;" in button_body
+    assert "background: transparent;" in button_body
+    value_rule = re.search(
+        r"\.recipe-edit-servings-value\s*\{(?P<body>.*?)\}",
+        styles,
+        re.DOTALL,
+    )
+    assert value_rule
+    assert "flex: 1 1 auto;" in value_rule.group("body")
+    assert "white-space: nowrap;" in value_rule.group("body")
+    count_rule = re.search(
+        r"\.recipe-edit-servings-stepper\s+#recipeEditServingsCount\s*\{(?P<body>.*?)\}",
+        styles,
+        re.DOTALL,
+    )
+    assert count_rule
+    assert "min-width: 3ch;" in count_rule.group("body")
+    assert "max-width: 5ch;" in count_rule.group("body")
+    assert "flex: 1 1 5ch;" in count_rule.group("body")
     assert ":is(.recipe-edit-servings-stepper, .recipe-edit-scale-control):focus-within" in styles
     assert ".recipe-edit-scale-control #recipeEditScaleMultiplier" in styles
     assert "white-space: nowrap;" in styles
