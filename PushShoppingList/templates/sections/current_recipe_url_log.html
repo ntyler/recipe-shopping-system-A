@@ -882,6 +882,12 @@
                         <template data-recipe-metadata-icon="inactive">{{ shell.svg_icon("timer") }}</template>
                         <template data-recipe-metadata-icon="difficulty">{{ shell.svg_icon("settings") }}</template>
                         <template data-recipe-metadata-icon="scale">{{ shell.svg_icon("sort") }}</template>
+                        <template data-recipe-metadata-icon="meal-type">{{ shell.svg_icon("meal") }}</template>
+                        <template data-recipe-metadata-icon="main-ingredient">{{ shell.svg_icon("shopping") }}</template>
+                        <template data-recipe-metadata-icon="cooking-method">{{ shell.svg_icon("cooking-pot") }}</template>
+                        <template data-recipe-metadata-icon="occasion">{{ shell.svg_icon("star") }}</template>
+                        <template data-recipe-metadata-icon="dietary-preference">{{ shell.svg_icon("heart") }}</template>
+                        <template data-recipe-metadata-icon="cuisine-category">{{ shell.svg_icon("globe") }}</template>
                         <template data-recipe-metadata-icon="plus">{{ shell.svg_icon("plus") }}</template>
                         <template data-recipe-metadata-icon="x">{{ shell.svg_icon("x") }}</template>
                     </div>
@@ -1606,71 +1612,33 @@
 
             {% set editor_category_choices = cookbook_view.category_choices if cookbook_view and cookbook_view.category_choices else {} %}
             <section id="recipeEditCategoriesSection"
-                     class="recipe-edit-categories-panel is-collapsed"
-                     aria-labelledby="recipeEditCategoriesSummaryLabel"
+                     class="recipe-edit-inline-categories"
+                     aria-label="Recipe categories"
                      data-recipe-edit-categories>
-                <div class="recipe-edit-category-summary" data-recipe-edit-category-summary>
-                    <span id="recipeEditCategoriesSummaryLabel" class="recipe-edit-category-summary-label">
-                        <span class="recipe-edit-panel-icon recipe-edit-panel-icon-categories" aria-hidden="true"></span>
-                        <span>Recipe Categories</span>
-                    </span>
-                    <div class="recipe-edit-category-summary-chips"
-                         role="group"
-                         aria-label="Selected recipe categories"
-                         data-recipe-edit-category-summary-chips></div>
+                <div class="recipe-edit-section-menu-wrap recipe-edit-category-menu-wrap">
                     <button type="button"
-                            class="recipe-edit-category-more-button"
-                            aria-label="Show all recipe categories"
-                            data-recipe-edit-category-more
-                            onclick="return openRecipeEditCategories(this)"
-                            hidden>+0 more</button>
-                    <button type="button"
-                            class="recipe-edit-category-edit-button"
-                            aria-label="Edit recipe categories"
-                            title="Edit recipe categories"
+                            class="recipe-edit-row-menu-btn recipe-edit-section-menu-btn recipe-edit-category-menu-btn"
+                            aria-label="Recipe category actions"
+                            title="Recipe category actions"
+                            aria-haspopup="true"
                             aria-expanded="false"
-                            aria-controls="recipeEditCategoriesBody"
-                            data-recipe-edit-category-collapse
-                            onclick="return toggleRecipeEditCategories(this)">
-                        {{ shell.svg_icon("edit") }}
-                        <span data-recipe-edit-category-edit-label>Edit categories</span>
+                            onclick="return toggleRecipeEditSectionMenu(this, event)">
+                        <span aria-hidden="true"></span>
                     </button>
-                </div>
-                <div id="recipeEditCategoriesBody"
-                     class="recipe-edit-category-collapse-region"
-                     aria-hidden="true"
-                     inert>
-                    <div class="recipe-edit-category-editor">
-                        <div class="recipe-edit-category-editor-heading">
-                            <div>
-                                <h3 id="recipeEditCategoriesTitle" tabindex="-1">Edit Recipe Categories</h3>
-                                <p id="recipeEditCategoryRecipeName" class="recipe-edit-category-recipe-name"></p>
-                            </div>
-                        <div class="recipe-edit-section-menu-wrap recipe-edit-category-menu-wrap">
+                    <div class="recipe-edit-row-menu recipe-edit-section-menu overflow-menu recipe-edit-category-menu" hidden>
+                        <div class="overflow-menu-section">
+                            <div class="overflow-menu-section-title">ChatGPT Categories</div>
                             <button type="button"
-                                    class="recipe-edit-row-menu-btn recipe-edit-section-menu-btn recipe-edit-category-menu-btn"
-                                    aria-label="Recipe category actions"
-                                    title="Recipe category actions"
-                                    aria-haspopup="true"
-                                    aria-expanded="false"
-                                    onclick="return toggleRecipeEditSectionMenu(this, event)">
-                                <span aria-hidden="true"></span>
+                                    onclick="return decideRecipeEditCategoriesWithChatGPT(this, 'all')">
+                                &#129302; Have ChatGPT Decide All
                             </button>
-                            <div class="recipe-edit-row-menu recipe-edit-section-menu overflow-menu recipe-edit-category-menu" hidden>
-                                <div class="overflow-menu-section">
-                                    <div class="overflow-menu-section-title">ChatGPT Categories</div>
-                                    <button type="button"
-                                            onclick="return decideRecipeEditCategoriesWithChatGPT(this, 'all')">
-                                        &#129302; Have ChatGPT Decide All
-                                    </button>
-                                    <button type="button"
-                                            onclick="return decideRecipeEditCategoriesWithChatGPT(this, 'missing')">
-                                        &#129302; Have ChatGPT Decide Missing
-                                    </button>
-                                </div>
-                            </div>
+                            <button type="button"
+                                    onclick="return decideRecipeEditCategoriesWithChatGPT(this, 'missing')">
+                                &#129302; Have ChatGPT Decide Missing
+                            </button>
                         </div>
                     </div>
+                </div>
                 <div class="cookbook-category-grid recipe-edit-category-grid">
                     <label for="recipeEditCategoryMealType">
                         <span>Meal Type</span>
@@ -1807,15 +1775,14 @@
                             </div>
                         </div>
                     </div>
-                    <label class="cookbook-category-custom-field recipe-edit-category-custom-field" for="recipeEditCategoryCustomCategories">
-                        <span>Custom Categories</span>
+                    <div class="recipe-edit-file-field recipe-edit-custom-categories-field recipe-edit-wide"
+                         role="group"
+                         aria-labelledby="recipeEditCustomCategoriesLabel">
+                        <span id="recipeEditCustomCategoriesLabel">Custom Categories</span>
                         <input id="recipeEditCategoryCustomCategories"
-                               type="text"
+                               type="hidden"
                                name="custom_categories"
-                               placeholder="Sophia's Favorites, Weeknight Dinners"
                                autocomplete="off">
-                    </label>
-                </div>
                     </div>
                 </div>
             </section>

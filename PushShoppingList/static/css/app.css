@@ -77517,3 +77517,95 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-
         max-width: 190px;
     }
 }
+
+/* Edit Recipe: inline category metadata and reusable custom-category tags. */
+body.recipe-edit-standalone-page .recipe-edit-inline-categories {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+    .recipe-edit-category-metadata-strip {
+    margin-top: 0;
+    padding-top: 6px;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+    .recipe-edit-category-metadata-strip > .recipe-edit-category-metadata-field {
+    min-width: 0;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+    .recipe-edit-category-metadata-strip .recipe-edit-metadata-value,
+body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+    .recipe-edit-category-metadata-strip .recipe-edit-metadata-value select {
+    max-width: 100%;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+    .recipe-edit-category-metadata-strip .recipe-edit-metadata-value select {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+    .recipe-edit-custom-category-tag-row {
+    margin-top: 4px;
+    padding: 0 8px 8px;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-tag-row
+    > .recipe-edit-custom-categories-field {
+    position: relative;
+    display: grid;
+    min-width: 0;
+    flex: 0 1 auto;
+    gap: 7px;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-custom-categories-field
+    > #recipeEditCustomCategoriesLabel {
+    color: var(--app-muted);
+    font-size: 10px;
+    font-weight: 650;
+    line-height: 1.2;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-custom-category-actions {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-custom-category-actions
+    .recipe-edit-category-menu-wrap {
+    position: relative;
+    flex: 0 0 auto;
+}
+
+@media (max-width: 767px) {
+    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+        .recipe-edit-category-metadata-strip {
+        column-gap: 16px;
+        row-gap: 12px;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+        .recipe-edit-custom-category-tag-row {
+        align-items: flex-start;
+        padding-inline: 0;
+    }
+}
+
+@media (max-width: 380px) {
+    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+        .recipe-edit-category-metadata-strip > .recipe-edit-category-metadata-field {
+        flex-basis: 100%;
+        width: 100%;
+    }
+}

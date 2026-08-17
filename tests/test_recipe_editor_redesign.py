@@ -1147,66 +1147,62 @@ def test_recipe_editor_standard_fields_are_quiet_until_active():
     assert "#recipeEditMenuPrice:is([aria-invalid=\"true\"], [data-recipe-edit-validation-invalid=\"true\"])" in quiet_fields
 
 
-def test_recipe_category_summary_uses_compact_scannable_visual_hierarchy():
+def test_recipe_category_fields_use_the_compact_metadata_visual_hierarchy():
     css = read_text("PushShoppingList/static/css/app.css")
-    marker = "/* Edit Recipe: compact category summary and inline disclosure. */"
+    marker = "/* Edit Recipe: inline category metadata and reusable custom-category tags. */"
     marker_start = css.index(marker)
     category_styles = css[marker_start:]
 
-    summary_start = category_styles.index(
-        ".recipe-edit-category-summary {"
+    section_start = category_styles.index(".recipe-edit-inline-categories {")
+    section_rule = category_styles[section_start:category_styles.index("}", section_start)]
+    assert "min-width: 0;" in section_rule
+    assert "border: 0;" in section_rule
+
+    row_start = category_styles.index(".recipe-edit-category-metadata-strip {")
+    row_rule = category_styles[row_start:category_styles.index("}", row_start)]
+    assert "margin-top: 0;" in row_rule
+    assert "padding-top: 6px;" in row_rule
+
+    select_start = category_styles.rindex(
+        ".recipe-edit-category-metadata-strip .recipe-edit-metadata-value select {"
     )
-    summary_rule = category_styles[summary_start:category_styles.index("}", summary_start)]
-    assert "grid-template-columns: auto minmax(0, 1fr) auto auto;" in summary_rule
-    assert "min-width: 0;" in summary_rule
+    select_rule = category_styles[select_start:category_styles.index("}", select_start)]
+    assert "overflow: hidden;" in select_rule
+    assert "text-overflow: ellipsis;" in select_rule
+    assert "white-space: nowrap;" in select_rule
 
-    chip_start = category_styles.index(
-        "body.recipe-edit-standalone-page .recipe-edit-category-summary-chip,\n"
-        "body.recipe-edit-standalone-page .recipe-edit-category-more-button {"
+    custom_start = category_styles.index(
+        "> .recipe-edit-custom-categories-field {"
     )
-    chip_rule = category_styles[chip_start:category_styles.index("}", chip_start)]
-    assert "min-height: 28px;" in chip_rule
-    assert "border-radius: 999px;" in chip_rule
-    assert "var(--app-primary" in chip_rule
-
-    list_start = category_styles.index(".recipe-edit-category-summary-chips {")
-    list_rule = category_styles[list_start:category_styles.index("}", list_start)]
-    assert "min-width: 0;" in list_rule
-    assert "overflow: hidden;" in list_rule
-    assert "white-space: nowrap;" in list_rule
-
-    editor_title_start = category_styles.index(
-        ".recipe-edit-category-editor-heading h3 {"
-    )
-    editor_title_rule = category_styles[
-        editor_title_start:category_styles.index("}", editor_title_start)
-    ]
-    assert "font-size: 14px;" in editor_title_rule
-    assert "font-weight: 780;" in editor_title_rule
-
-    assert ".recipe-edit-category-source {" not in category_styles
+    custom_rule = category_styles[custom_start:category_styles.index("}", custom_start)]
+    assert "display: grid;" in custom_rule
+    assert "min-width: 0;" in custom_rule
+    assert "flex: 0 1 auto;" in custom_rule
 
 
-def test_mobile_recipe_category_summary_wraps_without_horizontal_overflow():
+def test_mobile_recipe_category_fields_wrap_without_horizontal_overflow():
     css = read_text("PushShoppingList/static/css/app.css")
-    marker = "/* Edit Recipe: compact category summary and inline disclosure. */"
+    marker = "/* Edit Recipe: inline category metadata and reusable custom-category tags. */"
     category_styles = css[css.index(marker):]
-    mobile = category_styles[category_styles.index("@media (max-width: 760px)"):]
+    mobile = category_styles[category_styles.index("@media (max-width: 767px)"):]
 
-    summary_start = mobile.index(".recipe-edit-category-summary {")
-    summary_rule = mobile[summary_start:mobile.index("}", summary_start)]
-    assert "grid-template-columns: minmax(0, 1fr) auto;" in summary_rule
-    assert "row-gap: 8px;" in summary_rule
+    row_start = mobile.index(".recipe-edit-category-metadata-strip {")
+    row_rule = mobile[row_start:mobile.index("}", row_start)]
+    assert "column-gap: 16px;" in row_rule
+    assert "row-gap: 12px;" in row_rule
 
-    chips_start = mobile.index(".recipe-edit-category-summary-chips {")
-    chips_rule = mobile[chips_start:mobile.index("}", chips_start)]
-    assert "grid-column: 1;" in chips_rule
-    assert "grid-row: 2;" in chips_rule
+    custom_start = mobile.index(".recipe-edit-custom-category-tag-row {")
+    custom_rule = mobile[custom_start:mobile.index("}", custom_start)]
+    assert "align-items: flex-start;" in custom_rule
+    assert "padding-inline: 0;" in custom_rule
 
-    more_start = mobile.index(".recipe-edit-category-more-button {")
-    more_rule = mobile[more_start:mobile.index("}", more_start)]
-    assert "grid-column: 2;" in more_rule
-    assert "grid-row: 2;" in more_rule
+    phone = category_styles[category_styles.index("@media (max-width: 380px)"):]
+    field_start = phone.index(
+        ".recipe-edit-category-metadata-strip > .recipe-edit-category-metadata-field {"
+    )
+    field_rule = phone[field_start:phone.index("}", field_start)]
+    assert "flex-basis: 100%;" in field_rule
+    assert "width: 100%;" in field_rule
 
 
 def test_recipe_image_has_explicit_mobile_view_below_rating_at_narrow_widths():
