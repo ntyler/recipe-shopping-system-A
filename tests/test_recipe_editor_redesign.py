@@ -583,6 +583,26 @@ def test_restaurant_source_actions_are_borderless_until_hover_or_focus():
     assert focus_rule in css
 
 
+def test_add_tag_button_is_borderless_until_hover_with_keyboard_focus_ring():
+    css = read_text("PushShoppingList/static/css/app.css")
+    base_selector = ".recipe-edit-standalone-page .recipe-edit-tag-add {"
+    hover_selector = ".recipe-edit-standalone-page .recipe-edit-tag-add:hover {"
+    focus_selector = ".recipe-edit-standalone-page .recipe-edit-tag-add:focus-visible {"
+
+    base_start = css.index(base_selector)
+    base_rule = css[base_start:css.index("}", base_start)]
+    hover_start = css.index(hover_selector)
+    hover_rule = css[hover_start:css.index("}", hover_start)]
+    focus_start = css.index(focus_selector)
+    focus_rule = css[focus_start:css.index("}", focus_start)]
+
+    assert "border-color: transparent;" in base_rule
+    assert "border-color: var(--app-border);" in hover_rule
+    assert "outline: 2px solid var(--app-focus);" in focus_rule
+    assert "outline-offset: 2px;" in focus_rule
+    assert ".recipe-edit-tag-clear" not in base_rule + hover_rule + focus_rule
+
+
 def test_recipe_information_card_matches_compact_mockup_structure():
     script = read_text("PushShoppingList/static/js/app.js")
     css = read_text("PushShoppingList/static/css/app.css")
