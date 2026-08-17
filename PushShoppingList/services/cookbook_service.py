@@ -330,15 +330,18 @@ def clean_custom_categories(value):
             if cleaned
         ]
 
-    if isinstance(value, str):
-        return split_categories(value)
-
-    if not isinstance(value, list):
-        return []
+    raw_items = split_categories(value) if isinstance(value, str) else []
+    if isinstance(value, list):
+        for item in value:
+            raw_items.extend(split_categories(item))
 
     items = []
-    for item in value:
-        items.extend(split_categories(item))
+    seen = set()
+    for item in raw_items:
+        key = normalize_text(item)
+        if key and key not in seen:
+            items.append(item)
+            seen.add(key)
 
     return items
 
@@ -1248,6 +1251,22 @@ def cookbook_category_choices():
     }
 
 
+def cookbook_custom_tag_choices(view):
+    view = view if isinstance(view, dict) else {}
+    choices = []
+    seen = set()
+
+    for cookbook in view.get("cookbooks", []):
+        for recipe in cookbook.get("recipes", []):
+            for value in clean_custom_categories(recipe.get("custom_categories")):
+                key = normalize_text(value)
+                if key and key not in seen:
+                    choices.append(value)
+                    seen.add(key)
+
+    return sorted(choices, key=lambda value: normalize_text(value))
+
+
 def recipe_section_labels_for_mode(recipe, mode):
     field = mode.get("section_field", "")
 
@@ -1604,6 +1623,7 @@ def prepare_cookbook_menu_view(view):
     view = view if isinstance(view, dict) else {}
     view["menu_sort_options"] = cookbook_menu_sort_options()
     view["category_choices"] = cookbook_category_choices()
+    view["custom_tag_choices"] = cookbook_custom_tag_choices(view)
     menu_store = menu_store_service.load_menu_store()
     snapshot_index = menu_mega_json_service.load_snapshot_index()
 

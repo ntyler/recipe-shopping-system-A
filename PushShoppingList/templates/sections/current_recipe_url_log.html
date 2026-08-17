@@ -910,15 +910,6 @@
                         <span>Description</span>
                         <textarea name="description" id="recipeEditDescription" rows="3"></textarea>
                     </label>
-                    <div class="recipe-edit-file-field recipe-edit-cuisine-tags-field recipe-edit-wide"
-                         role="group"
-                         aria-labelledby="recipeEditCuisineTagsLabel">
-                        <span id="recipeEditCuisineTagsLabel">Cuisine Tags</span>
-                        <input type="hidden"
-                               name="cuisine_tags"
-                               id="recipeEditCuisineTags"
-                               autocomplete="off">
-                    </div>
                     <div class="recipe-edit-cover-field" id="recipeEditCoverField" data-recipe-edit-cover-view>
                         <div class="recipe-edit-cover-preview" id="recipeEditCoverPreview" data-recipe-edit-title-image-panel>
                             <img id="recipeEditCoverImage"
@@ -1474,26 +1465,38 @@
                             </label>
                         </div>
                     </div>
-                    <label class="recipe-edit-scale-field recipe-edit-detail-field">
+                    <div class="recipe-edit-scale-field recipe-edit-file-field recipe-edit-detail-field"
+                         role="group"
+                         aria-labelledby="recipeEditScaleLabel">
                         <span class="recipe-edit-label-line">
-                            <span>Scale</span>
+                            <span id="recipeEditScaleLabel">Scale</span>
                             <span class="recipe-edit-label-description">&mdash; Ingredient preview and shopping-list multiplier; saved Servings stays unchanged.</span>
                         </span>
-                        <input type="text"
+                        <input type="hidden"
                                name="scaling_multiplier"
                                id="recipeEditScaleMultiplier"
-                               autocomplete="off"
-                               spellcheck="false"
-                               aria-label="Scale"
-                               aria-describedby="recipeEditScaleError"
-                               oninput="applyRecipeScaleMultiplier(this)">
-                        <span class="recipe-edit-scale-suffix" aria-hidden="true">&times;</span>
+                               value="1">
+                        <div id="recipeEditScaleSegments"
+                             class="recipe-edit-scale-segments recipe-edit-metadata-value"
+                             data-recipe-edit-scale-segments
+                             role="group"
+                             aria-label="Recipe scale">
+                            <button type="button" data-recipe-edit-scale-preset="0.5" aria-pressed="false"
+                                    onclick="return selectRecipeEditScalePreset(this, 0.5)">&frac12;&times;</button>
+                            <button type="button" data-recipe-edit-scale-preset="1" aria-pressed="true"
+                                    onclick="return selectRecipeEditScalePreset(this, 1)">1&times;</button>
+                            <button type="button" data-recipe-edit-scale-preset="2" aria-pressed="false"
+                                    onclick="return selectRecipeEditScalePreset(this, 2)">2&times;</button>
+                            <button type="button" data-recipe-edit-scale-preset="3" aria-pressed="false"
+                                    onclick="return selectRecipeEditScalePreset(this, 3)">3&times;</button>
+                        </div>
+                        <span class="recipe-edit-scale-current" data-recipe-edit-scale-current hidden></span>
                         <span class="recipe-edit-scale-error"
                               id="recipeEditScaleError"
                               role="alert"
                               aria-live="polite"
                               hidden>Scale must be a positive number, decimal, or fraction.</span>
-                    </label>
+                    </div>
                     <label class="recipe-edit-detail-field">
                         <span class="recipe-edit-label-line">
                             <span>Level</span>
@@ -1507,7 +1510,7 @@
                             <option value="expert">Expert</option>
                         </select>
                     </label>
-                    <label class="recipe-edit-detail-field">
+                    <label class="recipe-edit-detail-field recipe-edit-total-time-field">
                         <span class="recipe-edit-label-line">
                             <span>Total</span>
                             <span class="recipe-edit-label-description">&mdash; Full start-to-finish recipe time.</span>
@@ -1535,10 +1538,31 @@
                         </span>
                         <input type="text" name="cook_time" id="recipeEditCookTime">
                     </label>
-                    <label class="recipe-edit-detail-field">
-                        <span>Servings</span>
-                        <input type="text" name="servings" id="recipeEditServings">
-                    </label>
+                    <div class="recipe-edit-servings-field recipe-edit-file-field recipe-edit-detail-field"
+                         role="group"
+                         aria-labelledby="recipeEditServingsLabel">
+                        <span id="recipeEditServingsLabel">Servings</span>
+                        <input type="hidden" name="servings" id="recipeEditServings">
+                        <div class="recipe-edit-servings-stepper recipe-edit-metadata-value"
+                             data-recipe-edit-servings-stepper>
+                            <button type="button"
+                                    data-recipe-edit-servings-decrement
+                                    aria-label="Decrease servings"
+                                    onclick="return stepRecipeEditServings(-1)">&minus;</button>
+                            <input type="number"
+                                   id="recipeEditServingsCount"
+                                   min="1"
+                                   step="1"
+                                   inputmode="numeric"
+                                   aria-labelledby="recipeEditServingsLabel"
+                                   oninput="return updateRecipeEditServingsFromStepper(this)">
+                            <span class="recipe-edit-servings-unit">people</span>
+                            <button type="button"
+                                    data-recipe-edit-servings-increment
+                                    aria-label="Increase servings"
+                                    onclick="return stepRecipeEditServings(1)">&plus;</button>
+                        </div>
+                    </div>
                     <div id="recipeEditCookbookField"
                          class="recipe-edit-cookbook-field recipe-edit-detail-field"
                          data-recipe-edit-cookbook-field>
@@ -1643,7 +1667,7 @@
                     <label for="recipeEditCategoryMealType">
                         <span>Meal Type</span>
                         <select id="recipeEditCategoryMealType" name="meal_type">
-                            <option value="">Use inferred</option>
+                            <option value="">Not selected</option>
                             {% for choice in editor_category_choices.meal_type or [] %}
                                 <option value="{{ choice }}">{{ choice }}</option>
                             {% endfor %}
@@ -1652,7 +1676,7 @@
                     <label for="recipeEditCategoryMainIngredient">
                         <span>Main Ingredient</span>
                         <select id="recipeEditCategoryMainIngredient" name="main_ingredient">
-                            <option value="">Use inferred</option>
+                            <option value="">Not selected</option>
                             {% for choice in editor_category_choices.main_ingredient or [] %}
                                 <option value="{{ choice }}">{{ choice }}</option>
                             {% endfor %}
@@ -1661,7 +1685,7 @@
                     <label for="recipeEditCategoryCookingMethod">
                         <span>Cooking Method</span>
                         <select id="recipeEditCategoryCookingMethod" name="cooking_method">
-                            <option value="">Use inferred</option>
+                            <option value="">Not selected</option>
                             {% for choice in editor_category_choices.cooking_method or [] %}
                                 <option value="{{ choice }}">{{ choice }}</option>
                             {% endfor %}
@@ -1670,30 +1694,38 @@
                     <label for="recipeEditCategoryOccasion">
                         <span>Occasion</span>
                         <select id="recipeEditCategoryOccasion" name="occasion">
-                            <option value="">Use inferred</option>
+                            <option value="">Not selected</option>
                             {% for choice in editor_category_choices.occasion or [] %}
                                 <option value="{{ choice }}">{{ choice }}</option>
                             {% endfor %}
                         </select>
                     </label>
-                    <label for="recipeEditCategoryDietaryPreference">
-                        <span>Dietary Preference</span>
-                        <select id="recipeEditCategoryDietaryPreference" name="dietary_preference">
-                            <option value="">Use inferred</option>
+                    <div class="recipe-edit-file-field recipe-edit-category-multiselect-field"
+                         role="group"
+                         aria-labelledby="recipeEditDietaryPreferencesLabel"
+                         data-recipe-edit-multiselect-field="dietary">
+                        <span id="recipeEditDietaryPreferencesLabel">Dietary Preferences</span>
+                        <input type="hidden" id="recipeEditCategoryDietaryPreference" name="dietary_preference">
+                        <input type="hidden" id="recipeEditDietaryPreferences" name="dietary_preferences">
+                        <div data-recipe-edit-multiselect-options hidden>
                             {% for choice in editor_category_choices.dietary_preference or [] %}
-                                <option value="{{ choice }}">{{ choice }}</option>
+                                <span data-recipe-edit-multiselect-option="{{ choice }}"></span>
                             {% endfor %}
-                        </select>
-                    </label>
-                    <label for="recipeEditCategoryCuisine">
-                        <span>Cuisine Category</span>
-                        <select id="recipeEditCategoryCuisine" name="cuisine">
-                            <option value="">Use inferred</option>
+                        </div>
+                    </div>
+                    <div class="recipe-edit-file-field recipe-edit-category-multiselect-field"
+                         role="group"
+                         aria-labelledby="recipeEditCuisineCategoriesLabel"
+                         data-recipe-edit-multiselect-field="cuisine">
+                        <span id="recipeEditCuisineCategoriesLabel">Cuisine Categories</span>
+                        <input type="hidden" id="recipeEditCategoryCuisine" name="cuisine">
+                        <input type="hidden" id="recipeEditCuisineTags" name="cuisine_tags" autocomplete="off">
+                        <div data-recipe-edit-multiselect-options hidden>
                             {% for choice in editor_category_choices.cuisine or [] %}
-                                <option value="{{ choice }}">{{ choice }}</option>
+                                <span data-recipe-edit-multiselect-option="{{ choice }}"></span>
                             {% endfor %}
-                        </select>
-                    </label>
+                        </div>
+                    </div>
                     <input id="recipeEditCategoryPrepTimeGroup"
                            type="hidden"
                            name="prep_time_group">
@@ -1777,12 +1809,18 @@
                     </div>
                     <div class="recipe-edit-file-field recipe-edit-custom-categories-field recipe-edit-wide"
                          role="group"
-                         aria-labelledby="recipeEditCustomCategoriesLabel">
-                        <span id="recipeEditCustomCategoriesLabel">Custom Categories</span>
+                         aria-labelledby="recipeEditCustomTagsLabel"
+                         data-recipe-edit-multiselect-field="custom">
+                        <span id="recipeEditCustomTagsLabel">Custom Tags</span>
                         <input id="recipeEditCategoryCustomCategories"
                                type="hidden"
                                name="custom_categories"
                                autocomplete="off">
+                        <div data-recipe-edit-multiselect-options hidden>
+                            {% for choice in cookbook_view.custom_tag_choices or [] %}
+                                <span data-recipe-edit-multiselect-option="{{ choice }}"></span>
+                            {% endfor %}
+                        </div>
                     </div>
                 </div>
             </section>

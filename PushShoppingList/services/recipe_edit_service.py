@@ -4964,6 +4964,10 @@ def load_editable_recipe(url):
                 recipe_data.get("description") or recipe_data.get("menu_description"),
                 "description",
             ),
+            "cuisine_tags": split_recipe_menu_text_list(recipe_data.get("cuisine_tags", [])),
+            "dietary_preferences": split_recipe_menu_text_list(
+                recipe_data.get("dietary_preferences", [])
+            ),
             "servings": servings,
             "cover_image": cover_image,
             "cover_image_prompt": cover_image_prompt,
@@ -7752,6 +7756,11 @@ def save_editable_recipe(original_url, payload, require_existing=False):
             payload.get("cuisine_tags")
             if "cuisine_tags" in payload
             else existing_data.get("cuisine_tags", [])
+        ),
+        "dietary_preferences": split_recipe_menu_text_list(
+            payload.get("dietary_preferences")
+            if "dietary_preferences" in payload
+            else existing_data.get("dietary_preferences", [])
         ),
         "servings": str(payload.get("servings") if "servings" in payload else existing_data.get("servings") or "").strip(),
         "level": str(payload.get("level") if "level" in payload else existing_data.get("level") or "").strip(),

@@ -1,4 +1,7 @@
+import json
 import re
+import shutil
+import subprocess
 from pathlib import Path
 
 from jinja2 import Environment
@@ -614,20 +617,19 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     hierarchy_css = css[css.index("/* Edit Recipe hierarchy, borderless cooking summary, and AI Image Prompt dialog. */"):]
 
     assert 'primaryRow.className = "recipe-edit-primary-fields"' in organizer
-    assert 'tagRow.className = "recipe-edit-tag-row"' in organizer
-    assert 'metadataRow.className = "recipe-edit-metadata-strip"' in organizer
+    assert 'detailsHeading.textContent = "Recipe Details"' in organizer
+    assert 'classificationHeading.textContent = "Classification"' in organizer
     assert 'descriptionRow.className = "recipe-edit-description-row"' in organizer
-    assert "addRecipeEditMetadataIcon(servingsField, \"servings\")" in organizer
     assert "[servingsField, totalField, prepField, cookField, inactiveField, levelField, scaleField]" in organizer
     assert 'setRecipeEditFieldLabel(levelField, "Difficulty")' in organizer
     assert 'setRecipeEditFieldLabel(scaleField, "Scale")' in organizer
     assert 'setRecipeEditFieldLabel(priceField, "Menu Price (optional)")' in organizer
-    assert 'setRecipeEditFieldLabel(cuisineTagsField, "Cuisine Tags")' in organizer
+    assert 'setRecipeEditFieldLabel(cuisineCategoryField, "Cuisine Categories")' in organizer
     assert 'heading.className = "recipe-edit-metadata-heading"' in script
     assert 'data-recipe-metadata-icon="servings"' in read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     assert 'shell.svg_icon("utensils")' in read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     assert 'shell.svg_icon("cooking-pot")' in read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
-    assert "data-recipe-edit-cuisine-chips" in script
+    assert "data-recipe-edit-multiselect-chips" in script
     assert "renderRecipeEditCuisineChips" in script
     assert "recipe-edit-price-control" in organizer
     assert template.count('class="recipe-edit-price-control recipe-edit-cookbook-value"') == 1
@@ -670,11 +672,9 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     assert 'data-rating-toggle-selected="true"' in macros
     assert 'class="recipe-edit-rating-clear"' not in macros
     assert "appendRecipeEditWorkspaceChildren(technicalBody, [\n        titleField," in organizer
-    final_order = (
-        "appendRecipeEditWorkspaceChildren(grid, [primaryRow, descriptionRow, tagRow, "
-        "metadataRow, categoriesPanel, technicalDetails])"
-    )
-    assert final_order in organizer
+    assert "detailsSection," in organizer
+    assert "categoriesPanel," in organizer
+    assert "tagRow" not in organizer
     assert "if (infoActions) infoActions.hidden = true;" in organizer
     assert "technicalDetails.open = false;" in organizer
     assert "grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(130px, .62fr);" in hierarchy_css
@@ -764,50 +764,25 @@ def test_recipe_summary_selectors_share_accessible_state_feedback():
     assert ".recipe-edit-price-control:has(" in controls
 
 
-def test_recipe_detail_metadata_fields_are_transparent_with_accessible_active_states():
+def test_recipe_detail_fields_use_bounded_accessible_controls():
     css = read_text("PushShoppingList/static/css/app.css")
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
-    selector = (
-        "body.recipe-edit-standalone-page #recipeEditForm\n"
-        "    .recipe-edit-info-panel-organized .recipe-edit-metadata-strip\n"
-        "    .recipe-edit-detail-field .recipe-edit-metadata-value :is(input, select)"
-    )
-    styles_start = css.index(selector)
-    styles = css[styles_start:css.index(
-        "body.recipe-edit-standalone-page > .recipe-edit-image-change-actions.recipe-edit-floating-menu",
-        styles_start,
-    )]
+    marker = "/* Recipe details and classification: bounded responsive controls with consolidated tags. */"
+    styles = css[css.index(marker):]
 
-    for field_id in (
-        "recipeEditServings",
-        "recipeEditScaleMultiplier",
-        "recipeEditTotalTime",
-        "recipeEditPrepTime",
-        "recipeEditCookTime",
-        "recipeEditInactiveTime",
-        "recipeEditLevel",
-    ):
-        field_position = template.index(f'id="{field_id}"')
-        label_start = template.rfind("<label", 0, field_position)
-        label_end = template.index(">", label_start)
-        assert "recipe-edit-detail-field" in template[label_start:label_end]
-
-    assert ":not([disabled]):not([readonly])" in styles
-    for declaration in (
-        "border-color: transparent;",
-        "background-color: transparent;",
-        "box-shadow: none;",
-        "transition: border-color 140ms ease, box-shadow 140ms ease;",
-        "border-color: color-mix(in srgb, var(--app-primary-hover) 72%, var(--app-border-strong));",
-        "box-shadow: 0 0 0 1px color-mix(in srgb, var(--app-primary-hover) 18%, transparent);",
-        "border-color: var(--app-primary-hover);",
-        "box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-primary-hover) 34%, transparent);",
-        "outline: 2px solid var(--app-focus);",
-        "outline-offset: 2px;",
-    ):
-        assert declaration in styles
-
-    assert "background-color: color-mix" not in styles
+    assert 'id="recipeEditServingsCount"' in template
+    assert 'aria-label="Decrease servings"' in template
+    assert 'aria-label="Increase servings"' in template
+    assert '<span class="recipe-edit-servings-unit">people</span>' in template
+    assert template.count('data-recipe-edit-scale-preset=') == 4
+    assert 'aria-label="Recipe scale"' in template
+    assert ".recipe-edit-servings-stepper" in styles
+    assert ".recipe-edit-scale-segments" in styles
+    assert "border: 1px solid var(--app-border-strong);" in styles
+    assert "flex: 1 1 auto;" in styles
+    assert "outline: 2px solid color-mix" in styles
+    assert ".recipe-edit-total-time-field #recipeEditTotalTime" in styles
+    assert "font-size: 20px;" in styles
 
 
 def test_recipe_metadata_strip_uses_equal_responsive_columns_without_internal_separators():
@@ -910,63 +885,24 @@ def test_recipe_metadata_controls_are_full_width_left_aligned_and_untruncated():
     assert "ellipsis" not in select_rule
 
 
-def test_recipe_time_breakdown_is_one_accessible_persisted_disclosure():
+def test_recipe_time_breakdown_is_always_visible_in_the_secondary_details_row():
     script = read_text("PushShoppingList/static/js/app.js")
     css = read_text("PushShoppingList/static/css/app.css")
     organizer = script[
         script.index("function organizeRecipeEditInformationCard()"):
         script.index("function organizeRecipeEditAiAssistant()")
     ]
-    control = script[
-        script.index("function createRecipeEditTimeBreakdownControl()"):
-        script.index("function parseRecipeEditDurationMinutes")
-    ]
-    disclosure = script[
-        script.index("function recipeEditTimeBreakdownStorageKey()"):
-        script.index("function createRecipeEditTimeBreakdownControl()")
-    ]
+    marker = "/* Recipe details and classification: bounded responsive controls with consolidated tags. */"
+    styles = css[css.index(marker):]
 
-    assert 'button.type = "button"' in control
-    assert "Breakdown</span>" not in control
-    assert "Details</span>" not in control
-    assert 'button.setAttribute("aria-expanded", "true")' in control
-    assert 'button.setAttribute("aria-controls", "recipeEditTimeBreakdown")' in control
-    assert 'button.setAttribute("aria-label", "Hide time breakdown")' in control
-    assert 'class="recipe-edit-time-breakdown-chevron" aria-hidden="true"' in control
-    assert 'button.addEventListener("click"' in control
-    assert 'timeBreakdownGroup.id = "recipeEditTimeBreakdown"' in organizer
-    assert 'timeBreakdownGroup.setAttribute("role", "group")' in organizer
-    assert (
-        "appendRecipeEditWorkspaceChildren(timeBreakdownGroup, "
-        "[prepField, cookField, inactiveField])"
-    ) in organizer
-    assert "recipe-edit-time-breakdown-collapsed" in disclosure
-    assert 'button.setAttribute("aria-label", `${isExpanded ? "Hide" : "Show"} time breakdown`)' in disclosure
-    assert "group.hidden = !isExpanded" in disclosure
-    assert ".value" not in script[
-        script.index("function setRecipeEditTimeBreakdownExpanded"):
-        script.index("function createRecipeEditTimeBreakdownControl")
-    ]
-
-    assert '"ai-pantry:recipe-editor:time-breakdown:v1"' in script
-    assert "encodeURIComponent(userId)" in disclosure
-    assert '!== "collapsed"' in disclosure
-    assert "window.localStorage.getItem" in disclosure
-    assert "window.localStorage.setItem" in disclosure
-    assert disclosure.count("catch (_error)") == 2
-
-    assert ".recipe-edit-time-breakdown-group[hidden]" in css
-    assert "display: contents;" in css
-    assert ".recipe-edit-time-breakdown-toggle:focus-visible" in css
-    assert 'recipe-edit-time-breakdown-toggle[aria-expanded="true"]' in css
-    assert ".recipe-edit-time-breakdown-group > label" in css
-    assert 'totalField?.classList.add("recipe-edit-total-time-field")' in organizer
-    assert "(totalTimeHeading || totalField)?.appendChild(timeBreakdownControl)" in organizer
-    assert "recipe-edit-total-time-cluster" not in organizer
-    assert (
-        "appendRecipeEditWorkspaceChildren(metadataRow, "
-        "[servingsField, scaleField, totalField, timeBreakdownGroup, levelField])"
-    ) in organizer
+    assert 'detailsHeading.textContent = "Recipe Details"' in organizer
+    assert "appendRecipeEditWorkspaceChildren(detailsPrimaryRow, [servingsField, scaleField, totalField])" in organizer
+    assert "appendRecipeEditWorkspaceChildren(detailsSecondaryRow, [prepField, cookField, inactiveField, levelField])" in organizer
+    assert "timeBreakdownGroup" not in organizer
+    assert "setRecipeEditTimeBreakdownExpanded" not in organizer
+    assert ".recipe-edit-details-primary-grid" in styles
+    assert ".recipe-edit-details-secondary-grid" in styles
+    assert "grid-template-columns: repeat(4, minmax(0, 1fr));" in styles
 
 
 def test_recipe_total_time_calculation_preserves_manual_override_and_saved_components():
@@ -1008,12 +944,55 @@ def test_recipe_total_time_calculation_preserves_manual_override_and_saved_compo
     initialize = population.index("initializeRecipeEditTotalTimeCalculation()")
     baseline = population.index("rememberRecipeEditorSavedState(form)")
     assert initialize < baseline
-    attached = script.index(
-        "appendRecipeEditWorkspaceChildren(grid, [primaryRow, descriptionRow, tagRow, "
-        "metadataRow, categoriesPanel, technicalDetails])"
-    )
-    bound = script.index("bindRecipeEditTotalTimeCalculation()", attached)
+    organizer = script[
+        script.index("function organizeRecipeEditInformationCard()"):
+        script.index("function organizeRecipeEditAiAssistant()")
+    ]
+    attached = organizer.index("grid.replaceChildren()")
+    bound = organizer.index("bindRecipeEditTotalTimeCalculation()", attached)
     assert attached < bound
+    assert 'return `${rounded} min`' in calculation
+    assert '`${hours} hr ${remainingMinutes} min`' in calculation
+
+
+def test_recipe_total_time_calculation_formats_component_sum():
+    node = shutil.which("node")
+    if not node:
+        return
+    script = read_text("PushShoppingList/static/js/app.js")
+    calculation = script[
+        script.index("function parseRecipeEditDurationMinutes"):
+        script.index("function bindRecipeEditNameInput")
+    ]
+    harness = r'''
+const values = {
+    recipeEditPrepTime: { value: "15 min" },
+    recipeEditCookTime: { value: "45 min" },
+    recipeEditInactiveTime: { value: "20 min" },
+};
+const document = { getElementById(id) { return values[id] || null; } };
+''' + calculation + r'''
+process.stdout.write(JSON.stringify({
+    total: calculateRecipeEditTimeBreakdownMinutes(),
+    formatted: formatRecipeEditDurationMinutes(calculateRecipeEditTimeBreakdownMinutes()),
+    parsed: parseRecipeEditDurationMinutes("1 hr 20 min"),
+}));
+'''
+    completed = subprocess.run(
+        [node],
+        input=harness,
+        text=True,
+        encoding="utf-8",
+        capture_output=True,
+        check=False,
+        timeout=10,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout) == {
+        "total": 80,
+        "formatted": "1 hr 20 min",
+        "parsed": 80,
+    }
 
 
 def test_recipe_name_is_directly_editable_without_a_pencil_control():
@@ -1217,6 +1196,27 @@ def test_recipe_category_fields_use_the_compact_metadata_visual_hierarchy():
     assert "display: grid;" in custom_rule
     assert "min-width: 0;" in custom_rule
     assert "flex: 0 1 auto;" in custom_rule
+
+
+def test_recipe_category_and_difficulty_values_align_with_calm_typography():
+    css = read_text("PushShoppingList/static/css/app.css")
+    marker = "/* Edit Recipe: inline category metadata and reusable custom-category tags. */"
+    category_styles = css[css.index(marker):]
+    selector = (
+        ".recipe-edit-category-metadata-strip .recipe-edit-category-metadata-field\n"
+        "    .recipe-edit-metadata-value select {"
+    )
+    rule_start = category_styles.index(selector)
+    rule = category_styles[rule_start:category_styles.index("}", rule_start)]
+
+    for declaration in (
+        "padding-left: 20px;",
+        "font-size: 12px;",
+        "font-weight: 600;",
+    ):
+        assert declaration in rule
+
+    assert ".recipe-edit-metadata-value #recipeEditLevel," in category_styles[:rule_start]
 
 
 def test_mobile_recipe_category_fields_wrap_without_horizontal_overflow():

@@ -144,6 +144,8 @@ def test_recipe_save_keeps_cuisine_tags_separate_from_category_cuisine(monkeypat
         cuisine="Thai category",
         cuisine_tags=["Thai", "Noodles"],
     )
+    initially_loaded = recipe_edit_service.load_editable_recipe(url)
+    assert initially_loaded["recipe"]["cuisine_tags"] == ["Thai", "Noodles"]
 
     response = recipe_route_client().post(
         "/api/recipe",
@@ -152,6 +154,7 @@ def test_recipe_save_keeps_cuisine_tags_separate_from_category_cuisine(monkeypat
             "recipe": editable_payload(
                 url,
                 cuisine_tags=["Southeast Asian", "Weeknight", "weeknight"],
+                dietary_preferences=["Vegan", "Gluten Free", "vegan"],
             ),
         },
     )
@@ -159,7 +162,14 @@ def test_recipe_save_keeps_cuisine_tags_separate_from_category_cuisine(monkeypat
     assert response.status_code == 200
     saved_recipe = recipe_edit_service.load_recipe_output(url)
     assert saved_recipe["cuisine_tags"] == ["Southeast Asian", "Weeknight"]
+    assert saved_recipe["dietary_preferences"] == ["Vegan", "Gluten Free"]
     assert saved_recipe["cuisine"] == "Thai category"
+
+    loaded = recipe_route_client().get("/api/recipe", query_string={"url": url})
+    assert loaded.status_code == 200
+    loaded_recipe = loaded.get_json()["recipe"]
+    assert loaded_recipe["cuisine_tags"] == ["Southeast Asian", "Weeknight"]
+    assert loaded_recipe["dietary_preferences"] == ["Vegan", "Gluten Free"]
 
 
 def test_recipe_save_route_canonicalizes_legacy_materialized_scale(monkeypatch, tmp_path):

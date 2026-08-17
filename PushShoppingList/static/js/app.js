@@ -23772,9 +23772,9 @@ function recipeEditCustomCategoryValues(
     const seen = new Set();
     return String(value || "")
         .split(/[,;\n]+/)
-        .map(item => item.trim())
+        .map(item => normalizeRecipeEditTagText(item))
         .filter(item => {
-            const key = item.toLowerCase();
+            const key = recipeEditTagKey(item);
             if (!key || seen.has(key)) return false;
             seen.add(key);
             return true;
@@ -23798,13 +23798,23 @@ function populateRecipeEditCategories(recipe = {}) {
     RECIPE_EDIT_CATEGORY_FIELD_NAMES.forEach(field => {
         setCookbookCategoryFieldValue(form, field, values[field]);
     });
+    setRecipeEditCuisineCategories(
+        [...recipeEditCuisineTagValues(recipe.cuisine_tags), values.cuisine],
+        { notify: false, primary: values.cuisine },
+    );
+    setRecipeEditDietaryPreferences(
+        [...recipeEditDietaryPreferenceValues(recipe.dietary_preferences), values.dietary_preference],
+        { notify: false, primary: values.dietary_preference },
+    );
     updateRecipeEditorMenuSectionOptions(currentRecipeEditorCookbookId(), values.menu_section);
-    setCookbookCategoryFieldValue(form, "custom_categories", values.custom_categories);
+    setRecipeEditCustomCategories(values.custom_categories, { notify: false });
 
     const sourceLabel = recipe.category_metadata_source
         || (recipe.category_metadata_user_set ? "Saved" : "Blank");
     setRecipeEditCategorySourceLabel(sourceLabel);
-    renderRecipeEditCustomCategoryChips();
+    renderRecipeEditMultiselect("cuisine");
+    renderRecipeEditMultiselect("dietary");
+    renderRecipeEditMultiselect("custom");
 }
 
 function bindRecipeEditCategorySourceTracking() {
@@ -23969,35 +23979,49 @@ function applyRecipeEditCategorySuggestions(categories = {}, mode = "missing") {
         const input = form.elements[field];
         const currentValue = input ? String(input.value || "").trim() : "";
         const nextValue = recipeEditCategorySuggestionValue(categories, field);
+        const shouldApply = input && (overwrite || (nextValue && !currentValue));
 
-        if (input && overwrite) {
+        if (!shouldApply) return;
+        if (field === "cuisine") {
+            setRecipeEditCuisineCategories(nextValue ? [nextValue] : [], {
+                primary: nextValue,
+                source: CATEGORY_SOURCE_AI_INFERRED,
+            });
+        } else if (field === "dietary_preference") {
+            setRecipeEditDietaryPreferences(nextValue ? [nextValue] : [], {
+                primary: nextValue,
+                source: CATEGORY_SOURCE_AI_INFERRED,
+            });
+        } else {
             setCookbookCategoryFieldValue(form, field, nextValue);
             setFormCategorySource(form, field, CATEGORY_SOURCE_AI_INFERRED);
-            applied = true;
-        } else if (input && nextValue && !currentValue) {
-            setCookbookCategoryFieldValue(form, field, nextValue);
-            setFormCategorySource(form, field, CATEGORY_SOURCE_AI_INFERRED);
-            applied = true;
         }
+        applied = true;
     });
 
     const customInput = form.elements.custom_categories;
     const currentCustom = customInput ? String(customInput.value || "").trim() : "";
     const nextCustom = recipeEditCategorySuggestionValue(categories, "custom_categories");
 
-    if (customInput && overwrite) {
-        setCookbookCategoryFieldValue(form, "custom_categories", nextCustom);
-        setFormCategorySource(form, "custom_categories", CATEGORY_SOURCE_AI_INFERRED);
-        applied = true;
-    } else if (customInput && nextCustom && !currentCustom) {
-        setCookbookCategoryFieldValue(form, "custom_categories", nextCustom);
-        setFormCategorySource(form, "custom_categories", CATEGORY_SOURCE_AI_INFERRED);
+    if (customInput && nextCustom) {
+        const mergedCustom = [
+            ...recipeEditCustomCategoryValues(currentCustom),
+            ...recipeEditCustomCategoryValues(nextCustom),
+        ];
+        const existingSource = form.dataset[categorySourceDatasetKey("custom_categories")];
+        setRecipeEditCustomCategories(mergedCustom, {
+            source: currentCustom
+                ? (existingSource || CATEGORY_SOURCE_USER_SELECTED)
+                : CATEGORY_SOURCE_AI_INFERRED,
+        });
         applied = true;
     }
 
     if (applied) {
         setRecipeEditCategorySourceLabel("AI inferred");
-        renderRecipeEditCustomCategoryChips();
+        renderRecipeEditMultiselect("cuisine");
+        renderRecipeEditMultiselect("dietary");
+        renderRecipeEditMultiselect("custom");
     }
 }
 
@@ -24761,21 +24785,30 @@ function populateRecipeEditor(recipe, originalUrl, options = {}) {
         coverImage.prompt = coverImagePrompt;
         coverImage.image_prompt = coverImagePrompt;
     }
+    const cuisineCategories = uniqueRecipeEditMultiselectValues(
+        [...recipeEditCuisineTagValues(recipe.cuisine_tags), recipe.cuisine || ""],
+        "cuisine",
+    );
+    const dietaryPreferences = uniqueRecipeEditMultiselectValues(
+        [...recipeEditDietaryPreferenceValues(recipe.dietary_preferences), recipe.dietary_preference || ""],
+        "dietary",
+    );
 
     recipeEditOriginalSnapshot = normalizeRecipeEditorSnapshot({
         display_name: recipe.display_name || "",
         recipe_title: recipe.recipe_title || "",
         description: recipe.description || "",
-        cuisine_tags: recipeEditCuisineTagValues(recipe.cuisine_tags),
+        cuisine_tags: cuisineCategories,
+        dietary_preferences: dietaryPreferences,
         source_url: recipe.source_url || originalUrl,
         quantity: recipe.quantity || "1",
         servings: recipe.servings || "",
         cover_image: coverImage,
         level: recipe.level || "",
-        total_time: recipe.total_time || "",
-        prep_time: recipe.prep_time || "",
-        inactive_time: recipe.inactive_time || "",
-        cook_time: recipe.cook_time || "",
+        total_time: normalizeRecipeEditDurationValue(recipe.total_time),
+        prep_time: normalizeRecipeEditDurationValue(recipe.prep_time),
+        inactive_time: normalizeRecipeEditDurationValue(recipe.inactive_time),
+        cook_time: normalizeRecipeEditDurationValue(recipe.cook_time),
         rating: recipe.rating || 0,
         recipe_notes: recipe.recipe_notes || [],
         reflection_notes: recipe.reflection_notes || [],
@@ -24799,7 +24832,8 @@ function populateRecipeEditor(recipe, originalUrl, options = {}) {
     }
     setValue("recipeEditTitleInput", recipe.recipe_title || "");
     setValue("recipeEditDescription", recipe.description || "");
-    setValue("recipeEditCuisineTags", recipeEditCuisineTagValues(recipe.cuisine_tags).join(", "));
+    setValue("recipeEditCuisineTags", cuisineCategories.join(", "));
+    setValue("recipeEditDietaryPreferences", dietaryPreferences.join(", "));
     syncRecipeEditorFavoriteControl(recipe, originalUrl);
     updateRecipeEditDescriptionCount();
     updateRecipeDescriptionAiActionLabel();
@@ -24808,11 +24842,12 @@ function populateRecipeEditor(recipe, originalUrl, options = {}) {
     setValue("recipeEditDocumentSourceUrl", recipe.document_source_url || recipe.source_url || originalUrl);
     setValue("recipeEditQuantity", recipe.quantity || "1");
     setValue("recipeEditServings", recipe.servings || "");
+    syncRecipeEditServingsStepper();
     setRecipeEditDifficultyValue(recipe.level || "");
-    setValue("recipeEditTotalTime", recipe.total_time || "");
-    setValue("recipeEditPrepTime", recipe.prep_time || "");
-    setValue("recipeEditInactiveTime", recipe.inactive_time || "");
-    setValue("recipeEditCookTime", recipe.cook_time || "");
+    setValue("recipeEditTotalTime", normalizeRecipeEditDurationValue(recipe.total_time));
+    setValue("recipeEditPrepTime", normalizeRecipeEditDurationValue(recipe.prep_time));
+    setValue("recipeEditInactiveTime", normalizeRecipeEditDurationValue(recipe.inactive_time));
+    setValue("recipeEditCookTime", normalizeRecipeEditDurationValue(recipe.cook_time));
     setRecipeRating(recipe.rating || 0);
     setRecipeEditorCookbook(recipe, originalUrl);
     populateRecipeEditCategories(recipe);
@@ -24823,7 +24858,9 @@ function populateRecipeEditor(recipe, originalUrl, options = {}) {
     syncRecipeEditSourceFilesDetails();
     populateRecipeMenuMetadata(recipe);
     setRecipeEditorCoverImage(coverImage, recipe.recipe_title || recipe.display_name || "Recipe title image");
-    renderRecipeEditCuisineChips();
+    renderRecipeEditMultiselect("cuisine");
+    renderRecipeEditMultiselect("dietary");
+    renderRecipeEditMultiselect("custom");
 
     const ingredientWrap = document.getElementById("recipeEditIngredients");
     const equipmentWrap = document.getElementById("recipeEditEquipment");
@@ -26408,189 +26445,535 @@ function updateRecipeEditMetadataUnits() {
     });
 }
 
-function recipeEditCuisineTagValues(value = document.getElementById("recipeEditCuisineTags")?.value) {
-    const values = Array.isArray(value)
-        ? value
-        : String(value || "").split(/[,;\n]+/);
+function normalizeRecipeEditTagText(value) {
+    return String(value || "").trim().replace(/\s+/g, " ");
+}
+
+function recipeEditTagKey(value) {
+    return normalizeRecipeEditTagText(value)
+        .normalize("NFKD")
+        .toLocaleLowerCase()
+        .replace(/[^\p{L}\p{N}]+/gu, " ")
+        .trim();
+}
+
+function normalizeRecipeEditCustomTag(value) {
+    const text = normalizeRecipeEditTagText(value);
+    return text.split(" ").map(word => {
+        if (!/^[a-z][a-z'’-]*$/.test(word)) return word;
+        return word.charAt(0).toLocaleUpperCase() + word.slice(1);
+    }).join(" ");
+}
+
+function recipeEditMultiselectField(kind) {
+    return document.querySelector(`[data-recipe-edit-multiselect-field="${kind}"]`);
+}
+
+function recipeEditMultiselectOptions(kind) {
+    const field = recipeEditMultiselectField(kind);
+    return Array.from(field?.querySelectorAll("[data-recipe-edit-multiselect-option]") || [])
+        .map(option => normalizeRecipeEditTagText(option.dataset.recipeEditMultiselectOption))
+        .filter(Boolean);
+}
+
+function canonicalRecipeEditMultiselectValue(kind, value) {
+    const text = normalizeRecipeEditTagText(value);
+    const key = recipeEditTagKey(text);
+    return recipeEditMultiselectOptions(kind).find(option => recipeEditTagKey(option) === key) || text;
+}
+
+function uniqueRecipeEditMultiselectValues(values, kind) {
+    const items = Array.isArray(values) ? values : String(values || "").split(/[,;\n]+/);
+    const unique = [];
     const seen = new Set();
-    return values
-        .map(item => String(item || "").trim())
-        .filter(item => {
-            const key = item.toLowerCase();
-            if (!key || seen.has(key)) return false;
+    items.forEach(value => {
+        const canonical = canonicalRecipeEditMultiselectValue(kind, value);
+        const key = recipeEditTagKey(canonical);
+        if (key && !seen.has(key)) {
+            unique.push(canonical);
             seen.add(key);
-            return true;
-        });
+        }
+    });
+    return unique;
+}
+
+function recipeEditCuisineTagValues(value = document.getElementById("recipeEditCuisineTags")?.value) {
+    return uniqueRecipeEditMultiselectValues(value, "cuisine");
+}
+
+function recipeEditDietaryPreferenceValues(
+    value = document.getElementById("recipeEditDietaryPreferences")?.value
+) {
+    return uniqueRecipeEditMultiselectValues(value, "dietary");
+}
+
+function recipeEditMultiselectPrimaryValue(values, currentValue, requestedValue, kind) {
+    const requested = canonicalRecipeEditMultiselectValue(kind, requestedValue);
+    const current = canonicalRecipeEditMultiselectValue(kind, currentValue);
+    const keys = new Set(values.map(recipeEditTagKey));
+    if (requested && keys.has(recipeEditTagKey(requested))) return requested;
+    if (current && keys.has(recipeEditTagKey(current))) return current;
+    return values[0] || "";
+}
+
+function notifyRecipeEditMultiselectInputs(inputs, sourceField, source) {
+    inputs.filter(Boolean).forEach(input => {
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    if (source) {
+        setFormCategorySource(document.getElementById("recipeEditForm"), sourceField, source);
+    }
+}
+
+function setRecipeEditCuisineCategories(values, options = {}) {
+    const tagsInput = document.getElementById("recipeEditCuisineTags");
+    const categoryInput = document.getElementById("recipeEditCategoryCuisine");
+    if (!tagsInput || !categoryInput) return;
+    const selected = uniqueRecipeEditMultiselectValues(values, "cuisine");
+    categoryInput.value = recipeEditMultiselectPrimaryValue(
+        selected,
+        categoryInput.value,
+        options.primary,
+        "cuisine",
+    );
+    tagsInput.value = selected.join(", ");
+    renderRecipeEditMultiselect("cuisine");
+    if (options.notify !== false) {
+        notifyRecipeEditMultiselectInputs(
+            [tagsInput, categoryInput],
+            "cuisine",
+            options.source || CATEGORY_SOURCE_USER_SELECTED,
+        );
+        renderRecipeEditMultiselect("cuisine");
+    }
 }
 
 function setRecipeEditCuisineTags(values, options = {}) {
-    const input = document.getElementById("recipeEditCuisineTags");
-    if (!input) return;
-    input.value = recipeEditCuisineTagValues(values).join(", ");
-    renderRecipeEditCuisineChips();
+    setRecipeEditCuisineCategories(values, options);
+}
+
+function setRecipeEditDietaryPreferences(values, options = {}) {
+    const valuesInput = document.getElementById("recipeEditDietaryPreferences");
+    const categoryInput = document.getElementById("recipeEditCategoryDietaryPreference");
+    if (!valuesInput || !categoryInput) return;
+    const selected = uniqueRecipeEditMultiselectValues(values, "dietary");
+    categoryInput.value = recipeEditMultiselectPrimaryValue(
+        selected,
+        categoryInput.value,
+        options.primary,
+        "dietary",
+    );
+    valuesInput.value = selected.join(", ");
+    renderRecipeEditMultiselect("dietary");
     if (options.notify !== false) {
-        input.dispatchEvent(new Event("input", { bubbles: true }));
-        input.dispatchEvent(new Event("change", { bubbles: true }));
+        notifyRecipeEditMultiselectInputs(
+            [valuesInput, categoryInput],
+            "dietary_preference",
+            options.source || CATEGORY_SOURCE_USER_SELECTED,
+        );
+        renderRecipeEditMultiselect("dietary");
     }
-}
-
-function openRecipeEditCuisinePicker(button) {
-    const entry = document.getElementById("recipeEditCuisineTagEntry");
-    if (!entry) return false;
-    entry.hidden = false;
-    button?.setAttribute("aria-expanded", "true");
-    entry.focus({ preventScroll: true });
-    return false;
-}
-
-function closeRecipeEditCuisinePicker(options = {}) {
-    const entry = document.getElementById("recipeEditCuisineTagEntry");
-    const button = document.querySelector("[data-recipe-edit-cuisine-add]");
-    if (!entry) return;
-    entry.hidden = true;
-    entry.value = "";
-    button?.setAttribute("aria-expanded", "false");
-    if (options.restoreFocus) button?.focus({ preventScroll: true });
-}
-
-function commitRecipeEditCuisineTag(entry) {
-    const additions = recipeEditCuisineTagValues(entry?.value || "");
-    if (additions.length) {
-        setRecipeEditCuisineTags([...recipeEditCuisineTagValues(), ...additions]);
-    }
-    closeRecipeEditCuisinePicker();
-    return false;
-}
-
-function handleRecipeEditCuisineTagEntryKeydown(event) {
-    if (event.key === "Escape") {
-        event.preventDefault();
-        closeRecipeEditCuisinePicker({ restoreFocus: true });
-        return false;
-    }
-    if (event.key === "Enter" || (event.key === "," && event.currentTarget.value.trim())) {
-        event.preventDefault();
-        commitRecipeEditCuisineTag(event.currentTarget);
-        return false;
-    }
-    return true;
-}
-
-function clearRecipeEditCuisineTag(index) {
-    const values = recipeEditCuisineTagValues();
-    values.splice(Number(index), 1);
-    setRecipeEditCuisineTags(values);
-    window.requestAnimationFrame(() => {
-        const buttons = [...document.querySelectorAll("[data-recipe-edit-cuisine-remove]")];
-        (buttons[Math.min(Number(index), buttons.length - 1)]
-            || document.querySelector("[data-recipe-edit-cuisine-add]"))?.focus({ preventScroll: true });
-    });
-    return false;
-}
-
-function renderRecipeEditCuisineChips() {
-    const input = document.getElementById("recipeEditCuisineTags");
-    const field = input?.closest(".recipe-edit-cuisine-tags-field");
-    const chips = field?.querySelector("[data-recipe-edit-cuisine-chips]");
-    if (!input || !chips) return;
-    const values = recipeEditCuisineTagValues(input.value);
-    const removeIcon = document.querySelector('[data-recipe-metadata-icon="x"]')?.innerHTML || "&times;";
-    chips.innerHTML = values.length
-        ? values.map((value, index) => `
-            <span class="recipe-edit-tag-chip">
-                <span>${escapeHtml(value)}</span>
-                <button type="button"
-                        data-recipe-edit-cuisine-remove
-                        aria-label="Remove cuisine tag ${escapeAttribute(value)}"
-                        onclick="return clearRecipeEditCuisineTag(${index})">${removeIcon}</button>
-            </span>
-        `).join("")
-        : '<span class="recipe-edit-tag-empty">No cuisine tags selected</span>';
 }
 
 function setRecipeEditCustomCategories(values, options = {}) {
     const input = document.getElementById("recipeEditCategoryCustomCategories");
     if (!input) return;
-    input.value = recipeEditCustomCategoryValues(values).join(", ");
-    renderRecipeEditCustomCategoryChips();
+    input.value = uniqueRecipeEditMultiselectValues(values, "custom").join(", ");
+    renderRecipeEditMultiselect("custom");
     if (options.notify !== false) {
-        input.dispatchEvent(new Event("input", { bubbles: true }));
-        input.dispatchEvent(new Event("change", { bubbles: true }));
+        notifyRecipeEditMultiselectInputs(
+            [input],
+            "custom_categories",
+            options.source || CATEGORY_SOURCE_USER_SELECTED,
+        );
+        renderRecipeEditMultiselect("custom");
     }
 }
 
-function openRecipeEditCustomCategoryPicker(button) {
-    const entry = document.getElementById("recipeEditCustomCategoryEntry");
-    if (!entry) return false;
-    entry.hidden = false;
-    button?.setAttribute("aria-expanded", "true");
-    entry.focus({ preventScroll: true });
+function recipeEditMultiselectValues(kind) {
+    if (kind === "cuisine") return recipeEditCuisineTagValues();
+    if (kind === "dietary") return recipeEditDietaryPreferenceValues();
+    return recipeEditCustomCategoryValues();
+}
+
+function setRecipeEditMultiselectValues(kind, values, options = {}) {
+    if (kind === "cuisine") return setRecipeEditCuisineCategories(values, options);
+    if (kind === "dietary") return setRecipeEditDietaryPreferences(values, options);
+    return setRecipeEditCustomCategories(values, options);
+}
+
+function recipeEditMultiselectSource(kind) {
+    const form = document.getElementById("recipeEditForm");
+    const field = kind === "cuisine"
+        ? "cuisine"
+        : (kind === "dietary" ? "dietary_preference" : "custom_categories");
+    return form ? form.dataset[categorySourceDatasetKey(field)] || "" : "";
+}
+
+function recipeEditMultiselectCopy(kind) {
+    return {
+        cuisine: {
+            inputLabel: "Search cuisine categories",
+            placeholder: "Search cuisines",
+            chipLabel: "cuisine category",
+            empty: "No matching cuisines",
+        },
+        dietary: {
+            inputLabel: "Search dietary preferences",
+            placeholder: "Search dietary preferences",
+            chipLabel: "dietary preference",
+            empty: "No matching dietary preferences",
+        },
+        custom: {
+            inputLabel: "Search or create custom tags",
+            placeholder: "Search or create a tag",
+            chipLabel: "custom tag",
+            empty: "No saved custom tags",
+        },
+    }[kind];
+}
+
+function recipeEditStructuredCategoryMatch(value) {
+    const queryKey = recipeEditTagKey(value);
+    if (!queryKey) return null;
+    const fields = [
+        ["meal_type", "recipeEditCategoryMealType", "Meal Type"],
+        ["main_ingredient", "recipeEditCategoryMainIngredient", "Main Ingredient"],
+        ["cooking_method", "recipeEditCategoryCookingMethod", "Cooking Method"],
+        ["occasion", "recipeEditCategoryOccasion", "Occasion"],
+    ];
+    for (const [field, id, label] of fields) {
+        const control = document.getElementById(id);
+        const option = Array.from(control?.options || [])
+            .find(item => item.value && recipeEditTagKey(item.value) === queryKey);
+        if (option) return { field, id, label, value: option.value };
+    }
+    for (const [kind, field, label] of [
+        ["dietary", "dietary_preference", "Dietary Preferences"],
+        ["cuisine", "cuisine", "Cuisine Categories"],
+    ]) {
+        const option = recipeEditMultiselectOptions(kind)
+            .find(item => recipeEditTagKey(item) === queryKey);
+        if (option) return { kind, field, label, value: option };
+    }
+    return null;
+}
+
+function recipeEditMultiselectParts(kind) {
+    const field = recipeEditMultiselectField(kind);
+    if (!field) return null;
+    const control = field.querySelector("[data-recipe-edit-multiselect-control]");
+    const chips = field.querySelector("[data-recipe-edit-multiselect-chips]");
+    const search = field.querySelector("[data-recipe-edit-multiselect-search]");
+    const listbox = field.querySelector("[data-recipe-edit-multiselect-listbox]");
+    const status = field.querySelector("[data-recipe-edit-multiselect-status]");
+    return control && chips && search && listbox && status
+        ? { field, control, chips, search, listbox, status }
+        : null;
+}
+
+function openRecipeEditMultiselect(kind) {
+    const parts = recipeEditMultiselectParts(kind);
+    if (!parts) return;
+    parts.field.classList.add("is-open");
+    parts.listbox.hidden = false;
+    parts.search.setAttribute("aria-expanded", "true");
+    renderRecipeEditMultiselectOptions(kind);
+}
+
+function closeRecipeEditMultiselect(kind, options = {}) {
+    const parts = recipeEditMultiselectParts(kind);
+    if (!parts) return;
+    parts.field.classList.remove("is-open");
+    parts.listbox.hidden = true;
+    parts.search.setAttribute("aria-expanded", "false");
+    parts.search.removeAttribute("aria-activedescendant");
+    if (options.focus) parts.search.focus({ preventScroll: true });
+}
+
+function recipeEditMultiselectOptionButton(text, className = "") {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `recipe-edit-multiselect-option ${className}`.trim();
+    button.setAttribute("role", "option");
+    button.setAttribute("aria-selected", "false");
+    button.tabIndex = -1;
+    button.textContent = text;
+    return button;
+}
+
+function renderRecipeEditMultiselectOptions(kind) {
+    const parts = recipeEditMultiselectParts(kind);
+    if (!parts) return;
+    const query = normalizeRecipeEditTagText(parts.search.value);
+    const queryKey = recipeEditTagKey(query);
+    const selectedKeys = new Set(recipeEditMultiselectValues(kind).map(recipeEditTagKey));
+    const choices = recipeEditMultiselectOptions(kind).filter(value => {
+        const key = recipeEditTagKey(value);
+        return !selectedKeys.has(key) && (!queryKey || key.includes(queryKey));
+    });
+    const buttons = choices.map(value => {
+        const button = recipeEditMultiselectOptionButton(value);
+        button.dataset.recipeEditMultiselectValue = value;
+        return button;
+    });
+
+    if (kind === "custom" && query) {
+        const structured = recipeEditStructuredCategoryMatch(query);
+        const exactSaved = recipeEditMultiselectOptions("custom")
+            .some(value => recipeEditTagKey(value) === queryKey);
+        const alreadySelected = selectedKeys.has(queryKey);
+        if (structured) {
+            const button = recipeEditMultiselectOptionButton(
+                `Use “${structured.value}” in ${structured.label}`,
+                "is-structured-suggestion",
+            );
+            button.dataset.recipeEditStructuredField = structured.field;
+            button.dataset.recipeEditStructuredValue = structured.value;
+            if (structured.kind) button.dataset.recipeEditStructuredKind = structured.kind;
+            buttons.unshift(button);
+            parts.status.textContent = "This matches a structured classification option.";
+        } else if (!exactSaved && !alreadySelected) {
+            const normalized = normalizeRecipeEditCustomTag(query);
+            const button = recipeEditMultiselectOptionButton(
+                `Create tag “${normalized}”`,
+                "is-create-action",
+            );
+            button.dataset.recipeEditCreateTag = normalized;
+            buttons.push(button);
+            parts.status.textContent = `Create tag ${normalized}`;
+        } else {
+            parts.status.textContent = alreadySelected ? "Tag already selected." : "Select the saved tag.";
+        }
+    } else {
+        parts.status.textContent = "";
+    }
+
+    if (!buttons.length) {
+        const empty = document.createElement("div");
+        empty.className = "recipe-edit-multiselect-empty";
+        empty.textContent = recipeEditMultiselectCopy(kind).empty;
+        parts.listbox.replaceChildren(empty);
+    } else {
+        parts.listbox.replaceChildren(...buttons);
+    }
+}
+
+function selectRecipeEditMultiselectValue(kind, value) {
+    const parts = recipeEditMultiselectParts(kind);
+    const nextValue = kind === "custom"
+        ? normalizeRecipeEditCustomTag(value)
+        : canonicalRecipeEditMultiselectValue(kind, value);
+    setRecipeEditMultiselectValues(
+        kind,
+        [...recipeEditMultiselectValues(kind), nextValue],
+        { source: CATEGORY_SOURCE_USER_SELECTED },
+    );
+    if (parts) {
+        parts.search.value = "";
+        openRecipeEditMultiselect(kind);
+        parts.search.focus({ preventScroll: true });
+    }
+}
+
+function useRecipeEditStructuredCategorySuggestion(button) {
+    const kind = button.dataset.recipeEditStructuredKind;
+    const value = button.dataset.recipeEditStructuredValue || "";
+    if (kind) {
+        setRecipeEditMultiselectValues(
+            kind,
+            [...recipeEditMultiselectValues(kind), value],
+            { source: CATEGORY_SOURCE_USER_SELECTED },
+        );
+        const target = recipeEditMultiselectParts(kind);
+        target?.search.focus({ preventScroll: true });
+    } else {
+        const control = document.querySelector(`[name="${button.dataset.recipeEditStructuredField}"]`);
+        if (control) {
+            control.value = value;
+            control.dispatchEvent(new Event("change", { bubbles: true }));
+            control.focus({ preventScroll: true });
+        }
+    }
+    closeRecipeEditMultiselect("custom");
+}
+
+function removeRecipeEditMultiselectValue(kind, index) {
+    const values = recipeEditMultiselectValues(kind);
+    values.splice(Number(index), 1);
+    setRecipeEditMultiselectValues(kind, values, { source: CATEGORY_SOURCE_USER_SELECTED });
+    window.requestAnimationFrame(() => recipeEditMultiselectParts(kind)?.search.focus({ preventScroll: true }));
+}
+
+function renderRecipeEditMultiselect(kind) {
+    const parts = recipeEditMultiselectParts(kind);
+    if (!parts) return;
+    const values = recipeEditMultiselectValues(kind);
+    const copy = recipeEditMultiselectCopy(kind);
+    const aiInferred = recipeEditMultiselectSource(kind) === CATEGORY_SOURCE_AI_INFERRED;
+    const chips = values.map((value, index) => {
+        const chip = document.createElement("span");
+        chip.className = "recipe-edit-tag-chip";
+        if (aiInferred) chip.classList.add("is-ai-inferred");
+        const text = document.createElement("span");
+        text.textContent = value;
+        chip.appendChild(text);
+        if (aiInferred) {
+            const badge = document.createElement("span");
+            badge.className = "recipe-edit-tag-chip-ai";
+            badge.textContent = "AI";
+            badge.setAttribute("aria-label", "AI inferred");
+            chip.appendChild(badge);
+        }
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.dataset.recipeEditMultiselectRemove = String(index);
+        remove.setAttribute("aria-label", `Remove ${copy.chipLabel} ${value}`);
+        remove.innerHTML = document.querySelector('[data-recipe-metadata-icon="x"]')?.innerHTML || "&times;";
+        chip.appendChild(remove);
+        return chip;
+    });
+    parts.chips.replaceChildren(...chips);
+    if (parts.field.classList.contains("is-open")) renderRecipeEditMultiselectOptions(kind);
+}
+
+function moveRecipeEditMultiselectOptionFocus(parts, current, offset) {
+    const options = Array.from(parts.listbox.querySelectorAll("[role='option']"));
+    if (!options.length) return;
+    const index = Math.max(0, options.indexOf(current));
+    options[(index + offset + options.length) % options.length].focus({ preventScroll: true });
+}
+
+function initializeRecipeEditMultiselectField(field, kind) {
+    if (!field || field.dataset.recipeEditMultiselectInitialized === "true") return;
+    field.dataset.recipeEditMultiselectInitialized = "true";
+    const copy = recipeEditMultiselectCopy(kind);
+    const control = document.createElement("div");
+    control.className = "recipe-edit-multiselect-control recipe-edit-metadata-value";
+    control.dataset.recipeEditMultiselectControl = "";
+    const chips = document.createElement("div");
+    chips.className = "recipe-edit-multiselect-chips";
+    chips.dataset.recipeEditMultiselectChips = "";
+    const search = document.createElement("input");
+    search.type = "search";
+    search.id = `recipeEdit${kind.charAt(0).toUpperCase() + kind.slice(1)}Search`;
+    search.className = "recipe-edit-multiselect-search";
+    search.dataset.recipeEditMultiselectSearch = "";
+    search.placeholder = copy.placeholder;
+    search.autocomplete = "off";
+    search.spellcheck = false;
+    search.setAttribute("role", "combobox");
+    search.setAttribute("aria-autocomplete", "list");
+    search.setAttribute("aria-expanded", "false");
+    search.setAttribute("aria-label", copy.inputLabel);
+    const listbox = document.createElement("div");
+    listbox.id = `${search.id}Options`;
+    listbox.className = "recipe-edit-multiselect-options";
+    listbox.dataset.recipeEditMultiselectListbox = "";
+    listbox.setAttribute("role", "listbox");
+    listbox.setAttribute("aria-label", `${copy.inputLabel} options`);
+    listbox.hidden = true;
+    search.setAttribute("aria-controls", listbox.id);
+    const status = document.createElement("div");
+    status.className = "recipe-edit-multiselect-status";
+    status.dataset.recipeEditMultiselectStatus = "";
+    status.setAttribute("role", "status");
+    status.setAttribute("aria-live", "polite");
+    control.append(chips, search, listbox, status);
+    field.appendChild(control);
+
+    search.addEventListener("focus", () => openRecipeEditMultiselect(kind));
+    search.addEventListener("click", () => openRecipeEditMultiselect(kind));
+    search.addEventListener("input", () => {
+        openRecipeEditMultiselect(kind);
+        renderRecipeEditMultiselectOptions(kind);
+    });
+    search.addEventListener("keydown", event => {
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            openRecipeEditMultiselect(kind);
+            const options = Array.from(listbox.querySelectorAll("[role='option']"));
+            options[event.key === "ArrowDown" ? 0 : options.length - 1]?.focus({ preventScroll: true });
+        } else if (event.key === "Enter") {
+            const option = listbox.querySelector("[role='option']");
+            if (!listbox.hidden && option) {
+                event.preventDefault();
+                option.click();
+            }
+        } else if (event.key === "Escape") {
+            event.preventDefault();
+            closeRecipeEditMultiselect(kind);
+        } else if (event.key === "Backspace" && !search.value) {
+            const values = recipeEditMultiselectValues(kind);
+            if (values.length) removeRecipeEditMultiselectValue(kind, values.length - 1);
+        } else if (event.key === "Tab") {
+            window.setTimeout(() => closeRecipeEditMultiselect(kind), 0);
+        }
+    });
+    listbox.addEventListener("click", event => {
+        const option = event.target.closest?.("[role='option']");
+        if (!option) return;
+        if (option.dataset.recipeEditStructuredField) {
+            useRecipeEditStructuredCategorySuggestion(option);
+        } else {
+            selectRecipeEditMultiselectValue(
+                kind,
+                option.dataset.recipeEditCreateTag || option.dataset.recipeEditMultiselectValue,
+            );
+        }
+    });
+    listbox.addEventListener("keydown", event => {
+        const option = event.target.closest?.("[role='option']");
+        if (!option) return;
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            moveRecipeEditMultiselectOptionFocus(
+                recipeEditMultiselectParts(kind),
+                option,
+                event.key === "ArrowDown" ? 1 : -1,
+            );
+        } else if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            option.click();
+        } else if (event.key === "Escape") {
+            event.preventDefault();
+            closeRecipeEditMultiselect(kind, { focus: true });
+        }
+    });
+    chips.addEventListener("click", event => {
+        const remove = event.target.closest?.("[data-recipe-edit-multiselect-remove]");
+        if (remove) removeRecipeEditMultiselectValue(kind, remove.dataset.recipeEditMultiselectRemove);
+    });
+    if (!document.body.dataset.recipeEditMultiselectDismissBound) {
+        document.body.dataset.recipeEditMultiselectDismissBound = "true";
+        document.addEventListener("pointerdown", event => {
+            document.querySelectorAll("[data-recipe-edit-multiselect-field].is-open").forEach(openField => {
+                if (!openField.contains(event.target)) {
+                    closeRecipeEditMultiselect(openField.dataset.recipeEditMultiselectField);
+                }
+            });
+        });
+    }
+    renderRecipeEditMultiselect(kind);
+}
+
+function clearRecipeEditCuisineTag(index) {
+    removeRecipeEditMultiselectValue("cuisine", index);
     return false;
-}
-
-function closeRecipeEditCustomCategoryPicker(options = {}) {
-    const entry = document.getElementById("recipeEditCustomCategoryEntry");
-    const button = document.querySelector("[data-recipe-edit-custom-category-add]");
-    if (!entry) return;
-    entry.hidden = true;
-    entry.value = "";
-    button?.setAttribute("aria-expanded", "false");
-    if (options.restoreFocus) button?.focus({ preventScroll: true });
-}
-
-function commitRecipeEditCustomCategory(entry) {
-    const additions = recipeEditCustomCategoryValues(entry?.value || "");
-    if (additions.length) {
-        setRecipeEditCustomCategories([...recipeEditCustomCategoryValues(), ...additions]);
-    }
-    closeRecipeEditCustomCategoryPicker();
-    return false;
-}
-
-function handleRecipeEditCustomCategoryEntryKeydown(event) {
-    if (event.key === "Escape") {
-        event.preventDefault();
-        closeRecipeEditCustomCategoryPicker({ restoreFocus: true });
-        return false;
-    }
-    if (event.key === "Enter" || (event.key === "," && event.currentTarget.value.trim())) {
-        event.preventDefault();
-        commitRecipeEditCustomCategory(event.currentTarget);
-        return false;
-    }
-    return true;
 }
 
 function clearRecipeEditCustomCategory(index) {
-    const values = recipeEditCustomCategoryValues();
-    values.splice(Number(index), 1);
-    setRecipeEditCustomCategories(values);
-    window.requestAnimationFrame(() => {
-        const buttons = [...document.querySelectorAll("[data-recipe-edit-custom-category-remove]")];
-        (buttons[Math.min(Number(index), buttons.length - 1)]
-            || document.querySelector("[data-recipe-edit-custom-category-add]"))?.focus({ preventScroll: true });
-    });
+    removeRecipeEditMultiselectValue("custom", index);
     return false;
 }
 
+function renderRecipeEditCuisineChips() {
+    renderRecipeEditMultiselect("cuisine");
+}
+
 function renderRecipeEditCustomCategoryChips() {
-    const input = document.getElementById("recipeEditCategoryCustomCategories");
-    const field = input?.closest(".recipe-edit-custom-categories-field");
-    const chips = field?.querySelector("[data-recipe-edit-custom-category-chips]");
-    if (!input || !chips) return;
-    const values = recipeEditCustomCategoryValues(input.value);
-    const removeIcon = document.querySelector('[data-recipe-metadata-icon="x"]')?.innerHTML || "&times;";
-    chips.innerHTML = values.length
-        ? values.map((value, index) => `
-            <span class="recipe-edit-tag-chip">
-                <span>${escapeHtml(value)}</span>
-                <button type="button"
-                        data-recipe-edit-custom-category-remove
-                        aria-label="Remove custom category ${escapeAttribute(value)}"
-                        onclick="return clearRecipeEditCustomCategory(${index})">${removeIcon}</button>
-            </span>
-        `).join("")
-        : '<span class="recipe-edit-tag-empty">No custom categories selected</span>';
+    renderRecipeEditMultiselect("custom");
 }
 
 function recipeEditMetadataIcon(kind) {
@@ -26613,15 +26996,17 @@ function organizeRecipeEditMetadataField(field) {
             ? labelLine
             : labelLine.querySelector(":scope > span:first-child"))
         : Array.from(field.children).find(child => child.tagName === "SPAN" && !child.classList.contains("recipe-edit-metadata-icon"));
-    if (!icon || !label) return;
+    if (!label) return;
     const heading = document.createElement("div");
     heading.className = "recipe-edit-metadata-heading";
     field.insertBefore(heading, field.firstChild);
-    heading.append(icon, label);
+    if (icon) heading.appendChild(icon);
+    heading.appendChild(label);
     if (labelLine && labelLine !== label) labelLine.hidden = true;
 
-    const control = field.querySelector(":scope > input, :scope > select");
-    if (control && !control.closest(".recipe-edit-metadata-value")) {
+    const existingValue = field.querySelector(":scope > .recipe-edit-metadata-value");
+    const control = field.querySelector(":scope > input:not([type='hidden']), :scope > select");
+    if (!existingValue && control && !control.closest(".recipe-edit-metadata-value")) {
         const valueWrap = document.createElement("div");
         valueWrap.className = "recipe-edit-metadata-value";
         control.parentNode.insertBefore(valueWrap, control);
@@ -26630,12 +27015,92 @@ function organizeRecipeEditMetadataField(field) {
 }
 
 function organizeRecipeEditScaleControl(field) {
-    if (!field) return;
-    const valueWrap = field.querySelector(":scope > .recipe-edit-metadata-value");
-    const suffix = field.querySelector(":scope > .recipe-edit-scale-suffix");
-    if (valueWrap && suffix && suffix.parentElement !== valueWrap) {
-        valueWrap.appendChild(suffix);
+    if (typeof syncRecipeEditScaleSegments === "function") {
+        syncRecipeEditScaleSegments();
     }
+}
+
+function syncRecipeEditScaleSegments() {
+    const input = document.getElementById("recipeEditScaleMultiplier");
+    const current = document.querySelector("[data-recipe-edit-scale-current]");
+    if (!input) return;
+    const multiplier = parseRecipeScaleMultiplier(input.value) || 1;
+    let matched = false;
+    document.querySelectorAll("[data-recipe-edit-scale-preset]").forEach(button => {
+        const selected = recipeMultipliersMatch(button.dataset.recipeEditScalePreset, multiplier);
+        button.setAttribute("aria-pressed", String(selected));
+        button.classList.toggle("is-selected", selected);
+        matched = matched || selected;
+    });
+    if (current) {
+        current.hidden = matched;
+        current.textContent = matched ? "" : `Current scale: ${formatRecipeScaleMultiplierLabel(multiplier)}`;
+    }
+}
+
+function selectRecipeEditScalePreset(button, multiplier) {
+    const input = document.getElementById("recipeEditScaleMultiplier");
+    if (!input) return false;
+    input.value = formatRecipeScaleInputValue(multiplier);
+    applyRecipeScaleMultiplier(input);
+    syncRecipeEditScaleSegments();
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    button?.focus({ preventScroll: true });
+    return false;
+}
+
+function recipeEditServingsParts(value) {
+    const text = normalizeRecipeEditTagText(value);
+    const match = text.match(/\d+(?:\.\d+)?/);
+    if (!match) return { number: null, prefix: "", suffix: "" };
+    return {
+        number: Number(match[0]),
+        prefix: text.slice(0, match.index),
+        suffix: text.slice(match.index + match[0].length),
+    };
+}
+
+function syncRecipeEditServingsStepper() {
+    const input = document.getElementById("recipeEditServings");
+    const count = document.getElementById("recipeEditServingsCount");
+    if (!input || !count) return;
+    const parts = recipeEditServingsParts(input.value);
+    input.dataset.recipeEditServingsPrefix = parts.prefix;
+    input.dataset.recipeEditServingsSuffix = parts.suffix;
+    count.value = parts.number === null ? "" : String(parts.number);
+    const decrement = document.querySelector("[data-recipe-edit-servings-decrement]");
+    if (decrement) decrement.disabled = parts.number !== null && parts.number <= 1;
+}
+
+function updateRecipeEditServingsFromStepper(count) {
+    const input = document.getElementById("recipeEditServings");
+    if (!input || !count) return false;
+    const number = Number(count.value);
+    if (!count.value || !Number.isFinite(number) || number < 1) {
+        input.value = "";
+    } else {
+        const prefix = input.dataset.recipeEditServingsPrefix || "";
+        const suffix = input.dataset.recipeEditServingsSuffix || "";
+        input.value = `${prefix}${Number(number.toFixed(2))}${suffix}`.trim();
+    }
+    const decrement = document.querySelector("[data-recipe-edit-servings-decrement]");
+    if (decrement) decrement.disabled = Number(count.value) <= 1;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    return false;
+}
+
+function stepRecipeEditServings(delta) {
+    const count = document.getElementById("recipeEditServingsCount");
+    if (!count) return false;
+    const current = Number(count.value) || recipeEditServingsParts(
+        document.getElementById("recipeEditServings")?.value,
+    ).number || 1;
+    count.value = String(Math.max(1, current + Number(delta || 0)));
+    updateRecipeEditServingsFromStepper(count);
+    count.focus({ preventScroll: true });
+    return false;
 }
 
 function closeRecipeEditMetadataTooltips(options = {}) {
@@ -26689,7 +27154,9 @@ function setRecipeEditMetadataTooltipOpen(trigger, open, options = {}) {
 
 function addRecipeEditMetadataTooltip(field, label, helpText) {
     const heading = field ? field.querySelector(".recipe-edit-metadata-heading") : null;
-    const control = field ? field.querySelector("input, select") : null;
+    const control = field
+        ? field.querySelector("input:not([type='hidden']), select, [data-recipe-edit-scale-segments]")
+        : null;
     if (!heading || !control || !control.id || heading.querySelector("[data-recipe-edit-metadata-tooltip-trigger]")) return;
     const tooltipId = `${control.id}Tooltip`;
     const trigger = document.createElement("span");
@@ -27220,7 +27687,17 @@ function recipeEditDurationMinutesMatch(left, right) {
 
 function formatRecipeEditDurationMinutes(minutes) {
     if (!Number.isFinite(minutes)) return "";
-    return Number(minutes.toFixed(2)).toString();
+    const rounded = Number(minutes.toFixed(2));
+    if (rounded < 60) return `${rounded} min`;
+    const hours = Math.floor(rounded / 60);
+    const remainingMinutes = Number((rounded - (hours * 60)).toFixed(2));
+    return remainingMinutes ? `${hours} hr ${remainingMinutes} min` : `${hours} hr`;
+}
+
+function normalizeRecipeEditDurationValue(value) {
+    const text = normalizeRecipeEditTagText(value);
+    const minutes = parseRecipeEditDurationMinutes(text);
+    return minutes === null ? text : formatRecipeEditDurationMinutes(minutes);
 }
 
 function initializeRecipeEditTotalTimeCalculation() {
@@ -27391,7 +27868,6 @@ function organizeRecipeEditInformationCard() {
     const descriptionField = recipeEditFieldContainer("recipeEditDescription");
     const cookbookField = document.getElementById("recipeEditCookbookField");
     const sectionField = document.getElementById("recipeEditCategoryMenuSectionField");
-    const cuisineTagsField = recipeEditFieldContainer("recipeEditCuisineTags");
     const mobileImageSlot = document.querySelector("[data-recipe-edit-mobile-image-slot]");
     const servingsField = recipeEditFieldContainer("recipeEditServings");
     const totalField = recipeEditFieldContainer("recipeEditTotalTime");
@@ -27424,7 +27900,6 @@ function organizeRecipeEditInformationCard() {
     setRecipeEditFieldLabel(nameField, "Recipe Name");
     setRecipeEditFieldLabel(cookbookField, "Cookbook");
     setRecipeEditFieldLabel(sectionField, "Section");
-    setRecipeEditFieldLabel(cuisineTagsField, "Cuisine Tags");
     setRecipeEditFieldLabel(totalField, "Total Time");
     setRecipeEditFieldLabel(prepField, "Prep Time");
     setRecipeEditFieldLabel(cookField, "Cook Time");
@@ -27436,28 +27911,11 @@ function organizeRecipeEditInformationCard() {
     setRecipeEditFieldLabel(mainIngredientField, "Main Ingredient");
     setRecipeEditFieldLabel(cookingMethodField, "Cooking Method");
     setRecipeEditFieldLabel(occasionField, "Occasion");
-    setRecipeEditFieldLabel(dietaryPreferenceField, "Dietary Preference");
-    setRecipeEditFieldLabel(cuisineCategoryField, "Cuisine Category");
-    setRecipeEditFieldLabel(customCategoriesField, "Custom Categories");
+    setRecipeEditFieldLabel(dietaryPreferenceField, "Dietary Preferences");
+    setRecipeEditFieldLabel(cuisineCategoryField, "Cuisine Categories");
+    setRecipeEditFieldLabel(customCategoriesField, "Custom Tags");
 
-    addRecipeEditUnit(servingsField, "people");
-    addRecipeEditUnit(totalField, "min");
-    addRecipeEditUnit(prepField, "min");
-    addRecipeEditUnit(cookField, "min");
-    addRecipeEditUnit(inactiveField, "min");
-    addRecipeEditMetadataIcon(servingsField, "servings");
     addRecipeEditMetadataIcon(totalField, "total");
-    addRecipeEditMetadataIcon(prepField, "prep");
-    addRecipeEditMetadataIcon(cookField, "cook");
-    addRecipeEditMetadataIcon(inactiveField, "inactive");
-    addRecipeEditMetadataIcon(levelField, "difficulty");
-    addRecipeEditMetadataIcon(scaleField, "scale");
-    addRecipeEditMetadataIcon(mealTypeField, "meal-type");
-    addRecipeEditMetadataIcon(mainIngredientField, "main-ingredient");
-    addRecipeEditMetadataIcon(cookingMethodField, "cooking-method");
-    addRecipeEditMetadataIcon(occasionField, "occasion");
-    addRecipeEditMetadataIcon(dietaryPreferenceField, "dietary-preference");
-    addRecipeEditMetadataIcon(cuisineCategoryField, "cuisine-category");
     [servingsField, totalField, prepField, cookField, inactiveField, levelField, scaleField]
         .forEach(organizeRecipeEditMetadataField);
     const categoryFields = [
@@ -27472,6 +27930,11 @@ function organizeRecipeEditInformationCard() {
         field?.classList.add("recipe-edit-detail-field", "recipe-edit-category-metadata-field");
         organizeRecipeEditMetadataField(field);
     });
+    initializeRecipeEditMultiselectField(dietaryPreferenceField, "dietary");
+    initializeRecipeEditMultiselectField(cuisineCategoryField, "cuisine");
+    customCategoriesField?.classList.add("recipe-edit-detail-field");
+    organizeRecipeEditMetadataField(customCategoriesField);
+    initializeRecipeEditMultiselectField(customCategoriesField, "custom");
     organizeRecipeEditScaleControl(scaleField);
     [
         [servingsField, "Servings", "Number of people or portions the base recipe serves. Scale does not change this saved value."],
@@ -27487,8 +27950,8 @@ function organizeRecipeEditInformationCard() {
         [mainIngredientField, "Main Ingredient", "The dominant ingredient category in the recipe."],
         [cookingMethodField, "Cooking Method", "The primary technique used to cook the recipe."],
         [occasionField, "Occasion", "The event or setting this recipe best suits."],
-        [dietaryPreferenceField, "Dietary Preference", "The dietary pattern that best describes the recipe."],
-        [cuisineCategoryField, "Cuisine Category", "The cuisine tradition most closely associated with the recipe."],
+        [dietaryPreferenceField, "Dietary Preferences", "Dietary patterns that describe the recipe."],
+        [cuisineCategoryField, "Cuisine Categories", "Cuisine traditions associated with the recipe."],
     ].forEach(([field, label, helpText]) => addRecipeEditMetadataTooltip(field, label, helpText));
 
     if (infoActions) infoActions.hidden = true;
@@ -27513,90 +27976,57 @@ function organizeRecipeEditInformationCard() {
     selectors.className = "recipe-edit-summary-selectors";
     appendRecipeEditWorkspaceChildren(selectors, [cookbookField, sectionField, priceField]);
 
-    const tagRow = document.createElement("div");
-    tagRow.className = "recipe-edit-tag-row";
-    const tagActions = document.createElement("div");
-    tagActions.className = "recipe-edit-tag-actions";
-    const addTagIcon = document.querySelector('[data-recipe-metadata-icon="plus"]')?.innerHTML || "+";
-    tagActions.innerHTML = `
-        <input type="text"
-               id="recipeEditCuisineTagEntry"
-               class="recipe-edit-tag-entry"
-               aria-label="New cuisine tag"
-               placeholder="Add cuisine tag"
-               autocomplete="off"
-               onkeydown="return handleRecipeEditCuisineTagEntryKeydown(event)"
-               onblur="return commitRecipeEditCuisineTag(this)"
-               hidden>
-        <button type="button"
-                class="recipe-edit-tag-add"
-                data-recipe-edit-cuisine-add
-                aria-expanded="false"
-                aria-controls="recipeEditCuisineTagEntry"
-                onclick="return openRecipeEditCuisinePicker(this)">${addTagIcon}<span>Add Tag</span></button>
-    `;
-    if (cuisineTagsField && !cuisineTagsField.querySelector("[data-recipe-edit-cuisine-chips]")) {
-        const chips = document.createElement("div");
-        chips.className = "recipe-edit-tag-chips";
-        chips.dataset.recipeEditCuisineChips = "";
-        cuisineTagsField.appendChild(chips);
-    }
-    appendRecipeEditWorkspaceChildren(tagRow, [cuisineTagsField, tagActions]);
     appendRecipeEditWorkspaceChildren(identity, [nameLine, ratingField]);
     appendRecipeEditWorkspaceChildren(primaryRow, [identity, selectors, mobileImageSlot]);
 
-    const metadataRow = document.createElement("div");
-    metadataRow.className = "recipe-edit-metadata-strip";
-    const timeBreakdownGroup = document.createElement("div");
-    timeBreakdownGroup.className = "recipe-edit-time-breakdown-group";
-    timeBreakdownGroup.id = "recipeEditTimeBreakdown";
-    timeBreakdownGroup.setAttribute("role", "group");
-    timeBreakdownGroup.setAttribute("aria-label", "Time breakdown");
-    const timeBreakdownControl = createRecipeEditTimeBreakdownControl();
-    const totalTimeHeading = totalField?.querySelector(".recipe-edit-metadata-heading");
-    totalField?.classList.add("recipe-edit-total-time-field");
-    (totalTimeHeading || totalField)?.appendChild(timeBreakdownControl);
-    appendRecipeEditWorkspaceChildren(timeBreakdownGroup, [prepField, cookField, inactiveField]);
-    appendRecipeEditWorkspaceChildren(metadataRow, [servingsField, scaleField, totalField, timeBreakdownGroup, levelField]);
+    const detailsSection = document.createElement("section");
+    detailsSection.className = "recipe-edit-form-section recipe-edit-details-section";
+    detailsSection.setAttribute("aria-labelledby", "recipeEditDetailsHeading");
+    const detailsHeading = document.createElement("h2");
+    detailsHeading.id = "recipeEditDetailsHeading";
+    detailsHeading.className = "recipe-edit-form-section-title";
+    detailsHeading.textContent = "Recipe Details";
+    const detailsPrimaryRow = document.createElement("div");
+    detailsPrimaryRow.className = "recipe-edit-details-primary-grid";
+    const detailsSecondaryRow = document.createElement("div");
+    detailsSecondaryRow.className = "recipe-edit-details-secondary-grid";
+    appendRecipeEditWorkspaceChildren(detailsPrimaryRow, [servingsField, scaleField, totalField]);
+    appendRecipeEditWorkspaceChildren(detailsSecondaryRow, [prepField, cookField, inactiveField, levelField]);
+    appendRecipeEditWorkspaceChildren(detailsSection, [detailsHeading, detailsPrimaryRow, detailsSecondaryRow]);
 
-    const categoryRow = document.createElement("div");
-    categoryRow.className = "recipe-edit-metadata-strip recipe-edit-category-metadata-strip";
-    categoryRow.setAttribute("role", "group");
-    categoryRow.setAttribute("aria-label", "Recipe category fields");
-    appendRecipeEditWorkspaceChildren(categoryRow, categoryFields);
-
+    const classificationHeadingRow = document.createElement("div");
+    classificationHeadingRow.className = "recipe-edit-form-section-heading";
+    const classificationHeading = document.createElement("h2");
+    classificationHeading.id = "recipeEditClassificationHeading";
+    classificationHeading.className = "recipe-edit-form-section-title";
+    classificationHeading.textContent = "Classification";
+    appendRecipeEditWorkspaceChildren(classificationHeadingRow, [classificationHeading, categoryMenu]);
+    const classificationPrimaryRow = document.createElement("div");
+    classificationPrimaryRow.className = "recipe-edit-classification-grid recipe-edit-classification-primary-grid";
+    appendRecipeEditWorkspaceChildren(
+        classificationPrimaryRow,
+        [mealTypeField, mainIngredientField, cookingMethodField],
+    );
+    const classificationSecondaryRow = document.createElement("div");
+    classificationSecondaryRow.className = "recipe-edit-classification-grid recipe-edit-classification-secondary-grid";
+    appendRecipeEditWorkspaceChildren(
+        classificationSecondaryRow,
+        [occasionField, dietaryPreferenceField, cuisineCategoryField],
+    );
     const customCategoryRow = document.createElement("div");
-    customCategoryRow.className = "recipe-edit-tag-row recipe-edit-custom-category-tag-row";
-    const customCategoryActions = document.createElement("div");
-    customCategoryActions.className = "recipe-edit-tag-actions recipe-edit-custom-category-actions";
-    customCategoryActions.innerHTML = `
-        <input type="text"
-               id="recipeEditCustomCategoryEntry"
-               class="recipe-edit-tag-entry"
-               aria-label="New custom category"
-               placeholder="Add custom category"
-               autocomplete="off"
-               onkeydown="return handleRecipeEditCustomCategoryEntryKeydown(event)"
-               onblur="return commitRecipeEditCustomCategory(this)"
-               hidden>
-        <button type="button"
-                class="recipe-edit-tag-add"
-                data-recipe-edit-custom-category-add
-                aria-expanded="false"
-                aria-controls="recipeEditCustomCategoryEntry"
-                onclick="return openRecipeEditCustomCategoryPicker(this)">${addTagIcon}<span>Add Tag</span></button>
-    `;
-    if (customCategoriesField && !customCategoriesField.querySelector("[data-recipe-edit-custom-category-chips]")) {
-        const chips = document.createElement("div");
-        chips.className = "recipe-edit-tag-chips";
-        chips.dataset.recipeEditCustomCategoryChips = "";
-        customCategoriesField.appendChild(chips);
-    }
-    appendRecipeEditWorkspaceChildren(customCategoryActions, [categoryMenu]);
-    appendRecipeEditWorkspaceChildren(customCategoryRow, [customCategoriesField, customCategoryActions]);
+    customCategoryRow.className = "recipe-edit-custom-category-tag-row";
+    appendRecipeEditWorkspaceChildren(customCategoryRow, [customCategoriesField]);
     if (categoriesPanel) {
+        categoriesPanel.classList.add("recipe-edit-form-section", "recipe-edit-classification-section");
+        categoriesPanel.setAttribute("aria-labelledby", "recipeEditClassificationHeading");
         categoriesPanel.replaceChildren();
-        appendRecipeEditWorkspaceChildren(categoriesPanel, [categoryRow, customCategoryRow, prepTimeGroupInput]);
+        appendRecipeEditWorkspaceChildren(categoriesPanel, [
+            classificationHeadingRow,
+            classificationPrimaryRow,
+            classificationSecondaryRow,
+            customCategoryRow,
+            prepTimeGroupInput,
+        ]);
     }
 
     const descriptionRow = document.createElement("div");
@@ -27650,12 +28080,19 @@ function organizeRecipeEditInformationCard() {
     ]);
 
     grid.replaceChildren();
-    appendRecipeEditWorkspaceChildren(grid, [primaryRow, descriptionRow, tagRow, metadataRow, categoriesPanel, technicalDetails]);
+    appendRecipeEditWorkspaceChildren(grid, [
+        primaryRow,
+        descriptionRow,
+        detailsSection,
+        categoriesPanel,
+        technicalDetails,
+    ]);
     bindRecipeEditTotalTimeCalculation();
-    setRecipeEditTimeBreakdownExpanded(loadRecipeEditTimeBreakdownExpanded());
-    renderRecipeEditCuisineChips();
-    renderRecipeEditCustomCategoryChips();
-    updateRecipeEditMetadataUnits();
+    syncRecipeEditServingsStepper();
+    syncRecipeEditScaleSegments();
+    renderRecipeEditMultiselect("cuisine");
+    renderRecipeEditMultiselect("dietary");
+    renderRecipeEditMultiselect("custom");
 }
 
 function organizeRecipeEditAiAssistant() {
@@ -41308,7 +41745,8 @@ function recipeEditorControlForFieldPath(path, form = document.getElementById("r
 
     const normalized = String(path || "").replace(/\[(\d+)\]/g, ".$1");
     if (normalized === "scaling.selected_multiplier") {
-        return document.getElementById("recipeEditScaleMultiplier");
+        return document.querySelector("[data-recipe-edit-scale-preset][aria-pressed='true']")
+            || document.getElementById("recipeEditScaleSegments");
     }
     const parts = normalized.split(".").filter(Boolean);
     const topLevelIds = {
@@ -41323,6 +41761,10 @@ function recipeEditorControlForFieldPath(path, form = document.getElementById("r
         cook_time: "recipeEditCookTime",
     };
     if (parts.length === 1 && topLevelIds[parts[0]]) {
+        if (parts[0] === "servings") {
+            return document.getElementById("recipeEditServingsCount")
+                || document.getElementById(topLevelIds[parts[0]]);
+        }
         return document.getElementById(topLevelIds[parts[0]]);
     }
 
@@ -42686,6 +43128,9 @@ function populateRecipeScalingControls(scaling = {}, servings = "", options = {}
     if (servingsInput) {
         servingsInput.dataset.baseServings = baseServings;
     }
+    if (typeof syncRecipeEditScaleSegments === "function") {
+        syncRecipeEditScaleSegments();
+    }
 }
 
 function normalizeRecipeScalingOptions(options) {
@@ -42821,6 +43266,9 @@ function applyRecipeScaleValue(input, multiplier) {
             applyRecipeScaleToIngredientRow(optionRow, multiplier);
         });
     });
+    if (typeof syncRecipeEditScaleSegments === "function") {
+        syncRecipeEditScaleSegments();
+    }
 }
 
 function applyRecipeScaleToIngredientRow(row, multiplier) {
@@ -56492,6 +56940,8 @@ function normalizeRecipeEditorSnapshot(recipe) {
         display_name: String(recipe.display_name || "").trim(),
         recipe_title: String(recipe.recipe_title || "").trim(),
         description: String(recipe.description || "").trim(),
+        cuisine_tags: recipeEditCuisineTagValues(recipe.cuisine_tags),
+        dietary_preferences: recipeEditDietaryPreferenceValues(recipe.dietary_preferences),
         source_url: String(recipe.source_url || "").trim(),
         quantity: String(parseRecipeScaleMultiplier(recipe.quantity || "1") || 1),
         servings: String(recipe.servings || "").trim(),
@@ -56922,6 +57372,7 @@ function collectRecipeEditorPayload() {
                 ? document.getElementById("recipeEditDescription").value.trim()
                 : "",
             cuisine_tags: recipeEditCuisineTagValues(),
+            dietary_preferences: recipeEditDietaryPreferenceValues(),
             source_url: sourceUrl,
             source_pdf_path: document.getElementById("recipeEditSourcePdfPath")
                 ? document.getElementById("recipeEditSourcePdfPath").value.trim()

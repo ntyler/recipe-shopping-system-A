@@ -22,7 +22,26 @@ def read_text(relative_path):
     return (ROOT / relative_path).read_text(encoding="utf-8")
 
 
-def test_recipe_editor_includes_inline_category_controls_above_ingredients():
+def test_custom_tag_choices_are_reusable_and_case_insensitive():
+    assert cookbook_service.clean_custom_categories(
+        ["  Weeknight   Dinners ", "weeknight dinners", "Family Favorites"]
+    ) == ["Weeknight Dinners", "Family Favorites"]
+
+    choices = cookbook_service.cookbook_custom_tag_choices({
+        "cookbooks": [
+            {
+                "recipes": [
+                    {"custom_categories": ["Family Favorites", "Weeknight Dinners"]},
+                    {"custom_categories": ["family favorites", "Freezer Meals"]},
+                ]
+            }
+        ]
+    })
+
+    assert choices == ["Family Favorites", "Freezer Meals", "Weeknight Dinners"]
+
+
+def test_recipe_editor_consolidates_cuisine_and_custom_tags_in_classification():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     script = read_text("PushShoppingList/static/js/app.js")
     css = read_text("PushShoppingList/static/css/app.css")
@@ -49,20 +68,29 @@ def test_recipe_editor_includes_inline_category_controls_above_ingredients():
     )
     for field_id in field_ids:
         assert category_markup.count(f'id="{field_id}"') == 1
-    assert '<span>Cuisine Category</span>' in category_markup
+    assert "Cuisine Categories" in category_markup
+    assert "Dietary Preferences" in category_markup
+    assert "Custom Tags" in category_markup
+    assert "Use inferred" not in category_markup
+    assert category_markup.count('data-recipe-edit-multiselect-field="cuisine"') == 1
+    assert category_markup.count('data-recipe-edit-multiselect-field="dietary"') == 1
+    assert category_markup.count('data-recipe-edit-multiselect-field="custom"') == 1
     assert 'id="recipeEditCategoryPrepTimeGroup"' in category_markup
     prep_start = category_markup.index('id="recipeEditCategoryPrepTimeGroup"')
     assert 'type="hidden"' in category_markup[prep_start:category_markup.index(">", prep_start)]
 
     assert 'role="group"' in category_markup
-    assert 'aria-labelledby="recipeEditCustomCategoriesLabel"' in category_markup
+    assert 'aria-labelledby="recipeEditCustomTagsLabel"' in category_markup
     assert 'id="recipeEditCategoryCustomCategories"' in category_markup
     custom_start = category_markup.index('id="recipeEditCategoryCustomCategories"')
     custom_control = category_markup[custom_start:category_markup.index(">", custom_start)]
     assert 'type="hidden"' in custom_control
     assert 'name="custom_categories"' in custom_control
-    assert 'id="recipeEditCuisineTags"' in template
-    assert 'name="cuisine_tags"' in template
+    assert template.count('id="recipeEditCuisineTags"') == 1
+    assert 'name="cuisine_tags"' in category_markup
+    assert template.index('id="recipeEditCuisineTags"') > category_start
+    assert 'data-recipe-edit-multiselect-option="{{ choice }}"' in category_markup
+    assert "cookbook_view.custom_tag_choices" in category_markup
 
     for removed_ui in (
         "Recipe Categories",
@@ -83,62 +111,51 @@ def test_recipe_editor_includes_inline_category_controls_above_ingredients():
         script.index("function organizeRecipeEditInformationCard"):
         script.index("function organizeRecipeEditAiAssistant")
     ]
-    assert 'categoryRow.className = "recipe-edit-metadata-strip recipe-edit-category-metadata-strip"' in organizer
-    assert 'categoryRow.setAttribute("role", "group")' in organizer
-    assert 'categoryRow.setAttribute("aria-label", "Recipe category fields")' in organizer
-    assert "appendRecipeEditWorkspaceChildren(categoryRow, categoryFields);" in organizer
-    assert "appendRecipeEditWorkspaceChildren(metadataRow, [servingsField, scaleField, totalField, timeBreakdownGroup, levelField]);" in organizer
-    assert "appendRecipeEditWorkspaceChildren(categoriesPanel, [categoryRow, customCategoryRow, prepTimeGroupInput]);" in organizer
-    assert "appendRecipeEditWorkspaceChildren(grid, [primaryRow, descriptionRow, tagRow, metadataRow, categoriesPanel, technicalDetails]);" in organizer
-    assert 'customCategoryRow.className = "recipe-edit-tag-row recipe-edit-custom-category-tag-row"' in organizer
-    assert 'chips.className = "recipe-edit-tag-chips"' in organizer
-    assert 'class="recipe-edit-tag-add"' in organizer
-    assert "appendRecipeEditWorkspaceChildren(customCategoryActions, [categoryMenu]);" in organizer
-
-    icon_pairs = {
-        "mealTypeField": "meal-type",
-        "mainIngredientField": "main-ingredient",
-        "cookingMethodField": "cooking-method",
-        "occasionField": "occasion",
-        "dietaryPreferenceField": "dietary-preference",
-        "cuisineCategoryField": "cuisine-category",
-    }
-    for variable, icon_name in icon_pairs.items():
-        assert f'addRecipeEditMetadataIcon({variable}, "{icon_name}")' in organizer
-        assert f'data-recipe-metadata-icon="{icon_name}"' in template
+    assert 'classificationHeading.textContent = "Classification"' in organizer
+    assert "[mealTypeField, mainIngredientField, cookingMethodField]" in organizer
+    assert "[occasionField, dietaryPreferenceField, cuisineCategoryField]" in organizer
+    assert 'customCategoryRow.className = "recipe-edit-custom-category-tag-row"' in organizer
+    assert 'initializeRecipeEditMultiselectField(dietaryPreferenceField, "dietary")' in organizer
+    assert 'initializeRecipeEditMultiselectField(cuisineCategoryField, "cuisine")' in organizer
+    assert 'initializeRecipeEditMultiselectField(customCategoriesField, "custom")' in organizer
+    assert "tagRow" not in organizer
 
     assert "function populateRecipeEditCategories" in script
     assert "function saveRecipeEditorCategories" in script
     assert "saveRecipeEditorCategories(sourceUrl, payload.original_url)" in script
     assert 'values.custom_categories = Array.isArray(recipe.custom_categories)' in script
-    assert 'setCookbookCategoryFieldValue(form, "custom_categories", values.custom_categories);' in script
+    assert 'setRecipeEditCustomCategories(values.custom_categories, { notify: false });' in script
+    assert "function setRecipeEditCuisineCategories" in script
+    assert "function setRecipeEditDietaryPreferences" in script
+    assert "function initializeRecipeEditMultiselectField" in script
+    assert "function recipeEditStructuredCategoryMatch" in script
+    assert 'data.recipeEditCreateTag' not in script
+    assert "dataset.recipeEditCreateTag" in script
     assert 'formData.set("custom_categories", values.custom_categories || "");' in script
     assert "function setRecipeEditCustomCategories" in script
-    assert "function openRecipeEditCustomCategoryPicker" in script
-    assert "function commitRecipeEditCustomCategory" in script
     assert "function clearRecipeEditCustomCategory" in script
     assert "function renderRecipeEditCustomCategoryChips" in script
-    assert 'data-recipe-edit-custom-category-remove' in script
-    assert 'aria-label="Remove custom category ${escapeAttribute(value)}"' in script
-    assert 'input.dispatchEvent(new Event("input", { bubbles: true }))' in script
-    assert "renderRecipeEditCustomCategoryChips();" in script
+    assert 'remove.setAttribute("aria-label", `Remove ${copy.chipLabel} ${value}`)' in script
+    assert "normalizeRecipeEditCustomTag" in script
+    assert "uniqueRecipeEditMultiselectValues" in script
+    assert "recipeEditStructuredCategoryMatch(query)" in script
+    assert 'setRecipeEditCustomCategories(mergedCustom' in script
     assert "function renderRecipeEditCategorySummary" not in script
     assert "function toggleRecipeEditCategories" not in script
 
-    marker = "/* Edit Recipe: inline category metadata and reusable custom-category tags. */"
+    marker = "/* Recipe details and classification: bounded responsive controls with consolidated tags. */"
     category_css = css[css.index(marker):]
-    assert ".recipe-edit-category-metadata-strip" in category_css
-    assert "margin-top: 0;" in category_css
+    assert ".recipe-edit-classification-grid" in category_css
     assert ".recipe-edit-custom-category-tag-row" in category_css
-    assert "> .recipe-edit-custom-categories-field" in category_css
+    assert ".recipe-edit-multiselect-control" in category_css
+    assert ".recipe-edit-multiselect-options" in category_css
     assert "max-width: 100%;" in category_css
     assert "flex-wrap: wrap;" in category_css
-    mobile_css = category_css[category_css.index("@media (max-width: 767px)"):]
-    assert ".recipe-edit-category-metadata-strip" in mobile_css
-    assert "gap: 16px;" in mobile_css
-    assert "@media (max-width: 380px)" not in category_css
+    assert "@container recipe-details (max-width: 820px)" in category_css
+    assert "@container recipe-details (max-width: 520px)" in category_css
 
     assert 'cuisine_tags: recipeEditCuisineTagValues(),' in script
+    assert 'dietary_preferences: recipeEditDietaryPreferenceValues(),' in script
     assert '"cuisine_tags": split_recipe_menu_text_list(' in read_text(
         "PushShoppingList/services/recipe_edit_service.py"
     )

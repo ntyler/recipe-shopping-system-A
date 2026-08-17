@@ -36,39 +36,34 @@ def scale_control_script(script):
     ]
 
 
-def test_recipe_scale_is_an_always_visible_accessible_text_input():
+def test_recipe_scale_is_an_accessible_four_option_segmented_control():
     template = TEMPLATE_PATH.read_text(encoding="utf-8")
     script = SCRIPT_PATH.read_text(encoding="utf-8")
     css = CSS_PATH.read_text(encoding="utf-8")
-    field_start = template.index(
-        '<label class="recipe-edit-scale-field recipe-edit-detail-field">'
-    )
-    field_end = template.index("</label>", field_start)
+    field_start = template.index('class="recipe-edit-scale-field')
+    field_end = template.index('id="recipeEditScaleError"', field_start)
     field = template[field_start:field_end]
 
-    assert '<input type="text"' in field
+    assert '<input type="hidden"' in field
     assert 'id="recipeEditScaleMultiplier"' in field
     assert 'name="scaling_multiplier"' in field
-    assert 'aria-label="Scale"' in field
-    assert 'aria-describedby="recipeEditScaleError"' in field
-    assert 'oninput="applyRecipeScaleMultiplier(this)"' in field
-    assert '<span class="recipe-edit-scale-suffix" aria-hidden="true">&times;</span>' in field
-    assert 'id="recipeEditScaleError"' in field
-    assert 'role="alert"' in field
-    assert 'aria-live="polite"' in field
-    assert "<select" not in field
-    assert "<option" not in field
-    assert "Custom" not in field
-    assert "onblur=" not in field
-    assert "onkeydown=" not in field
-    assert all(glyph not in field for glyph in ("¼", "½", "¾"))
-
+    assert 'data-recipe-edit-scale-segments' in field
+    assert 'role="group"' in field
+    assert 'aria-label="Recipe scale"' in field
+    assert field.count('data-recipe-edit-scale-preset=') == 4
+    assert 'data-recipe-edit-scale-preset="0.5"' in field
+    assert 'data-recipe-edit-scale-preset="1"' in field
+    assert 'data-recipe-edit-scale-preset="2"' in field
+    assert 'data-recipe-edit-scale-preset="3"' in field
+    assert '&frac12;&times;' in field
+    assert 'onclick="return selectRecipeEditScalePreset' in field
     assert "RECIPE_EDIT_SCALE_PRESETS" not in script
     assert "RECIPE_EDIT_CUSTOM_SCALE_VALUE" not in script
     assert "organizeRecipeEditScaleControl(scaleField)" in script
-    assert ".recipe-edit-scale-field .recipe-edit-metadata-value" in css
-    assert ".recipe-edit-scale-field #recipeEditScaleMultiplier" in css
-    assert ".recipe-edit-scale-suffix" in css
+    assert "function selectRecipeEditScalePreset" in script
+    assert "function syncRecipeEditScaleSegments" in script
+    assert ".recipe-edit-scale-segments" in css
+    assert "button.is-selected" in css
     assert ".recipe-edit-scale-error" in css
     assert "var(--app-primary-hover)" in css
 
