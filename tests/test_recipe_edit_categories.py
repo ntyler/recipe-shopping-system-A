@@ -36,6 +36,9 @@ def test_recipe_editor_includes_inline_category_controls_above_ingredients():
     assert "recipeEditCategoryOccasion" in template
     assert "recipeEditCategoryDietaryPreference" in template
     assert "recipeEditCategoryPrepTimeGroup" in template
+    assert '<select id="recipeEditCategoryPrepTimeGroup"' not in template
+    assert 'id="recipeEditCuisineTags"' in template
+    assert 'name="cuisine_tags"' in template
     assert "recipeEditMenuSectionField" in template
     assert "recipeEditCategoryMenuSectionField" in template
     assert "recipeEditCategoryMenuSection" in template
@@ -53,11 +56,15 @@ def test_recipe_editor_includes_inline_category_controls_above_ingredients():
     assert template.index('class="recipe-edit-info-panel"') < category_start < tabs_start
     assert template.count('id="recipeEditCategoriesSection"') == 1
     assert template.index("recipeEditCategoriesSection") < template.index("recipeEditIngredientsTitle")
-    assert 'aria-labelledby="recipeEditCategoriesTitle"' in template
-    assert 'id="recipeEditCategoriesTitle">Edit Recipe Categories</h3>' in template
+    assert 'aria-labelledby="recipeEditCategoriesSummaryLabel"' in template
+    assert 'id="recipeEditCategoriesTitle" tabindex="-1">Edit Recipe Categories</h3>' in template
     assert 'id="recipeEditCategoriesBody"' in template
     assert 'aria-controls="recipeEditCategoriesBody"' in template
-    assert 'aria-expanded="true"' in template
+    assert 'aria-expanded="false"' in template
+    assert 'aria-hidden="true"' in template
+    assert "data-recipe-edit-category-summary-chips" in template
+    assert "data-recipe-edit-category-more" in template
+    assert "Edit categories" in template
     assert "data-recipe-edit-category-collapse" in template
     assert template.index("recipeEditCategoryPrepTimeGroup") < template.index("recipeEditCategoryCustomCategories")
     assert template.index("recipeEditMenuItemDetails") < template.index("recipeEditCategoryMenuSection")
@@ -114,6 +121,9 @@ def test_recipe_editor_includes_inline_category_controls_above_ingredients():
     assert [category_markup.index(field_id) for field_id in target_field_order] == sorted(
         category_markup.index(field_id) for field_id in target_field_order
     )
+    prep_start = category_markup.index('id="recipeEditCategoryPrepTimeGroup"')
+    prep_control = category_markup[prep_start:category_markup.index(">", prep_start)]
+    assert 'type="hidden"' in prep_control
 
     organizer = script[
         script.index("function organizeRecipeEditInformationCard"):
@@ -124,9 +134,17 @@ def test_recipe_editor_includes_inline_category_controls_above_ingredients():
         organizer.index("grid.replaceChildren()")
     ]
     assert "categoriesPanel" not in technical_children
-    assert 'infoPanel.insertAdjacentElement("afterend", categoriesPanel);' in organizer
-    assert "appendRecipeEditWorkspaceChildren(tagRow, [cuisineField, tagActions]);" in organizer
-    assert "appendRecipeEditWorkspaceChildren(selectors, [cookbookField, sectionField]);" in organizer
+    assert 'infoPanel.insertAdjacentElement("afterend", categoriesPanel);' not in organizer
+    assert "appendRecipeEditWorkspaceChildren(tagRow, [cuisineTagsField, tagActions]);" in organizer
+    assert "appendRecipeEditWorkspaceChildren(selectors, [cookbookField, sectionField, priceField]);" in organizer
+    assert (
+        "appendRecipeEditWorkspaceChildren(grid, [primaryRow, descriptionRow, tagRow, "
+        "metadataRow, categoriesPanel, technicalDetails]);"
+    ) in organizer
+    assert 'const cuisineTagsField = recipeEditFieldContainer("recipeEditCuisineTags");' in organizer
+    assert 'const cuisineField = recipeEditFieldContainer("recipeEditCategoryCuisine");' not in organizer
+    assert 'setRecipeEditCategoriesExpanded(false);' in organizer
+    assert "initializeRecipeEditCategorySummary();" in organizer
 
     collapse = script[
         script.index("function setRecipeEditCategoriesExpanded"):
@@ -136,6 +154,7 @@ def test_recipe_editor_includes_inline_category_controls_above_ingredients():
     assert 'region.setAttribute("aria-hidden"' in collapse
     assert 'region.toggleAttribute("inert"' in collapse
     assert "function toggleRecipeEditCategories" in collapse
+    assert "function openRecipeEditCategories" in collapse
     assert "dispatchEvent" not in collapse
     for forbidden in (
         "populateRecipeEditCategories(",
@@ -153,13 +172,42 @@ def test_recipe_editor_includes_inline_category_controls_above_ingredients():
     ]
     assert "setRecipeEditCategorySourceLabel(sourceLabel);" in populate_categories
 
-    assert "body.recipe-edit-standalone-page .recipe-edit-categories-panel" in css
+    assert "/* Edit Recipe: compact category summary and inline disclosure. */" in css
+    assert "body.recipe-edit-standalone-page .recipe-edit-category-summary" in css
+    assert "body.recipe-edit-standalone-page .recipe-edit-category-summary-chip" in css
+    assert "body.recipe-edit-standalone-page .recipe-edit-category-more-button" in css
+    assert "grid-template-columns: auto minmax(0, 1fr) auto auto;" in css
     assert ".recipe-edit-source-files-details .recipe-edit-categories-panel" not in css
     assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in css
     assert "body.recipe-edit-standalone-page .recipe-edit-category-custom-field" in css
-    category_mobile = css[css.rindex("@media (max-width: 820px)"):]
-    assert "body.recipe-edit-standalone-page .recipe-edit-category-grid" in category_mobile
-    assert "grid-template-columns: minmax(0, 1fr);" in category_mobile
+    category_mobile = css[css.rindex("@media (max-width: 760px)"):]
+    assert "body.recipe-edit-standalone-page .recipe-edit-category-summary" in category_mobile
+    assert "grid-template-columns: minmax(0, 1fr) auto;" in category_mobile
+
+    summary_fields = script[
+        script.index("const RECIPE_EDIT_CATEGORY_SUMMARY_FIELDS"):
+        script.index("let recipeEditCategorySummaryResizeObserver")
+    ]
+    expected_summary_order = [
+        'field: "meal_type"',
+        'field: "main_ingredient"',
+        'field: "cooking_method"',
+        'field: "occasion"',
+        'field: "dietary_preference"',
+    ]
+    positions = [summary_fields.index(value) for value in expected_summary_order]
+    assert positions == sorted(positions)
+    assert 'field: "cuisine"' in summary_fields
+    assert summary_fields.index('field: "cuisine"') > positions[-1]
+    assert "recipeEditCustomCategoryValues(values.custom_categories).forEach" in script
+    assert "function fitRecipeEditCategorySummary" in script
+    assert "list.scrollWidth > list.clientWidth" in script
+    assert 'more.textContent = `+${hiddenCount} more`' in script
+
+    assert 'cuisine_tags: recipeEditCuisineTagValues(),' in script
+    assert '"cuisine_tags": split_recipe_menu_text_list(' in read_text(
+        "PushShoppingList/services/recipe_edit_service.py"
+    )
 
 
 def test_recipe_editor_mobile_footer_uses_compact_ai_controls():

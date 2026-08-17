@@ -7748,6 +7748,11 @@ def save_editable_recipe(original_url, payload, require_existing=False):
             if "description" in payload
             else existing_data.get("description") or ""
         ).strip(),
+        "cuisine_tags": split_recipe_menu_text_list(
+            payload.get("cuisine_tags")
+            if "cuisine_tags" in payload
+            else existing_data.get("cuisine_tags", [])
+        ),
         "servings": str(payload.get("servings") if "servings" in payload else existing_data.get("servings") or "").strip(),
         "level": str(payload.get("level") if "level" in payload else existing_data.get("level") or "").strip(),
         "total_time": str(payload.get("total_time") if "total_time" in payload else existing_data.get("total_time") or "").strip(),

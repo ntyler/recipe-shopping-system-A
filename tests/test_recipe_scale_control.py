@@ -40,7 +40,9 @@ def test_recipe_scale_is_an_always_visible_accessible_text_input():
     template = TEMPLATE_PATH.read_text(encoding="utf-8")
     script = SCRIPT_PATH.read_text(encoding="utf-8")
     css = CSS_PATH.read_text(encoding="utf-8")
-    field_start = template.index('<label class="recipe-edit-scale-field">')
+    field_start = template.index(
+        '<label class="recipe-edit-scale-field recipe-edit-detail-field">'
+    )
     field_end = template.index("</label>", field_start)
     field = template[field_start:field_end]
 

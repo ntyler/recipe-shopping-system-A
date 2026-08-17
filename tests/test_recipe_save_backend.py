@@ -136,6 +136,32 @@ def test_recipe_save_route_round_trips_encoded_source_url(monkeypatch, tmp_path)
     assert loaded_recipe["rating"] == 4
 
 
+def test_recipe_save_keeps_cuisine_tags_separate_from_category_cuisine(monkeypatch, tmp_path):
+    configure_recipe_save_storage(monkeypatch, tmp_path)
+    url = "https://example.test/recipes/noodle-bowl"
+    seed_recipe(
+        url,
+        cuisine="Thai category",
+        cuisine_tags=["Thai", "Noodles"],
+    )
+
+    response = recipe_route_client().post(
+        "/api/recipe",
+        json={
+            "original_url": url,
+            "recipe": editable_payload(
+                url,
+                cuisine_tags=["Southeast Asian", "Weeknight", "weeknight"],
+            ),
+        },
+    )
+
+    assert response.status_code == 200
+    saved_recipe = recipe_edit_service.load_recipe_output(url)
+    assert saved_recipe["cuisine_tags"] == ["Southeast Asian", "Weeknight"]
+    assert saved_recipe["cuisine"] == "Thai category"
+
+
 def test_recipe_save_route_canonicalizes_legacy_materialized_scale(monkeypatch, tmp_path):
     configure_recipe_save_storage(monkeypatch, tmp_path)
     saved_scales = []

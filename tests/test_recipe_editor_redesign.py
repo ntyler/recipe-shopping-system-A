@@ -622,7 +622,7 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     assert 'setRecipeEditFieldLabel(levelField, "Difficulty")' in organizer
     assert 'setRecipeEditFieldLabel(scaleField, "Scale")' in organizer
     assert 'setRecipeEditFieldLabel(priceField, "Menu Price (optional)")' in organizer
-    assert 'setRecipeEditFieldLabel(cuisineField, "Cuisine tags")' in organizer
+    assert 'setRecipeEditFieldLabel(cuisineTagsField, "Cuisine Tags")' in organizer
     assert 'heading.className = "recipe-edit-metadata-heading"' in script
     assert 'data-recipe-metadata-icon="servings"' in read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     assert 'shell.svg_icon("utensils")' in read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
@@ -670,7 +670,10 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     assert 'data-rating-toggle-selected="true"' in macros
     assert 'class="recipe-edit-rating-clear"' not in macros
     assert "appendRecipeEditWorkspaceChildren(technicalBody, [\n        titleField," in organizer
-    final_order = "appendRecipeEditWorkspaceChildren(grid, [primaryRow, descriptionRow, tagRow, metadataRow, technicalDetails])"
+    final_order = (
+        "appendRecipeEditWorkspaceChildren(grid, [primaryRow, descriptionRow, tagRow, "
+        "metadataRow, categoriesPanel, technicalDetails])"
+    )
     assert final_order in organizer
     assert "if (infoActions) infoActions.hidden = true;" in organizer
     assert "technicalDetails.open = false;" in organizer
@@ -699,8 +702,8 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     assert "if (clear) clear.hidden = normalizedRating <= 0;" in script
     assert "border-color: transparent;" in hierarchy_css
     assert "background-color: transparent;" in hierarchy_css
-    assert ".recipe-edit-summary-selectors > .recipe-edit-cookbook-field > .recipe-edit-cookbook-value" in hierarchy_css
-    assert 'class="recipe-edit-file-field recipe-edit-cookbook-field"' in template
+    assert ".recipe-edit-info-panel .recipe-edit-detail-field > .recipe-edit-cookbook-value" in hierarchy_css
+    assert 'class="recipe-edit-file-field recipe-edit-cookbook-field recipe-edit-detail-field"' in template
     assert 'class="recipe-edit-cookbook-label">Menu Price</span>' in template
     assert 'class="recipe-edit-price-control recipe-edit-cookbook-value"' in template
 
@@ -714,7 +717,7 @@ def test_recipe_summary_selectors_share_accessible_state_feedback():
     )]
 
     shared_value_selector = (
-        ".recipe-edit-summary-selectors > .recipe-edit-cookbook-field > "
+        ".recipe-edit-info-panel .recipe-edit-detail-field > "
         ".recipe-edit-cookbook-value"
     )
     assert shared_value_selector in controls
@@ -727,11 +730,16 @@ def test_recipe_summary_selectors_share_accessible_state_feedback():
 
     for declaration in (
         "border-color: transparent;",
-        "background: var(--app-surface-soft);",
         "background: transparent;",
+        "transition: border-color 140ms ease, box-shadow 140ms ease;",
+        "border-color: var(--app-primary-hover);",
         "box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-primary-hover) 34%, transparent);",
+        "outline: 2px solid var(--app-focus);",
+        "outline-offset: 2px;",
     ):
         assert declaration in controls
+
+    assert "background: var(--app-surface-soft);" not in controls
 
     for hover_declaration in (
         "border-color: color-mix(in srgb, var(--app-primary-hover) 72%, var(--app-border-strong));",
@@ -754,6 +762,52 @@ def test_recipe_summary_selectors_share_accessible_state_feedback():
     assert ".recipe-edit-price-control:focus-within:not(:has(" not in controls
     assert ".recipe-edit-price-control:has(#recipeEditMenuPrice:disabled)" not in controls
     assert ".recipe-edit-price-control:has(" in controls
+
+
+def test_recipe_detail_metadata_fields_are_transparent_with_accessible_active_states():
+    css = read_text("PushShoppingList/static/css/app.css")
+    template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    selector = (
+        "body.recipe-edit-standalone-page #recipeEditForm\n"
+        "    .recipe-edit-info-panel-organized .recipe-edit-metadata-strip\n"
+        "    .recipe-edit-detail-field .recipe-edit-metadata-value :is(input, select)"
+    )
+    styles_start = css.index(selector)
+    styles = css[styles_start:css.index(
+        "body.recipe-edit-standalone-page > .recipe-edit-image-change-actions.recipe-edit-floating-menu",
+        styles_start,
+    )]
+
+    for field_id in (
+        "recipeEditServings",
+        "recipeEditScaleMultiplier",
+        "recipeEditTotalTime",
+        "recipeEditPrepTime",
+        "recipeEditCookTime",
+        "recipeEditInactiveTime",
+        "recipeEditLevel",
+    ):
+        field_position = template.index(f'id="{field_id}"')
+        label_start = template.rfind("<label", 0, field_position)
+        label_end = template.index(">", label_start)
+        assert "recipe-edit-detail-field" in template[label_start:label_end]
+
+    assert ":not([disabled]):not([readonly])" in styles
+    for declaration in (
+        "border-color: transparent;",
+        "background-color: transparent;",
+        "box-shadow: none;",
+        "transition: border-color 140ms ease, box-shadow 140ms ease;",
+        "border-color: color-mix(in srgb, var(--app-primary-hover) 72%, var(--app-border-strong));",
+        "box-shadow: 0 0 0 1px color-mix(in srgb, var(--app-primary-hover) 18%, transparent);",
+        "border-color: var(--app-primary-hover);",
+        "box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-primary-hover) 34%, transparent);",
+        "outline: 2px solid var(--app-focus);",
+        "outline-offset: 2px;",
+    ):
+        assert declaration in styles
+
+    assert "background-color: color-mix" not in styles
 
 
 def test_recipe_metadata_strip_uses_spacing_without_internal_separators():
@@ -916,7 +970,8 @@ def test_recipe_total_time_calculation_preserves_manual_override_and_saved_compo
     baseline = population.index("rememberRecipeEditorSavedState(form)")
     assert initialize < baseline
     attached = script.index(
-        "appendRecipeEditWorkspaceChildren(grid, [primaryRow, descriptionRow, tagRow, metadataRow, technicalDetails])"
+        "appendRecipeEditWorkspaceChildren(grid, [primaryRow, descriptionRow, tagRow, "
+        "metadataRow, categoriesPanel, technicalDetails])"
     )
     bound = script.index("bindRecipeEditTotalTimeCalculation()", attached)
     assert attached < bound
@@ -1092,63 +1147,66 @@ def test_recipe_editor_standard_fields_are_quiet_until_active():
     assert "#recipeEditMenuPrice:is([aria-invalid=\"true\"], [data-recipe-edit-validation-invalid=\"true\"])" in quiet_fields
 
 
-def test_recipe_category_panel_uses_readable_visual_hierarchy():
+def test_recipe_category_summary_uses_compact_scannable_visual_hierarchy():
     css = read_text("PushShoppingList/static/css/app.css")
-    marker = "/* Recipe editor: full-width category card between summary and content tabs. */"
+    marker = "/* Edit Recipe: compact category summary and inline disclosure. */"
     marker_start = css.index(marker)
-    category_styles = css[marker_start:css.index("/* Narrow recipe editor:", marker_start)]
+    category_styles = css[marker_start:]
 
-    title_start = category_styles.index(
-        ".recipe-edit-categories-panel .recipe-edit-panel-heading h3 {"
+    summary_start = category_styles.index(
+        ".recipe-edit-category-summary {"
     )
-    title_rule = category_styles[title_start:category_styles.index("}", title_start)]
-    assert "font-size: 16px;" in title_rule
-    assert "font-weight: 800;" in title_rule
+    summary_rule = category_styles[summary_start:category_styles.index("}", summary_start)]
+    assert "grid-template-columns: auto minmax(0, 1fr) auto auto;" in summary_rule
+    assert "min-width: 0;" in summary_rule
 
-    subtitle_start = category_styles.index(".recipe-edit-category-recipe-name {")
-    subtitle_rule = category_styles[subtitle_start:category_styles.index("}", subtitle_start)]
-    assert "font-size: 12px;" in subtitle_rule
-    assert "font-weight: 650;" in subtitle_rule
+    chip_start = category_styles.index(
+        "body.recipe-edit-standalone-page .recipe-edit-category-summary-chip,\n"
+        "body.recipe-edit-standalone-page .recipe-edit-category-more-button {"
+    )
+    chip_rule = category_styles[chip_start:category_styles.index("}", chip_start)]
+    assert "min-height: 28px;" in chip_rule
+    assert "border-radius: 999px;" in chip_rule
+    assert "var(--app-primary" in chip_rule
+
+    list_start = category_styles.index(".recipe-edit-category-summary-chips {")
+    list_rule = category_styles[list_start:category_styles.index("}", list_start)]
+    assert "min-width: 0;" in list_rule
+    assert "overflow: hidden;" in list_rule
+    assert "white-space: nowrap;" in list_rule
+
+    editor_title_start = category_styles.index(
+        ".recipe-edit-category-editor-heading h3 {"
+    )
+    editor_title_rule = category_styles[
+        editor_title_start:category_styles.index("}", editor_title_start)
+    ]
+    assert "font-size: 14px;" in editor_title_rule
+    assert "font-weight: 780;" in editor_title_rule
 
     assert ".recipe-edit-category-source {" not in category_styles
 
-    label_start = category_styles.index(
-        ".recipe-edit-category-grid label > span:first-child,"
-    )
-    label_rule = category_styles[label_start:category_styles.index("}", label_start)]
-    assert "font-size: 11px;" in label_rule
-    assert "font-weight: 760;" in label_rule
 
-    value_start = category_styles.index(
-        ".recipe-edit-category-grid :is(input, select, .recipe-edit-cookbook-select) {"
-    )
-    value_rule = category_styles[value_start:category_styles.index("}", value_start)]
-    assert "font-size: 14px;" in value_rule
-    assert "font-weight: 650;" in value_rule
-
-
-def test_mobile_recipe_category_actions_share_the_heading_row():
+def test_mobile_recipe_category_summary_wraps_without_horizontal_overflow():
     css = read_text("PushShoppingList/static/css/app.css")
-    marker = "/* Recipe editor: full-width category card between summary and content tabs. */"
-    category_styles = css[css.index(marker):css.index("/* Narrow recipe editor:", css.index(marker))]
-    mobile = category_styles[category_styles.index("@media (max-width: 600px)"):]
+    marker = "/* Edit Recipe: compact category summary and inline disclosure. */"
+    category_styles = css[css.index(marker):]
+    mobile = category_styles[category_styles.index("@media (max-width: 760px)"):]
 
-    heading_start = mobile.index(
-        ".recipe-edit-categories-panel .recipe-edit-panel-heading {"
-    )
-    heading_rule = mobile[heading_start:mobile.index("}", heading_start)]
-    assert "align-items: center;" in heading_rule
-    assert "flex-direction: row;" in heading_rule
-    assert "flex-wrap: nowrap;" in heading_rule
+    summary_start = mobile.index(".recipe-edit-category-summary {")
+    summary_rule = mobile[summary_start:mobile.index("}", summary_start)]
+    assert "grid-template-columns: minmax(0, 1fr) auto;" in summary_rule
+    assert "row-gap: 8px;" in summary_rule
 
-    actions_start = mobile.index(".recipe-edit-category-actions {")
-    actions_rule = mobile[actions_start:mobile.index("}", actions_start)]
-    assert "width: auto;" in actions_rule
-    assert "max-width: none;" in actions_rule
-    assert "margin-left: auto;" in actions_rule
-    assert "justify-content: flex-end;" in actions_rule
+    chips_start = mobile.index(".recipe-edit-category-summary-chips {")
+    chips_rule = mobile[chips_start:mobile.index("}", chips_start)]
+    assert "grid-column: 1;" in chips_rule
+    assert "grid-row: 2;" in chips_rule
 
-    assert ".recipe-edit-category-source {" not in mobile
+    more_start = mobile.index(".recipe-edit-category-more-button {")
+    more_rule = mobile[more_start:mobile.index("}", more_start)]
+    assert "grid-column: 2;" in more_rule
+    assert "grid-row: 2;" in more_rule
 
 
 def test_recipe_image_has_explicit_mobile_view_below_rating_at_narrow_widths():

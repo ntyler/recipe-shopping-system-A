@@ -904,6 +904,15 @@
                         <span>Description</span>
                         <textarea name="description" id="recipeEditDescription" rows="3"></textarea>
                     </label>
+                    <div class="recipe-edit-file-field recipe-edit-cuisine-tags-field recipe-edit-wide"
+                         role="group"
+                         aria-labelledby="recipeEditCuisineTagsLabel">
+                        <span id="recipeEditCuisineTagsLabel">Cuisine Tags</span>
+                        <input type="hidden"
+                               name="cuisine_tags"
+                               id="recipeEditCuisineTags"
+                               autocomplete="off">
+                    </div>
                     <div class="recipe-edit-cover-field" id="recipeEditCoverField" data-recipe-edit-cover-view>
                         <div class="recipe-edit-cover-preview" id="recipeEditCoverPreview" data-recipe-edit-title-image-panel>
                             <img id="recipeEditCoverImage"
@@ -1302,7 +1311,7 @@
                                 <input type="text" id="recipeEditMenuItemName">
                             </label>
                             <div id="recipeEditMenuSectionField"
-                                 class="recipe-edit-cookbook-field recipe-edit-menu-section-field"
+                                 class="recipe-edit-cookbook-field recipe-edit-menu-section-field recipe-edit-detail-field"
                                  data-recipe-edit-menu-section-field>
                                 <span class="recipe-edit-cookbook-label">Menu Section</span>
                                 <input id="recipeEditCategoryMenuSection"
@@ -1397,7 +1406,7 @@
                                        title="Open Menu Order URL">&#8599;</a>
                                 </span>
                             </label>
-                            <div class="recipe-edit-file-field recipe-edit-cookbook-field">
+                            <div class="recipe-edit-file-field recipe-edit-cookbook-field recipe-edit-detail-field">
                                 <span id="recipeEditMenuPriceLabel"
                                       class="recipe-edit-cookbook-label">Menu Price</span>
                                 <span class="recipe-edit-price-control recipe-edit-cookbook-value"
@@ -1459,7 +1468,7 @@
                             </label>
                         </div>
                     </div>
-                    <label class="recipe-edit-scale-field">
+                    <label class="recipe-edit-scale-field recipe-edit-detail-field">
                         <span class="recipe-edit-label-line">
                             <span>Scale</span>
                             <span class="recipe-edit-label-description">&mdash; Ingredient preview and shopping-list multiplier; saved Servings stays unchanged.</span>
@@ -1479,7 +1488,7 @@
                               aria-live="polite"
                               hidden>Scale must be a positive number, decimal, or fraction.</span>
                     </label>
-                    <label>
+                    <label class="recipe-edit-detail-field">
                         <span class="recipe-edit-label-line">
                             <span>Level</span>
                             <span class="recipe-edit-label-description">&mdash; Estimated recipe difficulty.</span>
@@ -1492,40 +1501,40 @@
                             <option value="expert">Expert</option>
                         </select>
                     </label>
-                    <label>
+                    <label class="recipe-edit-detail-field">
                         <span class="recipe-edit-label-line">
                             <span>Total</span>
                             <span class="recipe-edit-label-description">&mdash; Full start-to-finish recipe time.</span>
                         </span>
                         <input type="text" name="total_time" id="recipeEditTotalTime">
                     </label>
-                    <label>
+                    <label class="recipe-edit-detail-field">
                         <span class="recipe-edit-label-line">
                             <span>Prep</span>
                             <span class="recipe-edit-label-description">&mdash; Hands-on preparation time.</span>
                         </span>
                         <input type="text" name="prep_time" id="recipeEditPrepTime">
                     </label>
-                    <label>
+                    <label class="recipe-edit-detail-field">
                         <span class="recipe-edit-label-line">
                             <span>Inactive</span>
                             <span class="recipe-edit-label-description">&mdash; Waiting/resting/chilling/rising time.</span>
                         </span>
                         <input type="text" name="inactive_time" id="recipeEditInactiveTime">
                     </label>
-                    <label>
+                    <label class="recipe-edit-detail-field">
                         <span class="recipe-edit-label-line">
                             <span>Cook</span>
                             <span class="recipe-edit-label-description">&mdash; Time spent cooking, baking, or heating.</span>
                         </span>
                         <input type="text" name="cook_time" id="recipeEditCookTime">
                     </label>
-                    <label>
+                    <label class="recipe-edit-detail-field">
                         <span>Servings</span>
                         <input type="text" name="servings" id="recipeEditServings">
                     </label>
                     <div id="recipeEditCookbookField"
-                         class="recipe-edit-cookbook-field"
+                         class="recipe-edit-cookbook-field recipe-edit-detail-field"
                          data-recipe-edit-cookbook-field>
                         <span class="recipe-edit-cookbook-label">Cookbook</span>
                         <div class="recipe-url-summary-cookbook-value recipe-edit-cookbook-value recipe-url-summary-cookbook-menu-wrap recipe-edit-row-menu-wrap muted">
@@ -1597,28 +1606,46 @@
 
             {% set editor_category_choices = cookbook_view.category_choices if cookbook_view and cookbook_view.category_choices else {} %}
             <section id="recipeEditCategoriesSection"
-                     class="recipe-edit-info-panel recipe-edit-categories-panel"
-                     aria-labelledby="recipeEditCategoriesTitle"
+                     class="recipe-edit-categories-panel is-collapsed"
+                     aria-labelledby="recipeEditCategoriesSummaryLabel"
                      data-recipe-edit-categories>
-                <div class="recipe-edit-panel-heading">
-                    <div class="recipe-edit-panel-title">
+                <div class="recipe-edit-category-summary" data-recipe-edit-category-summary>
+                    <span id="recipeEditCategoriesSummaryLabel" class="recipe-edit-category-summary-label">
                         <span class="recipe-edit-panel-icon recipe-edit-panel-icon-categories" aria-hidden="true"></span>
-                        <div>
-                            <h3 id="recipeEditCategoriesTitle">Edit Recipe Categories</h3>
-                            <p id="recipeEditCategoryRecipeName" class="recipe-edit-category-recipe-name"></p>
-                        </div>
-                    </div>
-                    <div class="recipe-edit-category-actions">
-                        <button type="button"
-                                class="recipe-edit-category-collapse-button"
-                                aria-label="Collapse recipe categories"
-                                title="Collapse recipe categories"
-                                aria-expanded="true"
-                                aria-controls="recipeEditCategoriesBody"
-                                data-recipe-edit-category-collapse
-                                onclick="return toggleRecipeEditCategories(this)">
-                            <span class="recipe-edit-category-chevron" aria-hidden="true"></span>
-                        </button>
+                        <span>Recipe Categories</span>
+                    </span>
+                    <div class="recipe-edit-category-summary-chips"
+                         role="group"
+                         aria-label="Selected recipe categories"
+                         data-recipe-edit-category-summary-chips></div>
+                    <button type="button"
+                            class="recipe-edit-category-more-button"
+                            aria-label="Show all recipe categories"
+                            data-recipe-edit-category-more
+                            onclick="return openRecipeEditCategories(this)"
+                            hidden>+0 more</button>
+                    <button type="button"
+                            class="recipe-edit-category-edit-button"
+                            aria-label="Edit recipe categories"
+                            title="Edit recipe categories"
+                            aria-expanded="false"
+                            aria-controls="recipeEditCategoriesBody"
+                            data-recipe-edit-category-collapse
+                            onclick="return toggleRecipeEditCategories(this)">
+                        {{ shell.svg_icon("edit") }}
+                        <span data-recipe-edit-category-edit-label>Edit categories</span>
+                    </button>
+                </div>
+                <div id="recipeEditCategoriesBody"
+                     class="recipe-edit-category-collapse-region"
+                     aria-hidden="true"
+                     inert>
+                    <div class="recipe-edit-category-editor">
+                        <div class="recipe-edit-category-editor-heading">
+                            <div>
+                                <h3 id="recipeEditCategoriesTitle" tabindex="-1">Edit Recipe Categories</h3>
+                                <p id="recipeEditCategoryRecipeName" class="recipe-edit-category-recipe-name"></p>
+                            </div>
                         <div class="recipe-edit-section-menu-wrap recipe-edit-category-menu-wrap">
                             <button type="button"
                                     class="recipe-edit-row-menu-btn recipe-edit-section-menu-btn recipe-edit-category-menu-btn"
@@ -1644,25 +1671,12 @@
                             </div>
                         </div>
                     </div>
-                </div>
-                <div id="recipeEditCategoriesBody"
-                     class="recipe-edit-category-collapse-region"
-                     aria-hidden="false">
                 <div class="cookbook-category-grid recipe-edit-category-grid">
                     <label for="recipeEditCategoryMealType">
                         <span>Meal Type</span>
                         <select id="recipeEditCategoryMealType" name="meal_type">
                             <option value="">Use inferred</option>
                             {% for choice in editor_category_choices.meal_type or [] %}
-                                <option value="{{ choice }}">{{ choice }}</option>
-                            {% endfor %}
-                        </select>
-                    </label>
-                    <label for="recipeEditCategoryCuisine">
-                        <span>Cuisine</span>
-                        <select id="recipeEditCategoryCuisine" name="cuisine">
-                            <option value="">Use inferred</option>
-                            {% for choice in editor_category_choices.cuisine or [] %}
                                 <option value="{{ choice }}">{{ choice }}</option>
                             {% endfor %}
                         </select>
@@ -1703,17 +1717,20 @@
                             {% endfor %}
                         </select>
                     </label>
-                    <label for="recipeEditCategoryPrepTimeGroup">
-                        <span>Prep Time</span>
-                        <select id="recipeEditCategoryPrepTimeGroup" name="prep_time_group">
+                    <label for="recipeEditCategoryCuisine">
+                        <span>Cuisine Category</span>
+                        <select id="recipeEditCategoryCuisine" name="cuisine">
                             <option value="">Use inferred</option>
-                            {% for choice in editor_category_choices.prep_time_group or [] %}
+                            {% for choice in editor_category_choices.cuisine or [] %}
                                 <option value="{{ choice }}">{{ choice }}</option>
                             {% endfor %}
                         </select>
                     </label>
+                    <input id="recipeEditCategoryPrepTimeGroup"
+                           type="hidden"
+                           name="prep_time_group">
                     <div id="recipeEditCategoryMenuSectionField"
-                         class="recipe-edit-cookbook-field recipe-edit-menu-section-field recipe-edit-category-menu-section-field"
+                         class="recipe-edit-cookbook-field recipe-edit-menu-section-field recipe-edit-category-menu-section-field recipe-edit-detail-field"
                          data-recipe-edit-menu-section-field>
                         <span class="recipe-edit-cookbook-label">Menu Section</span>
                         <div class="recipe-url-summary-cookbook-value recipe-edit-cookbook-value recipe-edit-menu-section-value recipe-url-summary-cookbook-menu-wrap recipe-edit-row-menu-wrap muted">
@@ -1799,6 +1816,7 @@
                                autocomplete="off">
                     </label>
                 </div>
+                    </div>
                 </div>
             </section>
 
