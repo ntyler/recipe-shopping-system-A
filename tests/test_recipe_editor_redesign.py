@@ -923,7 +923,14 @@ def test_recipe_details_match_classification_layout_and_field_order():
     assert ".recipe-edit-details-secondary-grid" in styles
     assert ".recipe-edit-scale-disclosure" not in styles
     assert ".recipe-edit-optional-details" in styles
-    assert "grid-template-columns: repeat(4, minmax(0, 1fr));" in styles
+    primary_grid_start = styles.index(
+        ".recipe-edit-details-primary-grid {"
+    )
+    primary_grid_rule = styles[
+        primary_grid_start:styles.index("}", primary_grid_start)
+    ]
+    assert "grid-template-columns: 175px 100px 250px 250px;" in primary_grid_rule
+    assert "justify-content: start;" in primary_grid_rule
     assert "grid-template-columns: repeat(3, minmax(0, 1fr));" in styles
 
 

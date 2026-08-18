@@ -112,6 +112,17 @@ def test_recipe_servings_and_scale_share_a_quiet_equal_height_control_family():
     gap = re.search(r"gap:\s*(\d+)px;", stepper_body)
     assert gap and 8 <= int(gap.group(1)) <= 12
     assert "grid-template-columns:" not in stepper_body
+    scale_rule = re.search(
+        r"\.recipe-edit-scale-control\s*\{(?P<body>.*?)\}",
+        styles,
+        re.DOTALL,
+    )
+    assert scale_rule
+    scale_body = scale_rule.group("body")
+    scale_width = re.search(r"width:\s*(\d+)px;", scale_body)
+    assert scale_width and 80 <= int(scale_width.group(1)) <= 120
+    assert "max-width: 100%;" in scale_body
+    assert "justify-self: start;" in scale_body
     button_rule = re.search(
         r"\.recipe-edit-servings-stepper\s*>\s*button\s*\{(?P<body>.*?)\}",
         styles,
@@ -124,6 +135,7 @@ def test_recipe_servings_and_scale_share_a_quiet_equal_height_control_family():
     assert button_width and button_height
     assert button_width.group(1) == button_height.group(1)
     assert f"flex: 0 0 {button_width.group(1)}px;" in button_body
+    assert "padding: 0 0 2px;" in button_body
     assert "background: transparent;" in button_body
     value_rule = re.search(
         r"\.recipe-edit-servings-value\s*\{(?P<body>.*?)\}",
