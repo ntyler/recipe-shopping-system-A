@@ -1048,7 +1048,7 @@ def test_recipe_details_match_classification_layout_and_field_order():
     assert ".recipe-edit-details-primary-grid" in styles
     assert ".recipe-edit-details-secondary-grid" not in styles
     assert ".recipe-edit-scale-disclosure" not in styles
-    assert ".recipe-edit-optional-details" in styles
+    assert ".recipe-edit-optional-details" not in styles
     primary_grid_start = styles.index(
         ".recipe-edit-details-primary-grid {"
     )
@@ -1057,7 +1057,8 @@ def test_recipe_details_match_classification_layout_and_field_order():
     ]
     assert "grid-template-columns: max-content max-content repeat(5, fit-content(170px));" in primary_grid_rule
     assert "justify-content: start;" in primary_grid_rule
-    assert "grid-template-columns: repeat(3, minmax(0, 1fr));" in styles
+    assert "grid-template-columns: minmax(0, 1fr) repeat(2, minmax(0, 1.4fr));" in styles
+    assert "grid-template-columns: repeat(4, minmax(0, 1fr));" in styles
 
     collapsed_rules = re.findall(
         r"\.recipe-edit-details-primary-grid\.recipe-edit-time-breakdown-collapsed\s*\{([^{}]*)\}",
@@ -1278,13 +1279,9 @@ process.stdout.write(JSON.stringify({
     }
 
 
-def test_recipe_optional_detail_rows_share_accessible_button_behavior():
+def test_recipe_classification_rows_render_without_optional_disclosure():
     script = read_text("PushShoppingList/static/js/app.js")
     css = read_text("PushShoppingList/static/css/app.css")
-    helper = script[
-        script.index("function setRecipeEditOptionalDetailsExpanded"):
-        script.index("function bindRecipeEditNameInput")
-    ]
     organizer = script[
         script.index("function organizeRecipeEditInformationCard()"):
         script.index("function organizeRecipeEditAiAssistant()")
@@ -1292,21 +1289,13 @@ def test_recipe_optional_detail_rows_share_accessible_button_behavior():
     marker = "/* Recipe details and classification: bounded responsive controls with consolidated tags. */"
     styles = css[css.index(marker):]
 
-    assert 'button.type = "button"' in helper
-    assert 'button.setAttribute("aria-expanded", "false")' in helper
-    assert 'button.setAttribute("aria-controls", id)' in helper
-    assert 'button.addEventListener("click"' in helper
-    assert 'panel.setAttribute("aria-hidden", String(!isExpanded))' in helper
-    assert 'disclosure.classList.toggle("is-expanded", isExpanded)' in helper
     assert 'id: "recipeEditCookingDetailsPanel"' not in organizer
-    assert 'id: "recipeEditClassificationDetailsPanel"' in organizer
-    assert organizer.count("createRecipeEditOptionalDetails({") == 1
-    assert ".recipe-edit-optional-details-toggle:hover" in styles
-    assert ".recipe-edit-optional-details-toggle:focus-visible" in styles
-    assert '.recipe-edit-optional-details-toggle[aria-expanded="true"]' in styles
-    assert "grid-template-rows: 0fr;" in styles
-    assert "grid-template-rows: 1fr;" in styles
-    assert "@media (prefers-reduced-motion: reduce)" in styles
+    assert 'id: "recipeEditClassificationDetailsPanel"' not in organizer
+    assert "createRecipeEditOptionalDetails" not in script
+    assert "More classification details" not in organizer
+    assert "classificationSecondaryRow," in organizer
+    assert organizer.index("classificationPrimaryRow,") < organizer.index("classificationSecondaryRow,")
+    assert ".recipe-edit-optional-details" not in styles
 
 
 def test_recipe_total_time_calculation_preserves_manual_override_and_saved_components():
