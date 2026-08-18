@@ -24892,6 +24892,7 @@ function populateRecipeEditor(recipe, originalUrl, options = {}) {
     setValue("recipeEditPrepTime", normalizeRecipeEditDurationValue(recipe.prep_time));
     setValue("recipeEditInactiveTime", normalizeRecipeEditDurationValue(recipe.inactive_time));
     setValue("recipeEditCookTime", normalizeRecipeEditDurationValue(recipe.cook_time));
+    syncRecipeEditContentSizedInputs();
     setRecipeRating(recipe.rating || 0);
     setRecipeEditorCookbook(recipe, originalUrl);
     populateRecipeEditCategories(recipe);
@@ -27051,6 +27052,85 @@ function organizeRecipeEditMetadataField(field) {
     }
 }
 
+const RECIPE_EDIT_CONTENT_SIZED_INPUT_SELECTOR = [
+    "#recipeEditServingsCount",
+    "#recipeEditScaleMultiplier",
+    "#recipeEditPrepTime",
+    "#recipeEditCookTime",
+    "#recipeEditInactiveTime",
+].join(", ");
+let recipeEditContentSizingCanvas = null;
+
+function recipeEditUsesNativeContentSizing() {
+    return typeof window !== "undefined"
+        && Boolean(window.CSS)
+        && typeof window.CSS.supports === "function"
+        && window.CSS.supports("field-sizing", "content");
+}
+
+function recipeEditContentSizePixels(value) {
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function resizeRecipeEditContentSizedInput(input) {
+    if (!input || !input.matches?.(RECIPE_EDIT_CONTENT_SIZED_INPUT_SELECTOR)) return;
+    if (typeof recipeEditorStandalonePageIsActive === "function"
+        && !recipeEditorStandalonePageIsActive()) return;
+    if (recipeEditUsesNativeContentSizing()) {
+        input.style.removeProperty("width");
+        return;
+    }
+    if (typeof document === "undefined"
+        || typeof window === "undefined"
+        || typeof window.getComputedStyle !== "function") return;
+
+    recipeEditContentSizingCanvas = recipeEditContentSizingCanvas || document.createElement("canvas");
+    const context = recipeEditContentSizingCanvas.getContext("2d");
+    if (!context) return;
+    const styles = window.getComputedStyle(input);
+    context.font = styles.font;
+    const text = String(input.value || input.placeholder || " ");
+    const letterSpacing = styles.letterSpacing === "normal"
+        ? 0
+        : recipeEditContentSizePixels(styles.letterSpacing);
+    const textWidth = context.measureText(text).width
+        + (letterSpacing * Math.max(0, text.length - 1));
+    const horizontalChrome = [
+        styles.paddingLeft,
+        styles.paddingRight,
+        styles.borderLeftWidth,
+        styles.borderRightWidth,
+    ].reduce((total, value) => total + recipeEditContentSizePixels(value), 0);
+    const minWidth = recipeEditContentSizePixels(styles.minWidth);
+    const parsedMaxWidth = recipeEditContentSizePixels(styles.maxWidth);
+    const maxWidth = parsedMaxWidth > 0 ? parsedMaxWidth : Number.POSITIVE_INFINITY;
+    const measuredWidth = Math.ceil(textWidth + horizontalChrome + 2);
+
+    input.style.width = `${Math.min(maxWidth, Math.max(minWidth, measuredWidth))}px`;
+}
+
+function syncRecipeEditContentSizedInputs(root = document) {
+    root?.querySelectorAll?.(RECIPE_EDIT_CONTENT_SIZED_INPUT_SELECTOR)
+        .forEach(resizeRecipeEditContentSizedInput);
+}
+
+function bindRecipeEditContentSizing() {
+    const form = document.getElementById("recipeEditForm");
+    if (!form) return;
+    if (form.dataset.recipeEditContentSizingBound !== "true") {
+        form.dataset.recipeEditContentSizingBound = "true";
+        form.querySelectorAll(RECIPE_EDIT_CONTENT_SIZED_INPUT_SELECTOR).forEach(input => {
+            input.addEventListener("input", () => resizeRecipeEditContentSizedInput(input));
+        });
+        if (!recipeEditUsesNativeContentSizing()) {
+            window.addEventListener("resize", () => syncRecipeEditContentSizedInputs(form), { passive: true });
+            document.fonts?.ready?.then(() => syncRecipeEditContentSizedInputs(form));
+        }
+    }
+    syncRecipeEditContentSizedInputs(form);
+}
+
 function recipeEditServingsParts(value) {
     const text = normalizeRecipeEditTagText(value);
     const match = text.match(/\d+(?:\.\d+)?/);
@@ -27070,6 +27150,9 @@ function syncRecipeEditServingsStepper() {
     input.dataset.recipeEditServingsPrefix = parts.prefix;
     input.dataset.recipeEditServingsSuffix = parts.suffix;
     count.value = parts.number === null ? "" : String(parts.number);
+    if (typeof resizeRecipeEditContentSizedInput === "function") {
+        resizeRecipeEditContentSizedInput(count);
+    }
     const decrement = document.querySelector("[data-recipe-edit-servings-decrement]");
     if (decrement) decrement.disabled = parts.number === null || parts.number <= 1;
 }
@@ -27087,6 +27170,9 @@ function updateRecipeEditServingsFromStepper(count) {
     }
     const decrement = document.querySelector("[data-recipe-edit-servings-decrement]");
     if (decrement) decrement.disabled = Number(count.value) <= 1;
+    if (typeof resizeRecipeEditContentSizedInput === "function") {
+        resizeRecipeEditContentSizedInput(count);
+    }
     input.dispatchEvent(new Event("input", { bubbles: true }));
     input.dispatchEvent(new Event("change", { bubbles: true }));
     return false;
@@ -28212,6 +28298,7 @@ function organizeRecipeEditInformationCard() {
     ]);
     bindRecipeEditTotalTimeCalculation();
     syncRecipeEditServingsStepper();
+    bindRecipeEditContentSizing();
     syncRecipeEditTotalTimeStatus();
     renderRecipeEditMultiselect("cuisine");
     renderRecipeEditMultiselect("dietary");
@@ -43244,6 +43331,9 @@ function populateRecipeScalingControls(scaling = {}, servings = "", options = {}
     input.value = requestedMultiplier !== null && recipeMultipliersMatch(requestedMultiplier, selectedMultiplier)
         ? requestedText
         : formatRecipeScaleInputValue(selectedMultiplier);
+    if (typeof resizeRecipeEditContentSizedInput === "function") {
+        resizeRecipeEditContentSizedInput(input);
+    }
     input.dataset.baseServings = baseServings;
     input.dataset.activeMultiplier = formatRecipeScaleInputValue(selectedMultiplier);
     input.dataset.lastValidInput = input.value;
@@ -43400,6 +43490,9 @@ function commitRecipeEditScaleMultiplier(input) {
         input.value = lastValidInput;
     } else if (activeMultiplier !== null) {
         input.value = formatRecipeScaleInputValue(activeMultiplier);
+    }
+    if (typeof resizeRecipeEditContentSizedInput === "function") {
+        resizeRecipeEditContentSizedInput(input);
     }
     input.dataset.recipeEditScaleInvalidCommit = "true";
     setRecipeScaleValidationMessage(RECIPE_EDIT_SCALE_ERROR_MESSAGE);

@@ -794,6 +794,125 @@ def test_recipe_detail_fields_use_bounded_accessible_controls():
     assert ".recipe-edit-total-time-field #recipeEditTotalTime" in styles
     assert "font-size: 13px;" in styles
     assert ".recipe-edit-total-time-status" in styles
+    assert ".recipe-edit-detail-field:has(:is(#recipeEditTotalTime, #recipeEditLevel))" in styles
+    assert "field-sizing: content;" in styles
+    assert "flex: 0 1 auto;" in styles
+    assert "min-width: 72px;" in styles
+    assert "max-width: 170px;" in styles
+
+
+def test_requested_recipe_detail_inputs_size_to_their_content():
+    css = read_text("PushShoppingList/static/css/app.css")
+    script = read_text("PushShoppingList/static/js/app.js")
+    marker = "/* Recipe details and classification: bounded responsive controls with consolidated tags. */"
+    styles = css[css.index(marker):]
+    target_ids = {
+        "recipeEditServingsCount",
+        "recipeEditScaleMultiplier",
+        "recipeEditPrepTime",
+        "recipeEditCookTime",
+        "recipeEditInactiveTime",
+    }
+    content_sized_ids = {
+        field_id
+        for selectors, declarations in re.findall(r"([^{}]+)\{([^{}]*)\}", styles)
+        if "field-sizing: content;" in declarations and "width: auto;" in declarations
+        for field_id in target_ids
+        if f"#{field_id}" in selectors
+    }
+
+    assert content_sized_ids == target_ids
+    assert ".recipe-edit-details-primary-grid .recipe-edit-servings-stepper" in styles
+    assert ".recipe-edit-details-primary-grid .recipe-edit-scale-control" in styles
+    assert styles.count("width: fit-content;") >= 2
+    assert "min-width: 72px;" in styles
+    assert "max-width: 170px;" in styles
+    assert "function resizeRecipeEditContentSizedInput(input)" in script
+    assert 'window.CSS.supports("field-sizing", "content")' in script
+    assert "function bindRecipeEditContentSizing()" in script
+    assert "bindRecipeEditContentSizing();" in script
+
+
+def test_recipe_content_sizing_fallback_measures_and_bounds_width():
+    node = shutil.which("node")
+    if not node:
+        return
+    script = read_text("PushShoppingList/static/js/app.js")
+    helper = script[
+        script.index("const RECIPE_EDIT_CONTENT_SIZED_INPUT_SELECTOR"):
+        script.index("function recipeEditServingsParts")
+    ]
+    harness = r'''
+const inputStyle = {
+    width: "",
+    removeProperty(name) { if (name === "width") this.width = ""; },
+};
+const input = {
+    value: "1",
+    placeholder: "",
+    style: inputStyle,
+    matches() { return true; },
+};
+let standaloneEditorActive = true;
+function recipeEditorStandalonePageIsActive() { return standaloneEditorActive; }
+const computedStyle = {
+    font: "700 13px Arial",
+    letterSpacing: "normal",
+    paddingLeft: "10px",
+    paddingRight: "38px",
+    borderLeftWidth: "0px",
+    borderRightWidth: "0px",
+    minWidth: "64px",
+    maxWidth: "170px",
+};
+const window = {
+    CSS: { supports() { return false; } },
+    getComputedStyle() { return computedStyle; },
+};
+const document = {
+    createElement() {
+        return {
+            getContext() {
+                return {
+                    font: "",
+                    measureText(text) { return { width: text.length * 8 }; },
+                };
+            },
+        };
+    },
+};
+''' + helper + r'''
+resizeRecipeEditContentSizedInput(input);
+const shortWidth = input.style.width;
+input.value = "123456789012345";
+resizeRecipeEditContentSizedInput(input);
+const longWidth = input.style.width;
+standaloneEditorActive = false;
+input.value = "1";
+resizeRecipeEditContentSizedInput(input);
+const legacyModalWidth = input.style.width;
+standaloneEditorActive = true;
+window.CSS.supports = () => true;
+resizeRecipeEditContentSizedInput(input);
+process.stdout.write(JSON.stringify({ shortWidth, longWidth, legacyModalWidth, nativeWidth: input.style.width }));
+'''
+    completed = subprocess.run(
+        [node],
+        input=harness,
+        text=True,
+        encoding="utf-8",
+        capture_output=True,
+        check=False,
+        timeout=10,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout) == {
+        "shortWidth": "64px",
+        "longWidth": "170px",
+        "legacyModalWidth": "170px",
+        "nativeWidth": "",
+    }
 
 
 def test_recipe_metadata_strip_uses_equal_responsive_columns_without_internal_separators():
@@ -929,8 +1048,9 @@ def test_recipe_details_match_classification_layout_and_field_order():
     primary_grid_rule = styles[
         primary_grid_start:styles.index("}", primary_grid_start)
     ]
-    assert "grid-template-columns: 175px 100px 250px 250px;" in primary_grid_rule
+    assert "grid-template-columns: max-content max-content fit-content(170px) fit-content(170px);" in primary_grid_rule
     assert "justify-content: start;" in primary_grid_rule
+    assert "grid-template-columns: repeat(3, fit-content(170px));" in styles
     assert "grid-template-columns: repeat(3, minmax(0, 1fr));" in styles
 
 

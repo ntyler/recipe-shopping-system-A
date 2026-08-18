@@ -105,8 +105,7 @@ def test_recipe_servings_and_scale_share_a_quiet_equal_height_control_family():
     assert stepper_rule
     stepper_body = stepper_rule.group("body")
     assert "display: inline-flex;" in stepper_body
-    width = re.search(r"width:\s*(\d+)px;", stepper_body)
-    assert width and 150 <= int(width.group(1)) <= 175
+    assert "width: fit-content;" in stepper_body
     assert "max-width: 100%;" in stepper_body
     assert "justify-self: start;" in stepper_body
     gap = re.search(r"gap:\s*(\d+)px;", stepper_body)
@@ -119,8 +118,8 @@ def test_recipe_servings_and_scale_share_a_quiet_equal_height_control_family():
     )
     assert scale_rule
     scale_body = scale_rule.group("body")
-    scale_width = re.search(r"width:\s*(\d+)px;", scale_body)
-    assert scale_width and 80 <= int(scale_width.group(1)) <= 120
+    assert "width: fit-content;" in scale_body
+    assert "min-width: 64px;" in scale_body
     assert "max-width: 100%;" in scale_body
     assert "justify-self: start;" in scale_body
     button_rule = re.search(
@@ -143,7 +142,7 @@ def test_recipe_servings_and_scale_share_a_quiet_equal_height_control_family():
         re.DOTALL,
     )
     assert value_rule
-    assert "flex: 1 1 auto;" in value_rule.group("body")
+    assert "flex: 0 1 auto;" in value_rule.group("body")
     assert "white-space: nowrap;" in value_rule.group("body")
     count_rule = re.search(
         r"\.recipe-edit-servings-stepper\s+#recipeEditServingsCount\s*\{(?P<body>.*?)\}",
@@ -151,9 +150,21 @@ def test_recipe_servings_and_scale_share_a_quiet_equal_height_control_family():
         re.DOTALL,
     )
     assert count_rule
-    assert "min-width: 3ch;" in count_rule.group("body")
-    assert "max-width: 5ch;" in count_rule.group("body")
-    assert "flex: 1 1 5ch;" in count_rule.group("body")
+    assert "field-sizing: content;" in count_rule.group("body")
+    assert "width: auto;" in count_rule.group("body")
+    assert "min-width: 1ch;" in count_rule.group("body")
+    assert "max-width: 8ch;" in count_rule.group("body")
+    assert "flex: 0 1 auto;" in count_rule.group("body")
+    scale_input_rule = re.search(
+        r"\.recipe-edit-scale-control\s+#recipeEditScaleMultiplier\s*\{(?P<body>.*?)\}",
+        styles,
+        re.DOTALL,
+    )
+    assert scale_input_rule
+    assert "field-sizing: content;" in scale_input_rule.group("body")
+    assert "width: auto;" in scale_input_rule.group("body")
+    assert "min-width: 64px;" in scale_input_rule.group("body")
+    assert "max-width: 170px;" in scale_input_rule.group("body")
     assert ":is(.recipe-edit-servings-stepper, .recipe-edit-scale-control):focus-within" in styles
     assert ".recipe-edit-scale-control #recipeEditScaleMultiplier" in styles
     assert "white-space: nowrap;" in styles
