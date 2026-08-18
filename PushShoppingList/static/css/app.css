@@ -77664,8 +77664,7 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-
 }
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
-    :is(.recipe-edit-details-primary-grid, .recipe-edit-details-secondary-grid,
-        .recipe-edit-classification-grid) {
+    :is(.recipe-edit-details-primary-grid, .recipe-edit-classification-grid) {
     display: grid;
     min-width: 0;
     align-items: stretch;
@@ -77673,7 +77672,7 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
 }
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-details-primary-grid {
-    grid-template-columns: max-content max-content fit-content(170px) fit-content(170px);
+    grid-template-columns: max-content max-content repeat(5, fit-content(170px));
     justify-content: start;
 }
 
@@ -77682,19 +77681,13 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-
 }
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
-    .recipe-edit-details-secondary-grid {
-    grid-template-columns: repeat(3, fit-content(170px));
-    justify-content: start;
-}
-
-body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
     .recipe-edit-classification-secondary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
-    :is(.recipe-edit-details-primary-grid, .recipe-edit-details-secondary-grid,
-        .recipe-edit-classification-grid) > .recipe-edit-detail-field,
+    :is(.recipe-edit-details-primary-grid, .recipe-edit-classification-grid)
+    > .recipe-edit-detail-field,
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-custom-category-tag-row
     > .recipe-edit-detail-field {
     position: relative;
@@ -77732,8 +77725,7 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-
 }
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
-    :is(.recipe-edit-details-primary-grid, .recipe-edit-details-secondary-grid,
-        .recipe-edit-classification-grid)
+    :is(.recipe-edit-details-primary-grid, .recipe-edit-classification-grid)
     .recipe-edit-metadata-value,
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-custom-category-tag-row
     .recipe-edit-metadata-value {
@@ -77743,8 +77735,7 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-
 }
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
-    :is(.recipe-edit-details-primary-grid, .recipe-edit-details-secondary-grid,
-        .recipe-edit-classification-grid)
+    :is(.recipe-edit-details-primary-grid, .recipe-edit-classification-grid)
     :is(input:not([type="hidden"]), select),
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-multiselect-control {
     flex: 1 1 auto;
@@ -77760,8 +77751,7 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-
 }
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
-    :is(.recipe-edit-details-primary-grid, .recipe-edit-details-secondary-grid,
-        .recipe-edit-classification-grid)
+    :is(.recipe-edit-details-primary-grid, .recipe-edit-classification-grid)
     :is(input:not([type="hidden"]), select):is(:hover, :focus-visible),
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
     .recipe-edit-multiselect-control:is(:hover, :focus-within) {
@@ -77769,8 +77759,7 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
 }
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
-    :is(.recipe-edit-details-primary-grid, .recipe-edit-details-secondary-grid,
-        .recipe-edit-classification-grid)
+    :is(.recipe-edit-details-primary-grid, .recipe-edit-classification-grid)
     :is(input:not([type="hidden"]), select):focus-visible,
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
     .recipe-edit-multiselect-control:focus-within {
@@ -77813,7 +77802,7 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
 }
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
-    .recipe-edit-details-secondary-grid
+    .recipe-edit-details-primary-grid
     :is(#recipeEditPrepTime, #recipeEditCookTime, #recipeEditInactiveTime) {
     field-sizing: content;
     justify-self: start;
@@ -78380,8 +78369,7 @@ body.recipe-edit-standalone-page [data-recipe-edit-category-field].is-ai-suggest
 
 @container recipe-details (max-width: 820px) {
     body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
-        :is(.recipe-edit-details-primary-grid, .recipe-edit-details-secondary-grid,
-            .recipe-edit-classification-grid) {
+        :is(.recipe-edit-details-primary-grid, .recipe-edit-classification-grid) {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
@@ -78393,8 +78381,7 @@ body.recipe-edit-standalone-page [data-recipe-edit-category-field].is-ai-suggest
 
 @container recipe-details (max-width: 520px) {
     body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
-        :is(.recipe-edit-details-primary-grid, .recipe-edit-details-secondary-grid,
-            .recipe-edit-classification-grid) {
+        :is(.recipe-edit-details-primary-grid, .recipe-edit-classification-grid) {
         grid-template-columns: minmax(0, 1fr);
     }
 
@@ -78406,16 +78393,14 @@ body.recipe-edit-standalone-page [data-recipe-edit-category-field].is-ai-suggest
 
 @media (max-width: 1100px) {
     body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
-        :is(.recipe-edit-details-primary-grid, .recipe-edit-details-secondary-grid,
-            .recipe-edit-classification-grid) {
+        :is(.recipe-edit-details-primary-grid, .recipe-edit-classification-grid) {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 
 @media (max-width: 640px) {
     body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
-        :is(.recipe-edit-details-primary-grid, .recipe-edit-details-secondary-grid,
-            .recipe-edit-classification-grid) {
+        :is(.recipe-edit-details-primary-grid, .recipe-edit-classification-grid) {
         grid-template-columns: minmax(0, 1fr);
     }
 

@@ -1031,15 +1031,15 @@ def test_recipe_details_match_classification_layout_and_field_order():
     assert "appendRecipeEditWorkspaceChildren(detailsHeadingRow, [detailsHeading, detailsMenu])" in organizer
     assert 'detailsMenuButton.setAttribute("aria-label", "Recipe detail actions")' in organizer
     assert 'onclick="return toggleRecipeEditSectionMenu(this, event)"' in template
-    assert "appendRecipeEditWorkspaceChildren(detailsPrimaryRow, [servingsField, scaleField, totalField, levelField])" in organizer
-    assert "appendRecipeEditWorkspaceChildren(cookingDetailsBody, [prepField, cookField, inactiveField])" in organizer
-    assert 'summary: "Prep Time, Cook Time, Inactive Time"' in organizer
+    assert "[servingsField, scaleField, prepField, cookField, inactiveField, totalField, levelField]" in organizer
+    assert "recipeEditCookingDetailsPanel" not in organizer
+    assert '"More cooking details"' not in organizer
     assert "recipe-edit-scale-disclosure" not in organizer
     assert "syncRecipeEditTotalTimeStatus" in organizer
     assert "timeBreakdownGroup" not in organizer
     assert "setRecipeEditTimeBreakdownExpanded" not in organizer
     assert ".recipe-edit-details-primary-grid" in styles
-    assert ".recipe-edit-details-secondary-grid" in styles
+    assert ".recipe-edit-details-secondary-grid" not in styles
     assert ".recipe-edit-scale-disclosure" not in styles
     assert ".recipe-edit-optional-details" in styles
     primary_grid_start = styles.index(
@@ -1048,9 +1048,8 @@ def test_recipe_details_match_classification_layout_and_field_order():
     primary_grid_rule = styles[
         primary_grid_start:styles.index("}", primary_grid_start)
     ]
-    assert "grid-template-columns: max-content max-content fit-content(170px) fit-content(170px);" in primary_grid_rule
+    assert "grid-template-columns: max-content max-content repeat(5, fit-content(170px));" in primary_grid_rule
     assert "justify-content: start;" in primary_grid_rule
-    assert "grid-template-columns: repeat(3, fit-content(170px));" in styles
     assert "grid-template-columns: repeat(3, minmax(0, 1fr));" in styles
 
 
@@ -1074,9 +1073,9 @@ def test_recipe_optional_detail_rows_share_accessible_button_behavior():
     assert 'button.addEventListener("click"' in helper
     assert 'panel.setAttribute("aria-hidden", String(!isExpanded))' in helper
     assert 'disclosure.classList.toggle("is-expanded", isExpanded)' in helper
-    assert 'id: "recipeEditCookingDetailsPanel"' in organizer
+    assert 'id: "recipeEditCookingDetailsPanel"' not in organizer
     assert 'id: "recipeEditClassificationDetailsPanel"' in organizer
-    assert organizer.count("createRecipeEditOptionalDetails({") == 2
+    assert organizer.count("createRecipeEditOptionalDetails({") == 1
     assert ".recipe-edit-optional-details-toggle:hover" in styles
     assert ".recipe-edit-optional-details-toggle:focus-visible" in styles
     assert '.recipe-edit-optional-details-toggle[aria-expanded="true"]' in styles

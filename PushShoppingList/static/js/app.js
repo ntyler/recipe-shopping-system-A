@@ -28155,24 +28155,17 @@ function organizeRecipeEditInformationCard() {
     appendRecipeEditWorkspaceChildren(detailsHeadingRow, [detailsHeading, detailsMenu]);
     const detailsPrimaryRow = document.createElement("div");
     detailsPrimaryRow.className = "recipe-edit-details-primary-grid";
-    appendRecipeEditWorkspaceChildren(detailsPrimaryRow, [servingsField, scaleField, totalField, levelField]);
+    appendRecipeEditWorkspaceChildren(
+        detailsPrimaryRow,
+        [servingsField, scaleField, prepField, cookField, inactiveField, totalField, levelField],
+    );
     if (totalField && !totalField.querySelector("[data-recipe-edit-total-time-status]")) {
         const totalStatus = document.createElement("span");
         totalStatus.className = "recipe-edit-total-time-status";
         totalStatus.dataset.recipeEditTotalTimeStatus = "";
         totalField.appendChild(totalStatus);
     }
-    const cookingDetailsBody = document.createElement("div");
-    cookingDetailsBody.className = "recipe-edit-details-secondary-grid";
-    appendRecipeEditWorkspaceChildren(cookingDetailsBody, [prepField, cookField, inactiveField]);
-    const cookingDetails = createRecipeEditOptionalDetails({
-        id: "recipeEditCookingDetailsPanel",
-        className: "recipe-edit-cooking-details",
-        label: "More cooking details",
-        summary: "Prep Time, Cook Time, Inactive Time",
-        body: cookingDetailsBody,
-    });
-    appendRecipeEditWorkspaceChildren(detailsSection, [detailsHeadingRow, detailsPrimaryRow, cookingDetails]);
+    appendRecipeEditWorkspaceChildren(detailsSection, [detailsHeadingRow, detailsPrimaryRow]);
 
     const classificationHeadingRow = document.createElement("div");
     classificationHeadingRow.className = "recipe-edit-form-section-heading";
