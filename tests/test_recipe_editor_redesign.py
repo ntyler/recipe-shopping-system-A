@@ -1031,13 +1031,20 @@ def test_recipe_details_match_classification_layout_and_field_order():
     assert "appendRecipeEditWorkspaceChildren(detailsHeadingRow, [detailsHeading, detailsMenu])" in organizer
     assert 'detailsMenuButton.setAttribute("aria-label", "Recipe detail actions")' in organizer
     assert 'onclick="return toggleRecipeEditSectionMenu(this, event)"' in template
-    assert "[servingsField, scaleField, prepField, cookField, inactiveField, totalField, levelField]" in organizer
+    assert 'timeBreakdownGroup.id = "recipeEditTimeBreakdown"' in organizer
+    assert 'timeBreakdownGroup.setAttribute("role", "group")' in organizer
+    assert (
+        "appendRecipeEditWorkspaceChildren(timeBreakdownGroup, "
+        "[prepField, cookField, inactiveField])"
+    ) in organizer
+    assert "[servingsField, scaleField, timeBreakdownGroup, totalField, levelField]" in organizer
+    assert "totalTimeHeading.insertBefore(timeBreakdownToggle, totalTimeHelp || null)" in organizer
+    assert "setRecipeEditTimeBreakdownExpanded(loadRecipeEditTimeBreakdownExpanded())" in organizer
+    assert '<label for="recipeEditTotalTime">Total</label>' in template
     assert "recipeEditCookingDetailsPanel" not in organizer
     assert '"More cooking details"' not in organizer
     assert "recipe-edit-scale-disclosure" not in organizer
     assert "syncRecipeEditTotalTimeStatus" in organizer
-    assert "timeBreakdownGroup" not in organizer
-    assert "setRecipeEditTimeBreakdownExpanded" not in organizer
     assert ".recipe-edit-details-primary-grid" in styles
     assert ".recipe-edit-details-secondary-grid" not in styles
     assert ".recipe-edit-scale-disclosure" not in styles
@@ -1051,6 +1058,224 @@ def test_recipe_details_match_classification_layout_and_field_order():
     assert "grid-template-columns: max-content max-content repeat(5, fit-content(170px));" in primary_grid_rule
     assert "justify-content: start;" in primary_grid_rule
     assert "grid-template-columns: repeat(3, minmax(0, 1fr));" in styles
+
+    collapsed_rules = re.findall(
+        r"\.recipe-edit-details-primary-grid\.recipe-edit-time-breakdown-collapsed\s*\{([^{}]*)\}",
+        styles,
+    )
+    assert len(collapsed_rules) >= 5
+    assert any(
+        "grid-template-columns: max-content max-content repeat(2, fit-content(170px));" in rule
+        for rule in collapsed_rules
+    )
+    assert sum(
+        "grid-template-columns: repeat(2, minmax(0, 1fr));" in rule
+        for rule in collapsed_rules
+    ) >= 2
+    assert sum(
+        "grid-template-columns: minmax(0, 1fr);" in rule
+        for rule in collapsed_rules
+    ) >= 2
+
+
+def test_recipe_time_breakdown_is_one_accessible_persisted_disclosure():
+    script = read_text("PushShoppingList/static/js/app.js")
+    css = read_text("PushShoppingList/static/css/app.css")
+    organizer = script[
+        script.index("function organizeRecipeEditInformationCard()"):
+        script.index("function organizeRecipeEditAiAssistant()")
+    ]
+    control = script[
+        script.index("function createRecipeEditTimeBreakdownControl()"):
+        script.index("function parseRecipeEditDurationMinutes")
+    ]
+    disclosure = script[
+        script.index("function recipeEditTimeBreakdownStorageKey()"):
+        script.index("function createRecipeEditTimeBreakdownControl()")
+    ]
+    setter = script[
+        script.index("function setRecipeEditTimeBreakdownExpanded"):
+        script.index("function createRecipeEditTimeBreakdownControl")
+    ]
+
+    assert 'button.type = "button"' in control
+    assert 'button.setAttribute("aria-expanded", "true")' in control
+    assert 'button.setAttribute("aria-controls", "recipeEditTimeBreakdown")' in control
+    assert 'button.setAttribute("aria-label", "Hide detailed cooking times")' in control
+    assert 'class="recipe-edit-time-breakdown-chevron" aria-hidden="true"' in control
+    assert 'button.addEventListener("click"' in control
+    assert 'button.setAttribute("aria-expanded", String(isExpanded))' in disclosure
+    assert '`${isExpanded ? "Hide" : "Show"} detailed cooking times`' in disclosure
+    assert 'timeBreakdownGroup.id = "recipeEditTimeBreakdown"' in organizer
+    assert 'timeBreakdownGroup.setAttribute("role", "group")' in organizer
+    assert 'timeBreakdownGroup.setAttribute("aria-label", "Detailed cooking times")' in organizer
+    assert (
+        "appendRecipeEditWorkspaceChildren(timeBreakdownGroup, "
+        "[prepField, cookField, inactiveField])"
+    ) in organizer
+    assert "recipe-edit-time-breakdown-collapsed" in disclosure
+    assert "group.hidden = !isExpanded" in disclosure
+    assert ".value" not in setter
+
+    assert '"ai-pantry:recipe-editor:time-breakdown:v1"' in script
+    assert "encodeURIComponent(userId)" in disclosure
+    assert '!== "collapsed"' in disclosure
+    assert "window.localStorage.getItem" in disclosure
+    assert "window.localStorage.setItem" in disclosure
+    assert disclosure.count("catch (_error)") == 2
+
+    assert ".recipe-edit-time-breakdown-group[hidden]" in css
+    assert "display: contents;" in css
+    assert ".recipe-edit-time-breakdown-toggle:focus-visible" in css
+    assert 'recipe-edit-time-breakdown-toggle[aria-expanded="true"]' in css
+    assert ".recipe-edit-time-breakdown-group > .recipe-edit-detail-field" in css
+    assert ".recipe-edit-details-primary-grid.recipe-edit-time-breakdown-collapsed" in css
+
+
+def test_recipe_time_breakdown_toggle_preserves_values_and_calculation():
+    node = shutil.which("node")
+    if not node:
+        return
+    script = read_text("PushShoppingList/static/js/app.js")
+    behavior = script[
+        script.index("function recipeEditTimeBreakdownStorageKey()"):
+        script.index("function bindRecipeEditNameInput")
+    ]
+    harness = r'''
+const storage = new Map();
+const listeners = {};
+const attributes = new Map();
+const activeClasses = new Set();
+const values = {
+    recipeEditPrepTime: { value: "15 min" },
+    recipeEditCookTime: { value: "45 min" },
+    recipeEditInactiveTime: { value: "20 min" },
+    recipeEditTotalTime: { value: "1 hr 20 min" },
+};
+const grid = {
+    classList: {
+        toggle(name, force) {
+            if (force) activeClasses.add(name);
+            else activeClasses.delete(name);
+        },
+        contains(name) { return activeClasses.has(name); },
+    },
+};
+const group = {
+    hidden: false,
+    closest(selector) {
+        return selector === ".recipe-edit-details-primary-grid" ? grid : null;
+    },
+};
+const button = {
+    type: "",
+    className: "",
+    dataset: {},
+    id: "",
+    innerHTML: "",
+    setAttribute(name, value) { attributes.set(name, String(value)); },
+    getAttribute(name) { return attributes.get(name) || null; },
+    addEventListener(name, listener) { listeners[name] = listener; },
+};
+const document = {
+    body: { dataset: { userId: "qa-user" } },
+    createElement(tag) {
+        if (tag !== "button") throw new Error(`Unexpected element: ${tag}`);
+        return button;
+    },
+    querySelector(selector) {
+        return selector === "[data-recipe-edit-time-breakdown-toggle]" ? button : null;
+    },
+    getElementById(id) {
+        if (id === "recipeEditTimeBreakdown") return group;
+        return values[id] || null;
+    },
+};
+const window = {
+    localStorage: {
+        getItem(key) { return storage.has(key) ? storage.get(key) : null; },
+        setItem(key, value) { storage.set(key, String(value)); },
+    },
+};
+const RECIPE_EDIT_TIME_BREAKDOWN_STORAGE_KEY = "ai-pantry:recipe-editor:time-breakdown:v1";
+''' + behavior + r'''
+const control = createRecipeEditTimeBreakdownControl();
+const cookingValues = () => [
+    values.recipeEditPrepTime.value,
+    values.recipeEditCookTime.value,
+    values.recipeEditInactiveTime.value,
+];
+const initial = {
+    expanded: control.getAttribute("aria-expanded"),
+    label: control.getAttribute("aria-label"),
+    hidden: group.hidden,
+    values: cookingValues(),
+};
+listeners.click();
+const collapsed = {
+    expanded: control.getAttribute("aria-expanded"),
+    label: control.getAttribute("aria-label"),
+    hidden: group.hidden,
+    compact: grid.classList.contains("recipe-edit-time-breakdown-collapsed"),
+    values: cookingValues(),
+};
+listeners.click();
+const reopened = {
+    expanded: control.getAttribute("aria-expanded"),
+    label: control.getAttribute("aria-label"),
+    hidden: group.hidden,
+    compact: grid.classList.contains("recipe-edit-time-breakdown-collapsed"),
+    values: cookingValues(),
+};
+process.stdout.write(JSON.stringify({
+    type: control.type,
+    controls: control.getAttribute("aria-controls"),
+    initial,
+    collapsed,
+    reopened,
+    totalMinutes: calculateRecipeEditTimeBreakdownMinutes(),
+    totalValue: values.recipeEditTotalTime.value,
+    savedState: storage.get("ai-pantry:recipe-editor:time-breakdown:v1:qa-user"),
+}));
+'''
+    completed = subprocess.run(
+        [node],
+        input=harness,
+        text=True,
+        encoding="utf-8",
+        capture_output=True,
+        check=False,
+        timeout=10,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout) == {
+        "type": "button",
+        "controls": "recipeEditTimeBreakdown",
+        "initial": {
+            "expanded": "true",
+            "label": "Hide detailed cooking times",
+            "hidden": False,
+            "values": ["15 min", "45 min", "20 min"],
+        },
+        "collapsed": {
+            "expanded": "false",
+            "label": "Show detailed cooking times",
+            "hidden": True,
+            "compact": True,
+            "values": ["15 min", "45 min", "20 min"],
+        },
+        "reopened": {
+            "expanded": "true",
+            "label": "Hide detailed cooking times",
+            "hidden": False,
+            "compact": False,
+            "values": ["15 min", "45 min", "20 min"],
+        },
+        "totalMinutes": 80,
+        "totalValue": "1 hr 20 min",
+        "savedState": "expanded",
+    }
 
 
 def test_recipe_optional_detail_rows_share_accessible_button_behavior():

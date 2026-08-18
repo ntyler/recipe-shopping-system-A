@@ -163,6 +163,13 @@ def test_recipe_editor_consolidates_cuisine_and_custom_tags_in_classification():
     assert ".recipe-edit-ai-field-actions" not in category_css
     assert ".recipe-edit-multiselect-control" in category_css
     assert ".recipe-edit-multiselect-options" in category_css
+    assert category_css.count(
+        'input:not([type="hidden"]):not(.recipe-edit-multiselect-search)'
+    ) == 3
+    assert ".recipe-edit-multiselect-control > input.recipe-edit-multiselect-search" in category_css
+    assert "flex: 1 1 132px;" in category_css
+    assert "min-height: 30px;" in category_css
+    assert "padding: 4px 8px;" in category_css
     assert "max-width: 100%;" in category_css
     assert "flex-wrap: wrap;" in category_css
     assert "@container recipe-details (max-width: 820px)" in category_css

@@ -26435,7 +26435,9 @@ function recipeEditInputValue(id) {
 
 function recipeEditFieldContainer(id) {
     const input = document.getElementById(id);
-    return input ? input.closest("label, .recipe-edit-file-field, .recipe-edit-cookbook-field") : null;
+    return input
+        ? input.closest("label, .recipe-edit-detail-field, .recipe-edit-file-field, .recipe-edit-cookbook-field")
+        : null;
 }
 
 function setRecipeEditFieldLabel(field, text) {
@@ -26443,7 +26445,7 @@ function setRecipeEditFieldLabel(field, text) {
         return;
     }
     const label = field.querySelector(
-        ":scope > .recipe-edit-cookbook-label, :scope > .recipe-edit-label-line > span:first-child, :scope > span:first-child"
+        ":scope > .recipe-edit-cookbook-label, :scope > .recipe-edit-label-line > :is(span, label):first-child, :scope > span:first-child"
     );
     if (label) {
         label.textContent = text;
@@ -27030,9 +27032,9 @@ function organizeRecipeEditMetadataField(field) {
     const icon = field.querySelector(":scope > .recipe-edit-metadata-icon");
     const labelLine = field.querySelector(":scope > .recipe-edit-label-line");
     const label = labelLine
-        ? (labelLine.matches("span") && !labelLine.querySelector(":scope > span:first-child")
+        ? (labelLine.matches("span") && !labelLine.querySelector(":scope > :is(span, label):first-child")
             ? labelLine
-            : labelLine.querySelector(":scope > span:first-child"))
+            : labelLine.querySelector(":scope > :is(span, label):first-child"))
         : Array.from(field.children).find(child => child.tagName === "SPAN" && !child.classList.contains("recipe-edit-metadata-icon"));
     if (!label) return;
     const heading = document.createElement("div");
@@ -27700,9 +27702,9 @@ function setRecipeEditTimeBreakdownExpanded(expanded) {
     if (!button || !group) return;
     const isExpanded = Boolean(expanded);
     button.setAttribute("aria-expanded", String(isExpanded));
-    button.setAttribute("aria-label", `${isExpanded ? "Hide" : "Show"} time breakdown`);
+    button.setAttribute("aria-label", `${isExpanded ? "Hide" : "Show"} detailed cooking times`);
     group.hidden = !isExpanded;
-    group.closest(".recipe-edit-metadata-strip")
+    group.closest(".recipe-edit-details-primary-grid")
         ?.classList.toggle("recipe-edit-time-breakdown-collapsed", !isExpanded);
 }
 
@@ -27714,7 +27716,7 @@ function createRecipeEditTimeBreakdownControl() {
     button.id = "recipeEditTimeBreakdownToggle";
     button.setAttribute("aria-controls", "recipeEditTimeBreakdown");
     button.setAttribute("aria-expanded", "true");
-    button.setAttribute("aria-label", "Hide time breakdown");
+    button.setAttribute("aria-label", "Hide detailed cooking times");
     button.innerHTML = '<span class="recipe-edit-time-breakdown-chevron" aria-hidden="true"></span>';
     button.addEventListener("click", () => {
         const expanded = button.getAttribute("aria-expanded") !== "true";
@@ -28155,9 +28157,22 @@ function organizeRecipeEditInformationCard() {
     appendRecipeEditWorkspaceChildren(detailsHeadingRow, [detailsHeading, detailsMenu]);
     const detailsPrimaryRow = document.createElement("div");
     detailsPrimaryRow.className = "recipe-edit-details-primary-grid";
+    const timeBreakdownGroup = document.createElement("div");
+    timeBreakdownGroup.id = "recipeEditTimeBreakdown";
+    timeBreakdownGroup.className = "recipe-edit-time-breakdown-group";
+    timeBreakdownGroup.setAttribute("role", "group");
+    timeBreakdownGroup.setAttribute("aria-label", "Detailed cooking times");
+    appendRecipeEditWorkspaceChildren(timeBreakdownGroup, [prepField, cookField, inactiveField]);
+
+    const timeBreakdownToggle = createRecipeEditTimeBreakdownControl();
+    const totalTimeHeading = totalField?.querySelector(".recipe-edit-metadata-heading");
+    const totalTimeHelp = totalTimeHeading?.querySelector("[data-recipe-edit-metadata-tooltip-trigger]");
+    if (totalTimeHeading) {
+        totalTimeHeading.insertBefore(timeBreakdownToggle, totalTimeHelp || null);
+    }
     appendRecipeEditWorkspaceChildren(
         detailsPrimaryRow,
-        [servingsField, scaleField, prepField, cookField, inactiveField, totalField, levelField],
+        [servingsField, scaleField, timeBreakdownGroup, totalField, levelField],
     );
     if (totalField && !totalField.querySelector("[data-recipe-edit-total-time-status]")) {
         const totalStatus = document.createElement("span");
@@ -28289,6 +28304,7 @@ function organizeRecipeEditInformationCard() {
         categoriesPanel,
         technicalDetails,
     ]);
+    setRecipeEditTimeBreakdownExpanded(loadRecipeEditTimeBreakdownExpanded());
     bindRecipeEditTotalTimeCalculation();
     syncRecipeEditServingsStepper();
     bindRecipeEditContentSizing();

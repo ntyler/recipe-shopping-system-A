@@ -57818,7 +57818,8 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-
 }
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-metadata-strip > label,
-body.recipe-edit-standalone-page .recipe-edit-time-breakdown-group > label {
+body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+    .recipe-edit-metadata-strip > .recipe-edit-detail-field {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: minmax(32px, auto) minmax(36px, auto);
@@ -57864,6 +57865,8 @@ body.recipe-edit-standalone-page .recipe-edit-time-breakdown-toggle {
     background: transparent;
     box-shadow: none;
     color: var(--app-muted);
+    cursor: pointer;
+    transition: color 140ms ease;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-time-breakdown-toggle:is(:hover, :focus-visible) {
@@ -77676,6 +77679,11 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-
     justify-content: start;
 }
 
+body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+    .recipe-edit-details-primary-grid.recipe-edit-time-breakdown-collapsed {
+    grid-template-columns: max-content max-content repeat(2, fit-content(170px));
+}
+
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-classification-primary-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
 }
@@ -77688,6 +77696,8 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
     :is(.recipe-edit-details-primary-grid, .recipe-edit-classification-grid)
     > .recipe-edit-detail-field,
+body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+    .recipe-edit-time-breakdown-group > .recipe-edit-detail-field,
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-custom-category-tag-row
     > .recipe-edit-detail-field {
     position: relative;
@@ -77736,7 +77746,7 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
     :is(.recipe-edit-details-primary-grid, .recipe-edit-classification-grid)
-    :is(input:not([type="hidden"]), select),
+    :is(input:not([type="hidden"]):not(.recipe-edit-multiselect-search), select),
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-multiselect-control {
     flex: 1 1 auto;
     width: 100%;
@@ -77752,7 +77762,7 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
     :is(.recipe-edit-details-primary-grid, .recipe-edit-classification-grid)
-    :is(input:not([type="hidden"]), select):is(:hover, :focus-visible),
+    :is(input:not([type="hidden"]):not(.recipe-edit-multiselect-search), select):is(:hover, :focus-visible),
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
     .recipe-edit-multiselect-control:is(:hover, :focus-within) {
     border-color: var(--app-primary-hover);
@@ -77760,7 +77770,7 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
     :is(.recipe-edit-details-primary-grid, .recipe-edit-classification-grid)
-    :is(input:not([type="hidden"]), select):focus-visible,
+    :is(input:not([type="hidden"]):not(.recipe-edit-multiselect-search), select):focus-visible,
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
     .recipe-edit-multiselect-control:focus-within {
     outline: 2px solid color-mix(in srgb, var(--app-primary-hover) 38%, transparent);
@@ -78189,7 +78199,7 @@ body.recipe-edit-standalone-page .recipe-edit-multiselect-control {
     align-items: center;
     flex-wrap: wrap;
     gap: 6px;
-    padding: 5px 8px;
+    padding: 4px 8px;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-multiselect-chips {
@@ -78201,7 +78211,8 @@ body.recipe-edit-standalone-page .recipe-edit-multiselect-chips {
     gap: 5px;
 }
 
-body.recipe-edit-standalone-page .recipe-edit-multiselect-search {
+body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+    .recipe-edit-multiselect-control > input.recipe-edit-multiselect-search {
     flex: 1 1 132px;
     width: auto;
     min-width: 92px;
@@ -78377,6 +78388,11 @@ body.recipe-edit-standalone-page [data-recipe-edit-category-field].is-ai-suggest
         .recipe-edit-details-primary-grid .recipe-edit-total-time-field {
         grid-column: auto;
     }
+
+    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+        .recipe-edit-details-primary-grid.recipe-edit-time-breakdown-collapsed {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
 }
 
 @container recipe-details (max-width: 520px) {
@@ -78389,6 +78405,11 @@ body.recipe-edit-standalone-page [data-recipe-edit-category-field].is-ai-suggest
         .recipe-edit-details-primary-grid .recipe-edit-total-time-field {
         grid-column: auto;
     }
+
+    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+        .recipe-edit-details-primary-grid.recipe-edit-time-breakdown-collapsed {
+        grid-template-columns: minmax(0, 1fr);
+    }
 }
 
 @media (max-width: 1100px) {
@@ -78396,11 +78417,21 @@ body.recipe-edit-standalone-page [data-recipe-edit-category-field].is-ai-suggest
         :is(.recipe-edit-details-primary-grid, .recipe-edit-classification-grid) {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
+
+    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+        .recipe-edit-details-primary-grid.recipe-edit-time-breakdown-collapsed {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
 }
 
 @media (max-width: 640px) {
     body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
         :is(.recipe-edit-details-primary-grid, .recipe-edit-classification-grid) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+        .recipe-edit-details-primary-grid.recipe-edit-time-breakdown-collapsed {
         grid-template-columns: minmax(0, 1fr);
     }
 
