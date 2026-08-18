@@ -14725,6 +14725,15 @@ function categorySourceFieldsForForm(form) {
         : CATEGORY_ALL_FIELD_NAMES;
 }
 
+function categoryFieldOptionKey(value) {
+    return String(value || "")
+        .normalize("NFKD")
+        .toLowerCase()
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim();
+}
+
 function setCookbookCategoryFieldValue(form, name, value) {
     const field = form ? form.elements[name] : null;
     const nextValue = String(value || "").trim();
@@ -14734,8 +14743,33 @@ function setCookbookCategoryFieldValue(form, name, value) {
     }
 
     if (field.tagName === "SELECT") {
-        const hasOption = [...field.options].some(option => option.value === nextValue);
-        field.value = hasOption ? nextValue : "";
+        [...field.options]
+            .filter(option => option.dataset.preservedCategoryValue === "1")
+            .forEach(option => option.remove());
+
+        const nextKey = categoryFieldOptionKey(nextValue);
+        const match = [...field.options].find(option => (
+            option.value === nextValue
+            || (
+                nextKey
+                && [option.value, option.textContent].some(
+                    optionValue => categoryFieldOptionKey(optionValue) === nextKey,
+                )
+            )
+        ));
+
+        if (match) {
+            field.value = match.value;
+        } else if (nextValue) {
+            const preservedOption = document.createElement("option");
+            preservedOption.value = nextValue;
+            preservedOption.textContent = nextValue;
+            preservedOption.dataset.preservedCategoryValue = "1";
+            field.add(preservedOption);
+            field.value = nextValue;
+        } else {
+            field.value = "";
+        }
         return;
     }
 

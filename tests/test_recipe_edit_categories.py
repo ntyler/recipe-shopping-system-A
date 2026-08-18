@@ -214,6 +214,107 @@ def test_recipe_editor_renders_all_classification_fields_with_prominent_add_butt
     )
 
 
+def test_recipe_category_select_fills_from_saved_text_content():
+    node = shutil.which("node")
+    if not node:
+        return
+
+    script = read_text("PushShoppingList/static/js/app.js")
+    field_binding = script[
+        script.index("function categoryFieldOptionKey"):
+        script.index("function openCookbookCategoryEditor")
+    ]
+    harness = r'''
+function makeOption(value, textContent, preserved = false) {
+    return {
+        value,
+        textContent,
+        dataset: preserved ? { preservedCategoryValue: "1" } : {},
+        owner: null,
+        remove() {
+            const index = this.owner.options.indexOf(this);
+            if (index >= 0) this.owner.options.splice(index, 1);
+        },
+    };
+}
+
+function makeSelect() {
+    const field = {
+        tagName: "SELECT",
+        value: "",
+        options: [
+            makeOption("", "Not selected"),
+            makeOption("🍽️ Dinner", "🍽️ Dinner"),
+        ],
+        add(option) {
+            option.owner = this;
+            this.options.push(option);
+        },
+    };
+    field.options.forEach(option => { option.owner = field; });
+    return field;
+}
+
+const document = {
+    createElement(tagName) {
+        if (tagName !== "option") throw new Error(`Unexpected element: ${tagName}`);
+        return makeOption("", "");
+    },
+};
+''' + field_binding + r'''
+
+const mealType = makeSelect();
+const form = { elements: { meal_type: mealType } };
+
+setCookbookCategoryFieldValue(form, "meal_type", "Dinner");
+const matchedVisibleText = {
+    value: mealType.value,
+    preservedCount: mealType.options.filter(option => option.dataset.preservedCategoryValue === "1").length,
+};
+
+setCookbookCategoryFieldValue(form, "meal_type", "Brunch");
+const preservedSavedText = {
+    value: mealType.value,
+    text: mealType.options.find(option => option.value === mealType.value)?.textContent,
+    preservedCount: mealType.options.filter(option => option.dataset.preservedCategoryValue === "1").length,
+};
+
+setCookbookCategoryFieldValue(form, "meal_type", "Dinner");
+const staleOptionRemoved = {
+    value: mealType.value,
+    preservedCount: mealType.options.filter(option => option.dataset.preservedCategoryValue === "1").length,
+};
+
+process.stdout.write(JSON.stringify({ matchedVisibleText, preservedSavedText, staleOptionRemoved }));
+'''
+    completed = subprocess.run(
+        [node],
+        input=harness,
+        text=True,
+        encoding="utf-8",
+        capture_output=True,
+        check=False,
+        timeout=10,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout) == {
+        "matchedVisibleText": {
+            "value": "🍽️ Dinner",
+            "preservedCount": 0,
+        },
+        "preservedSavedText": {
+            "value": "Brunch",
+            "text": "Brunch",
+            "preservedCount": 1,
+        },
+        "staleOptionRemoved": {
+            "value": "🍽️ Dinner",
+            "preservedCount": 0,
+        },
+    }
+
+
 def test_recipe_classification_add_buttons_commit_trimmed_unique_values_without_form_submit():
     node = shutil.which("node")
     if not node:
