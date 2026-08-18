@@ -187,8 +187,8 @@ def test_recipe_editor_renders_all_classification_fields_with_prominent_add_butt
     assert ".recipe-edit-multiselect-add" in category_css
     assert ".recipe-edit-multiselect-options" in category_css
     assert ".recipe-edit-classification-secondary-grid" in category_css
-    assert "grid-template-columns: fit-content(190px) repeat(2, minmax(0, 1fr));" in category_css
-    assert "grid-template-columns: repeat(3, fit-content(190px)) minmax(0, 1fr);" in category_css
+    assert "grid-template-columns: fit-content(190px) fit-content(300px) fit-content(320px);" in category_css
+    assert "grid-template-columns: repeat(3, fit-content(190px)) fit-content(320px);" in category_css
     assert category_css.count(
         'input:not([type="hidden"]):not(.recipe-edit-multiselect-search)'
     ) == 3
@@ -198,16 +198,50 @@ def test_recipe_editor_renders_all_classification_fields_with_prominent_add_butt
     assert "width: 42px;" in category_css
     assert "height: 42px;" in category_css
     assert "flex: 0 0 42px;" in category_css
-    assert "padding: 4px 8px;" in category_css
+    assert "padding: 0 8px;" in category_css
     assert "max-width: 100%;" in category_css
     assert "flex-wrap: wrap;" in category_css
     assert "flex-wrap: nowrap;" in category_css
+    assert "@container recipe-details (max-width: 940px)" in category_css
     assert "@container recipe-details (max-width: 820px)" in category_css
+    assert "@container recipe-details (max-width: 620px)" in category_css
     assert "@container recipe-details (max-width: 520px)" in category_css
     assert "@media (max-width: 1100px)" in category_css
     assert "@media (max-width: 640px)" in category_css
     assert category_css.count("> .recipe-edit-custom-categories-field {") == 2
+    assert category_css.count("> [data-recipe-edit-category-field=\"dietary_preference\"] {") == 2
     assert category_css.count("grid-column: 1 / -1;") >= 2
+
+    classification_container = category_css[
+        category_css.index("@container recipe-details (max-width: 940px)"):
+        category_css.index("@container recipe-details (max-width: 820px)")
+    ]
+    assert ".recipe-edit-classification-primary-grid" in classification_container
+    assert ".recipe-edit-classification-secondary-grid" in classification_container
+    assert ".recipe-edit-details-primary-grid" not in classification_container
+
+    details_container = category_css[
+        category_css.index("@container recipe-details (max-width: 820px)"):
+        category_css.index("@media (max-width: 1100px)")
+    ]
+    assert ".recipe-edit-details-primary-grid" in details_container
+
+    narrow_classification_container = category_css[
+        category_css.index("@container recipe-details (max-width: 620px)"):
+        category_css.index("@container recipe-details (max-width: 520px)")
+    ]
+    assert "grid-template-columns: repeat(2, fit-content(190px));" in narrow_classification_container
+
+    for declaration in (
+        "--recipe-edit-compact-multiselect-min-width: 240px;",
+        "--recipe-edit-compact-multiselect-min-width: 280px;",
+        "--recipe-edit-compact-multiselect-max-width: 300px;",
+        "--recipe-edit-compact-multiselect-max-width: 320px;",
+        "width: var(--recipe-edit-compact-multiselect-max-width);",
+        "min-width: var(--recipe-edit-compact-multiselect-min-width);",
+        "max-width: var(--recipe-edit-compact-multiselect-max-width);",
+    ):
+        assert declaration in category_css
 
     for declaration in (
         "--recipe-edit-compact-select-field-sizing: content;",
@@ -243,6 +277,15 @@ def test_recipe_editor_renders_all_classification_fields_with_prominent_add_butt
         "--recipe-edit-compact-select-min-width: 0;",
         "--recipe-edit-compact-select-max-width: 100%;",
         "--recipe-edit-compact-select-justify-self: stretch;",
+    ):
+        assert declaration in mobile
+    for field_name in ("cuisine", "dietary_preference", "custom_categories"):
+        assert f'[data-recipe-edit-category-field="{field_name}"]' in mobile
+    for declaration in (
+        "width: 100%;",
+        "min-width: 0;",
+        "max-width: 100%;",
+        "justify-self: stretch;",
     ):
         assert declaration in mobile
 

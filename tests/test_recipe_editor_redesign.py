@@ -1057,7 +1057,16 @@ def test_recipe_details_match_classification_layout_and_field_order():
     ]
     assert "grid-template-columns: max-content max-content repeat(5, fit-content(170px));" in primary_grid_rule
     assert "justify-content: start;" in primary_grid_rule
-    assert "grid-template-columns: fit-content(190px) repeat(2, minmax(0, 1fr));" in styles
+    classification_primary_start = styles.index(
+        ".recipe-edit-classification-primary-grid {"
+    )
+    classification_primary_rule = styles[
+        classification_primary_start:styles.index("}", classification_primary_start)
+    ]
+    assert (
+        "grid-template-columns: fit-content(190px) fit-content(300px) fit-content(320px);"
+        in classification_primary_rule
+    )
     secondary_grid_start = styles.index(
         ".recipe-edit-classification-secondary-grid {"
     )
@@ -1065,7 +1074,7 @@ def test_recipe_details_match_classification_layout_and_field_order():
         secondary_grid_start:styles.index("}", secondary_grid_start)
     ]
     assert (
-        "grid-template-columns: repeat(3, fit-content(190px)) minmax(0, 1fr);"
+        "grid-template-columns: repeat(3, fit-content(190px)) fit-content(320px);"
         in secondary_grid_rule
     )
 

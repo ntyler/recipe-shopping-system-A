@@ -77713,15 +77713,47 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
     --recipe-edit-compact-select-field-sizing: content;
     --recipe-edit-compact-select-flex: 0 1 auto;
     --recipe-edit-compact-select-justify-self: start;
+    justify-content: start;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-classification-primary-grid {
-    grid-template-columns: fit-content(190px) repeat(2, minmax(0, 1fr));
+    grid-template-columns: fit-content(190px) fit-content(300px) fit-content(320px);
 }
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
     .recipe-edit-classification-secondary-grid {
-    grid-template-columns: repeat(3, fit-content(190px)) minmax(0, 1fr);
+    grid-template-columns: repeat(3, fit-content(190px)) fit-content(320px);
+}
+
+body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+    [data-recipe-edit-category-field="cuisine"] {
+    --recipe-edit-compact-multiselect-min-width: 240px;
+    --recipe-edit-compact-multiselect-max-width: 300px;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+    [data-recipe-edit-category-field="dietary_preference"] {
+    --recipe-edit-compact-multiselect-min-width: 280px;
+    --recipe-edit-compact-multiselect-max-width: 320px;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+    [data-recipe-edit-category-field="custom_categories"] {
+    --recipe-edit-compact-multiselect-min-width: 240px;
+    --recipe-edit-compact-multiselect-max-width: 320px;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+    :is(.recipe-edit-classification-primary-grid, .recipe-edit-classification-secondary-grid)
+    > .recipe-edit-detail-field:is(
+        [data-recipe-edit-category-field="cuisine"],
+        [data-recipe-edit-category-field="dietary_preference"],
+        [data-recipe-edit-category-field="custom_categories"]
+    ) {
+    width: var(--recipe-edit-compact-multiselect-max-width);
+    min-width: var(--recipe-edit-compact-multiselect-min-width);
+    max-width: var(--recipe-edit-compact-multiselect-max-width);
+    justify-self: start;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
@@ -78170,7 +78202,7 @@ body.recipe-edit-standalone-page .recipe-edit-custom-categories-field.is-open {
     z-index: var(--app-layer-floating);
 }
 
-body.recipe-edit-standalone-page .recipe-edit-multiselect-control {
+body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-multiselect-control {
     position: relative;
     display: flex;
     width: 100%;
@@ -78186,7 +78218,7 @@ body.recipe-edit-standalone-page .recipe-edit-multiselect-control {
     box-shadow: none;
 }
 
-body.recipe-edit-standalone-page .recipe-edit-multiselect-entry {
+body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-multiselect-entry {
     display: flex;
     width: auto;
     min-width: 0;
@@ -78195,7 +78227,7 @@ body.recipe-edit-standalone-page .recipe-edit-multiselect-entry {
     align-items: center;
     flex-wrap: wrap;
     gap: 6px;
-    padding: 4px 8px;
+    padding: 0 8px;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-multiselect-chips {
@@ -78418,16 +78450,34 @@ body.recipe-edit-standalone-page [data-recipe-edit-category-field].is-ai-suggest
     border-color: color-mix(in srgb, var(--app-primary-hover) 58%, var(--app-border));
 }
 
-@container recipe-details (max-width: 820px) {
+@container recipe-details (max-width: 940px) {
     body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
-        .recipe-edit-details-primary-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        .recipe-edit-classification-primary-grid {
+        grid-template-columns: fit-content(190px) fit-content(300px);
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+        .recipe-edit-classification-primary-grid
+        > [data-recipe-edit-category-field="dietary_preference"] {
+        grid-column: 1 / -1;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+        .recipe-edit-classification-secondary-grid {
+        grid-template-columns: repeat(3, fit-content(190px)) minmax(0, 1fr);
     }
 
     body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
         .recipe-edit-classification-secondary-grid
         > .recipe-edit-custom-categories-field {
         grid-column: 1 / -1;
+    }
+}
+
+@container recipe-details (max-width: 820px) {
+    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+        .recipe-edit-details-primary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
@@ -78438,6 +78488,47 @@ body.recipe-edit-standalone-page [data-recipe-edit-category-field].is-ai-suggest
     body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
         .recipe-edit-details-primary-grid.recipe-edit-time-breakdown-collapsed {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 1100px) {
+    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+        .recipe-edit-details-primary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+        .recipe-edit-classification-primary-grid {
+        grid-template-columns: fit-content(190px) fit-content(300px);
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+        .recipe-edit-classification-primary-grid
+        > [data-recipe-edit-category-field="dietary_preference"] {
+        grid-column: 1 / -1;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+        .recipe-edit-classification-secondary-grid {
+        grid-template-columns: repeat(3, fit-content(190px)) minmax(0, 1fr);
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+        .recipe-edit-classification-secondary-grid
+        > .recipe-edit-custom-categories-field {
+        grid-column: 1 / -1;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+        .recipe-edit-details-primary-grid.recipe-edit-time-breakdown-collapsed {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@container recipe-details (max-width: 620px) {
+    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+        .recipe-edit-classification-secondary-grid {
+        grid-template-columns: repeat(2, fit-content(190px));
     }
 }
 
@@ -78458,6 +78549,19 @@ body.recipe-edit-standalone-page [data-recipe-edit-category-field].is-ai-suggest
     }
 
     body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+        :is(.recipe-edit-classification-primary-grid, .recipe-edit-classification-secondary-grid)
+        > .recipe-edit-detail-field:is(
+            [data-recipe-edit-category-field="cuisine"],
+            [data-recipe-edit-category-field="dietary_preference"],
+            [data-recipe-edit-category-field="custom_categories"]
+        ) {
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+        justify-self: stretch;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
         .recipe-edit-details-primary-grid .recipe-edit-total-time-field {
         grid-column: auto;
     }
@@ -78465,24 +78569,6 @@ body.recipe-edit-standalone-page [data-recipe-edit-category-field].is-ai-suggest
     body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
         .recipe-edit-details-primary-grid.recipe-edit-time-breakdown-collapsed {
         grid-template-columns: minmax(0, 1fr);
-    }
-}
-
-@media (max-width: 1100px) {
-    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
-        .recipe-edit-details-primary-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
-        .recipe-edit-classification-secondary-grid
-        > .recipe-edit-custom-categories-field {
-        grid-column: 1 / -1;
-    }
-
-    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
-        .recipe-edit-details-primary-grid.recipe-edit-time-breakdown-collapsed {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 
@@ -78500,6 +78586,19 @@ body.recipe-edit-standalone-page [data-recipe-edit-category-field].is-ai-suggest
         --recipe-edit-compact-select-field-sizing: fixed;
         --recipe-edit-compact-select-flex: 1 1 auto;
         --recipe-edit-compact-select-justify-self: stretch;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+        :is(.recipe-edit-classification-primary-grid, .recipe-edit-classification-secondary-grid)
+        > .recipe-edit-detail-field:is(
+            [data-recipe-edit-category-field="cuisine"],
+            [data-recipe-edit-category-field="dietary_preference"],
+            [data-recipe-edit-category-field="custom_categories"]
+        ) {
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+        justify-self: stretch;
     }
 
     body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
