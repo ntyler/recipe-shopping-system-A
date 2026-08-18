@@ -77727,19 +77727,19 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
     [data-recipe-edit-category-field="cuisine"] {
-    --recipe-edit-compact-multiselect-min-width: 240px;
+    --recipe-edit-compact-multiselect-min-width: 0;
     --recipe-edit-compact-multiselect-max-width: 300px;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
     [data-recipe-edit-category-field="dietary_preference"] {
-    --recipe-edit-compact-multiselect-min-width: 280px;
+    --recipe-edit-compact-multiselect-min-width: 0;
     --recipe-edit-compact-multiselect-max-width: 320px;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
     [data-recipe-edit-category-field="custom_categories"] {
-    --recipe-edit-compact-multiselect-min-width: 240px;
+    --recipe-edit-compact-multiselect-min-width: 0;
     --recipe-edit-compact-multiselect-max-width: 320px;
 }
 
@@ -77750,7 +77750,7 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
         [data-recipe-edit-category-field="dietary_preference"],
         [data-recipe-edit-category-field="custom_categories"]
     ) {
-    width: var(--recipe-edit-compact-multiselect-max-width);
+    width: fit-content;
     min-width: var(--recipe-edit-compact-multiselect-min-width);
     max-width: var(--recipe-edit-compact-multiselect-max-width);
     justify-self: start;
@@ -77812,7 +77812,7 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
     :is(.recipe-edit-details-primary-grid, .recipe-edit-classification-grid)
     :is(input:not([type="hidden"]):not(.recipe-edit-multiselect-search), select),
-body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-multiselect-entry {
+body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-multiselect-control {
     flex: 1 1 auto;
     width: 100%;
     min-width: 0;
@@ -77826,10 +77826,15 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-
 }
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+    .recipe-edit-classification-grid .recipe-edit-multiselect-control {
+    width: fit-content;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
     :is(.recipe-edit-details-primary-grid, .recipe-edit-classification-grid)
     :is(input:not([type="hidden"]):not(.recipe-edit-multiselect-search), select):is(:hover, :focus-visible),
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
-    .recipe-edit-multiselect-entry:is(:hover, :focus-within) {
+    .recipe-edit-multiselect-control:is(:hover, :focus-within) {
     border-color: var(--app-primary-hover);
 }
 
@@ -77837,7 +77842,7 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
     :is(.recipe-edit-details-primary-grid, .recipe-edit-classification-grid)
     :is(input:not([type="hidden"]):not(.recipe-edit-multiselect-search), select):focus-visible,
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
-    .recipe-edit-multiselect-entry:focus-within {
+    .recipe-edit-multiselect-control:focus-within {
     outline: 2px solid color-mix(in srgb, var(--app-primary-hover) 38%, transparent);
     outline-offset: 1px;
 }
@@ -78204,98 +78209,125 @@ body.recipe-edit-standalone-page .recipe-edit-custom-categories-field.is-open {
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-multiselect-control {
     position: relative;
-    display: flex;
-    width: 100%;
-    min-width: 0;
+    display: inline-flex;
+    width: fit-content;
+    min-width: 42px;
     max-width: 100%;
-    flex: 1 1 auto;
-    align-items: flex-end;
-    flex-wrap: nowrap;
-    gap: 8px;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    box-shadow: none;
-}
-
-body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-multiselect-entry {
-    display: flex;
-    width: auto;
-    min-width: 0;
-    max-width: 100%;
-    flex: 1 1 0%;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 6px;
-    padding: 0 8px;
-}
-
-body.recipe-edit-standalone-page .recipe-edit-multiselect-chips {
-    display: flex;
-    min-width: 0;
-    max-width: 100%;
+    min-height: 42px;
     flex: 0 1 auto;
     align-items: center;
     flex-wrap: wrap;
     gap: 5px;
+    padding: 4px;
+    border: 1px solid var(--app-border-strong);
+    border-radius: 9px;
+    background: var(--app-surface);
+    color: var(--app-text);
+    box-shadow: none;
 }
 
-body.recipe-edit-standalone-page .recipe-edit-multiselect-chips:empty {
+body.recipe-edit-standalone-page .recipe-edit-multiselect-chips {
+    display: contents;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-multiselect-trigger {
+    display: inline-grid;
+    width: 32px;
+    min-width: 32px;
+    height: 32px;
+    min-height: 32px;
+    flex: 0 0 32px;
+    margin: 0;
+    padding: 0;
+    place-items: center;
+    border: 0;
+    border-radius: 7px;
+    background: var(--app-primary-soft);
+    color: var(--app-primary-hover);
+    cursor: pointer;
+    font-size: 20px;
+    font-weight: 650;
+    line-height: 1;
+    transition: background-color 140ms ease, color 140ms ease;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-multiselect-trigger:is(:hover, :focus-visible) {
+    background: color-mix(in srgb, var(--app-primary-soft) 72%, var(--app-surface));
+    color: var(--app-text);
+}
+
+body.recipe-edit-standalone-page .recipe-edit-multiselect-trigger:focus-visible {
+    outline: 2px solid var(--app-focus);
+    outline-offset: -2px;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-multiselect-popover {
+    position: absolute;
+    z-index: var(--app-layer-floating);
+    top: calc(100% + 6px);
+    left: 0;
+    display: grid;
+    width: min(320px, calc(100vw - 32px));
+    min-width: min(280px, calc(100vw - 32px));
+    max-width: min(360px, calc(100vw - 32px));
+    max-height: min(
+        var(--recipe-edit-multiselect-popover-max-height, calc(100vh - 24px)),
+        calc(100vh - 24px)
+    );
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 6px;
+    padding: 7px;
+    border: 1px solid var(--app-border-strong);
+    border-radius: 9px;
+    background: var(--app-surface);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, .2);
+    overflow: hidden;
+}
+
+body.recipe-edit-standalone-page
+    .recipe-edit-multiselect-field.is-flipped .recipe-edit-multiselect-popover {
+    top: auto;
+    bottom: calc(100% + 6px);
+}
+
+body.recipe-edit-standalone-page .recipe-edit-multiselect-popover[hidden] {
     display: none;
 }
 
+body.recipe-edit-standalone-page .recipe-edit-multiselect-search-wrap {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    min-height: 38px;
+    align-items: center;
+    border: 1px solid var(--app-border-strong);
+    border-radius: 7px;
+    background: var(--app-bg);
+}
+
+body.recipe-edit-standalone-page .recipe-edit-multiselect-search-wrap:focus-within {
+    border-color: var(--app-primary-hover);
+    outline: 2px solid color-mix(in srgb, var(--app-primary-hover) 38%, transparent);
+    outline-offset: 1px;
+}
+
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
-    .recipe-edit-multiselect-entry > input.recipe-edit-multiselect-search {
-    flex: 1 1 132px;
-    width: auto;
-    min-width: 92px;
-    max-width: none;
-    height: 40px;
-    min-height: 40px;
-    padding: 2px 4px;
+    .recipe-edit-multiselect-search-wrap > input.recipe-edit-multiselect-search {
+    field-sizing: fixed;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    height: 36px;
+    min-height: 36px;
+    flex: 1 1 auto;
+    padding: 2px 9px;
     border: 0;
-    border-radius: 4px;
+    border-radius: 6px;
     outline: 0;
     background: transparent;
     color: var(--app-text);
     font-size: 13px;
-}
-
-body.recipe-edit-standalone-page .recipe-edit-multiselect-add {
-    display: inline-grid;
-    width: 42px;
-    min-width: 42px;
-    height: 42px;
-    flex: 0 0 42px;
-    margin: 0;
-    padding: 0;
-    place-items: center;
-    border: 1px solid var(--app-border-strong);
-    border-radius: 9px;
-    background: var(--app-primary-soft);
-    color: var(--app-primary-hover);
-    cursor: pointer;
-    font-size: 24px;
-    font-weight: 650;
-    line-height: 1;
-}
-
-body.recipe-edit-standalone-page .recipe-edit-multiselect-add:not(:disabled):is(:hover, :focus-visible) {
-    border-color: var(--app-primary-hover);
-    background: color-mix(in srgb, var(--app-primary-soft) 72%, var(--app-surface));
-}
-
-body.recipe-edit-standalone-page .recipe-edit-multiselect-add:focus-visible {
-    outline: 2px solid var(--app-focus);
-    outline-offset: 1px;
-}
-
-body.recipe-edit-standalone-page .recipe-edit-multiselect-add:disabled {
-    border-color: var(--app-border-strong);
-    background: color-mix(in srgb, var(--app-primary-soft) 55%, var(--app-surface));
-    color: var(--app-muted);
-    cursor: not-allowed;
-    opacity: .82;
+    box-shadow: none;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-multiselect-search::placeholder {
@@ -78304,21 +78336,14 @@ body.recipe-edit-standalone-page .recipe-edit-multiselect-search::placeholder {
 }
 
 body.recipe-edit-standalone-page .recipe-edit-multiselect-options {
-    position: absolute;
-    z-index: var(--app-layer-floating);
-    top: calc(100% + 6px);
-    right: 0;
-    left: 0;
     display: grid;
     width: 100%;
+    min-height: 0;
     max-height: min(260px, 45vh);
-    padding: 6px;
+    padding: 2px 0;
     overflow-x: hidden;
     overflow-y: auto;
-    border: 1px solid var(--app-border-strong);
-    border-radius: 9px;
-    background: var(--app-surface);
-    box-shadow: 0 12px 30px rgba(0, 0, 0, .2);
+    overscroll-behavior: contain;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-multiselect-options[hidden] {
@@ -78326,9 +78351,13 @@ body.recipe-edit-standalone-page .recipe-edit-multiselect-options[hidden] {
 }
 
 body.recipe-edit-standalone-page .recipe-edit-multiselect-option {
+    display: flex;
     width: 100%;
     min-width: 0;
     min-height: 36px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
     padding: 7px 9px;
     border: 0;
     border-radius: 6px;
@@ -78340,9 +78369,20 @@ body.recipe-edit-standalone-page .recipe-edit-multiselect-option {
 }
 
 body.recipe-edit-standalone-page .recipe-edit-multiselect-option:is(:hover, :focus-visible),
-body.recipe-edit-standalone-page .recipe-edit-multiselect-option.is-create-action {
+body.recipe-edit-standalone-page .recipe-edit-multiselect-option.is-create-action,
+body.recipe-edit-standalone-page .recipe-edit-multiselect-option.is-selected {
     background: var(--app-primary-soft);
     color: var(--app-primary-hover);
+}
+
+body.recipe-edit-standalone-page .recipe-edit-multiselect-option.is-selected {
+    font-weight: 700;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-multiselect-option.is-selected::after {
+    flex: 0 0 auto;
+    content: "✓";
+    font-size: 13px;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-multiselect-option.is-structured-suggestion {
@@ -78354,6 +78394,33 @@ body.recipe-edit-standalone-page .recipe-edit-multiselect-empty {
     padding: 9px;
     color: var(--app-muted);
     font-size: 12px;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-multiselect-footer {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: 5px;
+    border-top: 1px solid var(--app-border);
+}
+
+body.recipe-edit-standalone-page .recipe-edit-multiselect-done {
+    min-height: 30px;
+    padding: 4px 10px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--app-primary-hover);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-multiselect-done:is(:hover, :focus-visible) {
+    background: var(--app-primary-soft);
+}
+
+body.recipe-edit-standalone-page .recipe-edit-multiselect-done:focus-visible {
+    outline: 2px solid var(--app-focus);
+    outline-offset: -2px;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-multiselect-status {
@@ -78370,6 +78437,7 @@ body.recipe-edit-standalone-page .recipe-edit-tag-chip {
     display: inline-flex;
     min-width: 0;
     max-width: 100%;
+    flex: 0 1 auto;
     align-items: center;
     gap: 4px;
     padding: 4px 5px 4px 8px;
@@ -78445,7 +78513,7 @@ body.recipe-edit-standalone-page .recipe-edit-ai-suggestion-summary > span:last-
 }
 
 body.recipe-edit-standalone-page [data-recipe-edit-category-field].is-ai-suggested
-    :is(select, .recipe-edit-multiselect-entry) {
+    :is(select, .recipe-edit-multiselect-control) {
     border-style: dashed;
     border-color: color-mix(in srgb, var(--app-primary-hover) 58%, var(--app-border));
 }
@@ -78609,6 +78677,14 @@ body.recipe-edit-standalone-page [data-recipe-edit-category-field].is-ai-suggest
     body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-form-section {
         gap: 13px;
         padding-top: 15px;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+        .recipe-edit-classification-grid .recipe-edit-multiselect-control,
+    body.recipe-edit-standalone-page .recipe-edit-multiselect-popover {
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
     }
 
     body.recipe-edit-standalone-page .recipe-edit-multiselect-options {

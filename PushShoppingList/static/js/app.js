@@ -26538,6 +26538,10 @@ function normalizeRecipeEditCustomTag(value) {
     }).join(" ");
 }
 
+function recipeEditCustomTagHasDelimiter(value) {
+    return /[,;\n]/.test(String(value || ""));
+}
+
 function recipeEditMultiselectField(kind) {
     return document.querySelector(`[data-recipe-edit-multiselect-field="${kind}"]`);
 }
@@ -26690,7 +26694,7 @@ function recipeEditMultiselectCopy(kind) {
             inputLabel: "Search cuisine categories",
             placeholder: "Search cuisines",
             chipLabel: "cuisine category",
-            addLabel: "Add cuisine category",
+            addLabel: "Add cuisine",
             empty: "No matching cuisines",
         },
         dietary: {
@@ -26704,6 +26708,7 @@ function recipeEditMultiselectCopy(kind) {
             inputLabel: "Search or create custom tags",
             placeholder: "Search or create a tag",
             chipLabel: "custom tag",
+            addLabel: "Add custom tag",
             empty: "No saved custom tags",
         },
     }[kind];
@@ -26740,73 +26745,138 @@ function recipeEditMultiselectParts(kind) {
     if (!field) return null;
     const control = field.querySelector("[data-recipe-edit-multiselect-control]");
     const chips = field.querySelector("[data-recipe-edit-multiselect-chips]");
+    const trigger = field.querySelector("[data-recipe-edit-multiselect-trigger]");
+    const popover = field.querySelector("[data-recipe-edit-multiselect-popover]");
     const search = field.querySelector("[data-recipe-edit-multiselect-search]");
-    const add = field.querySelector("[data-recipe-edit-multiselect-add]");
     const listbox = field.querySelector("[data-recipe-edit-multiselect-listbox]");
     const status = field.querySelector("[data-recipe-edit-multiselect-status]");
-    return control && chips && search && listbox && status
-        ? { field, control, chips, search, add, listbox, status }
+    const done = field.querySelector("[data-recipe-edit-multiselect-done]");
+    return control && chips && trigger && popover && search && listbox && status
+        ? { field, control, chips, trigger, popover, search, listbox, status, done }
         : null;
 }
 
-function recipeEditMultiselectPendingValues(kind) {
-    const parts = recipeEditMultiselectParts(kind);
-    if (!parts) return [];
-    const selectedKeys = new Set(recipeEditMultiselectValues(kind).map(recipeEditTagKey));
-    return uniqueRecipeEditMultiselectValues(parts.search.value, kind)
-        .filter(value => !selectedKeys.has(recipeEditTagKey(value)));
-}
-
-function updateRecipeEditMultiselectAddButton(kind) {
-    const parts = recipeEditMultiselectParts(kind);
-    if (!parts?.add) return;
-    const additions = recipeEditMultiselectPendingValues(kind);
-    const copy = recipeEditMultiselectCopy(kind);
-    parts.add.disabled = !additions.length;
-    parts.add.setAttribute("aria-label", copy.addLabel);
-    parts.add.title = copy.addLabel;
-}
-
-function addRecipeEditMultiselectSearchValues(kind) {
+function announceRecipeEditMultiselect(kind, message) {
     const parts = recipeEditMultiselectParts(kind);
     if (!parts) return;
-    const additions = recipeEditMultiselectPendingValues(kind);
-    if (!additions.length) return;
-    setRecipeEditMultiselectValues(
-        kind,
-        [...recipeEditMultiselectValues(kind), ...additions],
-        { source: CATEGORY_SOURCE_USER_SELECTED },
+    parts.status.textContent = "";
+    window.requestAnimationFrame(() => {
+        const current = recipeEditMultiselectParts(kind);
+        if (current) current.status.textContent = message;
+    });
+}
+
+function positionRecipeEditMultiselectPopover(kind) {
+    const parts = recipeEditMultiselectParts(kind);
+    if (!parts || parts.popover.hidden) return;
+    parts.field.classList.remove("is-flipped");
+    parts.popover.style.removeProperty("--recipe-edit-multiselect-popover-max-height");
+    const controlRect = parts.control.getBoundingClientRect();
+    const viewportHeight = window.visualViewport?.height || window.innerHeight;
+    let safeTop = 8;
+    let safeBottom = viewportHeight - 8;
+    const topbar = document.querySelector(".app-topbar");
+    if (topbar) {
+        const topbarRect = topbar.getBoundingClientRect();
+        const topbarStyle = window.getComputedStyle(topbar);
+        if (
+            topbarStyle.display !== "none"
+            && topbarStyle.visibility !== "hidden"
+            && topbarRect.height > 0
+            && topbarRect.top <= safeTop
+            && topbarRect.bottom > safeTop
+        ) {
+            safeTop = topbarRect.bottom + 8;
+        }
+    }
+    const bottomNav = document.querySelector(".app-mobile-bottom-nav");
+    if (bottomNav) {
+        const navRect = bottomNav.getBoundingClientRect();
+        const navStyle = window.getComputedStyle(bottomNav);
+        if (
+            navStyle.display !== "none"
+            && navStyle.visibility !== "hidden"
+            && navRect.height > 0
+            && navRect.top < safeBottom
+        ) {
+            safeBottom = navRect.top - 8;
+        }
+    }
+    const availableBelow = Math.max(0, safeBottom - controlRect.bottom - 6);
+    const availableAbove = Math.max(0, controlRect.top - safeTop - 6);
+    const naturalHeight = parts.popover.scrollHeight;
+    const flip = naturalHeight > availableBelow && availableAbove > availableBelow;
+    parts.field.classList.toggle("is-flipped", flip);
+    const availableHeight = Math.floor(flip ? availableAbove : availableBelow);
+    parts.popover.style.setProperty(
+        "--recipe-edit-multiselect-popover-max-height",
+        `${availableHeight}px`,
     );
-    parts.search.value = "";
-    openRecipeEditMultiselect(kind);
-    parts.search.focus({ preventScroll: true });
 }
 
-function openRecipeEditMultiselect(kind) {
+let recipeEditMultiselectPositionFrame = 0;
+
+function scheduleRecipeEditMultiselectPopoverPosition() {
+    if (recipeEditMultiselectPositionFrame) return;
+    recipeEditMultiselectPositionFrame = window.requestAnimationFrame(() => {
+        recipeEditMultiselectPositionFrame = 0;
+        document.querySelectorAll("[data-recipe-edit-multiselect-field].is-open").forEach(field => {
+            positionRecipeEditMultiselectPopover(field.dataset.recipeEditMultiselectField);
+        });
+    });
+}
+
+function openRecipeEditMultiselect(kind, options = {}) {
     const parts = recipeEditMultiselectParts(kind);
     if (!parts) return;
+    document.querySelectorAll("[data-recipe-edit-multiselect-field].is-open").forEach(openField => {
+        if (openField !== parts.field) {
+            closeRecipeEditMultiselect(openField.dataset.recipeEditMultiselectField);
+        }
+    });
     parts.field.classList.add("is-open");
+    parts.popover.hidden = false;
     parts.listbox.hidden = false;
+    parts.trigger.setAttribute("aria-expanded", "true");
     parts.search.setAttribute("aria-expanded", "true");
     renderRecipeEditMultiselectOptions(kind);
+    positionRecipeEditMultiselectPopover(kind);
+    if (options.focus !== false) {
+        window.requestAnimationFrame(() => {
+            const current = recipeEditMultiselectParts(kind);
+            current?.search.focus({ preventScroll: true });
+            current?.search.select?.();
+        });
+    }
 }
 
 function closeRecipeEditMultiselect(kind, options = {}) {
     const parts = recipeEditMultiselectParts(kind);
     if (!parts) return;
     parts.field.classList.remove("is-open");
+    parts.popover.hidden = true;
     parts.listbox.hidden = true;
+    parts.trigger.setAttribute("aria-expanded", "false");
     parts.search.setAttribute("aria-expanded", "false");
     parts.search.removeAttribute("aria-activedescendant");
-    if (options.focus) parts.search.focus({ preventScroll: true });
+    parts.field.classList.remove("is-flipped");
+    parts.popover.style.removeProperty("--recipe-edit-multiselect-popover-max-height");
+    if (options.resetSearch !== false) parts.search.value = "";
+    if (options.focusTrigger || options.focus) {
+        parts.trigger.focus({ preventScroll: true });
+    }
 }
 
-function recipeEditMultiselectOptionButton(text, className = "") {
+function recipeEditMultiselectOptionButton(text, className = "", selected = false) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = `recipe-edit-multiselect-option ${className}`.trim();
     button.setAttribute("role", "option");
-    button.setAttribute("aria-selected", "false");
+    button.setAttribute("aria-selected", selected ? "true" : "false");
+    if (selected) {
+        button.classList.add("is-selected");
+        button.setAttribute("aria-label", `${text}, selected`);
+    }
     button.tabIndex = -1;
     button.textContent = text;
     return button;
@@ -26817,14 +26887,22 @@ function renderRecipeEditMultiselectOptions(kind) {
     if (!parts) return;
     const query = normalizeRecipeEditTagText(parts.search.value);
     const queryKey = recipeEditTagKey(query);
-    updateRecipeEditMultiselectAddButton(kind);
+    const invalidCustomTag = kind === "custom"
+        && recipeEditCustomTagHasDelimiter(parts.search.value);
     const selectedKeys = new Set(recipeEditMultiselectValues(kind).map(recipeEditTagKey));
-    const choices = recipeEditMultiselectOptions(kind).filter(value => {
+    const choices = uniqueRecipeEditMultiselectValues(
+        [...recipeEditMultiselectOptions(kind), ...recipeEditMultiselectValues(kind)],
+        kind,
+    ).filter(value => {
         const key = recipeEditTagKey(value);
-        return !selectedKeys.has(key) && (!queryKey || key.includes(queryKey));
+        return !queryKey || key.includes(queryKey);
     });
     const buttons = choices.map(value => {
-        const button = recipeEditMultiselectOptionButton(value);
+        const button = recipeEditMultiselectOptionButton(
+            value,
+            "",
+            selectedKeys.has(recipeEditTagKey(value)),
+        );
         button.dataset.recipeEditMultiselectValue = value;
         return button;
     });
@@ -26842,39 +26920,61 @@ function renderRecipeEditMultiselectOptions(kind) {
             button.dataset.recipeEditStructuredField = structured.field;
             button.dataset.recipeEditStructuredValue = structured.value;
             if (structured.kind) button.dataset.recipeEditStructuredKind = structured.kind;
-            buttons.unshift(button);
-            parts.status.textContent = "This matches a structured classification option.";
-        } else if (!exactSaved && !alreadySelected) {
-            const normalized = normalizeRecipeEditCustomTag(query);
-            const button = recipeEditMultiselectOptionButton(
-                `Create tag “${normalized}”`,
-                "is-create-action",
-            );
-            button.dataset.recipeEditCreateTag = normalized;
             buttons.push(button);
-            parts.status.textContent = `Create tag ${normalized}`;
-        } else {
-            parts.status.textContent = alreadySelected ? "Tag already selected." : "Select the saved tag.";
         }
-    } else {
-        parts.status.textContent = "";
+        if (!exactSaved && !alreadySelected && !invalidCustomTag) {
+            const normalized = normalizeRecipeEditCustomTag(query);
+            if (recipeEditTagKey(normalized)) {
+                const button = recipeEditMultiselectOptionButton(
+                    `Create “${normalized}”`,
+                    "is-create-action",
+                );
+                button.dataset.recipeEditCreateTag = normalized;
+                buttons.unshift(button);
+            }
+        }
     }
 
     if (!buttons.length) {
         const empty = document.createElement("div");
         empty.className = "recipe-edit-multiselect-empty";
-        empty.textContent = recipeEditMultiselectCopy(kind).empty;
+        empty.textContent = invalidCustomTag
+            ? "Create one tag at a time; commas and semicolons separate tags."
+            : recipeEditMultiselectCopy(kind).empty;
         parts.listbox.replaceChildren(empty);
     } else {
         parts.listbox.replaceChildren(...buttons);
+    }
+    if (parts.field.classList.contains("is-open")) {
+        scheduleRecipeEditMultiselectPopoverPosition();
     }
 }
 
 function selectRecipeEditMultiselectValue(kind, value) {
     const parts = recipeEditMultiselectParts(kind);
+    if (kind === "custom" && recipeEditCustomTagHasDelimiter(value)) {
+        announceRecipeEditMultiselect(
+            kind,
+            "Create one tag at a time. Commas and semicolons are not part of a tag.",
+        );
+        parts?.search.focus({ preventScroll: true });
+        return false;
+    }
     const nextValue = kind === "custom"
         ? normalizeRecipeEditCustomTag(value)
         : canonicalRecipeEditMultiselectValue(kind, value);
+    const copy = recipeEditMultiselectCopy(kind);
+    const nextKey = recipeEditTagKey(nextValue);
+    if (!nextKey) return false;
+    if (recipeEditMultiselectValues(kind).some(item => recipeEditTagKey(item) === nextKey)) {
+        if (parts) {
+            parts.search.value = "";
+            renderRecipeEditMultiselectOptions(kind);
+            parts.search.focus({ preventScroll: true });
+        }
+        announceRecipeEditMultiselect(kind, `${nextValue} is already selected.`);
+        return false;
+    }
     setRecipeEditMultiselectValues(
         kind,
         [...recipeEditMultiselectValues(kind), nextValue],
@@ -26882,23 +26982,31 @@ function selectRecipeEditMultiselectValue(kind, value) {
     );
     if (parts) {
         parts.search.value = "";
-        openRecipeEditMultiselect(kind);
+        openRecipeEditMultiselect(kind, { focus: false });
         parts.search.focus({ preventScroll: true });
     }
+    announceRecipeEditMultiselect(kind, `Added ${copy.chipLabel} ${nextValue}.`);
+    return true;
+}
+
+function createRecipeEditCustomTagFromSearch() {
+    const parts = recipeEditMultiselectParts("custom");
+    if (!parts) return false;
+    const value = normalizeRecipeEditCustomTag(parts.search.value);
+    const key = recipeEditTagKey(value);
+    if (!key) return false;
+    const savedMatch = recipeEditMultiselectOptions("custom")
+        .find(option => recipeEditTagKey(option) === key);
+    return selectRecipeEditMultiselectValue("custom", savedMatch || value);
 }
 
 function useRecipeEditStructuredCategorySuggestion(button) {
     const kind = button.dataset.recipeEditStructuredKind;
     const value = button.dataset.recipeEditStructuredValue || "";
     if (kind) {
-        setRecipeEditMultiselectValues(
-            kind,
-            [...recipeEditMultiselectValues(kind), value],
-            { source: CATEGORY_SOURCE_USER_SELECTED },
-        );
-        const target = recipeEditMultiselectParts(kind);
-        target?.search.focus({ preventScroll: true });
+        selectRecipeEditMultiselectValue(kind, value);
     } else {
+        closeRecipeEditMultiselect("custom");
         const control = document.querySelector(`[name="${button.dataset.recipeEditStructuredField}"]`);
         if (control) {
             control.value = value;
@@ -26906,14 +27014,29 @@ function useRecipeEditStructuredCategorySuggestion(button) {
             control.focus({ preventScroll: true });
         }
     }
-    closeRecipeEditMultiselect("custom");
 }
 
 function removeRecipeEditMultiselectValue(kind, index) {
     const values = recipeEditMultiselectValues(kind);
-    values.splice(Number(index), 1);
+    const numericIndex = Number(index);
+    if (!Number.isInteger(numericIndex) || numericIndex < 0 || numericIndex >= values.length) return;
+    const [removed] = values.splice(numericIndex, 1);
+    const wasOpen = recipeEditMultiselectParts(kind)?.field.classList.contains("is-open");
     setRecipeEditMultiselectValues(kind, values, { source: CATEGORY_SOURCE_USER_SELECTED });
-    window.requestAnimationFrame(() => recipeEditMultiselectParts(kind)?.search.focus({ preventScroll: true }));
+    announceRecipeEditMultiselect(kind, `Removed ${recipeEditMultiselectCopy(kind).chipLabel} ${removed}.`);
+    if (wasOpen) {
+        recipeEditMultiselectParts(kind)?.search.focus({ preventScroll: true });
+        return;
+    }
+    window.requestAnimationFrame(() => {
+        const parts = recipeEditMultiselectParts(kind);
+        if (!parts) return;
+        const removeButtons = Array.from(
+            parts.chips.querySelectorAll("[data-recipe-edit-multiselect-remove]"),
+        );
+        (removeButtons[Math.min(numericIndex, removeButtons.length - 1)] || parts.trigger)
+            .focus({ preventScroll: true });
+    });
 }
 
 function renderRecipeEditMultiselect(kind) {
@@ -26938,7 +27061,6 @@ function renderRecipeEditMultiselect(kind) {
         return chip;
     });
     parts.chips.replaceChildren(...chips);
-    updateRecipeEditMultiselectAddButton(kind);
     if (parts.field.classList.contains("is-open")) renderRecipeEditMultiselectOptions(kind);
 }
 
@@ -26952,34 +27074,40 @@ function moveRecipeEditMultiselectOptionFocus(parts, current, offset) {
 function handleRecipeEditMultiselectSearchKeydown(event, kind) {
     const parts = recipeEditMultiselectParts(kind);
     if (!parts) return;
-    const { search, add, listbox } = parts;
+    const { search, listbox } = parts;
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
         event.preventDefault();
-        openRecipeEditMultiselect(kind);
+        openRecipeEditMultiselect(kind, { focus: false });
         const options = Array.from(listbox.querySelectorAll("[role='option']"));
         options[event.key === "ArrowDown" ? 0 : options.length - 1]?.focus({ preventScroll: true });
     } else if (event.key === "Enter") {
         event.preventDefault();
-        if (add) {
-            if (!add.disabled) add.click();
+        const queryKey = recipeEditTagKey(search.value);
+        if (!queryKey) return;
+        const options = Array.from(listbox.querySelectorAll("[role='option']"));
+        const exactOption = options.find(option => (
+            recipeEditTagKey(option.dataset.recipeEditMultiselectValue) === queryKey
+        ));
+        if (exactOption) {
+            exactOption.click();
+        } else if (kind === "custom" && queryKey) {
+            createRecipeEditCustomTagFromSearch();
         } else {
-            const option = listbox.querySelector("[role='option']");
-            if (!listbox.hidden && option) option.click();
+            options.find(option => !option.classList.contains("is-selected"))?.click();
         }
     } else if (event.key === "Escape") {
         event.preventDefault();
-        closeRecipeEditMultiselect(kind);
+        closeRecipeEditMultiselect(kind, { focusTrigger: true });
     } else if (event.key === "Backspace" && !search.value) {
         const values = recipeEditMultiselectValues(kind);
         if (values.length) removeRecipeEditMultiselectValue(kind, values.length - 1);
-    } else if (event.key === "Tab") {
-        window.setTimeout(() => closeRecipeEditMultiselect(kind), 0);
     }
 }
 
 function initializeRecipeEditMultiselectField(field, kind) {
     if (!field || field.dataset.recipeEditMultiselectInitialized === "true") return;
     field.dataset.recipeEditMultiselectInitialized = "true";
+    field.classList.add("recipe-edit-multiselect-field");
     const copy = recipeEditMultiselectCopy(kind);
     const control = document.createElement("div");
     control.className = "recipe-edit-multiselect-control recipe-edit-metadata-value";
@@ -26987,8 +27115,24 @@ function initializeRecipeEditMultiselectField(field, kind) {
     const chips = document.createElement("div");
     chips.className = "recipe-edit-multiselect-chips";
     chips.dataset.recipeEditMultiselectChips = "";
-    const entry = document.createElement("div");
-    entry.className = "recipe-edit-multiselect-entry";
+    const trigger = document.createElement("button");
+    trigger.type = "button";
+    trigger.id = `recipeEdit${kind.charAt(0).toUpperCase() + kind.slice(1)}Add`;
+    trigger.className = "recipe-edit-multiselect-trigger";
+    trigger.dataset.recipeEditMultiselectTrigger = "";
+    trigger.setAttribute("aria-label", copy.addLabel);
+    trigger.setAttribute("aria-haspopup", "listbox");
+    trigger.setAttribute("aria-expanded", "false");
+    trigger.title = copy.addLabel;
+    trigger.innerHTML = '<span aria-hidden="true">+</span>';
+    const popover = document.createElement("div");
+    popover.id = `${trigger.id}Popover`;
+    popover.className = "recipe-edit-multiselect-popover";
+    popover.dataset.recipeEditMultiselectPopover = "";
+    popover.hidden = true;
+    trigger.setAttribute("aria-controls", popover.id);
+    const searchWrap = document.createElement("div");
+    searchWrap.className = "recipe-edit-multiselect-search-wrap";
     const search = document.createElement("input");
     search.type = "search";
     search.id = `recipeEdit${kind.charAt(0).toUpperCase() + kind.slice(1)}Search`;
@@ -27001,41 +27145,52 @@ function initializeRecipeEditMultiselectField(field, kind) {
     search.setAttribute("aria-autocomplete", "list");
     search.setAttribute("aria-expanded", "false");
     search.setAttribute("aria-label", copy.inputLabel);
-    const add = kind === "cuisine" || kind === "dietary"
-        ? document.createElement("button")
-        : null;
-    if (add) {
-        add.type = "button";
-        add.className = "recipe-edit-multiselect-add";
-        add.dataset.recipeEditMultiselectAdd = "";
-        add.disabled = true;
-        add.setAttribute("aria-label", copy.addLabel);
-        add.title = copy.addLabel;
-        add.textContent = "+";
-    }
     const listbox = document.createElement("div");
     listbox.id = `${search.id}Options`;
     listbox.className = "recipe-edit-multiselect-options";
     listbox.dataset.recipeEditMultiselectListbox = "";
     listbox.setAttribute("role", "listbox");
     listbox.setAttribute("aria-label", `${copy.inputLabel} options`);
+    listbox.setAttribute("aria-multiselectable", "true");
+    listbox.tabIndex = -1;
     listbox.hidden = true;
     search.setAttribute("aria-controls", listbox.id);
+    const footer = document.createElement("div");
+    footer.className = "recipe-edit-multiselect-footer";
+    const done = document.createElement("button");
+    done.type = "button";
+    done.className = "recipe-edit-multiselect-done";
+    done.dataset.recipeEditMultiselectDone = "";
+    done.textContent = "Done";
+    footer.appendChild(done);
     const status = document.createElement("div");
     status.className = "recipe-edit-multiselect-status";
     status.dataset.recipeEditMultiselectStatus = "";
     status.setAttribute("role", "status");
     status.setAttribute("aria-live", "polite");
-    entry.append(chips, search);
-    control.appendChild(entry);
-    if (add) control.appendChild(add);
-    control.append(listbox, status);
+    status.setAttribute("aria-atomic", "true");
+    searchWrap.appendChild(search);
+    popover.append(searchWrap, listbox, footer);
+    control.append(chips, trigger, popover, status);
     field.appendChild(control);
 
-    search.addEventListener("focus", () => openRecipeEditMultiselect(kind));
-    search.addEventListener("click", () => openRecipeEditMultiselect(kind));
+    trigger.addEventListener("click", () => {
+        if (trigger.getAttribute("aria-expanded") === "true") {
+            closeRecipeEditMultiselect(kind);
+        } else {
+            openRecipeEditMultiselect(kind);
+        }
+    });
+    trigger.addEventListener("keydown", event => {
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            openRecipeEditMultiselect(kind);
+        } else if (event.key === "Escape") {
+            event.preventDefault();
+            closeRecipeEditMultiselect(kind, { focusTrigger: true });
+        }
+    });
     search.addEventListener("input", () => {
-        openRecipeEditMultiselect(kind);
         renderRecipeEditMultiselectOptions(kind);
     });
     search.addEventListener("keydown", event => handleRecipeEditMultiselectSearchKeydown(event, kind));
@@ -27066,14 +27221,34 @@ function initializeRecipeEditMultiselectField(field, kind) {
             option.click();
         } else if (event.key === "Escape") {
             event.preventDefault();
-            closeRecipeEditMultiselect(kind, { focus: true });
+            closeRecipeEditMultiselect(kind, { focusTrigger: true });
+        } else if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+            event.preventDefault();
+            const current = recipeEditMultiselectParts(kind);
+            current?.search.focus({ preventScroll: true });
+            if (current) {
+                current.search.value += event.key;
+                renderRecipeEditMultiselectOptions(kind);
+            }
         }
     });
     chips.addEventListener("click", event => {
         const remove = event.target.closest?.("[data-recipe-edit-multiselect-remove]");
         if (remove) removeRecipeEditMultiselectValue(kind, remove.dataset.recipeEditMultiselectRemove);
     });
-    add?.addEventListener("click", () => addRecipeEditMultiselectSearchValues(kind));
+    done.addEventListener("click", () => closeRecipeEditMultiselect(kind, { focusTrigger: true }));
+    field.addEventListener("keydown", event => {
+        if (event.key === "Escape" && field.classList.contains("is-open")) {
+            event.preventDefault();
+            event.stopPropagation();
+            closeRecipeEditMultiselect(kind, { focusTrigger: true });
+        }
+    });
+    field.addEventListener("focusout", () => {
+        window.setTimeout(() => {
+            if (!field.contains(document.activeElement)) closeRecipeEditMultiselect(kind);
+        }, 0);
+    });
     if (!document.body.dataset.recipeEditMultiselectDismissBound) {
         document.body.dataset.recipeEditMultiselectDismissBound = "true";
         document.addEventListener("pointerdown", event => {
@@ -27083,6 +27258,19 @@ function initializeRecipeEditMultiselectField(field, kind) {
                 }
             });
         });
+    }
+    if (!document.body.dataset.recipeEditMultiselectPositionBound) {
+        document.body.dataset.recipeEditMultiselectPositionBound = "true";
+        window.addEventListener("resize", scheduleRecipeEditMultiselectPopoverPosition);
+        window.visualViewport?.addEventListener(
+            "resize",
+            scheduleRecipeEditMultiselectPopoverPosition,
+        );
+        document.addEventListener(
+            "scroll",
+            scheduleRecipeEditMultiselectPopoverPosition,
+            true,
+        );
     }
     renderRecipeEditMultiselect(kind);
 }

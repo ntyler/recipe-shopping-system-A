@@ -43,7 +43,7 @@ def test_custom_tag_choices_are_reusable_and_case_insensitive():
     assert choices == ["Family Favorites", "Freezer Meals", "Weeknight Dinners"]
 
 
-def test_recipe_editor_renders_all_classification_fields_with_prominent_add_buttons():
+def test_recipe_editor_renders_compact_classification_token_controls():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     script = read_text("PushShoppingList/static/js/app.js")
     css = read_text("PushShoppingList/static/css/app.css")
@@ -138,20 +138,41 @@ def test_recipe_editor_renders_all_classification_fields_with_prominent_add_butt
     assert "function setRecipeEditCuisineCategories" in script
     assert "function setRecipeEditDietaryPreferences" in script
     assert "function initializeRecipeEditMultiselectField" in script
-    assert "function addRecipeEditMultiselectSearchValues" in script
-    assert "function updateRecipeEditMultiselectAddButton" in script
+    assert "function openRecipeEditMultiselect" in script
+    assert "function closeRecipeEditMultiselect" in script
+    assert "function createRecipeEditCustomTagFromSearch" in script
+    assert "function announceRecipeEditMultiselect" in script
+    assert "function positionRecipeEditMultiselectPopover" in script
+    assert "function recipeEditCustomTagHasDelimiter" in script
     assert "function handleRecipeEditMultiselectSearchKeydown" in script
-    assert 'const add = kind === "cuisine" || kind === "dietary"' in script
-    assert 'add.type = "button";' in script
-    assert 'add.dataset.recipeEditMultiselectAdd = "";' in script
-    assert 'add.textContent = "+";' in script
-    assert script.count('addLabel: "Add cuisine category"') == 1
+    assert 'trigger.type = "button";' in script
+    assert 'trigger.dataset.recipeEditMultiselectTrigger = "";' in script
+    assert 'trigger.innerHTML = \'<span aria-hidden="true">+</span>\';' in script
+    assert script.count('addLabel: "Add cuisine"') == 1
     assert script.count('addLabel: "Add dietary preference"') == 1
-    assert 'add.setAttribute("aria-label", copy.addLabel);' in script
-    assert "add.title = copy.addLabel;" in script
-    assert 'add?.addEventListener("click", () => addRecipeEditMultiselectSearchValues(kind));' in script
+    assert script.count('addLabel: "Add custom tag"') == 1
+    assert 'trigger.setAttribute("aria-label", copy.addLabel);' in script
+    assert 'trigger.setAttribute("aria-haspopup", "listbox");' in script
+    assert 'trigger.setAttribute("aria-expanded", "false");' in script
+    assert "trigger.title = copy.addLabel;" in script
+    assert "control.append(chips, trigger, popover, status);" in script
+    assert 'popover.hidden = true;' in script
+    assert 'parts.popover.hidden = false;' in script
+    assert 'parts.trigger.setAttribute("aria-expanded", "true");' in script
+    assert 'parts.trigger.focus({ preventScroll: true });' in script
+    assert 'current?.search.focus({ preventScroll: true });' in script
+    assert 'closeRecipeEditMultiselect(kind, { focusTrigger: true });' in script
     assert 'search.addEventListener("keydown", event => handleRecipeEditMultiselectSearchKeydown(event, kind));' in script
-    assert "parts.add.disabled = !additions.length;" in script
+    assert 'listbox.setAttribute("aria-multiselectable", "true");' in script
+    assert "listbox.tabIndex = -1;" in script
+    assert 'button.setAttribute("aria-selected", selected ? "true" : "false");' in script
+    assert 'button.classList.add("is-selected");' in script
+    assert 'return !queryKey || key.includes(queryKey);' in script
+    assert 'return !selectedKeys.has(key)' not in script
+    assert "function addRecipeEditMultiselectSearchValues" not in script
+    assert "function updateRecipeEditMultiselectAddButton" not in script
+    assert "recipe-edit-multiselect-entry" not in script
+    assert "recipe-edit-multiselect-add" not in script
     assert "function recipeEditStructuredCategoryMatch" in script
     assert 'data.recipeEditCreateTag' not in script
     assert "dataset.recipeEditCreateTag" in script
@@ -184,24 +205,37 @@ def test_recipe_editor_renders_all_classification_fields_with_prominent_add_butt
     assert ".recipe-edit-ai-suggestion-summary" in category_css
     assert ".recipe-edit-ai-field-actions" not in category_css
     assert ".recipe-edit-multiselect-control" in category_css
-    assert ".recipe-edit-multiselect-add" in category_css
+    assert ".recipe-edit-multiselect-trigger" in category_css
+    assert ".recipe-edit-multiselect-popover" in category_css
+    assert ".recipe-edit-multiselect-field.is-flipped .recipe-edit-multiselect-popover" in category_css
+    assert ".recipe-edit-multiselect-search-wrap" in category_css
+    assert ".recipe-edit-multiselect-done" in category_css
     assert ".recipe-edit-multiselect-options" in category_css
+    assert ".recipe-edit-multiselect-entry" not in category_css
+    assert ".recipe-edit-multiselect-add" not in category_css
     assert ".recipe-edit-classification-secondary-grid" in category_css
     assert "grid-template-columns: fit-content(190px) fit-content(300px) fit-content(320px);" in category_css
     assert "grid-template-columns: repeat(3, fit-content(190px)) fit-content(320px);" in category_css
     assert category_css.count(
         'input:not([type="hidden"]):not(.recipe-edit-multiselect-search)'
     ) == 3
-    assert ".recipe-edit-multiselect-entry > input.recipe-edit-multiselect-search" in category_css
-    assert "flex: 1 1 132px;" in category_css
-    assert "min-height: 40px;" in category_css
-    assert "width: 42px;" in category_css
-    assert "height: 42px;" in category_css
-    assert "flex: 0 0 42px;" in category_css
-    assert "padding: 0 8px;" in category_css
+    assert ".recipe-edit-multiselect-search-wrap > input.recipe-edit-multiselect-search" in category_css
+    assert "display: contents;" in category_css
+    assert "width: fit-content;" in category_css
+    assert "min-height: 42px;" in category_css
+    assert "width: 32px;" in category_css
+    assert "min-width: 32px;" in category_css
+    assert "height: 32px;" in category_css
+    assert "flex: 0 0 32px;" in category_css
+    assert "width: min(320px, calc(100vw - 32px));" in category_css
+    assert "min-width: min(280px, calc(100vw - 32px));" in category_css
+    assert "max-width: min(360px, calc(100vw - 32px));" in category_css
+    assert "height: 36px;" in category_css
+    assert "min-height: 36px;" in category_css
     assert "max-width: 100%;" in category_css
     assert "flex-wrap: wrap;" in category_css
-    assert "flex-wrap: nowrap;" in category_css
+    assert ".recipe-edit-multiselect-option.is-selected" in category_css
+    assert 'content: "✓";' in category_css
     assert "@container recipe-details (max-width: 940px)" in category_css
     assert "@container recipe-details (max-width: 820px)" in category_css
     assert "@container recipe-details (max-width: 620px)" in category_css
@@ -233,11 +267,10 @@ def test_recipe_editor_renders_all_classification_fields_with_prominent_add_butt
     assert "grid-template-columns: repeat(2, fit-content(190px));" in narrow_classification_container
 
     for declaration in (
-        "--recipe-edit-compact-multiselect-min-width: 240px;",
-        "--recipe-edit-compact-multiselect-min-width: 280px;",
+        "--recipe-edit-compact-multiselect-min-width: 0;",
         "--recipe-edit-compact-multiselect-max-width: 300px;",
         "--recipe-edit-compact-multiselect-max-width: 320px;",
-        "width: var(--recipe-edit-compact-multiselect-max-width);",
+        "width: fit-content;",
         "min-width: var(--recipe-edit-compact-multiselect-min-width);",
         "max-width: var(--recipe-edit-compact-multiselect-max-width);",
     ):
@@ -397,7 +430,7 @@ process.stdout.write(JSON.stringify({ matchedVisibleText, preservedSavedText, st
     }
 
 
-def test_recipe_classification_add_buttons_commit_trimmed_unique_values_without_form_submit():
+def test_recipe_classification_token_search_commits_only_valid_unique_values():
     node = shutil.which("node")
     if not node:
         return
@@ -415,9 +448,9 @@ def test_recipe_classification_add_buttons_commit_trimmed_unique_values_without_
         script.index("function recipeEditMultiselectCopy"):
         script.index("function recipeEditStructuredCategoryMatch")
     ]
-    add_behavior = script[
-        script.index("function recipeEditMultiselectPendingValues"):
-        script.index("function openRecipeEditMultiselect")
+    selection_behavior = script[
+        script.index("function selectRecipeEditMultiselectValue"):
+        script.index("function useRecipeEditStructuredCategorySuggestion")
     ]
     keyboard_behavior = script[
         script.index("function handleRecipeEditMultiselectSearchKeydown"):
@@ -425,123 +458,150 @@ def test_recipe_classification_add_buttons_commit_trimmed_unique_values_without_
     ]
 
     harness = r'''
-const state = { cuisine: [], dietary: [] };
+const state = { cuisine: [], dietary: [], custom: [] };
+const available = {
+    cuisine: ["🇵🇪 Peruvian", "🇮🇹 Italian"],
+    dietary: ["🍽️ Flexible", "🌱 Vegan"],
+    custom: ["Creamy", "Spicy", "Audit Tag"],
+};
+const announcements = [];
 let formSubmissions = 0;
 const CATEGORY_SOURCE_USER_SELECTED = "user_selected";
+const window = { requestAnimationFrame(callback) { callback(); } };
 
-function recipeEditMultiselectOptions() { return []; }
+function recipeEditMultiselectOptions(kind) { return available[kind].slice(); }
 function recipeEditMultiselectValues(kind) { return state[kind].slice(); }
 function setRecipeEditMultiselectValues(kind, values) {
     state[kind] = uniqueRecipeEditMultiselectValues(values, kind);
 }
-function openRecipeEditMultiselect() {}
-function closeRecipeEditMultiselect() {}
+function announceRecipeEditMultiselect(kind, message) {
+    announcements.push({ kind, message });
+}
+function renderRecipeEditMultiselectOptions() {}
+function openRecipeEditMultiselect(kind) {
+    const parts = allParts[kind];
+    parts.open = true;
+    parts.search.focus();
+}
+function closeRecipeEditMultiselect(kind, options = {}) {
+    const parts = allParts[kind];
+    parts.open = false;
+    parts.search.value = "";
+    if (options.focusTrigger) parts.trigger.focus();
+}
 function removeRecipeEditMultiselectValue() {}
-const window = { setTimeout(callback) { callback(); } };
 
-function createParts(kind) {
-    const attributes = new Map();
-    const search = {
-        value: "",
-        focused: false,
-        focus() { this.focused = true; },
+function makeOption(kind, value, selected = false) {
+    return {
+        dataset: { recipeEditMultiselectValue: value },
+        classList: { contains(name) { return name === "is-selected" && selected; } },
+        click() { selectRecipeEditMultiselectValue(kind, value); },
+        focus() {},
     };
-    const add = {
-        type: "button",
-        disabled: true,
-        title: "",
-        setAttribute(name, value) { attributes.set(name, String(value)); },
-        getAttribute(name) { return attributes.get(name) || null; },
-        click() {
-            if (!this.disabled) addRecipeEditMultiselectSearchValues(kind);
+}
+
+function createParts() {
+    const parts = {
+        open: false,
+        options: [],
+        search: {
+            value: "",
+            focused: false,
+            focus() { this.focused = true; },
+        },
+        trigger: {
+            focused: false,
+            focus() { this.focused = true; },
         },
     };
-    const listbox = {
-        hidden: false,
-        querySelector() { return null; },
-        querySelectorAll() { return []; },
+    parts.listbox = {
+        querySelectorAll() { return parts.options; },
     };
-    return { search, add, listbox };
+    return parts;
 }
 
 const allParts = {
-    cuisine: createParts("cuisine"),
-    dietary: createParts("dietary"),
+    cuisine: createParts(),
+    dietary: createParts(),
+    custom: createParts(),
 };
 function recipeEditMultiselectParts(kind) { return allParts[kind]; }
-''' + normalizers + unique_values + copy + add_behavior + keyboard_behavior + r'''
+''' + normalizers + unique_values + copy + selection_behavior + keyboard_behavior + r'''
 
-function pressEnter(kind, value) {
+function press(kind, key, value, options = []) {
     const parts = allParts[kind];
     parts.search.value = value;
     parts.search.focused = false;
-    updateRecipeEditMultiselectAddButton(kind);
+    parts.options = options;
     let prevented = false;
     handleRecipeEditMultiselectSearchKeydown({
-        key: "Enter",
+        key,
         preventDefault() { prevented = true; },
     }, kind);
-    if (!prevented) formSubmissions += 1;
+    if (key === "Enter" && !prevented) formSubmissions += 1;
     return {
         prevented,
-        cleared: parts.search.value === "",
+        open: parts.open,
         focused: parts.search.focused,
+        triggerFocused: parts.trigger.focused,
         values: state[kind].slice(),
     };
 }
 
-const cuisine = allParts.cuisine;
-updateRecipeEditMultiselectAddButton("cuisine");
-const initial = {
-    disabled: cuisine.add.disabled,
-    label: cuisine.add.getAttribute("aria-label"),
-    title: cuisine.add.title,
-};
-
-cuisine.search.value = "  Italian  ";
-updateRecipeEditMultiselectAddButton("cuisine");
-const clickEnabled = !cuisine.add.disabled;
-cuisine.add.click();
-const afterClick = {
-    values: state.cuisine.slice(),
-    cleared: cuisine.search.value === "",
-    focused: cuisine.search.focused,
-};
-
-cuisine.search.value = " italian ";
-updateRecipeEditMultiselectAddButton("cuisine");
-const duplicateDisabled = cuisine.add.disabled;
-cuisine.add.click();
-
-cuisine.search.value = "   ";
-updateRecipeEditMultiselectAddButton("cuisine");
-const blankDisabled = cuisine.add.disabled;
-cuisine.add.click();
-
-const enterAdd = pressEnter("cuisine", " Thai ");
-const enterDuplicate = pressEnter("cuisine", "thai");
-const enterBlank = pressEnter("cuisine", "   ");
-
-const dietary = allParts.dietary;
-dietary.search.value = "Vegan";
-updateRecipeEditMultiselectAddButton("dietary");
-dietary.add.click();
+const cuisineAdd = press(
+    "cuisine",
+    "Enter",
+    "peruvian",
+    [makeOption("cuisine", "🇵🇪 Peruvian")],
+);
+const cuisineDuplicate = press(
+    "cuisine",
+    "Enter",
+    "PERUVIAN",
+    [makeOption("cuisine", "🇵🇪 Peruvian", true)],
+);
+const cuisineUnknown = press("cuisine", "Enter", "Martian", []);
+const dietaryAdd = press(
+    "dietary",
+    "Enter",
+    "vegan",
+    [makeOption("dietary", "🌱 Vegan")],
+);
+const existingCustom = press(
+    "custom",
+    "Enter",
+    "  creamy ",
+    [makeOption("custom", "Creamy")],
+);
+const newCustom = press("custom", "Enter", "  mediterranean  ", []);
+const duplicateCustom = press("custom", "Enter", "mediterranean", []);
+const delimitedSavedCustom = press(
+    "custom",
+    "Enter",
+    "Audit, Tag",
+    [makeOption("custom", "Audit Tag")],
+);
+const delimitedNewCustom = press("custom", "Enter", "New, Split", []);
+const blankCustom = press("custom", "Enter", "   ", []);
+allParts.custom.open = true;
+const beforeEscape = state.custom.slice();
+const escape = press("custom", "Escape", "sp", []);
 
 process.stdout.write(JSON.stringify({
-    initial,
-    clickEnabled,
-    afterClick,
-    duplicateDisabled,
-    blankDisabled,
-    afterRejectedValues: state.cuisine.slice(),
-    enterAdd,
-    enterDuplicate,
-    enterBlank,
-    dietary: {
-        values: state.dietary.slice(),
-        label: dietary.add.getAttribute("aria-label"),
-        title: dietary.add.title,
-    },
+    cuisineAdd,
+    cuisineDuplicate,
+    cuisineUnknown,
+    dietaryAdd,
+    existingCustom,
+    newCustom,
+    duplicateCustom,
+    delimitedSavedCustom,
+    delimitedNewCustom,
+    blankCustom,
+    escape,
+    beforeEscape,
+    finalState: state,
+    announcements,
     formSubmissions,
 }));
 '''
@@ -557,44 +617,164 @@ process.stdout.write(JSON.stringify({
 
     assert completed.returncode == 0, completed.stderr
     result = json.loads(completed.stdout)
-    assert result["initial"] == {
-        "disabled": True,
-        "label": "Add cuisine category",
-        "title": "Add cuisine category",
-    }
-    assert result["clickEnabled"] is True
-    assert result["afterClick"] == {
-        "values": ["Italian"],
-        "cleared": True,
+    assert result["cuisineAdd"] == {
+        "prevented": True,
+        "open": True,
         "focused": True,
+        "triggerFocused": False,
+        "values": ["🇵🇪 Peruvian"],
     }
-    assert result["duplicateDisabled"] is True
-    assert result["blankDisabled"] is True
-    assert result["afterRejectedValues"] == ["Italian", "Thai"]
-    assert result["enterAdd"] == {
+    assert result["cuisineDuplicate"]["values"] == ["🇵🇪 Peruvian"]
+    assert result["cuisineUnknown"]["values"] == ["🇵🇪 Peruvian"]
+    assert result["dietaryAdd"]["values"] == ["🌱 Vegan"]
+    assert result["existingCustom"]["values"] == ["Creamy"]
+    assert result["newCustom"]["values"] == ["Creamy", "Mediterranean"]
+    assert result["duplicateCustom"]["values"] == ["Creamy", "Mediterranean"]
+    assert result["delimitedSavedCustom"]["values"] == ["Creamy", "Mediterranean", "Audit Tag"]
+    assert result["delimitedNewCustom"]["values"] == ["Creamy", "Mediterranean", "Audit Tag"]
+    assert result["blankCustom"]["values"] == ["Creamy", "Mediterranean", "Audit Tag"]
+    assert result["beforeEscape"] == ["Creamy", "Mediterranean", "Audit Tag"]
+    assert result["escape"] == {
         "prevented": True,
-        "cleared": True,
-        "focused": True,
-        "values": ["Italian", "Thai"],
-    }
-    assert result["enterDuplicate"] == {
-        "prevented": True,
-        "cleared": False,
+        "open": False,
         "focused": False,
-        "values": ["Italian", "Thai"],
+        "triggerFocused": True,
+        "values": ["Creamy", "Mediterranean", "Audit Tag"],
     }
-    assert result["enterBlank"] == {
-        "prevented": True,
-        "cleared": False,
-        "focused": False,
-        "values": ["Italian", "Thai"],
-    }
-    assert result["dietary"] == {
-        "values": ["Vegan"],
-        "label": "Add dietary preference",
-        "title": "Add dietary preference",
-    }
+    assert any("already selected" in item["message"] for item in result["announcements"])
+    assert any("one tag at a time" in item["message"] for item in result["announcements"])
     assert result["formSubmissions"] == 0
+
+
+def test_recipe_classification_multiselects_preserve_primary_hidden_values():
+    node = shutil.which("node")
+    if not node:
+        return
+
+    script = read_text("PushShoppingList/static/js/app.js")
+    normalizers = script[
+        script.index("function normalizeRecipeEditTagText"):
+        script.index("function recipeEditMultiselectField")
+    ]
+    value_logic = script[
+        script.index("function canonicalRecipeEditMultiselectValue"):
+        script.index("function setRecipeEditCustomCategories")
+    ]
+    harness = r'''
+const CATEGORY_SOURCE_USER_SELECTED = "user_selected";
+const available = {
+    cuisine: ["🇵🇪 Peruvian", "🇮🇹 Italian"],
+    dietary: ["🍽️ Flexible", "🌱 Vegan"],
+};
+let eventCount = 0;
+let sourceUpdates = 0;
+const inputs = Object.fromEntries([
+    "recipeEditCuisineTags",
+    "recipeEditCategoryCuisine",
+    "recipeEditDietaryPreferences",
+    "recipeEditCategoryDietaryPreference",
+].map(id => [id, {
+    id,
+    value: "",
+    dispatchEvent() { eventCount += 1; },
+}]));
+const document = {
+    getElementById(id) { return id === "recipeEditForm" ? {} : inputs[id] || null; },
+};
+function Event(type) { this.type = type; }
+function recipeEditMultiselectOptions(kind) { return available[kind] || []; }
+function renderRecipeEditMultiselect() {}
+function setFormCategorySource() { sourceUpdates += 1; }
+''' + normalizers + value_logic + r'''
+
+setRecipeEditCuisineCategories(["Peruvian"], { notify: false, primary: "Peruvian" });
+const initialCuisine = {
+    primary: inputs.recipeEditCategoryCuisine.value,
+    list: inputs.recipeEditCuisineTags.value,
+    events: eventCount,
+};
+setRecipeEditCuisineCategories([...recipeEditCuisineTagValues(), "Italian"]);
+const addedCuisine = {
+    primary: inputs.recipeEditCategoryCuisine.value,
+    list: inputs.recipeEditCuisineTags.value,
+};
+setRecipeEditCuisineCategories(["Italian"]);
+const promotedCuisine = {
+    primary: inputs.recipeEditCategoryCuisine.value,
+    list: inputs.recipeEditCuisineTags.value,
+};
+setRecipeEditCuisineCategories([]);
+const clearedCuisine = {
+    primary: inputs.recipeEditCategoryCuisine.value,
+    list: inputs.recipeEditCuisineTags.value,
+};
+
+setRecipeEditDietaryPreferences(["Flexible"], { notify: false, primary: "Flexible" });
+setRecipeEditDietaryPreferences([...recipeEditDietaryPreferenceValues(), "Vegan"]);
+const addedDietary = {
+    primary: inputs.recipeEditCategoryDietaryPreference.value,
+    list: inputs.recipeEditDietaryPreferences.value,
+};
+setRecipeEditDietaryPreferences(["Vegan"]);
+const promotedDietary = {
+    primary: inputs.recipeEditCategoryDietaryPreference.value,
+    list: inputs.recipeEditDietaryPreferences.value,
+};
+setRecipeEditDietaryPreferences([]);
+const clearedDietary = {
+    primary: inputs.recipeEditCategoryDietaryPreference.value,
+    list: inputs.recipeEditDietaryPreferences.value,
+};
+
+process.stdout.write(JSON.stringify({
+    initialCuisine,
+    addedCuisine,
+    promotedCuisine,
+    clearedCuisine,
+    addedDietary,
+    promotedDietary,
+    clearedDietary,
+    eventCount,
+    sourceUpdates,
+}));
+'''
+    completed = subprocess.run(
+        [node],
+        input=harness,
+        text=True,
+        encoding="utf-8",
+        capture_output=True,
+        check=False,
+        timeout=10,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    result = json.loads(completed.stdout)
+    assert result["initialCuisine"] == {
+        "primary": "🇵🇪 Peruvian",
+        "list": "🇵🇪 Peruvian",
+        "events": 0,
+    }
+    assert result["addedCuisine"] == {
+        "primary": "🇵🇪 Peruvian",
+        "list": "🇵🇪 Peruvian, 🇮🇹 Italian",
+    }
+    assert result["promotedCuisine"] == {
+        "primary": "🇮🇹 Italian",
+        "list": "🇮🇹 Italian",
+    }
+    assert result["clearedCuisine"] == {"primary": "", "list": ""}
+    assert result["addedDietary"] == {
+        "primary": "🍽️ Flexible",
+        "list": "🍽️ Flexible, 🌱 Vegan",
+    }
+    assert result["promotedDietary"] == {
+        "primary": "🌱 Vegan",
+        "list": "🌱 Vegan",
+    }
+    assert result["clearedDietary"] == {"primary": "", "list": ""}
+    assert result["eventCount"] == 24
+    assert result["sourceUpdates"] == 6
 
 
 def test_recipe_editor_mobile_footer_uses_compact_ai_controls():
