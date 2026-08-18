@@ -1058,7 +1058,16 @@ def test_recipe_details_match_classification_layout_and_field_order():
     assert "grid-template-columns: max-content max-content repeat(5, fit-content(170px));" in primary_grid_rule
     assert "justify-content: start;" in primary_grid_rule
     assert "grid-template-columns: fit-content(190px) repeat(2, minmax(0, 1fr));" in styles
-    assert "grid-template-columns: repeat(4, minmax(0, 1fr));" in styles
+    secondary_grid_start = styles.index(
+        ".recipe-edit-classification-secondary-grid {"
+    )
+    secondary_grid_rule = styles[
+        secondary_grid_start:styles.index("}", secondary_grid_start)
+    ]
+    assert (
+        "grid-template-columns: repeat(3, fit-content(190px)) minmax(0, 1fr);"
+        in secondary_grid_rule
+    )
 
     collapsed_rules = re.findall(
         r"\.recipe-edit-details-primary-grid\.recipe-edit-time-breakdown-collapsed\s*\{([^{}]*)\}",

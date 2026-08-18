@@ -188,7 +188,7 @@ def test_recipe_editor_renders_all_classification_fields_with_prominent_add_butt
     assert ".recipe-edit-multiselect-options" in category_css
     assert ".recipe-edit-classification-secondary-grid" in category_css
     assert "grid-template-columns: fit-content(190px) repeat(2, minmax(0, 1fr));" in category_css
-    assert "grid-template-columns: repeat(4, minmax(0, 1fr));" in category_css
+    assert "grid-template-columns: repeat(3, fit-content(190px)) minmax(0, 1fr);" in category_css
     assert category_css.count(
         'input:not([type="hidden"]):not(.recipe-edit-multiselect-search)'
     ) == 3
@@ -206,52 +206,43 @@ def test_recipe_editor_renders_all_classification_fields_with_prominent_add_butt
     assert "@container recipe-details (max-width: 520px)" in category_css
     assert "@media (max-width: 1100px)" in category_css
     assert "@media (max-width: 640px)" in category_css
+    assert category_css.count("> .recipe-edit-custom-categories-field {") == 2
+    assert category_css.count("grid-column: 1 / -1;") >= 2
 
-    meal_type_grid_start = category_css.index(
-        ".recipe-edit-classification-primary-grid {"
-    )
-    meal_type_grid_rule = category_css[
-        meal_type_grid_start:category_css.index("}", meal_type_grid_start)
-    ]
     for declaration in (
-        "--recipe-edit-meal-type-field-sizing: content;",
-        "--recipe-edit-meal-type-flex: 0 1 auto;",
-        "--recipe-edit-meal-type-width: auto;",
-        "--recipe-edit-meal-type-min-width: 132px;",
-        "--recipe-edit-meal-type-max-width: 190px;",
-        "--recipe-edit-meal-type-justify-self: start;",
+        "--recipe-edit-compact-select-field-sizing: content;",
+        "--recipe-edit-compact-select-flex: 0 1 auto;",
+        "--recipe-edit-compact-select-width: auto;",
+        "--recipe-edit-compact-select-min-width: 132px;",
+        "--recipe-edit-compact-select-max-width: 190px;",
+        "--recipe-edit-compact-select-justify-self: start;",
     ):
-        assert declaration in meal_type_grid_rule
+        assert declaration in category_css
 
-    meal_type_rule_start = category_css.index(
-        ".recipe-edit-classification-primary-grid #recipeEditCategoryMealType {"
-    )
-    meal_type_rule = category_css[
-        meal_type_rule_start:category_css.index("}", meal_type_rule_start)
-    ]
     for property_name in ("field-sizing", "flex", "width", "min-width", "max-width"):
-        assert f"{property_name}: var(--recipe-edit-meal-type-" in meal_type_rule
+        assert f"{property_name}: var(--recipe-edit-compact-select-" in category_css
 
-    quiet_state_selector = (
-        "#recipeEditCategoryMealType:not([disabled]):not([readonly])"
-        ":not([aria-invalid=\"true\"]):not([data-recipe-edit-validation-invalid=\"true\"])"
+    compact_select_ids = (
+        "recipeEditCategoryMealType",
+        "recipeEditCategoryMainIngredient",
+        "recipeEditCategoryCookingMethod",
+        "recipeEditCategoryOccasion",
     )
-    assert f"{quiet_state_selector} {{" in css
-    assert f"{quiet_state_selector}:hover {{" in css
-    assert (
-        "#recipeEditCategoryMealType:not([disabled]):not([readonly])"
-        ":is(:focus, :focus-visible) {"
-    ) in css
+    for field_id in compact_select_ids:
+        assert f"#{field_id}" in category_css
+        assert css.count(f"#{field_id}") >= 6
+    assert "):not([disabled]):not([readonly]):not([aria-invalid=\"true\"])" in css
+    assert "):not([disabled]):not([readonly]):is(:focus, :focus-visible) {" in css
 
     mobile_start = category_css.index("@media (max-width: 640px)")
     mobile = category_css[mobile_start:]
     for declaration in (
-        "--recipe-edit-meal-type-field-sizing: fixed;",
-        "--recipe-edit-meal-type-flex: 1 1 auto;",
-        "--recipe-edit-meal-type-width: 100%;",
-        "--recipe-edit-meal-type-min-width: 0;",
-        "--recipe-edit-meal-type-max-width: 100%;",
-        "--recipe-edit-meal-type-justify-self: stretch;",
+        "--recipe-edit-compact-select-field-sizing: fixed;",
+        "--recipe-edit-compact-select-flex: 1 1 auto;",
+        "--recipe-edit-compact-select-width: 100%;",
+        "--recipe-edit-compact-select-min-width: 0;",
+        "--recipe-edit-compact-select-max-width: 100%;",
+        "--recipe-edit-compact-select-justify-self: stretch;",
     ):
         assert declaration in mobile
 
