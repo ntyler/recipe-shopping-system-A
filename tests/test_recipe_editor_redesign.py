@@ -1471,7 +1471,9 @@ def test_recipe_metadata_fields_have_accessible_tooltips():
     for label, help_text in expected_tooltips.items():
         assert f'"{label}", "{help_text}"' in organizer
 
-    assert "function addRecipeEditMetadataTooltip(field, label, helpText)" in script
+    assert "function addRecipeEditMetadataTooltip(field, label, helpText, options = {})" in script
+    assert 'const labelTrigger = options.trigger === "label"' in script
+    assert organizer.count('{ trigger: "label" }') == 2
     assert 'trigger.setAttribute("role", "button")' in script
     assert 'trigger.setAttribute("tabindex", "0")' in script
     assert 'trigger.setAttribute("aria-describedby", tooltipId)' in script
@@ -1480,12 +1482,18 @@ def test_recipe_metadata_fields_have_accessible_tooltips():
     assert 'trigger.addEventListener("pointerenter"' in script
     assert 'trigger.addEventListener("focus"' in script
     assert 'trigger.addEventListener("click"' in script
+    assert 'trigger.addEventListener("pointerdown"' in script
     assert 'event.key === "Enter" || event.key === " "' in script
+    assert 'tooltip.addEventListener("pointerenter", cancelRecipeEditMetadataTooltipClose)' in script
+    assert "const overlapsControlBelow = controlRect" in script
     assert 'document.addEventListener("pointerdown"' in script
     assert ".recipe-edit-metadata-tooltip-trigger:focus-visible" in css
+    assert ".recipe-edit-metadata-tooltip-label-trigger {" in css
+    assert "text-decoration-style: dotted;" in css
+    assert "cursor: help;" in css
     assert ".recipe-edit-metadata-tooltip[hidden]" in css
     tooltip_trigger_rule = css[
-        css.index("body.recipe-edit-standalone-page .recipe-edit-metadata-tooltip-trigger {"):
+        css.index(".recipe-edit-metadata-tooltip-trigger:not(.recipe-edit-metadata-tooltip-label-trigger) {"):
     ]
     tooltip_trigger_rule = tooltip_trigger_rule[:tooltip_trigger_rule.index("}")]
     for declaration in (
@@ -1504,6 +1512,7 @@ def test_recipe_metadata_fields_have_accessible_tooltips():
         assert declaration in tooltip_trigger_rule
     assert "position: fixed;" in css[css.index("body.recipe-edit-standalone-page .recipe-edit-metadata-tooltip {"):]
     assert "max-width: calc(100vw - 24px);" in css
+    assert "pointer-events: auto;" in css[css.index("body.recipe-edit-standalone-page .recipe-edit-metadata-tooltip {"):]
 
 
 def test_recipe_editor_standard_fields_are_quiet_until_active():

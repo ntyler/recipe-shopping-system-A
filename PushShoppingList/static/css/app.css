@@ -57910,7 +57910,8 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-
     white-space: normal;
 }
 
-body.recipe-edit-standalone-page .recipe-edit-metadata-tooltip-trigger {
+body.recipe-edit-standalone-page
+    .recipe-edit-metadata-tooltip-trigger:not(.recipe-edit-metadata-tooltip-label-trigger) {
     display: inline-flex;
     width: 16px;
     min-width: 16px;
@@ -57936,8 +57937,10 @@ body.recipe-edit-standalone-page .recipe-edit-metadata-tooltip-trigger {
     user-select: none;
 }
 
-body.recipe-edit-standalone-page .recipe-edit-metadata-tooltip-trigger:is(:hover, :focus-visible),
-body.recipe-edit-standalone-page .recipe-edit-metadata-tooltip-open .recipe-edit-metadata-tooltip-trigger {
+body.recipe-edit-standalone-page
+    .recipe-edit-metadata-tooltip-trigger:not(.recipe-edit-metadata-tooltip-label-trigger):is(:hover, :focus-visible),
+body.recipe-edit-standalone-page .recipe-edit-metadata-tooltip-open
+    .recipe-edit-metadata-tooltip-trigger:not(.recipe-edit-metadata-tooltip-label-trigger) {
     border-color: var(--app-primary-hover);
     color: var(--app-primary-hover);
 }
@@ -57967,7 +57970,7 @@ body.recipe-edit-standalone-page .recipe-edit-metadata-tooltip {
     line-height: 1.4;
     text-align: left;
     white-space: normal;
-    pointer-events: none;
+    pointer-events: auto;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-metadata-value {
@@ -57978,6 +57981,26 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-
     justify-content: flex-start;
     gap: 6px;
     text-align: left;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-metadata-tooltip-label-trigger {
+    color: inherit;
+    cursor: help;
+    text-decoration-line: underline;
+    text-decoration-style: dotted;
+    text-decoration-thickness: 1px;
+    text-decoration-color: color-mix(in srgb, var(--app-muted) 46%, transparent);
+    text-underline-offset: 3px;
+    touch-action: manipulation;
+    user-select: none;
+    transition: color 140ms ease, text-decoration-color 140ms ease;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-metadata-tooltip-label-trigger:is(:hover, :focus-visible),
+body.recipe-edit-standalone-page .recipe-edit-metadata-tooltip-open
+    .recipe-edit-metadata-tooltip-label-trigger {
+    color: color-mix(in srgb, var(--app-muted) 72%, var(--app-text-strong));
+    text-decoration-color: var(--app-muted);
 }
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-metadata-value :is(input, select) {
