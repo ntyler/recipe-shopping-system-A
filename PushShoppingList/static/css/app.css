@@ -77690,7 +77690,7 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
     .recipe-edit-classification-secondary-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
@@ -77775,6 +77775,19 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
     .recipe-edit-multiselect-control:focus-within {
     outline: 2px solid color-mix(in srgb, var(--app-primary-hover) 38%, transparent);
     outline-offset: 1px;
+}
+
+body.recipe-edit-standalone-page #recipeEditForm #recipeEditCategoriesSection
+    .recipe-edit-classification-grid .recipe-edit-metadata-value
+    > select:not([aria-invalid="true"]):not([data-recipe-edit-validation-invalid="true"]) {
+    border-color: var(--app-border-strong);
+    background-color: var(--app-surface);
+}
+
+body.recipe-edit-standalone-page #recipeEditForm #recipeEditCategoriesSection
+    .recipe-edit-classification-grid .recipe-edit-metadata-value
+    > select:not([disabled]):not([aria-invalid="true"]):not([data-recipe-edit-validation-invalid="true"]):is(:hover, :focus-visible) {
+    border-color: var(--app-primary-hover);
 }
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
@@ -78224,6 +78237,44 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
     background: transparent;
     color: var(--app-text);
     font-size: 13px;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-multiselect-add {
+    display: inline-grid;
+    width: 30px;
+    min-width: 30px;
+    height: 30px;
+    flex: 0 0 30px;
+    margin: 0;
+    padding: 0;
+    place-items: center;
+    border: 1px solid var(--app-border-strong);
+    border-radius: 7px;
+    background: var(--app-primary-soft);
+    color: var(--app-primary-hover);
+}
+
+body.recipe-edit-standalone-page .recipe-edit-multiselect-add:not(:disabled):is(:hover, :focus-visible) {
+    border-color: var(--app-primary-hover);
+    background: color-mix(in srgb, var(--app-primary-soft) 72%, var(--app-surface));
+}
+
+body.recipe-edit-standalone-page .recipe-edit-multiselect-add:focus-visible {
+    outline: 2px solid var(--app-focus);
+    outline-offset: 1px;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-multiselect-add:disabled {
+    border-color: color-mix(in srgb, var(--app-border-strong) 62%, transparent);
+    background: transparent;
+    color: var(--app-muted);
+    cursor: not-allowed;
+    opacity: .62;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-multiselect-add svg {
+    width: 14px;
+    height: 14px;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-multiselect-search::placeholder {

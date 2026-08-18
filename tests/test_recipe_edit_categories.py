@@ -130,6 +130,14 @@ def test_recipe_editor_consolidates_cuisine_and_custom_tags_in_classification():
     assert "function setRecipeEditCuisineCategories" in script
     assert "function setRecipeEditDietaryPreferences" in script
     assert "function initializeRecipeEditMultiselectField" in script
+    assert "function addRecipeEditMultiselectSearchValues" in script
+    assert "function updateRecipeEditMultiselectAddButton" in script
+    assert 'const add = kind === "cuisine" || kind === "dietary"' in script
+    assert 'add.type = "button";' in script
+    assert 'add.dataset.recipeEditMultiselectAdd = "";' in script
+    assert 'data-recipe-metadata-icon="plus"' in script
+    assert 'add?.addEventListener("click", () => addRecipeEditMultiselectSearchValues(kind));' in script
+    assert "parts.add.disabled = !additions.length;" in script
     assert "function recipeEditStructuredCategoryMatch" in script
     assert 'data.recipeEditCreateTag' not in script
     assert "dataset.recipeEditCreateTag" in script
@@ -162,7 +170,10 @@ def test_recipe_editor_consolidates_cuisine_and_custom_tags_in_classification():
     assert ".recipe-edit-ai-suggestion-summary" in category_css
     assert ".recipe-edit-ai-field-actions" not in category_css
     assert ".recipe-edit-multiselect-control" in category_css
+    assert ".recipe-edit-multiselect-add" in category_css
     assert ".recipe-edit-multiselect-options" in category_css
+    assert ".recipe-edit-classification-secondary-grid" in category_css
+    assert "grid-template-columns: repeat(3, minmax(0, 1fr));" in category_css
     assert category_css.count(
         'input:not([type="hidden"]):not(.recipe-edit-multiselect-search)'
     ) == 3

@@ -26713,11 +26713,48 @@ function recipeEditMultiselectParts(kind) {
     const control = field.querySelector("[data-recipe-edit-multiselect-control]");
     const chips = field.querySelector("[data-recipe-edit-multiselect-chips]");
     const search = field.querySelector("[data-recipe-edit-multiselect-search]");
+    const add = field.querySelector("[data-recipe-edit-multiselect-add]");
     const listbox = field.querySelector("[data-recipe-edit-multiselect-listbox]");
     const status = field.querySelector("[data-recipe-edit-multiselect-status]");
     return control && chips && search && listbox && status
-        ? { field, control, chips, search, listbox, status }
+        ? { field, control, chips, search, add, listbox, status }
         : null;
+}
+
+function recipeEditMultiselectPendingValues(kind) {
+    const parts = recipeEditMultiselectParts(kind);
+    if (!parts) return [];
+    const selectedKeys = new Set(recipeEditMultiselectValues(kind).map(recipeEditTagKey));
+    return uniqueRecipeEditMultiselectValues(parts.search.value, kind)
+        .filter(value => !selectedKeys.has(recipeEditTagKey(value)));
+}
+
+function updateRecipeEditMultiselectAddButton(kind) {
+    const parts = recipeEditMultiselectParts(kind);
+    if (!parts?.add) return;
+    const additions = recipeEditMultiselectPendingValues(kind);
+    const copy = recipeEditMultiselectCopy(kind);
+    const label = additions.length === 1
+        ? `Add ${copy.chipLabel} ${additions[0]}`
+        : `Add ${copy.chipLabel}`;
+    parts.add.disabled = !additions.length;
+    parts.add.setAttribute("aria-label", label);
+    parts.add.title = label;
+}
+
+function addRecipeEditMultiselectSearchValues(kind) {
+    const parts = recipeEditMultiselectParts(kind);
+    if (!parts) return;
+    const additions = recipeEditMultiselectPendingValues(kind);
+    if (!additions.length) return;
+    setRecipeEditMultiselectValues(
+        kind,
+        [...recipeEditMultiselectValues(kind), ...additions],
+        { source: CATEGORY_SOURCE_USER_SELECTED },
+    );
+    parts.search.value = "";
+    openRecipeEditMultiselect(kind);
+    parts.search.focus({ preventScroll: true });
 }
 
 function openRecipeEditMultiselect(kind) {
@@ -26755,6 +26792,7 @@ function renderRecipeEditMultiselectOptions(kind) {
     if (!parts) return;
     const query = normalizeRecipeEditTagText(parts.search.value);
     const queryKey = recipeEditTagKey(query);
+    updateRecipeEditMultiselectAddButton(kind);
     const selectedKeys = new Set(recipeEditMultiselectValues(kind).map(recipeEditTagKey));
     const choices = recipeEditMultiselectOptions(kind).filter(value => {
         const key = recipeEditTagKey(value);
@@ -26875,6 +26913,7 @@ function renderRecipeEditMultiselect(kind) {
         return chip;
     });
     parts.chips.replaceChildren(...chips);
+    updateRecipeEditMultiselectAddButton(kind);
     if (parts.field.classList.contains("is-open")) renderRecipeEditMultiselectOptions(kind);
 }
 
@@ -26907,6 +26946,18 @@ function initializeRecipeEditMultiselectField(field, kind) {
     search.setAttribute("aria-autocomplete", "list");
     search.setAttribute("aria-expanded", "false");
     search.setAttribute("aria-label", copy.inputLabel);
+    const add = kind === "cuisine" || kind === "dietary"
+        ? document.createElement("button")
+        : null;
+    if (add) {
+        add.type = "button";
+        add.className = "recipe-edit-multiselect-add";
+        add.dataset.recipeEditMultiselectAdd = "";
+        add.disabled = true;
+        add.setAttribute("aria-label", `Add ${copy.chipLabel}`);
+        add.title = `Add ${copy.chipLabel}`;
+        add.innerHTML = document.querySelector('[data-recipe-metadata-icon="plus"]')?.innerHTML || "+";
+    }
     const listbox = document.createElement("div");
     listbox.id = `${search.id}Options`;
     listbox.className = "recipe-edit-multiselect-options";
@@ -26920,7 +26971,9 @@ function initializeRecipeEditMultiselectField(field, kind) {
     status.dataset.recipeEditMultiselectStatus = "";
     status.setAttribute("role", "status");
     status.setAttribute("aria-live", "polite");
-    control.append(chips, search, listbox, status);
+    control.append(chips, search);
+    if (add) control.appendChild(add);
+    control.append(listbox, status);
     field.appendChild(control);
 
     search.addEventListener("focus", () => openRecipeEditMultiselect(kind));
@@ -26940,6 +26993,9 @@ function initializeRecipeEditMultiselectField(field, kind) {
             if (!listbox.hidden && option) {
                 event.preventDefault();
                 option.click();
+            } else if (add && !add.disabled) {
+                event.preventDefault();
+                add.click();
             }
         } else if (event.key === "Escape") {
             event.preventDefault();
@@ -26985,6 +27041,7 @@ function initializeRecipeEditMultiselectField(field, kind) {
         const remove = event.target.closest?.("[data-recipe-edit-multiselect-remove]");
         if (remove) removeRecipeEditMultiselectValue(kind, remove.dataset.recipeEditMultiselectRemove);
     });
+    add?.addEventListener("click", () => addRecipeEditMultiselectSearchValues(kind));
     if (!document.body.dataset.recipeEditMultiselectDismissBound) {
         document.body.dataset.recipeEditMultiselectDismissBound = "true";
         document.addEventListener("pointerdown", event => {
