@@ -187,7 +187,7 @@ def test_recipe_editor_renders_all_classification_fields_with_prominent_add_butt
     assert ".recipe-edit-multiselect-add" in category_css
     assert ".recipe-edit-multiselect-options" in category_css
     assert ".recipe-edit-classification-secondary-grid" in category_css
-    assert "grid-template-columns: minmax(0, 1fr) repeat(2, minmax(0, 1.4fr));" in category_css
+    assert "grid-template-columns: fit-content(190px) repeat(2, minmax(0, 1fr));" in category_css
     assert "grid-template-columns: repeat(4, minmax(0, 1fr));" in category_css
     assert category_css.count(
         'input:not([type="hidden"]):not(.recipe-edit-multiselect-search)'
@@ -206,6 +206,54 @@ def test_recipe_editor_renders_all_classification_fields_with_prominent_add_butt
     assert "@container recipe-details (max-width: 520px)" in category_css
     assert "@media (max-width: 1100px)" in category_css
     assert "@media (max-width: 640px)" in category_css
+
+    meal_type_grid_start = category_css.index(
+        ".recipe-edit-classification-primary-grid {"
+    )
+    meal_type_grid_rule = category_css[
+        meal_type_grid_start:category_css.index("}", meal_type_grid_start)
+    ]
+    for declaration in (
+        "--recipe-edit-meal-type-field-sizing: content;",
+        "--recipe-edit-meal-type-flex: 0 1 auto;",
+        "--recipe-edit-meal-type-width: auto;",
+        "--recipe-edit-meal-type-min-width: 132px;",
+        "--recipe-edit-meal-type-max-width: 190px;",
+        "--recipe-edit-meal-type-justify-self: start;",
+    ):
+        assert declaration in meal_type_grid_rule
+
+    meal_type_rule_start = category_css.index(
+        ".recipe-edit-classification-primary-grid #recipeEditCategoryMealType {"
+    )
+    meal_type_rule = category_css[
+        meal_type_rule_start:category_css.index("}", meal_type_rule_start)
+    ]
+    for property_name in ("field-sizing", "flex", "width", "min-width", "max-width"):
+        assert f"{property_name}: var(--recipe-edit-meal-type-" in meal_type_rule
+
+    quiet_state_selector = (
+        "#recipeEditCategoryMealType:not([disabled]):not([readonly])"
+        ":not([aria-invalid=\"true\"]):not([data-recipe-edit-validation-invalid=\"true\"])"
+    )
+    assert f"{quiet_state_selector} {{" in css
+    assert f"{quiet_state_selector}:hover {{" in css
+    assert (
+        "#recipeEditCategoryMealType:not([disabled]):not([readonly])"
+        ":is(:focus, :focus-visible) {"
+    ) in css
+
+    mobile_start = category_css.index("@media (max-width: 640px)")
+    mobile = category_css[mobile_start:]
+    for declaration in (
+        "--recipe-edit-meal-type-field-sizing: fixed;",
+        "--recipe-edit-meal-type-flex: 1 1 auto;",
+        "--recipe-edit-meal-type-width: 100%;",
+        "--recipe-edit-meal-type-min-width: 0;",
+        "--recipe-edit-meal-type-max-width: 100%;",
+        "--recipe-edit-meal-type-justify-self: stretch;",
+    ):
+        assert declaration in mobile
 
     assert 'cuisine_tags: recipeEditCuisineTagValues(),' in script
     assert 'dietary_preferences: recipeEditDietaryPreferenceValues(),' in script

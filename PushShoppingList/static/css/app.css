@@ -63870,7 +63870,9 @@ body.recipe-edit-standalone-page #recipeEditForm :is(
     )),
     textarea,
     select
-):not([disabled]):not([readonly]):not([aria-invalid="true"]):not([data-recipe-edit-validation-invalid="true"]) {
+):not([disabled]):not([readonly]):not([aria-invalid="true"]):not([data-recipe-edit-validation-invalid="true"]),
+body.recipe-edit-standalone-page #recipeEditForm #recipeEditCategoriesSection
+    #recipeEditCategoryMealType:not([disabled]):not([readonly]):not([aria-invalid="true"]):not([data-recipe-edit-validation-invalid="true"]) {
     border-color: transparent;
     background-color: color-mix(in srgb, var(--app-bg) 68%, var(--app-surface-soft));
     box-shadow: none;
@@ -63895,7 +63897,9 @@ body.recipe-edit-standalone-page #recipeEditForm :is(
     )),
     textarea,
     select
-):not([disabled]):not([readonly]):not([aria-invalid="true"]):not([data-recipe-edit-validation-invalid="true"]):hover {
+):not([disabled]):not([readonly]):not([aria-invalid="true"]):not([data-recipe-edit-validation-invalid="true"]):hover,
+body.recipe-edit-standalone-page #recipeEditForm #recipeEditCategoriesSection
+    #recipeEditCategoryMealType:not([disabled]):not([readonly]):not([aria-invalid="true"]):not([data-recipe-edit-validation-invalid="true"]):hover {
     border-color: color-mix(in srgb, var(--app-primary-hover) 72%, var(--app-border-strong));
     background-color: color-mix(in srgb, var(--app-bg) 76%, var(--app-surface-soft));
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--app-primary-hover) 18%, transparent);
@@ -63936,7 +63940,9 @@ body.recipe-edit-standalone-page #recipeEditForm :is(
     )),
     textarea,
     select
-):not([disabled]):not([readonly]):is(:focus, :focus-visible) {
+):not([disabled]):not([readonly]):is(:focus, :focus-visible),
+body.recipe-edit-standalone-page #recipeEditForm #recipeEditCategoriesSection
+    #recipeEditCategoryMealType:not([disabled]):not([readonly]):is(:focus, :focus-visible) {
     border-color: var(--app-primary-hover);
     outline: 0;
     background-color: color-mix(in srgb, var(--app-bg) 82%, var(--app-surface-soft));
@@ -77685,7 +77691,13 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
 }
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-classification-primary-grid {
-    grid-template-columns: minmax(0, 1fr) repeat(2, minmax(0, 1.4fr));
+    --recipe-edit-meal-type-width: auto;
+    --recipe-edit-meal-type-min-width: 132px;
+    --recipe-edit-meal-type-max-width: 190px;
+    --recipe-edit-meal-type-field-sizing: content;
+    --recipe-edit-meal-type-flex: 0 1 auto;
+    --recipe-edit-meal-type-justify-self: start;
+    grid-template-columns: fit-content(190px) repeat(2, minmax(0, 1fr));
 }
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
@@ -77790,6 +77802,31 @@ body.recipe-edit-standalone-page #recipeEditForm #recipeEditCategoriesSection
     .recipe-edit-classification-grid .recipe-edit-metadata-value
     > select:not([disabled]):not([aria-invalid="true"]):not([data-recipe-edit-validation-invalid="true"]):is(:hover, :focus-visible) {
     border-color: var(--app-primary-hover);
+}
+
+body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+    .recipe-edit-classification-primary-grid
+    > .recipe-edit-detail-field:has(#recipeEditCategoryMealType) {
+    width: var(--recipe-edit-meal-type-width);
+    max-width: var(--recipe-edit-meal-type-max-width);
+    justify-self: var(--recipe-edit-meal-type-justify-self);
+}
+
+body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+    .recipe-edit-classification-primary-grid
+    .recipe-edit-detail-field:has(#recipeEditCategoryMealType)
+    .recipe-edit-metadata-value {
+    width: var(--recipe-edit-meal-type-width);
+    max-width: 100%;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+    .recipe-edit-classification-primary-grid #recipeEditCategoryMealType {
+    field-sizing: var(--recipe-edit-meal-type-field-sizing);
+    flex: var(--recipe-edit-meal-type-flex);
+    width: var(--recipe-edit-meal-type-width);
+    min-width: var(--recipe-edit-meal-type-min-width);
+    max-width: var(--recipe-edit-meal-type-max-width);
 }
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
@@ -78348,7 +78385,7 @@ body.recipe-edit-standalone-page [data-recipe-edit-category-field].is-ai-suggest
 
 @container recipe-details (max-width: 820px) {
     body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
-        :is(.recipe-edit-details-primary-grid, .recipe-edit-classification-grid) {
+        :is(.recipe-edit-details-primary-grid, .recipe-edit-classification-secondary-grid) {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
@@ -78370,6 +78407,16 @@ body.recipe-edit-standalone-page [data-recipe-edit-category-field].is-ai-suggest
     }
 
     body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+        .recipe-edit-classification-primary-grid {
+        --recipe-edit-meal-type-width: 100%;
+        --recipe-edit-meal-type-min-width: 0;
+        --recipe-edit-meal-type-max-width: 100%;
+        --recipe-edit-meal-type-field-sizing: fixed;
+        --recipe-edit-meal-type-flex: 1 1 auto;
+        --recipe-edit-meal-type-justify-self: stretch;
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
         .recipe-edit-details-primary-grid .recipe-edit-total-time-field {
         grid-column: auto;
     }
@@ -78382,7 +78429,7 @@ body.recipe-edit-standalone-page [data-recipe-edit-category-field].is-ai-suggest
 
 @media (max-width: 1100px) {
     body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
-        :is(.recipe-edit-details-primary-grid, .recipe-edit-classification-grid) {
+        :is(.recipe-edit-details-primary-grid, .recipe-edit-classification-secondary-grid) {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
@@ -78396,6 +78443,16 @@ body.recipe-edit-standalone-page [data-recipe-edit-category-field].is-ai-suggest
     body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
         :is(.recipe-edit-details-primary-grid, .recipe-edit-classification-grid) {
         grid-template-columns: minmax(0, 1fr);
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+        .recipe-edit-classification-primary-grid {
+        --recipe-edit-meal-type-width: 100%;
+        --recipe-edit-meal-type-min-width: 0;
+        --recipe-edit-meal-type-max-width: 100%;
+        --recipe-edit-meal-type-field-sizing: fixed;
+        --recipe-edit-meal-type-flex: 1 1 auto;
+        --recipe-edit-meal-type-justify-self: stretch;
     }
 
     body.recipe-edit-standalone-page .recipe-edit-info-panel-organized

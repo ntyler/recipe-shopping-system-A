@@ -1057,7 +1057,7 @@ def test_recipe_details_match_classification_layout_and_field_order():
     ]
     assert "grid-template-columns: max-content max-content repeat(5, fit-content(170px));" in primary_grid_rule
     assert "justify-content: start;" in primary_grid_rule
-    assert "grid-template-columns: minmax(0, 1fr) repeat(2, minmax(0, 1.4fr));" in styles
+    assert "grid-template-columns: fit-content(190px) repeat(2, minmax(0, 1fr));" in styles
     assert "grid-template-columns: repeat(4, minmax(0, 1fr));" in styles
 
     collapsed_rules = re.findall(
