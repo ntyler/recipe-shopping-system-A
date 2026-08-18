@@ -205,6 +205,13 @@ def test_recipe_editor_renders_compact_classification_token_controls():
     assert ".recipe-edit-ai-suggestion-summary" in category_css
     assert ".recipe-edit-ai-field-actions" not in category_css
     assert ".recipe-edit-multiselect-control" in category_css
+    control_selector = (
+        "body.recipe-edit-standalone-page .recipe-edit-info-panel-organized "
+        ".recipe-edit-multiselect-control {"
+    )
+    control_start = category_css.rindex(control_selector)
+    control_rule = category_css[control_start:category_css.index("}", control_start)]
+    assert "border: 0;" in control_rule
     assert ".recipe-edit-multiselect-trigger" in category_css
     assert ".recipe-edit-multiselect-popover" in category_css
     assert ".recipe-edit-multiselect-field.is-flipped .recipe-edit-multiselect-popover" in category_css

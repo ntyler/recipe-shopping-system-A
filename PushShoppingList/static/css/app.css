@@ -78219,7 +78219,7 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-
     flex-wrap: wrap;
     gap: 5px;
     padding: 4px;
-    border: 1px solid var(--app-border-strong);
+    border: 0;
     border-radius: 9px;
     background: var(--app-surface);
     color: var(--app-text);
