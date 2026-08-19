@@ -829,6 +829,37 @@ def test_recipe_select_chevrons_are_contextual_on_desktop_and_persistent_on_touc
     assert ".recipe-edit-metadata-value:has(> select:open)::after" in styles
 
 
+def test_requested_labels_highlight_only_their_associated_control_surface():
+    script = read_text("PushShoppingList/static/js/app.js")
+    css = read_text("PushShoppingList/static/css/app.css")
+    organizer = script[
+        script.index("function organizeRecipeEditInformationCard()"):
+        script.index("function organizeRecipeEditAiAssistant()")
+    ]
+    marker = "/* Recipe details and classification: bounded responsive controls with consolidated tags. */"
+    styles = css[css.index(marker):]
+
+    for association in (
+        '[servingsField, servingsField?.querySelector(".recipe-edit-servings-stepper")]',
+        '[scaleField, scaleField?.querySelector(".recipe-edit-scale-control")]',
+        '[totalField, document.getElementById("recipeEditTotalTime")]',
+        '[cuisineCategoryField, cuisineCategoryField?.querySelector(".recipe-edit-multiselect-control")]',
+        '[dietaryPreferenceField, dietaryPreferenceField?.querySelector(".recipe-edit-multiselect-control")]',
+        '[customCategoriesField, customCategoriesField?.querySelector(".recipe-edit-multiselect-control")]',
+    ):
+        assert association in organizer
+    assert 'classList.add("recipe-edit-label-control-highlight-field")' in organizer
+    assert 'classList.add("recipe-edit-label-control-highlight-target")' in organizer
+    assert ".recipe-edit-label-control-highlight-target {" in styles
+    assert ".recipe-edit-metadata-tooltip-label-trigger:is(:hover, :focus-visible)" in styles
+    assert ".recipe-edit-label-control-highlight-target:is(:hover, :active)" in styles
+    assert ".recipe-edit-label-control-highlight-field.is-open" in styles
+    assert ".recipe-edit-label-control-highlight-field:focus-within" in styles
+    assert "border-color: var(--app-primary-hover);" in styles
+    assert "box-shadow: inset 0 0 0 1px transparent;" in styles
+    assert "0 0 0 2px color-mix(in srgb, var(--app-primary-hover) 24%, transparent);" in styles
+
+
 def test_requested_recipe_detail_inputs_size_to_their_content():
     css = read_text("PushShoppingList/static/css/app.css")
     script = read_text("PushShoppingList/static/js/app.js")

@@ -28392,6 +28392,18 @@ function organizeRecipeEditInformationCard() {
     organizeRecipeEditMetadataField(customCategoriesField);
     initializeRecipeEditMultiselectField(customCategoriesField, "custom");
     [
+        [servingsField, servingsField?.querySelector(".recipe-edit-servings-stepper")],
+        [scaleField, scaleField?.querySelector(".recipe-edit-scale-control")],
+        [totalField, document.getElementById("recipeEditTotalTime")],
+        [cuisineCategoryField, cuisineCategoryField?.querySelector(".recipe-edit-multiselect-control")],
+        [dietaryPreferenceField, dietaryPreferenceField?.querySelector(".recipe-edit-multiselect-control")],
+        [customCategoriesField, customCategoriesField?.querySelector(".recipe-edit-multiselect-control")],
+    ].forEach(([field, control]) => {
+        if (!field || !control) return;
+        field.classList.add("recipe-edit-label-control-highlight-field");
+        control.classList.add("recipe-edit-label-control-highlight-target");
+    });
+    [
         [servingsField, "Servings", "Number of people or portions the base recipe serves. Scale does not change this saved value."],
         [totalField, "Total Time", "Total elapsed time from start to finish, typically including prep, cooking, and inactive time."],
         [prepField, "Prep Time", "Hands-on preparation time."],

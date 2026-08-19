@@ -78312,6 +78312,79 @@ body.recipe-edit-standalone-page .recipe-edit-multiselect-trigger:focus-visible 
     outline-offset: -2px;
 }
 
+body.recipe-edit-standalone-page #recipeEditForm .recipe-edit-info-panel-organized
+    .recipe-edit-label-control-highlight-target {
+    transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
+}
+
+body.recipe-edit-standalone-page #recipeEditForm .recipe-edit-info-panel-organized
+    .recipe-edit-label-control-highlight-target.recipe-edit-multiselect-control {
+    box-shadow: inset 0 0 0 1px transparent;
+}
+
+body.recipe-edit-standalone-page #recipeEditForm .recipe-edit-info-panel-organized
+    .recipe-edit-label-control-highlight-field:has(
+        > .recipe-edit-metadata-heading
+        > .recipe-edit-metadata-tooltip-label-trigger:is(:hover, :focus-visible)
+    )
+    .recipe-edit-label-control-highlight-target,
+body.recipe-edit-standalone-page #recipeEditForm .recipe-edit-info-panel-organized
+    .recipe-edit-label-control-highlight-target:is(:hover, :active),
+body.recipe-edit-standalone-page #recipeEditForm .recipe-edit-info-panel-organized
+    .recipe-edit-label-control-highlight-field.is-open
+    .recipe-edit-label-control-highlight-target {
+    border-color: color-mix(in srgb, var(--app-primary-hover) 72%, var(--app-border-strong));
+}
+
+body.recipe-edit-standalone-page #recipeEditForm .recipe-edit-info-panel-organized
+    .recipe-edit-total-time-field:has(
+        > .recipe-edit-metadata-heading
+        > .recipe-edit-metadata-tooltip-label-trigger:is(:hover, :focus-visible)
+    )
+    #recipeEditTotalTime {
+    border-color: color-mix(in srgb, var(--app-primary-hover) 72%, var(--app-border-strong));
+}
+
+body.recipe-edit-standalone-page #recipeEditForm .recipe-edit-info-panel-organized
+    .recipe-edit-label-control-highlight-field:has(
+        > .recipe-edit-metadata-heading
+        > .recipe-edit-metadata-tooltip-label-trigger:is(:hover, :focus-visible)
+    )
+    .recipe-edit-label-control-highlight-target.recipe-edit-multiselect-control,
+body.recipe-edit-standalone-page #recipeEditForm .recipe-edit-info-panel-organized
+    .recipe-edit-label-control-highlight-target.recipe-edit-multiselect-control:is(:hover, :active),
+body.recipe-edit-standalone-page #recipeEditForm .recipe-edit-info-panel-organized
+    .recipe-edit-label-control-highlight-field.is-open
+    .recipe-edit-label-control-highlight-target.recipe-edit-multiselect-control {
+    box-shadow: inset 0 0 0 1px color-mix(
+        in srgb,
+        var(--app-primary-hover) 72%,
+        var(--app-border-strong)
+    );
+}
+
+body.recipe-edit-standalone-page #recipeEditForm .recipe-edit-info-panel-organized
+    .recipe-edit-label-control-highlight-field:focus-within
+    .recipe-edit-label-control-highlight-target {
+    border-color: var(--app-primary-hover);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-primary-hover) 24%, transparent);
+}
+
+body.recipe-edit-standalone-page #recipeEditForm .recipe-edit-info-panel-organized
+    .recipe-edit-total-time-field:focus-within #recipeEditTotalTime {
+    border-color: var(--app-primary-hover);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-primary-hover) 24%, transparent);
+}
+
+body.recipe-edit-standalone-page #recipeEditForm .recipe-edit-info-panel-organized
+    .recipe-edit-label-control-highlight-field:focus-within
+    .recipe-edit-label-control-highlight-target.recipe-edit-multiselect-control {
+    outline: 0;
+    box-shadow:
+        inset 0 0 0 1px var(--app-primary-hover),
+        0 0 0 2px color-mix(in srgb, var(--app-primary-hover) 24%, transparent);
+}
+
 body.recipe-edit-standalone-page .recipe-edit-multiselect-popover {
     position: absolute;
     z-index: var(--app-layer-floating);
