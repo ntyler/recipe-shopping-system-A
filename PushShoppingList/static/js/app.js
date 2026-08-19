@@ -28476,7 +28476,7 @@ function organizeRecipeEditInformationCard() {
     }
     appendRecipeEditWorkspaceChildren(
         detailsPrimaryRow,
-        [servingsField, scaleField, timeBreakdownGroup, totalField, levelField],
+        [servingsField, scaleField, totalField, timeBreakdownGroup, levelField],
     );
     if (totalField && !totalField.querySelector("[data-recipe-edit-total-time-status]")) {
         const totalStatus = document.createElement("span");

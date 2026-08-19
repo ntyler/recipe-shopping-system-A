@@ -1037,7 +1037,7 @@ def test_recipe_details_match_classification_layout_and_field_order():
         "appendRecipeEditWorkspaceChildren(timeBreakdownGroup, "
         "[prepField, cookField, inactiveField])"
     ) in organizer
-    assert "[servingsField, scaleField, timeBreakdownGroup, totalField, levelField]" in organizer
+    assert "[servingsField, scaleField, totalField, timeBreakdownGroup, levelField]" in organizer
     assert 'addRecipeEditMetadataIcon(totalField, "total")' not in organizer
     assert 'data-recipe-metadata-icon="total"' not in template
     assert "totalTimeLabel.insertAdjacentElement(\"afterend\", timeBreakdownToggle)" in organizer
