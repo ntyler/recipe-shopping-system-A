@@ -139,7 +139,11 @@ def test_recipe_servings_and_scale_share_a_quiet_equal_height_control_family():
     assert button_width and button_height
     assert button_width.group(1) == button_height.group(1)
     assert f"flex: 0 0 {button_width.group(1)}px;" in button_body
-    assert "padding: 0 0 2px;" in button_body
+    assert "display: inline-flex;" in button_body
+    assert "align-items: center;" in button_body
+    assert "justify-content: center;" in button_body
+    assert "margin: 0;" in button_body
+    assert "padding: 0;" in button_body
     assert "background: transparent;" in button_body
     value_rule = re.search(
         r"\.recipe-edit-servings-value\s*\{(?P<body>.*?)\}",
