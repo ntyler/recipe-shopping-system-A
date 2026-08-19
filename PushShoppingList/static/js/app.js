@@ -28369,7 +28369,6 @@ function organizeRecipeEditInformationCard() {
     setRecipeEditFieldLabel(cuisineCategoryField, "Cuisine Categories");
     setRecipeEditFieldLabel(customCategoriesField, "Custom Tags");
 
-    addRecipeEditMetadataIcon(totalField, "total");
     [servingsField, totalField, prepField, cookField, inactiveField, levelField, scaleField]
         .forEach(organizeRecipeEditMetadataField);
     const categoryFields = [
@@ -28469,9 +28468,11 @@ function organizeRecipeEditInformationCard() {
 
     const timeBreakdownToggle = createRecipeEditTimeBreakdownControl();
     const totalTimeHeading = totalField?.querySelector(".recipe-edit-metadata-heading");
-    const totalTimeHelp = totalTimeHeading?.querySelector("[data-recipe-edit-metadata-tooltip-trigger]");
-    if (totalTimeHeading) {
-        totalTimeHeading.insertBefore(timeBreakdownToggle, totalTimeHelp || null);
+    const totalTimeLabel = totalTimeHeading?.querySelector("[data-recipe-edit-metadata-tooltip-trigger]");
+    if (totalTimeLabel) {
+        totalTimeLabel.insertAdjacentElement("afterend", timeBreakdownToggle);
+    } else if (totalTimeHeading) {
+        totalTimeHeading.appendChild(timeBreakdownToggle);
     }
     appendRecipeEditWorkspaceChildren(
         detailsPrimaryRow,
