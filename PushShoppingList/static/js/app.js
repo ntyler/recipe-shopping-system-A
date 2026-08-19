@@ -27505,18 +27505,41 @@ function positionRecipeEditMetadataTooltip(trigger, tooltip) {
     if (!trigger || !tooltip || tooltip.hidden) return;
     const margin = 12;
     const gap = 8;
+    const boundaryPadding = 8;
     const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
     const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
-    const width = Math.min(280, Math.max(0, viewportWidth - (margin * 2)));
-    tooltip.style.width = `${width}px`;
     const triggerRect = trigger.getBoundingClientRect();
-    const tooltipHeight = tooltip.offsetHeight;
     const field = trigger.closest(".recipe-edit-detail-field, .recipe-edit-file-field");
-    const control = field?.querySelector("input:not([type='hidden']), select");
+    const chipTooltipPlacement = {
+        cuisine: "top-start",
+        dietary_preference: "top",
+        custom_categories: "top-start",
+    }[field?.dataset.recipeEditCategoryField];
+    const contentBoundary = chipTooltipPlacement
+        ? field.closest(".recipe-edit-info-panel-organized")
+        : null;
+    const contentRect = contentBoundary?.getBoundingClientRect();
+    const boundaryLeft = Math.max(margin, (contentRect?.left ?? 0) + boundaryPadding);
+    const boundaryRight = Math.min(
+        viewportWidth - margin,
+        (contentRect?.right ?? viewportWidth) - boundaryPadding,
+    );
+    const width = Math.min(280, Math.max(0, boundaryRight - boundaryLeft));
+    tooltip.style.width = `${width}px`;
+    const tooltipHeight = tooltip.offsetHeight;
+    const control = field?.querySelector(
+        "input:not([type='hidden']), select, .recipe-edit-multiselect-control",
+    );
     const controlRect = control?.getBoundingClientRect();
+    const centeredLeft = triggerRect.left + (triggerRect.width / 2) - (width / 2);
+    const preferredLeft = chipTooltipPlacement === "top-start"
+        ? triggerRect.left
+        : chipTooltipPlacement === "top-end"
+            ? triggerRect.right - width
+            : centeredLeft;
     const left = Math.max(
-        margin,
-        Math.min(triggerRect.left + (triggerRect.width / 2) - (width / 2), viewportWidth - margin - width)
+        boundaryLeft,
+        Math.min(preferredLeft, boundaryRight - width),
     );
     const belowTop = triggerRect.bottom + gap;
     const aboveTop = triggerRect.top - gap - tooltipHeight;
@@ -27524,9 +27547,29 @@ function positionRecipeEditMetadataTooltip(trigger, tooltip) {
     const overlapsControlBelow = controlRect
         && belowTop < controlRect.bottom
         && belowTop + tooltipHeight > controlRect.top;
-    const top = (overlapsControlBelow && aboveTop >= margin) || (!fitsBelow && aboveTop >= margin)
-        ? aboveTop
-        : belowTop;
+    let top;
+    let resolvedPlacement;
+    if (chipTooltipPlacement && aboveTop >= margin) {
+        top = aboveTop;
+        resolvedPlacement = chipTooltipPlacement;
+    } else if (chipTooltipPlacement) {
+        const fieldRect = field.getBoundingClientRect();
+        const overlayBottom = viewportHeight - margin - tooltipHeight;
+        if (overlayBottom >= fieldRect.bottom + gap) {
+            top = overlayBottom;
+            resolvedPlacement = "overlay-bottom";
+        } else {
+            top = Math.max(margin, Math.min(aboveTop, overlayBottom));
+            resolvedPlacement = "overlay";
+        }
+    } else if ((overlapsControlBelow && aboveTop >= margin) || (!fitsBelow && aboveTop >= margin)) {
+        top = aboveTop;
+        resolvedPlacement = "top";
+    } else {
+        top = belowTop;
+        resolvedPlacement = "bottom";
+    }
+    tooltip.dataset.recipeEditTooltipPlacement = resolvedPlacement;
     tooltip.style.left = `${Math.round(left)}px`;
     tooltip.style.top = `${Math.round(Math.max(margin, Math.min(top, viewportHeight - margin - tooltipHeight)))}px`;
 }

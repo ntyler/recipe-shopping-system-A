@@ -1541,6 +1541,17 @@ def test_recipe_metadata_fields_have_accessible_tooltips():
     assert 'event.key === "Enter" || event.key === " "' in script
     assert 'tooltip.addEventListener("pointerenter", cancelRecipeEditMetadataTooltipClose)' in script
     assert "const overlapsControlBelow = controlRect" in script
+    for field_name, placement in (
+        ("cuisine", "top-start"),
+        ("dietary_preference", "top"),
+        ("custom_categories", "top-start"),
+    ):
+        assert f'{field_name}: "{placement}"' in script
+    assert 'field.closest(".recipe-edit-info-panel-organized")' in script
+    assert '"input:not([type=\'hidden\']), select, .recipe-edit-multiselect-control"' in script
+    assert "const boundaryPadding = 8;" in script
+    assert "const aboveTop = triggerRect.top - gap - tooltipHeight;" in script
+    assert "tooltip.dataset.recipeEditTooltipPlacement = resolvedPlacement;" in script
     assert 'document.addEventListener("pointerdown"' in script
     assert ".recipe-edit-metadata-tooltip-trigger:focus-visible" in css
     assert ".recipe-edit-metadata-tooltip-label-trigger {" in css
