@@ -222,7 +222,7 @@ def test_recipe_editor_renders_compact_classification_token_controls():
     assert ".recipe-edit-multiselect-add" not in category_css
     assert ".recipe-edit-classification-secondary-grid" in category_css
     assert "grid-template-columns: fit-content(190px) fit-content(300px) fit-content(320px);" in category_css
-    assert "grid-template-columns: repeat(3, fit-content(190px)) fit-content(320px);" in category_css
+    assert "grid-template-columns: repeat(3, fit-content(190px));" in category_css
     assert category_css.count(
         'input:not([type="hidden"]):not(.recipe-edit-multiselect-search)'
     ) == 3
@@ -249,7 +249,7 @@ def test_recipe_editor_renders_compact_classification_token_controls():
     assert "@container recipe-details (max-width: 520px)" in category_css
     assert "@media (max-width: 1100px)" in category_css
     assert "@media (max-width: 640px)" in category_css
-    assert category_css.count("> .recipe-edit-custom-categories-field {") == 2
+    assert category_css.count("> .recipe-edit-custom-categories-field {") == 3
     assert category_css.count("> [data-recipe-edit-category-field=\"dietary_preference\"] {") == 2
     assert category_css.count("grid-column: 1 / -1;") >= 2
 
@@ -259,6 +259,7 @@ def test_recipe_editor_renders_compact_classification_token_controls():
     ]
     assert ".recipe-edit-classification-primary-grid" in classification_container
     assert ".recipe-edit-classification-secondary-grid" in classification_container
+    assert "grid-template-columns: repeat(2, fit-content(190px));" in classification_container
     assert ".recipe-edit-details-primary-grid" not in classification_container
 
     details_container = category_css[

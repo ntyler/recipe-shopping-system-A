@@ -1135,9 +1135,15 @@ def test_recipe_details_match_classification_layout_and_field_order():
         secondary_grid_start:styles.index("}", secondary_grid_start)
     ]
     assert (
-        "grid-template-columns: repeat(3, fit-content(190px)) fit-content(320px);"
+        "grid-template-columns: repeat(3, fit-content(190px));"
         in secondary_grid_rule
     )
+    assert "row-gap: 16px;" in styles
+    assert "column-gap: clamp(16px, 1.25vw, 24px);" in styles
+    assert "column-gap: clamp(16px, 1.25vw, 20px);" in primary_grid_rule
+    assert "gap: 8px;" in styles
+    assert ".recipe-edit-details-primary-grid .recipe-edit-metadata-heading" in styles
+    assert "min-height: 22px;" in styles
 
     collapsed_rules = re.findall(
         r"\.recipe-edit-details-primary-grid\.recipe-edit-time-breakdown-collapsed\s*\{([^{}]*)\}",
@@ -1149,7 +1155,7 @@ def test_recipe_details_match_classification_layout_and_field_order():
         for rule in collapsed_rules
     )
     assert sum(
-        "grid-template-columns: repeat(2, minmax(0, 1fr));" in rule
+        "grid-template-columns: repeat(2, max-content);" in rule
         for rule in collapsed_rules
     ) >= 2
     assert sum(

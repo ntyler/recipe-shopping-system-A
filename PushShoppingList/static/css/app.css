@@ -77702,13 +77702,15 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
     :is(.recipe-edit-details-primary-grid, .recipe-edit-classification-grid) {
     display: grid;
     min-width: 0;
-    align-items: stretch;
-    gap: 12px;
+    align-items: start;
+    row-gap: 16px;
+    column-gap: clamp(16px, 1.25vw, 24px);
 }
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-details-primary-grid {
     grid-template-columns: max-content max-content repeat(5, fit-content(170px));
     justify-content: start;
+    column-gap: clamp(16px, 1.25vw, 20px);
 }
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
@@ -77733,7 +77735,13 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
     .recipe-edit-classification-secondary-grid {
-    grid-template-columns: repeat(3, fit-content(190px)) fit-content(320px);
+    grid-template-columns: repeat(3, fit-content(190px));
+}
+
+body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+    .recipe-edit-classification-secondary-grid
+    > .recipe-edit-custom-categories-field {
+    grid-column: 1 / -1;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
@@ -77780,12 +77788,22 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-
     min-width: 0;
     max-width: none;
     align-content: start;
-    gap: 7px;
+    gap: 8px;
     margin: 0;
     padding: 0;
     border: 0;
     background: transparent;
     text-align: left;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+    .recipe-edit-details-primary-grid .recipe-edit-metadata-heading {
+    min-height: 22px;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+    .recipe-edit-classification-section {
+    padding-top: 20px;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-metadata-heading {
@@ -78656,7 +78674,7 @@ body.recipe-edit-standalone-page [data-recipe-edit-category-field].is-ai-suggest
 
     body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
         .recipe-edit-classification-secondary-grid {
-        grid-template-columns: repeat(3, fit-content(190px)) minmax(0, 1fr);
+        grid-template-columns: repeat(2, fit-content(190px));
     }
 
     body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
@@ -78669,7 +78687,7 @@ body.recipe-edit-standalone-page [data-recipe-edit-category-field].is-ai-suggest
 @container recipe-details (max-width: 820px) {
     body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
         .recipe-edit-details-primary-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: repeat(2, max-content);
     }
 
     body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
@@ -78679,14 +78697,14 @@ body.recipe-edit-standalone-page [data-recipe-edit-category-field].is-ai-suggest
 
     body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
         .recipe-edit-details-primary-grid.recipe-edit-time-breakdown-collapsed {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: repeat(2, max-content);
     }
 }
 
 @media (max-width: 1100px) {
     body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
         .recipe-edit-details-primary-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: repeat(2, max-content);
     }
 
     body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
@@ -78702,7 +78720,7 @@ body.recipe-edit-standalone-page [data-recipe-edit-category-field].is-ai-suggest
 
     body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
         .recipe-edit-classification-secondary-grid {
-        grid-template-columns: repeat(3, fit-content(190px)) minmax(0, 1fr);
+        grid-template-columns: repeat(2, fit-content(190px));
     }
 
     body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
@@ -78713,7 +78731,7 @@ body.recipe-edit-standalone-page [data-recipe-edit-category-field].is-ai-suggest
 
     body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
         .recipe-edit-details-primary-grid.recipe-edit-time-breakdown-collapsed {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: repeat(2, max-content);
     }
 }
 
