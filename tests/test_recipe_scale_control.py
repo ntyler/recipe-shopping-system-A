@@ -58,7 +58,8 @@ def test_recipe_scale_is_an_accessible_free_entry_decimal_control():
     assert 'oninput="return applyRecipeScaleMultiplier(this)"' in field
     assert 'onblur="return commitRecipeEditScaleMultiplier(this)"' in field
     assert 'onkeydown="return handleRecipeEditScaleKeydown(event, this)"' in field
-    assert '<span class="recipe-edit-scale-suffix" aria-hidden="true">&times;</span>' in field
+    assert "recipe-edit-scale-suffix" not in field
+    assert "&times;" not in field
     assert '<input type="hidden"' not in field
     assert 'data-recipe-edit-scale-preset' not in template
     assert 'data-recipe-edit-scale-segments' not in template
@@ -67,7 +68,7 @@ def test_recipe_scale_is_an_accessible_free_entry_decimal_control():
     assert "organizeRecipeEditScaleControl" not in script
     assert ".recipe-edit-scale-segments" not in css
     assert ".recipe-edit-scale-control" in css
-    assert ".recipe-edit-scale-suffix" in css
+    assert ".recipe-edit-scale-suffix" not in css
     assert ".recipe-edit-scale-error" in css
 
 
@@ -174,6 +175,7 @@ def test_recipe_servings_and_scale_share_a_quiet_equal_height_control_family():
     assert "width: auto;" in scale_input_rule.group("body")
     assert "min-width: 64px;" in scale_input_rule.group("body")
     assert "max-width: 170px;" in scale_input_rule.group("body")
+    assert "padding: 0 10px;" in scale_input_rule.group("body")
     assert ":is(.recipe-edit-servings-stepper, .recipe-edit-scale-control):focus-within" in styles
     assert ".recipe-edit-scale-control #recipeEditScaleMultiplier" in styles
     assert "white-space: nowrap;" in styles

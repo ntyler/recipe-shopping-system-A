@@ -782,7 +782,8 @@ def test_recipe_detail_fields_use_bounded_accessible_controls():
     assert 'inputmode="decimal"' in template
     assert 'aria-label="Scale multiplier"' in template
     assert 'aria-describedby="recipeEditScaleError"' in template
-    assert '<span class="recipe-edit-scale-suffix" aria-hidden="true">&times;</span>' in template
+    assert "recipe-edit-scale-suffix" not in template
+    assert "&times;" not in template
     assert 'data-recipe-edit-scale-preset' not in template
     assert 'data-recipe-edit-scale-segments' not in template
     assert ".recipe-edit-servings-stepper" in styles
@@ -799,6 +800,33 @@ def test_recipe_detail_fields_use_bounded_accessible_controls():
     assert "flex: 0 1 auto;" in styles
     assert "min-width: 72px;" in styles
     assert "max-width: 170px;" in styles
+
+
+def test_recipe_select_chevrons_are_contextual_on_desktop_and_persistent_on_touch():
+    script = read_text("PushShoppingList/static/js/app.js")
+    css = read_text("PushShoppingList/static/css/app.css")
+    organizer = script[
+        script.index("function organizeRecipeEditInformationCard()"):
+        script.index("function organizeRecipeEditAiAssistant()")
+    ]
+    marker = "/* Recipe details and classification: bounded responsive controls with consolidated tags. */"
+    styles = css[css.index(marker):]
+
+    assert (
+        "[levelField, mealTypeField, mainIngredientField, cookingMethodField, occasionField]"
+        in organizer
+    )
+    assert 'classList.add("recipe-edit-contextual-select-field")' in organizer
+    assert ".recipe-edit-contextual-select-field .recipe-edit-metadata-value > select" in styles
+    assert "appearance: none;" in styles
+    assert "padding-right: 50px;" in styles
+    assert ".recipe-edit-contextual-select-field .recipe-edit-metadata-value::after" in styles
+    assert "pointer-events: none;" in styles
+    assert "transition: opacity 140ms ease;" in styles
+    assert "@media (hover: hover) and (pointer: fine)" in styles
+    assert "opacity: 0;" in styles
+    assert ".recipe-edit-metadata-value:is(:hover, :focus-within)::after" in styles
+    assert ".recipe-edit-metadata-value:has(> select:open)::after" in styles
 
 
 def test_requested_recipe_detail_inputs_size_to_their_content():

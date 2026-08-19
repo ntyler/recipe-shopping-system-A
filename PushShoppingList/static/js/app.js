@@ -28383,6 +28383,8 @@ function organizeRecipeEditInformationCard() {
         field?.classList.add("recipe-edit-detail-field", "recipe-edit-category-metadata-field");
         organizeRecipeEditMetadataField(field);
     });
+    [levelField, mealTypeField, mainIngredientField, cookingMethodField, occasionField]
+        .forEach(field => field?.classList.add("recipe-edit-contextual-select-field"));
     initializeRecipeEditMultiselectField(dietaryPreferenceField, "dietary");
     initializeRecipeEditMultiselectField(cuisineCategoryField, "cuisine");
     customCategoriesField?.classList.remove("recipe-edit-wide");
