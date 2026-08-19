@@ -28410,6 +28410,7 @@ function organizeRecipeEditInformationCard() {
         [occasionField, "Occasion", "The event or setting this recipe best suits."],
         [dietaryPreferenceField, "Dietary Preferences", "Dietary patterns that describe the recipe."],
         [cuisineCategoryField, "Cuisine Categories", "Cuisine traditions associated with the recipe."],
+        [customCategoriesField, "Custom Tags", "Add descriptive tags to organize recipes and improve searching. Select an existing tag or create a new one."],
     ].forEach(([field, label, helpText]) => addRecipeEditMetadataTooltip(
         field,
         label,

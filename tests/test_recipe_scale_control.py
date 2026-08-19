@@ -79,7 +79,12 @@ def test_recipe_servings_and_scale_share_a_quiet_equal_height_control_family():
         "    .recipe-edit-details-primary-grid\n"
         "    :is(.recipe-edit-servings-stepper, .recipe-edit-scale-control) {"
     )
-    styles = css[styles_start:css.index("body.recipe-edit-standalone-page .recipe-edit-optional-details-toggle", styles_start)]
+    styles = css[
+        styles_start:css.index(
+            "body.recipe-edit-standalone-page .recipe-edit-ai-assistant-summary:focus-visible",
+            styles_start,
+        )
+    ]
 
     assert 'aria-label="Decrease servings"' in template
     assert 'aria-label="Increase servings"' in template

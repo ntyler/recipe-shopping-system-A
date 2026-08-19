@@ -1469,6 +1469,7 @@ def test_recipe_metadata_fields_have_accessible_tooltips():
         "Inactive Time": "Hands-off waiting time, such as resting, marinating, chilling, rising, or cooling.",
         "Difficulty": "Overall complexity based on skill, steps, timing, and equipment.",
         "Scale": "Shopping multiplier and ingredient preview. It does not rewrite the recipe's saved Servings or base amounts.",
+        "Custom Tags": "Add descriptive tags to organize recipes and improve searching. Select an existing tag or create a new one.",
     }
     for label, help_text in expected_tooltips.items():
         assert f'"{label}", "{help_text}"' in organizer
@@ -1515,6 +1516,46 @@ def test_recipe_metadata_fields_have_accessible_tooltips():
     assert "position: fixed;" in css[css.index("body.recipe-edit-standalone-page .recipe-edit-metadata-tooltip {"):]
     assert "max-width: calc(100vw - 24px);" in css
     assert "pointer-events: auto;" in css[css.index("body.recipe-edit-standalone-page .recipe-edit-metadata-tooltip {"):]
+
+
+def test_recipe_details_and_classification_controls_are_transparent_until_active():
+    css = read_text("PushShoppingList/static/css/app.css")
+    marker = "/* Recipe details and classification: bounded responsive controls with consolidated tags. */"
+    styles = css[css.index(marker):]
+
+    shared_control_start = styles.index(
+        ':is(input:not([type="hidden"]):not(.recipe-edit-multiselect-search), select),'
+    )
+    shared_control_rule = styles[
+        shared_control_start:styles.index("}", shared_control_start)
+    ]
+    assert "background: transparent !important;" in shared_control_rule
+
+    classification_select_start = styles.index(
+        '> select:not([aria-invalid="true"]):not([data-recipe-edit-validation-invalid="true"]) {'
+    )
+    classification_select_rule = styles[
+        classification_select_start:styles.index("}", classification_select_start)
+    ]
+    assert "background-color: transparent !important;" in classification_select_rule
+
+    quiet_control_start = styles.index(
+        ":is(.recipe-edit-servings-stepper, .recipe-edit-scale-control) {"
+    )
+    quiet_control_rule = styles[
+        quiet_control_start:styles.index("}", quiet_control_start)
+    ]
+    assert "background-color: transparent;" in quiet_control_rule
+
+    multiselect_selector = (
+        "body.recipe-edit-standalone-page .recipe-edit-info-panel-organized "
+        ".recipe-edit-multiselect-control {"
+    )
+    multiselect_start = styles.rindex(multiselect_selector)
+    multiselect_rule = styles[multiselect_start:styles.index("}", multiselect_start)]
+    assert "background: transparent !important;" in multiselect_rule
+    assert "background-color: color-mix(in srgb, var(--app-primary-soft) 18%, transparent) !important;" in styles
+    assert "background-color: color-mix(in srgb, var(--app-primary-soft) 24%, transparent) !important;" in styles
 
 
 def test_recipe_editor_standard_fields_are_quiet_until_active():
