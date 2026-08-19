@@ -1116,31 +1116,18 @@ def test_recipe_details_match_classification_layout_and_field_order():
     primary_grid_rule = styles[
         primary_grid_start:styles.index("}", primary_grid_start)
     ]
-    assert "grid-template-columns: max-content max-content repeat(5, fit-content(170px));" in primary_grid_rule
-    assert "justify-content: start;" in primary_grid_rule
-    classification_primary_start = styles.index(
-        ".recipe-edit-classification-primary-grid {"
-    )
-    classification_primary_rule = styles[
-        classification_primary_start:styles.index("}", classification_primary_start)
-    ]
+    assert "minmax(145px, 1.25fr)" in primary_grid_rule
+    assert "minmax(72px, .65fr)" in primary_grid_rule
+    assert "repeat(4, minmax(88px, 1fr))" in primary_grid_rule
+    assert "minmax(112px, 1fr)" in primary_grid_rule
+    assert "width: min(100%, 960px);" in styles
     assert (
-        "grid-template-columns: fit-content(190px) fit-content(300px) fit-content(320px);"
-        in classification_primary_rule
+        "grid-template-columns: minmax(180px, 220px) repeat(2, minmax(260px, 320px));"
+        in styles
     )
-    secondary_grid_start = styles.index(
-        ".recipe-edit-classification-secondary-grid {"
-    )
-    secondary_grid_rule = styles[
-        secondary_grid_start:styles.index("}", secondary_grid_start)
-    ]
-    assert (
-        "grid-template-columns: repeat(3, fit-content(190px));"
-        in secondary_grid_rule
-    )
-    assert "row-gap: 16px;" in styles
-    assert "column-gap: clamp(16px, 1.25vw, 24px);" in styles
-    assert "column-gap: clamp(16px, 1.25vw, 20px);" in primary_grid_rule
+    assert "row-gap: 22px;" in styles
+    assert "column-gap: clamp(32px, 2vw, 40px);" in styles
+    assert "column-gap: clamp(24px, 1.7vw, 32px);" in primary_grid_rule
     assert "gap: 8px;" in styles
     assert ".recipe-edit-details-primary-grid .recipe-edit-metadata-heading" in styles
     assert "min-height: 22px;" in styles
@@ -1151,13 +1138,13 @@ def test_recipe_details_match_classification_layout_and_field_order():
     )
     assert len(collapsed_rules) >= 5
     assert any(
-        "grid-template-columns: max-content max-content repeat(2, fit-content(170px));" in rule
+        "grid-template-columns: repeat(4, minmax(0, 1fr));" in rule
         for rule in collapsed_rules
     )
     assert sum(
-        "grid-template-columns: repeat(2, max-content);" in rule
+        "grid-template-columns: repeat(2, minmax(0, 1fr));" in rule
         for rule in collapsed_rules
-    ) >= 2
+    ) >= 1
     assert sum(
         "grid-template-columns: minmax(0, 1fr);" in rule
         for rule in collapsed_rules

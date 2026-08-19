@@ -221,8 +221,9 @@ def test_recipe_editor_renders_compact_classification_token_controls():
     assert ".recipe-edit-multiselect-entry" not in category_css
     assert ".recipe-edit-multiselect-add" not in category_css
     assert ".recipe-edit-classification-secondary-grid" in category_css
-    assert "grid-template-columns: fit-content(190px) fit-content(300px) fit-content(320px);" in category_css
-    assert "grid-template-columns: repeat(3, fit-content(190px));" in category_css
+    assert "width: min(100%, 960px);" in category_css
+    assert "grid-template-columns: minmax(180px, 220px) repeat(2, minmax(260px, 320px));" in category_css
+    assert "column-gap: clamp(32px, 2vw, 40px);" in category_css
     assert category_css.count(
         'input:not([type="hidden"]):not(.recipe-edit-multiselect-search)'
     ) == 3
@@ -255,16 +256,17 @@ def test_recipe_editor_renders_compact_classification_token_controls():
 
     classification_container = category_css[
         category_css.index("@container recipe-details (max-width: 940px)"):
-        category_css.index("@container recipe-details (max-width: 820px)")
+        category_css.index("@media (max-width: 1100px)")
     ]
     assert ".recipe-edit-classification-primary-grid" in classification_container
     assert ".recipe-edit-classification-secondary-grid" in classification_container
-    assert "grid-template-columns: repeat(2, fit-content(190px));" in classification_container
+    assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in classification_container
+    assert "column-gap: clamp(24px, 3vw, 32px);" in classification_container
     assert ".recipe-edit-details-primary-grid" not in classification_container
 
     details_container = category_css[
         category_css.index("@container recipe-details (max-width: 820px)"):
-        category_css.index("@media (max-width: 1100px)")
+        category_css.index("@container recipe-details (max-width: 620px)")
     ]
     assert ".recipe-edit-details-primary-grid" in details_container
 
@@ -272,7 +274,7 @@ def test_recipe_editor_renders_compact_classification_token_controls():
         category_css.index("@container recipe-details (max-width: 620px)"):
         category_css.index("@container recipe-details (max-width: 520px)")
     ]
-    assert "grid-template-columns: repeat(2, fit-content(190px));" in narrow_classification_container
+    assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in narrow_classification_container
 
     for declaration in (
         "--recipe-edit-compact-multiselect-min-width: 0;",
