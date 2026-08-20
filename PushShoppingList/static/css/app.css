@@ -77541,10 +77541,9 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-
     display: grid;
     grid-column: 1 / -1;
     min-width: 0;
-    gap: 16px;
-    padding: 18px 0 0;
+    gap: 18px;
+    padding: 22px 0 0;
     border: 0;
-    border-top: 1px solid var(--app-border);
     background: transparent;
     overflow: visible;
 }
@@ -77669,12 +77668,6 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
     .recipe-edit-details-primary-grid .recipe-edit-metadata-heading {
     min-height: 22px;
-}
-
-body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
-    .recipe-edit-classification-section {
-    padding-top: 20px;
-    row-gap: 22px;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-metadata-heading {
@@ -78678,11 +78671,6 @@ body.recipe-edit-standalone-page [data-recipe-edit-category-field].is-ai-suggest
     body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
         .recipe-edit-details-primary-grid.recipe-edit-time-breakdown-collapsed {
         grid-template-columns: minmax(0, 1fr);
-    }
-
-    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-form-section {
-        gap: 13px;
-        padding-top: 15px;
     }
 
     body.recipe-edit-standalone-page .recipe-edit-info-panel-organized

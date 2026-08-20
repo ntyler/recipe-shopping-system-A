@@ -1764,6 +1764,40 @@ def test_recipe_description_is_transparent_until_hover_or_focus():
     assert '[data-recipe-edit-validation-invalid="true"]' in styles
 
 
+def test_recipe_information_sections_use_whitespace_instead_of_internal_dividers():
+    script = read_text("PushShoppingList/static/js/app.js")
+    css = read_text("PushShoppingList/static/css/app.css")
+    marker = "/* Recipe details and classification: bounded responsive controls with consolidated tags. */"
+    styles = css[css.index(marker):]
+    organizer = script[
+        script.index("function organizeRecipeEditInformationCard()"):
+        script.index("function organizeRecipeEditAiAssistant()")
+    ]
+
+    section_selector = (
+        "body.recipe-edit-standalone-page .recipe-edit-info-panel-organized "
+        ".recipe-edit-form-section {"
+    )
+    section_start = styles.index(section_selector)
+    section_rule = styles[section_start:styles.index("}", section_start)]
+
+    assert 'detailsSection.className = "recipe-edit-form-section recipe-edit-details-section"' in organizer
+    assert 'categoriesPanel.classList.add("recipe-edit-form-section", "recipe-edit-classification-section")' in organizer
+    assert "gap: 18px;" in section_rule
+    assert "padding: 22px 0 0;" in section_rule
+    assert "border: 0;" in section_rule
+    assert "border-top" not in section_rule
+    assert ".recipe-edit-classification-section {" not in styles
+
+    mobile_start = styles.index("@media (max-width: 640px)")
+    mobile_end = styles.index(
+        "/* Recipe description: transparent card-integrated editing surface. */",
+        mobile_start,
+    )
+    mobile_styles = styles[mobile_start:mobile_end]
+    assert ".recipe-edit-form-section" not in mobile_styles
+
+
 def test_recipe_editor_standard_fields_are_quiet_until_active():
     css = read_text("PushShoppingList/static/css/app.css")
     marker = "/* Recipe workspace: keep standard fields quiet until they are active or invalid. */"
