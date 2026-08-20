@@ -57,10 +57,12 @@ def test_shared_recipe_pdf_section_is_wired_into_user_account_menu():
     assert ".pdf-orphan-table" in css
     assert ".pdf-orphan-select" in css
     assert ".pdf-orphan-reason" in css
-    assert "Copy Cloudflare Link" in current_recipe_template
-    assert "recipeEditLocalPdfDownloadButton" in current_recipe_template
-    assert "Download Local PDF" in current_recipe_template
-    assert "{% if current_user and current_user.is_admin %}" in current_recipe_template
+    assert 'id="recipeEditPdfButton"' in current_recipe_template
+    assert "data-source-document-modal-download" in current_recipe_template
+    assert "Advanced Document Management" in current_recipe_template
+    assert "data-source-document-technical-copy" in current_recipe_template
+    assert "Copy Cloudflare Link" not in current_recipe_template
+    assert "recipeEditLocalPdfDownloadButton" not in current_recipe_template
     assert "R2_PUBLIC_BASE_URL" in read_text("PushShoppingList/services/cloudflare_r2_storage.py")
     assert "function createPdfShareLink" in js
     assert "function copyPdfShareLink" in js
@@ -86,7 +88,8 @@ def test_shared_recipe_pdf_section_is_wired_into_user_account_menu():
     assert "function openSharedRecipePdfsPanel" in js
     assert "function closeSharedRecipePdfsPanel" in js
     assert "function uploadRecipeEditorPdfToCloudflare" in js
-    assert "function copyRecipeEditorPdfLink" in js
+    assert "function copyRecipeEditorPdfLink" not in js
+    assert "function copyRecipeEditorDocumentValue" in js
     assert "recipeArchivePdfDownloadUrl" in js
 
 
@@ -141,7 +144,7 @@ def test_recipe_editor_hides_create_pdf_controls_when_generated_pdf_is_available
     controls_end = js.index("function recipeEditTabKey", controls_start)
     controls = js[controls_start:controls_end]
 
-    assert 'document.getElementById("recipeEditCreatePdfButton")' in controls
+    assert 'document.getElementById("recipeEditCreatePdfButton")' not in controls
     assert 'document.getElementById("recipeEditCreatePdfButtonLegacy")' in controls
     assert "const generatedOpenUrl = generatedCloudflareUrl;" in controls
     assert "const hasGeneratedPdf = Boolean(generatedCloudflareUrl || generatedArchiveUrl);" in controls

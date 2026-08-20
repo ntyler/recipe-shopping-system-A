@@ -677,7 +677,8 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     assert "detailsSection," in organizer
     assert "categoriesPanel," in organizer
     assert "tagRow" not in organizer
-    assert "if (infoActions) infoActions.hidden = true;" in organizer
+    assert "infoActions" not in organizer
+    assert "recipe-edit-info-actions" not in template
     assert "technicalDetails" not in organizer
     assert "grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(130px, .62fr);" in hierarchy_css
     assert ".recipe-edit-info-panel-organized .recipe-edit-metadata-heading {" in css
@@ -1110,9 +1111,20 @@ def test_recipe_details_match_classification_layout_and_field_order():
 
     assert 'detailsHeading.textContent = "Recipe Details"' in organizer
     assert 'detailsHeadingRow.className = "recipe-edit-form-section-heading"' in organizer
-    assert "appendRecipeEditWorkspaceChildren(detailsHeadingRow, [detailsHeading, detailsMenu])" in organizer
-    assert 'detailsMenuButton.setAttribute("aria-label", "Recipe detail actions")' in organizer
+    assert "appendRecipeEditWorkspaceChildren(detailsHeadingRow, [detailsHeading])" in organizer
+    assert "detailsMenu" not in organizer
+    assert "Recipe detail actions" not in organizer
+    assert "recipe-edit-info-actions" not in template
+    assert "recipe-edit-info-menu-wrap" not in template
+    assert "recipeEditPdfMenuButton" not in template
+    assert "recipeEditLocalPdfDownloadButton" not in template
+    assert "recipeEditCopyPdfLinkButton" not in template
+    assert ".recipe-edit-info-actions" not in css
+    assert ".recipe-edit-info-menu-wrap" not in css
+    assert ".recipe-edit-info-menu {" not in css
     assert 'onclick="return toggleRecipeEditSectionMenu(this, event)"' in template
+    assert "appendRecipeEditWorkspaceChildren(classificationHeadingRow, [classificationHeading, categoryMenu])" in organizer
+    assert "recipe-edit-category-menu-wrap" in template
     assert 'timeBreakdownGroup.id = "recipeEditTimeBreakdown"' in organizer
     assert 'timeBreakdownGroup.setAttribute("role", "group")' in organizer
     assert (

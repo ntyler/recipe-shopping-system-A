@@ -26232,13 +26232,9 @@ function updateRecipeEditorPdfControls(recipe, options = {}) {
     const headerSourcePdfAction = document.getElementById("recipeEditHeaderOpenSourcePdfAction");
     const headerGeneratePdfAction = document.getElementById("recipeEditHeaderGeneratePdfAction");
     const pdfPanelButton = document.getElementById("recipeEditPdfButtonPanel");
-    const pdfMenuButton = document.getElementById("recipeEditPdfMenuButton");
-    const localPdfDownloadButton = document.getElementById("recipeEditLocalPdfDownloadButton");
     const deletePdfButton = document.getElementById("recipeEditDeletePdfButton");
-    const copyPdfLinkButton = document.getElementById("recipeEditCopyPdfLinkButton");
     const uploadPdfButton = document.getElementById("recipeEditUploadPdfButton");
     const createPdfButtons = [
-        document.getElementById("recipeEditCreatePdfButton"),
         document.getElementById("recipeEditCreatePdfButtonLegacy"),
     ];
     const pdfValues = normalizeRecipeEditorPdfValues(recipe || {}, recipeEditorCurrentUrl(), {
@@ -26293,13 +26289,11 @@ function updateRecipeEditorPdfControls(recipe, options = {}) {
         }
     });
 
-    [pdfPanelButton, pdfMenuButton].forEach((button) => {
-        if (button) {
-            button.hidden = !generatedOpenUrl;
-            button.href = generatedOpenUrl || "#";
-            button.dataset.recipePdfUrl = generatedOpenUrl || "";
-        }
-    });
+    if (pdfPanelButton) {
+        pdfPanelButton.hidden = !generatedOpenUrl;
+        pdfPanelButton.href = generatedOpenUrl || "#";
+        pdfPanelButton.dataset.recipePdfUrl = generatedOpenUrl || "";
+    }
 
     [sourcePdfButton, sourcePdfMobileButton, headerSourcePdfAction].forEach((button) => {
         if (button) {
@@ -26311,16 +26305,6 @@ function updateRecipeEditorPdfControls(recipe, options = {}) {
 
     if (deletePdfButton) {
         deletePdfButton.hidden = !hasGeneratedPdf;
-    }
-
-    if (localPdfDownloadButton) {
-        localPdfDownloadButton.hidden = !hasGeneratedLocalPdf;
-        localPdfDownloadButton.href = hasGeneratedLocalPdf ? recipeArchivePdfDownloadUrl(sourceUrl, "generated_recipe") : "#";
-    }
-
-    if (copyPdfLinkButton) {
-        copyPdfLinkButton.hidden = !generatedCloudflareUrl;
-        copyPdfLinkButton.dataset.pdfPublicUrl = generatedCloudflareUrl;
     }
 
     if (uploadPdfButton) {
@@ -28394,8 +28378,6 @@ function organizeRecipeEditInformationCard() {
     const customCategoriesField = recipeEditFieldContainer("recipeEditCategoryCustomCategories");
     const categoryMenu = categoriesPanel?.querySelector(".recipe-edit-category-menu-wrap");
     const prepTimeGroupInput = document.getElementById("recipeEditCategoryPrepTimeGroup");
-    const infoActions = infoPanel.querySelector(".recipe-edit-info-actions");
-    const detailsMenu = infoPanel.querySelector(".recipe-edit-info-menu-wrap");
     const panelHeading = infoPanel.querySelector(".recipe-edit-panel-heading");
 
     setRecipeEditFieldLabel(nameField, "Recipe Name");
@@ -28479,7 +28461,6 @@ function organizeRecipeEditInformationCard() {
         { trigger: "label" },
     ));
 
-    if (infoActions) infoActions.hidden = true;
     if (panelHeading) panelHeading.hidden = true;
 
     const primaryRow = document.createElement("div");
@@ -28513,12 +28494,7 @@ function organizeRecipeEditInformationCard() {
     detailsHeading.id = "recipeEditDetailsHeading";
     detailsHeading.className = "recipe-edit-form-section-title";
     detailsHeading.textContent = "Recipe Details";
-    const detailsMenuButton = detailsMenu?.querySelector(".recipe-edit-section-menu-btn");
-    if (detailsMenuButton) {
-        detailsMenuButton.setAttribute("aria-label", "Recipe detail actions");
-        detailsMenuButton.title = "Recipe detail actions";
-    }
-    appendRecipeEditWorkspaceChildren(detailsHeadingRow, [detailsHeading, detailsMenu]);
+    appendRecipeEditWorkspaceChildren(detailsHeadingRow, [detailsHeading]);
     const detailsPrimaryRow = document.createElement("div");
     detailsPrimaryRow.className = "recipe-edit-details-primary-grid";
     const timeBreakdownGroup = document.createElement("div");
@@ -57090,7 +57066,7 @@ function rerunRecipePredictionFromMenu(button) {
 
 function recipePdfCreationReasonOnSave(recipe) {
     const pdfButton = document.getElementById("recipeEditPdfButton");
-    const createPdfButton = document.getElementById("recipeEditCreatePdfButton");
+    const createPdfButton = document.getElementById("recipeEditCreatePdfButtonLegacy");
 
     if (createPdfButton && !createPdfButton.hidden && pdfButton && pdfButton.hidden) {
         return "missing_pdf";
@@ -57498,43 +57474,6 @@ async function uploadRecipeEditorPdfToCloudflare(button) {
             button.disabled = false;
             button.textContent = originalText || "Upload to Cloudflare";
         }
-    }
-
-    return false;
-}
-
-async function copyRecipeEditorPdfLink(button) {
-    const publicUrlInput = document.getElementById("recipeEditGeneratedCloudflarePdfUrl");
-    const publicUrl = (
-        (button && button.dataset.pdfPublicUrl ? button.dataset.pdfPublicUrl : "")
-        || (publicUrlInput ? publicUrlInput.value.trim() : "")
-    );
-
-    if (!publicUrl) {
-        setRecipeEditStatus("Cloud PDF link is not ready yet.", true);
-        return false;
-    }
-
-    if (!isShareablePublicPdfUrl(publicUrl)) {
-        setRecipeEditStatus("Cloudflare PDF link is not ready yet.", true);
-        return false;
-    }
-
-    try {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            await navigator.clipboard.writeText(publicUrl);
-        } else if (publicUrlInput) {
-            publicUrlInput.select();
-            document.execCommand("copy");
-        }
-
-        setRecipeEditStatus("Cloudflare link copied.");
-    } catch (err) {
-        console.warn("Unable to copy recipe PDF link.", err);
-        if (publicUrlInput) {
-            publicUrlInput.select();
-        }
-        setRecipeEditStatus("PDF link selected. Use Ctrl+C to copy.", true);
     }
 
     return false;

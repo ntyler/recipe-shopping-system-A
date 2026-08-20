@@ -16070,21 +16070,6 @@ body {
     min-width: 0;
 }
 
-.recipe-edit-info-actions {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 10px;
-    margin-left: auto;
-    min-width: 0;
-}
-
-.recipe-edit-info-menu-wrap {
-    position: relative;
-    display: inline-flex;
-    flex: 0 0 auto;
-}
-
 .recipe-edit-header-pdf-button {
     flex: 0 0 auto;
     margin: 0;
@@ -16098,10 +16083,6 @@ body {
     height: 38px;
     padding: 0 14px;
     font-size: 13px;
-}
-
-.recipe-edit-info-menu {
-    min-width: 172px;
 }
 
 .recipe-edit-panel-heading h3,
@@ -19842,10 +19823,6 @@ body {
 
     .recipe-edit-panel-title {
         gap: 8px;
-    }
-
-    .recipe-edit-info-actions {
-        gap: 6px;
     }
 
     .recipe-edit-header-pdf-button {
