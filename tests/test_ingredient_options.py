@@ -837,48 +837,46 @@ def test_collapsed_choice_removes_all_internal_component_dividers():
     assert "border-bottom: 0 !important;" in collapsed_divider_css
 
 
-def test_collapsed_saved_choice_has_top_and_bottom_section_dividers_only():
+def test_collapsed_saved_choice_uses_one_complete_group_boundary():
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
-    outline_css = css[css.index(
-        "/* Ingredient editor v101: bracket each collapsed saved option with section dividers. */"
+    hierarchy_css = css[css.index(
+        "/* Ingredient editor v108: one quiet boundary per complete ingredient group. */"
     ):]
-    rule_start = outline_css.index(
-        "> .recipe-edit-ingredient-row.has-selected-choice-group-header:not("
+    rule_start = hierarchy_css.index(
+        "> :is("
     )
-    rule = outline_css[rule_start:outline_css.index("}", rule_start)]
+    rule = hierarchy_css[rule_start:hierarchy_css.index("}", rule_start)]
 
-    assert ".recipe-edit-substitutions-open" in rule
-    assert "border-top: 1px solid var(--app-border);" in rule
+    assert ".recipe-edit-ingredient-row" in rule
+    assert ".recipe-edit-ingredient-column-group-projection" in rule
+    assert "border-top: 0 !important;" in rule
     assert "border-right: 0 !important;" in rule
-    assert "border-bottom: 1px solid var(--app-border);" in rule
+    assert "border-bottom: 1px solid color-mix(" in rule
+    assert "var(--recipe-editor-border-soft) 22%" in rule
     assert "border-left: 0 !important;" in rule
     assert "border-radius: 0 !important;" in rule
-    assert "box-shadow: none;" in rule
-    assert "overflow:" not in rule
-
-    header_rule_start = outline_css.index(
-        ".recipe-edit-selected-choice-group-header {"
-    )
-    header_rule = outline_css[
-        header_rule_start:outline_css.index("}", header_rule_start)
-    ]
-    assert "border-bottom: 0 !important;" in header_rule
+    assert "box-shadow:" not in rule
+    assert "> .recipe-edit-ingredient-row:is(.is-editing, .recipe-edit-substitutions-open)" in hierarchy_css
+    assert "border-left: 2px solid var(--app-primary-hover) !important;" in hierarchy_css
+    assert ":nth-child" not in hierarchy_css
 
 
-def test_standard_ingredient_rows_drop_dividers_without_changing_choice_outlines():
+def test_standard_and_choice_rows_share_the_same_faint_group_boundary():
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
-    divider_css = css[css.index(
-        "/* Ingredient editor v102: reserve row dividers for multi-option groups. */"
+    hierarchy_css = css[css.index(
+        "/* Ingredient editor v108: one quiet boundary per complete ingredient group. */"
     ):]
-    rule_start = divider_css.index(
-        "> .recipe-edit-ingredient-row:not(.has-ingredient-choice)"
+    rule_start = hierarchy_css.index(
+        "> :is("
     )
-    rule = divider_css[rule_start:divider_css.index("}", rule_start)]
+    rule = hierarchy_css[rule_start:hierarchy_css.index("}", rule_start)]
 
-    assert "border-bottom: 0 !important;" in rule
+    assert ".recipe-edit-ingredient-row" in rule
+    assert ".has-ingredient-choice" not in rule
     assert ".has-selected-choice-group-header" not in rule
-    assert "border-top: 1px solid var(--app-border);" in css
-    assert "border-bottom: 1px solid var(--app-border);" in css
+    assert "border-bottom: 1px solid color-mix(" in rule
+    assert "var(--recipe-editor-border-soft) 22%" in rule
+    assert "var(--app-border)" not in rule
 
 
 def test_collapsed_default_choice_has_one_parent_gap_before_its_ingredient_group():
@@ -1000,7 +998,6 @@ def test_idle_choice_group_chrome_does_not_look_selected():
     )
     assert "background: var(--app-surface);" in neutral_css
     assert ".recipe-edit-selected-choice-group-header {" in neutral_css
-    assert "border-bottom-color: var(--app-border);" in neutral_css
     assert "var(--app-text) 3%" in neutral_css
     assert "> .recipe-edit-ingredient-options-panel" in neutral_css
     assert ".is-ingredient-expansion-anchor" in neutral_css

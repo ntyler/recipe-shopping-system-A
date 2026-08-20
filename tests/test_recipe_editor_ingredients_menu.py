@@ -6930,3 +6930,98 @@ def test_ingredient_drag_handle_brightening_is_local_active_and_disabled_safe():
     assert "cursor: not-allowed;" in disabled_rule
     assert "background:" not in handle_css
     assert "box-shadow:" not in handle_css
+
+
+def test_ingredients_table_uses_quiet_logical_group_boundaries():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    marker = "/* Ingredient editor v108: one quiet boundary per complete ingredient group. */"
+
+    assert css.index(marker) > css.index("/* Ingredient editor v107:")
+    hierarchy_css = css[css.index(marker):]
+
+    tab_start = hierarchy_css.index(
+        "body.recipe-edit-standalone-page .recipe-edit-tab-bar {"
+    )
+    tab_rule = hierarchy_css[tab_start:hierarchy_css.index("}", tab_start)]
+    assert "border-bottom-color: color-mix(" in tab_rule
+    assert "var(--recipe-editor-border-soft) 58%" in tab_rule
+
+    table_start = hierarchy_css.index(
+        "body.recipe-edit-standalone-page .recipe-edit-ingredient-table-scroll {"
+    )
+    table_rule = hierarchy_css[table_start:hierarchy_css.index("}", table_start)]
+    for declaration in (
+        "border: 0;",
+        "border-radius: 0;",
+        "background: transparent;",
+        "box-shadow: none;",
+    ):
+        assert declaration in table_rule
+
+    viewport_start = hierarchy_css.index(
+        "body.recipe-edit-standalone-page .recipe-edit-ingredient-table-head-viewport {"
+    )
+    viewport_rule = hierarchy_css[
+        viewport_start:hierarchy_css.index("}", viewport_start)
+    ]
+    assert "box-shadow: none;" in viewport_rule
+
+    header_start = hierarchy_css.index(
+        "body.recipe-edit-standalone-page .recipe-edit-ingredient-table-head {"
+    )
+    header_rule = hierarchy_css[header_start:hierarchy_css.index("}", header_start)]
+    assert "border-top: 0;" in header_rule
+    assert "border-right: 0;" in header_rule
+    assert "border-bottom: 1px solid color-mix(" in header_rule
+    assert "var(--recipe-editor-border) 68%" in header_rule
+    assert "border-left: 0;" in header_rule
+
+    resize_start = hierarchy_css.index(
+        "body.recipe-edit-standalone-page .recipe-edit-ingredient-column-resize::before {"
+    )
+    resize_rule = hierarchy_css[resize_start:hierarchy_css.index("}", resize_start)]
+    assert "background: transparent;" in resize_rule
+    assert "box-shadow: none;" in resize_rule
+    assert "> [data-ingredient-column]:hover" in hierarchy_css
+    assert ".recipe-edit-ingredient-column-resize.is-resizing::before" in hierarchy_css
+    assert "background: var(--app-primary-hover);" in hierarchy_css
+
+    group_start = hierarchy_css.index(
+        "/* Each direct row/projection owns its complete collapsed or expanded logical group. */"
+    )
+    group_rule_start = hierarchy_css.index("> :is(", group_start)
+    group_rule = hierarchy_css[
+        group_rule_start:hierarchy_css.index("}", group_rule_start)
+    ]
+    assert ".recipe-edit-ingredient-row" in group_rule
+    assert ".recipe-edit-ingredient-column-group-projection" in group_rule
+    assert "border-top: 0 !important;" in group_rule
+    assert "border-right: 0 !important;" in group_rule
+    assert "border-bottom: 1px solid color-mix(" in group_rule
+    assert "var(--recipe-editor-border-soft) 22%" in group_rule
+    assert "border-left: 0 !important;" in group_rule
+    assert "padding:" not in group_rule
+    assert "grid-template" not in group_rule
+    assert ":nth-child" not in hierarchy_css
+    assert "> .recipe-edit-ingredient-row:is(.is-editing, .recipe-edit-substitutions-open)" in hierarchy_css
+    assert "border-left: 2px solid var(--app-primary-hover) !important;" in hierarchy_css
+
+    assert "> .recipe-edit-ingredient-row:hover {" in hierarchy_css
+    assert "var(--app-primary-soft) 18%" in hierarchy_css
+    assert ".recipe-edit-selected-choice-group-header," in hierarchy_css
+    assert ".recipe-edit-selected-option-line-item," in hierarchy_css
+    assert ".recipe-edit-ingredient-option-divider," in hierarchy_css
+    assert ".recipe-edit-default-option-summary," in hierarchy_css
+    assert ".recipe-edit-alternative-component-summary," in hierarchy_css
+    assert ".recipe-edit-alternative-edit-footer {" in hierarchy_css
+    assert "border-block: 0 !important;" in hierarchy_css
+    assert "> .recipe-edit-ingredient-options-panel::before" in hierarchy_css
+    assert ".recipe-edit-ingredient-option-group::before" in hierarchy_css
+    assert "> .recipe-edit-alternative-card::before" in hierarchy_css
+    assert "display: none !important;" in hierarchy_css
+    assert "content: none !important;" in hierarchy_css
+
+    assert "@media (forced-colors: active)" in hierarchy_css
+    assert "border-bottom-color: CanvasText;" in hierarchy_css
+    assert "border-bottom-color: CanvasText !important;" in hierarchy_css
+    assert "background: Highlight;" in hierarchy_css

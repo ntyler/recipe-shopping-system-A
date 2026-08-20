@@ -2573,9 +2573,8 @@ def test_recipe_editor_expanded_option_dividers_and_add_rows_are_compact_grid_ro
     assert ".recipe-edit-substitution-heading" in expanded_grid_css
     assert "grid-column: 1 / -1;" in expanded_grid_css
 
-    # Hierarchy is carried by the ingredient-cell inset, not by shifting the row.
+    # Hierarchy is carried by spacing and labels, not by shifting the row.
     assert "padding-left: 14px;" in expanded_grid_css
-    assert "border-left: 1px solid" in expanded_grid_css
     assert ".recipe-edit-ingredient-option-group::before" in expanded_grid_css
     assert "content: none;" in expanded_grid_css
 
