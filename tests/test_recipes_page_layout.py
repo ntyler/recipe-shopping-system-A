@@ -82,6 +82,8 @@ def test_recipe_preview_link_opens_its_visible_parent_workspace():
 def test_recipes_page_css_keeps_cards_and_text_legible_at_normal_zoom():
     css = read_text("PushShoppingList/static/css/app.css")
     grid_rule = css_rule_body(css, ".app-page-workspace-recipes .app-recipes-grid")
+    card_rule = css_rule_body(css, ".app-page-workspace-recipes .app-recipe-card")
+    rail_card_rule = css_rule_body(css, ".app-page-workspace-recipes .app-page-rail-card")
     title_rule = css_rule_body(css, ".app-page-workspace-recipes .app-recipe-card-body h3")
     metadata_rule = css_rule_body(css, ".app-page-workspace-recipes .app-recipe-card-metadata")
     tab_rule = css_rule_body(css, ".app-page-workspace-recipes .app-page-tabs .app-page-tab-label")
@@ -93,6 +95,9 @@ def test_recipes_page_css_keeps_cards_and_text_legible_at_normal_zoom():
     assert "grid-template-columns: minmax(0, 1fr) 246px;" in css
     assert ".app-page-workspace-recipes .app-recipes-grid" in css
     assert "grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));" in grid_rule
+    assert "--app-border-subtle: #dfe6e2;" in css
+    assert "border-color: var(--app-border-subtle);" in card_rule
+    assert "border-color: var(--app-border-subtle);" in rail_card_rule
     assert "aspect-ratio: 13 / 10;" in css
     assert "font-size: 17px;" in title_rule
     assert "font-size: 14px;" in metadata_rule

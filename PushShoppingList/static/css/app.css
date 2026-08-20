@@ -15481,7 +15481,7 @@ body {
 
 .app-page-workspace-recipes .app-recipe-card {
     min-height: 0;
-    border-color: #dfe6e2;
+    border-color: var(--app-border-subtle);
     border-radius: 12px;
     background: #ffffff;
     box-shadow: 0 1px 2px rgba(16, 29, 49, 0.025), 0 8px 22px rgba(16, 29, 49, 0.035);
@@ -15589,7 +15589,7 @@ body {
 .app-page-workspace-recipes .app-page-rail-card {
     gap: 16px;
     padding: 18px;
-    border-color: #dfe6e2;
+    border-color: var(--app-border-subtle);
     border-radius: 12px;
     background: #ffffff;
     box-shadow: 0 1px 2px rgba(16, 29, 49, 0.02);
@@ -31403,6 +31403,7 @@ img[data-deferred-src] {
     --app-muted: #66738a;
     --app-border: #dce5e1;
     --app-border-strong: #b9c8c1;
+    --app-border-subtle: #dfe6e2;
     --app-primary: #078a2f;
     --app-primary-hover: #057226;
     --app-primary-soft: #eaf7ed;
@@ -31430,7 +31431,12 @@ img[data-deferred-src] {
     --app-font-family: "Segoe UI Variable Text", Inter, "Segoe UI", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Arial, sans-serif;
 }
 
+/* Preserve the Recipes card source for Dark Reader; native dark uses the app border. */
 @media (prefers-color-scheme: dark) {
+    :root:not([data-darkreader-mode]) {
+        --app-border-subtle: var(--app-border);
+    }
+
     :root {
         --app-bg: #0d141b;
         --app-bg-soft: #121d26;
@@ -37737,6 +37743,7 @@ html[data-public-auth-theme="light"] {
     --app-muted: #66738a;
     --app-border: #dce5e1;
     --app-border-strong: #b9c8c1;
+    --app-border-subtle: #dfe6e2;
     --app-primary: #078a2f;
     --app-primary-hover: #057226;
     --app-primary-soft: #eaf7ed;
@@ -37774,6 +37781,10 @@ html[data-public-auth-theme="dark"] {
     --app-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.28), 0 8px 24px rgba(0, 0, 0, 0.24);
     --app-shadow-md: 0 18px 40px rgba(0, 0, 0, 0.38);
     color-scheme: dark;
+}
+
+html[data-public-auth-theme="dark"]:not([data-darkreader-mode]) {
+    --app-border-subtle: var(--app-border);
 }
 
 html[data-public-auth-theme="light"] .app-sidebar-promo {
@@ -57300,11 +57311,11 @@ body.recipe-edit-standalone-page :is(
     --recipe-editor-bg: #f8faf9;
     --recipe-editor-surface: #ffffff;
     --recipe-editor-surface-soft: #fbfdfc;
-    --recipe-editor-border: #dfe6e2;
-    --recipe-editor-border-soft: #e8eeeb;
+    --recipe-editor-border: var(--app-border-subtle);
+    --recipe-editor-border-soft: var(--app-border-subtle);
     --submenu-bg: #ffffff;
-    --submenu-border: #dfe6e2;
-    --submenu-divider: #e8eeeb;
+    --submenu-border: var(--app-border-subtle);
+    --submenu-divider: var(--app-border-subtle);
     --submenu-hover: #eaf7ed;
     --submenu-active: #eaf7ed;
     --submenu-text: #17233a;
@@ -57322,11 +57333,7 @@ html[data-public-auth-theme="dark"] body.recipe-edit-standalone-page :is(
     --recipe-editor-bg: #101415;
     --recipe-editor-surface: #171c1e;
     --recipe-editor-surface-soft: #1c2325;
-    --recipe-editor-border: #343b3d;
-    --recipe-editor-border-soft: #2a3234;
     --submenu-bg: #171c1e;
-    --submenu-border: #343b3d;
-    --submenu-divider: #2a3234;
     --submenu-hover: #103624;
     --submenu-active: #103624;
     --submenu-text: #e7eae8;
@@ -57344,11 +57351,7 @@ html[data-public-auth-theme="dark"] body.recipe-edit-standalone-page :is(
         --recipe-editor-bg: #101415;
         --recipe-editor-surface: #171c1e;
         --recipe-editor-surface-soft: #1c2325;
-        --recipe-editor-border: #343b3d;
-        --recipe-editor-border-soft: #2a3234;
         --submenu-bg: #171c1e;
-        --submenu-border: #343b3d;
-        --submenu-divider: #2a3234;
         --submenu-hover: #103624;
         --submenu-active: #103624;
         --submenu-text: #e7eae8;

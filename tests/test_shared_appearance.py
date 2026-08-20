@@ -194,10 +194,15 @@ def test_recipe_editor_theme_tokens_follow_the_shared_root_preference():
     assert "Keep editor content color-locked" not in css
     assert "--recipe-editor-bg: #f8faf9;" in workspace
     assert "--recipe-editor-surface: #ffffff;" in workspace
-    assert "--recipe-editor-border: #dfe6e2;" in workspace
-    assert "--recipe-editor-border-soft: #e8eeeb;" in workspace
+    assert "--recipe-editor-border: var(--app-border-subtle);" in workspace
+    assert "--recipe-editor-border-soft: var(--app-border-subtle);" in workspace
+    assert "--app-border-subtle: #dfe6e2;" in css
+    assert ':root:not([data-darkreader-mode]) {' in css
+    assert "--app-border-subtle: var(--app-border);" in css
     assert 'html[data-public-auth-theme="dark"] body.recipe-edit-standalone-page' in workspace
     assert 'html:not([data-public-auth-theme="light"]) body.recipe-edit-standalone-page' in workspace
     assert "--recipe-editor-bg: #101415;" in workspace
     assert "--recipe-editor-surface: #171c1e;" in workspace
+    assert "--recipe-editor-border: #343b3d;" not in workspace
+    assert "--recipe-editor-border-soft: #2a3234;" not in workspace
     assert "color-scheme: inherit;" in workspace

@@ -3197,8 +3197,8 @@ def test_recipe_editor_uses_the_recipes_page_card_visual_system_in_both_themes()
         "--app-text-soft: color-mix(in srgb, var(--app-text) 76%, var(--app-bg));",
         "--recipe-editor-bg: #f8faf9;",
         "--recipe-editor-surface: #ffffff;",
-        "--recipe-editor-border: #dfe6e2;",
-        "--recipe-editor-border-soft: #e8eeeb;",
+        "--recipe-editor-border: var(--app-border-subtle);",
+        "--recipe-editor-border-soft: var(--app-border-subtle);",
         "color-scheme: inherit;",
     ):
         assert declaration in theme_rule
@@ -3211,20 +3211,22 @@ def test_recipe_editor_uses_the_recipes_page_card_visual_system_in_both_themes()
         "--recipe-editor-bg: #101415;",
         "--recipe-editor-surface: #171c1e;",
         "--recipe-editor-surface-soft: #1c2325;",
-        "--recipe-editor-border: #343b3d;",
-        "--recipe-editor-border-soft: #2a3234;",
         "--submenu-bg: #171c1e;",
         "--submenu-text: #e7eae8;",
     ):
         assert declaration in dark_theme_rule
+    assert "--recipe-editor-border:" not in dark_theme_rule
+    assert "--recipe-editor-border-soft:" not in dark_theme_rule
+    assert "--submenu-border:" not in dark_theme_rule
+    assert "--submenu-divider:" not in dark_theme_rule
 
     assert 'html:not([data-public-auth-theme="light"]) body.recipe-edit-standalone-page :is(' in workspace
     assert "Keep editor content color-locked" not in css
 
     for declaration in (
         "--submenu-bg: #ffffff;",
-        "--submenu-border: #dfe6e2;",
-        "--submenu-divider: #e8eeeb;",
+        "--submenu-border: var(--app-border-subtle);",
+        "--submenu-divider: var(--app-border-subtle);",
         "--submenu-text: #17233a;",
     ):
         assert declaration in theme_rule
