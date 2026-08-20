@@ -803,6 +803,18 @@
             <input type="hidden" id="recipeEditMenuItemUrl">
             <input type="hidden" id="recipeEditDocumentSourceUrl">
             <input type="hidden" name="quantity" id="recipeEditQuantity" value="1">
+            <div id="recipeEditSourceDocumentState" hidden aria-hidden="true">
+                <input type="hidden" name="source_url" id="recipeEditSourceUrl">
+                <input type="hidden" id="recipeEditSourcePdfPath" readonly>
+                <input type="hidden" id="recipeEditSourceCloudflarePdfUrl" readonly>
+                <input type="hidden" id="recipeEditGeneratedPdfPath" readonly>
+                <input type="hidden" id="recipeEditGeneratedCloudflarePdfUrl" readonly>
+                <a id="recipeEditSourceUrlLink" href="#" target="_blank" rel="noopener noreferrer" hidden></a>
+                <a id="recipeEditSourcePdfPathLink" href="#" target="_blank" rel="noopener noreferrer" hidden></a>
+                <a id="recipeEditSourceCloudflarePdfUrlLink" href="#" target="_blank" rel="noopener noreferrer" hidden></a>
+                <a id="recipeEditGeneratedPdfPathLink" href="#" target="_blank" rel="noopener noreferrer" hidden></a>
+                <a id="recipeEditGeneratedCloudflarePdfUrlLink" href="#" target="_blank" rel="noopener noreferrer" hidden></a>
+            </div>
 
             <div id="recipeEditStatus"
                  class="recipe-edit-status"
@@ -1119,96 +1131,6 @@
                             <span>Source PDF</span>
                         </a>
                     </div>
-                    <details id="recipeEditSourceFilesDetails"
-                             class="recipe-edit-source-files-details recipe-edit-wide">
-                        <summary class="recipe-edit-source-files-summary">
-                            <span>Technical details</span>
-                            <span class="recipe-edit-source-files-chevron" aria-hidden="true"></span>
-                        </summary>
-                        <div class="recipe-edit-file-groups">
-                            <label class="recipe-edit-file-field">
-                                <span>Source URL</span>
-                                <span class="recipe-edit-source-url-field">
-                                    <input type="text" name="source_url" id="recipeEditSourceUrl">
-                                    <a id="recipeEditSourceUrlLink"
-                                       class="recipe-edit-source-url-link"
-                                       href="#"
-                                       target="_blank"
-                                       rel="noopener noreferrer"
-                                       aria-label="Open Source URL"
-                                       title="Open Source URL">&#8599;</a>
-                                </span>
-                            </label>
-                            <label class="recipe-edit-file-field">
-                                <span>Source PDF Path</span>
-                                <span class="recipe-edit-source-url-field">
-                                    <input type="text" id="recipeEditSourcePdfPath" readonly>
-                                    <a id="recipeEditSourcePdfPathLink"
-                                       class="recipe-edit-source-url-link"
-                                       href="#"
-                                       target="_blank"
-                                       rel="noopener noreferrer"
-                                       aria-label="Open Source PDF Path"
-                                       title="Open Source PDF Path"
-                                       onclick="return openRecipeEditorPdf(this, event)"
-                                       hidden>
-                                        &#8599;
-                                    </a>
-                                </span>
-                            </label>
-                            <label class="recipe-edit-file-field">
-                                <span>Source Cloudflare PDF Path</span>
-                                <span class="recipe-edit-source-url-field">
-                                    <input type="text" id="recipeEditSourceCloudflarePdfUrl" readonly>
-                                    <a id="recipeEditSourceCloudflarePdfUrlLink"
-                                       class="recipe-edit-source-url-link"
-                                       href="#"
-                                       target="_blank"
-                                       rel="noopener noreferrer"
-                                       aria-label="Open Source Cloudflare PDF"
-                                       title="Open Source Cloudflare PDF"
-                                       onclick="return openRecipeEditorPdf(this, event)"
-                                       hidden>
-                                        &#8599;
-                                    </a>
-                                </span>
-                            </label>
-                            <label class="recipe-edit-file-field">
-                                <span>Generated PDF Path</span>
-                                <span class="recipe-edit-source-url-field">
-                                    <input type="text" id="recipeEditGeneratedPdfPath" readonly>
-                                    <a id="recipeEditGeneratedPdfPathLink"
-                                       class="recipe-edit-source-url-link"
-                                       href="#"
-                                       target="_blank"
-                                       rel="noopener noreferrer"
-                                       aria-label="Open Generated PDF"
-                                       title="Open Generated PDF"
-                                       onclick="return openRecipeEditorPdf(this, event)"
-                                       hidden>
-                                        &#8599;
-                                    </a>
-                                </span>
-                            </label>
-                            <label class="recipe-edit-file-field">
-                                <span>Generated Cloudflare PDF Path</span>
-                                <span class="recipe-edit-source-url-field">
-                                    <input type="text" id="recipeEditGeneratedCloudflarePdfUrl" readonly>
-                                    <a id="recipeEditGeneratedCloudflarePdfUrlLink"
-                                       class="recipe-edit-source-url-link"
-                                       href="#"
-                                       target="_blank"
-                                       rel="noopener noreferrer"
-                                       aria-label="Open Generated Cloudflare PDF"
-                                       title="Open Generated Cloudflare PDF"
-                                       onclick="return openRecipeEditorPdf(this, event)"
-                                       hidden>
-                                        &#8599;
-                                    </a>
-                                </span>
-                            </label>
-                        </div>
-                    </details>
                     <div id="recipeEditRestaurantMenuSourceDetails"
                          class="recipe-edit-menu-metadata-state"
                          aria-hidden="true"
@@ -2522,11 +2444,9 @@
                                     <dt>Source URL</dt><dd>Original webpage the recipe was imported from.</dd>
                                     <dt>Source Menu URL</dt><dd>Restaurant menu containing this recipe.</dd>
                                     <dt>Source PDF</dt><dd>Snapshot of the original source.</dd>
-                                    <dt>Generated PDF</dt><dd>Recipe PDF generated by AI Pantry.</dd>
-                                    <dt>Cloudflare Source PDF</dt><dd>Online backup of the source PDF.</dd>
-                                    <dt>Cloudflare Generated PDF</dt><dd>Online backup of the generated recipe PDF.</dd>
+                                    <dt>Generated Recipe PDF</dt><dd>Recipe PDF generated by AI Pantry.</dd>
                                 </dl>
-                                <p>Use Open to view a document. Additional icons provide download or external-link actions when available.</p>
+                                <p>Cloud backups are shown as the status of the associated document rather than as separate files.</p>
                             </aside>
                         <div id="recipeEditDocumentList" class="recipe-edit-document-list" data-recipe-edit-document-list>
                             <div class="recipe-edit-document-row"
@@ -2540,8 +2460,7 @@
                                     <strong>Source URL</strong>
                                     <span data-document-status onclick="return copyRecipeEditorDocumentValue(this)">Unavailable</span>
                                 </div>
-                                <a class="recipe-edit-document-open" href="#" target="_blank" rel="noopener noreferrer" data-document-open hidden>Open</a>
-                                <a class="recipe-edit-document-secondary" href="#" target="_blank" rel="noopener noreferrer" data-document-external title="Open source URL in new tab" aria-label="Open source URL in new tab" hidden>{{ shell.svg_icon("external-link") }}</a>
+                                <a class="recipe-edit-document-open" href="#" target="_blank" rel="noopener noreferrer" data-document-open aria-label="Open Source URL" hidden>Open</a>
                             </div>
                             <div class="recipe-edit-document-row"
                                  data-recipe-edit-document-row
@@ -2553,60 +2472,29 @@
                                     <strong>Source Menu URL</strong>
                                     <span data-document-status onclick="return copyRecipeEditorDocumentValue(this)">Unavailable</span>
                                 </div>
-                                <a class="recipe-edit-document-open" href="#" target="_blank" rel="noopener noreferrer" data-document-open hidden>Open</a>
-                                <a class="recipe-edit-document-secondary" href="#" target="_blank" rel="noopener noreferrer" data-document-external title="Open source menu URL in new tab" aria-label="Open source menu URL in new tab" hidden>{{ shell.svg_icon("external-link") }}</a>
+                                <a class="recipe-edit-document-open" href="#" target="_blank" rel="noopener noreferrer" data-document-open aria-label="Open Source Menu URL" hidden>Open</a>
                             </div>
                             <div class="recipe-edit-document-row"
                                  data-recipe-edit-document-row
-                                 data-document-input-id="recipeEditSourcePdfPath"
-                                 data-document-link-id="recipeEditSourcePdfPathLink"
-                                 data-document-kind="pdf">
+                                 data-document-logical-kind="source">
                                 <span class="recipe-edit-document-icon" aria-hidden="true">{{ shell.svg_icon("document") }}</span>
                                 <div class="recipe-edit-document-identity">
                                     <strong>Source PDF</strong>
-                                    <span data-document-status onclick="return copyRecipeEditorDocumentValue(this)">Unavailable</span>
+                                    <span data-document-status role="status">Unavailable</span>
+                                    <span class="recipe-edit-document-cloud-status" data-document-cloud-status hidden>Cloud backup available</span>
                                 </div>
-                                <a class="recipe-edit-document-open" href="#" target="_blank" rel="noopener noreferrer" data-document-open hidden>Open</a>
-                                <button type="button" class="recipe-edit-document-secondary" data-document-cloud-upload title="Upload Source PDF to Cloudflare" aria-label="Upload Source PDF to Cloudflare" onclick="return uploadRecipeSourcePdfToCloudflare(this)" hidden>{{ shell.svg_icon("cloud-upload") }}</button>
+                                <a class="recipe-edit-document-open" href="#" target="_blank" rel="noopener noreferrer" data-document-open aria-label="Open Source PDF" onclick="return openRecipeEditorPdf(this, event)" hidden>Open</a>
                             </div>
                             <div class="recipe-edit-document-row"
                                  data-recipe-edit-document-row
-                                 data-document-input-id="recipeEditSourceCloudflarePdfUrl"
-                                 data-document-link-id="recipeEditSourceCloudflarePdfUrlLink"
-                                 data-document-kind="cloudflare">
+                                 data-document-logical-kind="generated">
                                 <span class="recipe-edit-document-icon" aria-hidden="true">{{ shell.svg_icon("document") }}</span>
                                 <div class="recipe-edit-document-identity">
-                                    <strong>Cloudflare Source PDF</strong>
-                                    <span data-document-status onclick="return copyRecipeEditorDocumentValue(this)">Unavailable</span>
+                                    <strong>Generated Recipe PDF</strong>
+                                    <span data-document-status role="status">Unavailable</span>
+                                    <span class="recipe-edit-document-cloud-status" data-document-cloud-status hidden>Cloud backup available</span>
                                 </div>
-                                <a class="recipe-edit-document-open" href="#" target="_blank" rel="noopener noreferrer" data-document-open hidden>Open</a>
-                                <a class="recipe-edit-document-secondary" href="#" target="_blank" rel="noopener noreferrer" data-document-download title="Open Cloudflare source PDF in a new tab" aria-label="Open Cloudflare source PDF in a new tab" hidden>{{ shell.svg_icon("external-link") }}</a>
-                            </div>
-                            <div class="recipe-edit-document-row"
-                                 data-recipe-edit-document-row
-                                 data-document-input-id="recipeEditGeneratedPdfPath"
-                                 data-document-link-id="recipeEditGeneratedPdfPathLink"
-                                 data-document-kind="pdf">
-                                <span class="recipe-edit-document-icon" aria-hidden="true">{{ shell.svg_icon("document") }}</span>
-                                <div class="recipe-edit-document-identity">
-                                    <strong>Generated PDF</strong>
-                                    <span data-document-status onclick="return copyRecipeEditorDocumentValue(this)">Unavailable</span>
-                                </div>
-                                <a class="recipe-edit-document-open" href="#" target="_blank" rel="noopener noreferrer" data-document-open hidden>Open</a>
-                                <a class="recipe-edit-document-secondary" href="#" target="_blank" rel="noopener noreferrer" download data-document-download title="Download generated PDF" aria-label="Download generated PDF" hidden>{{ shell.svg_icon("download") }}</a>
-                            </div>
-                            <div class="recipe-edit-document-row"
-                                 data-recipe-edit-document-row
-                                 data-document-input-id="recipeEditGeneratedCloudflarePdfUrl"
-                                 data-document-link-id="recipeEditGeneratedCloudflarePdfUrlLink"
-                                 data-document-kind="cloudflare">
-                                <span class="recipe-edit-document-icon" aria-hidden="true">{{ shell.svg_icon("document") }}</span>
-                                <div class="recipe-edit-document-identity">
-                                    <strong>Cloudflare Generated PDF</strong>
-                                    <span data-document-status onclick="return copyRecipeEditorDocumentValue(this)">Unavailable</span>
-                                </div>
-                                <a class="recipe-edit-document-open" href="#" target="_blank" rel="noopener noreferrer" data-document-open hidden>Open</a>
-                                <a class="recipe-edit-document-secondary" href="#" target="_blank" rel="noopener noreferrer" data-document-download title="Open Cloudflare generated PDF in a new tab" aria-label="Open Cloudflare generated PDF in a new tab" hidden>{{ shell.svg_icon("external-link") }}</a>
+                                <a class="recipe-edit-document-open" href="#" target="_blank" rel="noopener noreferrer" data-document-open aria-label="Open Generated Recipe PDF" onclick="return openRecipeEditorPdf(this, event)" hidden>Open</a>
                             </div>
                         </div>
                     </details>
@@ -2627,26 +2515,39 @@
                                     </section>
                                     <section class="recipe-edit-source-document-records">
                                         <h3>Documents</h3>
-                                        {% for record in (("Source PDF", "recipeEditSourcePdfPath", "source"), ("Generated PDF", "recipeEditGeneratedPdfPath", "generated"), ("Cloudflare Source PDF", "recipeEditSourceCloudflarePdfUrl", "cloud-source"), ("Cloudflare Generated PDF", "recipeEditGeneratedCloudflarePdfUrl", "cloud-generated")) %}
-                                        <div class="recipe-edit-source-document-record" data-source-document-modal-row data-document-input-id="{{ record[1] }}" data-document-modal-kind="{{ record[2] }}">
+                                        {% for record in (("Source PDF", "source"), ("Generated Recipe PDF", "generated")) %}
+                                        <div class="recipe-edit-source-document-record" data-source-document-modal-row data-document-logical-kind="{{ record[1] }}">
                                             <span class="recipe-edit-document-icon" aria-hidden="true">{{ shell.svg_icon("document") }}</span>
-                                            <div><strong>{{ record[0] }}</strong><span data-source-document-modal-status>Unavailable</span></div>
+                                            <div>
+                                                <strong>{{ record[0] }}</strong>
+                                                <span data-source-document-modal-filename>Unavailable</span>
+                                                <span data-source-document-modal-status role="status">Unavailable</span>
+                                                <span class="recipe-edit-source-document-cloud-status" data-source-document-modal-cloud-status hidden>Cloud backup available</span>
+                                            </div>
                                             <div class="recipe-edit-source-document-actions" data-source-document-modal-actions>
-                                                <a class="action-open" href="#" target="_blank" rel="noopener noreferrer" data-source-document-modal-open hidden>Open</a>
-                                                {% if record[2] in ("source", "generated") %}<a class="action-download" href="#" target="_blank" rel="noopener noreferrer" data-source-document-modal-download hidden>Download</a>{% endif %}
-                                                {% if record[2] == "generated" %}<button type="button" class="action-management" onclick="return createRecipeEditorPdf(this)">Regenerate PDF</button>{% endif %}
-                                                {% if record[2] == "cloud-source" %}<button type="button" class="action-management" onclick="return uploadRecipeSourcePdfToCloudflare(this)">Refresh Upload</button>{% endif %}
+                                                <a class="action-open" href="#" target="_blank" rel="noopener noreferrer" data-source-document-modal-open aria-label="Open {{ record[0] }}" onclick="return openRecipeEditorPdf(this, event)" hidden>Open</a>
+                                                <a class="action-download" href="#" target="_blank" rel="noopener noreferrer" data-source-document-modal-download aria-label="Download {{ record[0] }}" hidden>Download</a>
+                                                {% if record[1] == "generated" %}<button type="button" class="action-management" aria-label="Regenerate Generated Recipe PDF" onclick="return createRecipeEditorPdf(this)">Regenerate PDF</button>{% endif %}
                                             </div>
                                         </div>
                                         {% endfor %}
                                     </section>
                                     <details class="recipe-edit-source-documents-advanced">
                                         <summary>Advanced Document Management</summary>
-                                        <div>
-                                            <button type="button" data-source-documents-copy="document_source_url" onclick="return copyRecipeSourceDocumentsField(this)">Copy Source URL</button>
-                                            <button type="button" data-source-documents-copy="source_menu_url" onclick="return copyRecipeSourceDocumentsField(this)">Copy Menu URL</button>
-                                            <button type="button" data-source-documents-copy="menu_item_url" onclick="return copyRecipeSourceDocumentsField(this)">Copy Menu Item URL</button>
+                                        <div class="recipe-edit-source-documents-technical-values" data-source-documents-technical-values>
+                                            {% for field in (("Source PDF local path", "source", "local"), ("Source PDF Cloudflare URL or object path", "source", "cloud"), ("Generated PDF local path", "generated", "local"), ("Generated PDF Cloudflare URL or object path", "generated", "cloud")) %}
+                                            <div class="recipe-edit-source-documents-technical-row" data-source-document-technical-row data-document-logical-kind="{{ field[1] }}" data-document-location="{{ field[2] }}">
+                                                <span>{{ field[0] }}</span>
+                                                <code data-source-document-technical-value>Unavailable</code>
+                                                <div>
+                                                    <button type="button" data-source-document-technical-copy aria-label="Copy {{ field[0] }}" onclick="return copyRecipeEditorDocumentValue(this)">Copy</button>
+                                                    <a href="#" target="_blank" rel="noopener noreferrer" data-source-document-technical-open aria-label="Open {{ field[0] }}" onclick="return openRecipeEditorPdf(this, event)" hidden>Open</a>
+                                                    {% if field[1] == "source" and field[2] == "cloud" %}<button type="button" data-source-document-refresh aria-label="Refresh Source PDF cloud upload" onclick="return uploadRecipeSourcePdfToCloudflare(this)">Refresh Upload</button>{% endif %}
+                                                </div>
+                                            </div>
+                                            {% endfor %}
                                         </div>
+                                        <p class="recipe-edit-source-documents-technical-restricted" data-source-documents-technical-restricted hidden>Technical storage values are available only to signed-in users.</p>
                                     </details>
                                     <p class="recipe-edit-source-documents-error" data-source-documents-edit-error hidden></p>
                                 </div>

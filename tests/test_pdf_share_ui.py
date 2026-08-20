@@ -106,16 +106,16 @@ def test_recipe_editor_uses_split_source_and_generated_pdf_fields():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     js = read_text("PushShoppingList/static/js/app.js")
 
-    assert "recipe-edit-file-groups" in template
-    assert "Source URL" in template
-    assert "Source PDF Path" in template
-    assert "Source Cloudflare PDF Path" in template
-    assert "Generated PDF Path" in template
-    assert "Generated Cloudflare PDF Path" in template
+    assert 'id="recipeEditSourceDocumentState" hidden aria-hidden="true"' in template
+    assert 'type="hidden" name="source_url" id="recipeEditSourceUrl"' in template
+    assert "Source PDF local path" in template
+    assert "Source PDF Cloudflare URL or object path" in template
+    assert "Generated PDF local path" in template
+    assert "Generated PDF Cloudflare URL or object path" in template
+    assert "Technical Details" not in template
     assert "SOURCE FILES" not in template
     assert "GENERATED FILES" not in template
     assert "<span>PDF Path</span>" not in template
-    assert "Cloudflare PDF URL" not in template
     assert "recipeEditSourcePdfPath" in template
     assert "recipeEditGeneratedPdfPath" in template
     assert '<textarea id="recipeEditSourcePdfPath"' not in template
@@ -138,7 +138,7 @@ def test_recipe_editor_uses_split_source_and_generated_pdf_fields():
 def test_recipe_editor_hides_create_pdf_controls_when_generated_pdf_is_available():
     js = read_text("PushShoppingList/static/js/app.js")
     controls_start = js.index("function updateRecipeEditorPdfControls")
-    controls_end = js.index("function syncRecipeEditSourceFilesDetails", controls_start)
+    controls_end = js.index("function recipeEditTabKey", controls_start)
     controls = js[controls_start:controls_end]
 
     assert 'document.getElementById("recipeEditCreatePdfButton")' in controls
@@ -189,7 +189,7 @@ def test_recipe_editor_header_overflow_has_persistent_recipe_documents_actions()
     assert "editRecipeSourceDocuments(this, event)" in documents_menu
 
     controls_start = js.index("function updateRecipeEditorPdfControls")
-    controls_end = js.index("function syncRecipeEditSourceFilesDetails", controls_start)
+    controls_end = js.index("function recipeEditTabKey", controls_start)
     controls = js[controls_start:controls_end]
     assert "headerGeneratePdfAction.hidden = false;" in controls
     assert 'hasGeneratedPdf ? "Regenerate recipe PDF" : "Generate recipe PDF"' in controls

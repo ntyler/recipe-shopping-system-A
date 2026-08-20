@@ -632,16 +632,18 @@ def test_recipe_editor_saves_ingredient_substitutions(monkeypatch, tmp_path):
     assert all(item["store_section"] for item in saved["ingredients"][0]["substitutions"])
 
 
-def test_recipe_editor_menu_metadata_state_is_hidden_outside_technical_details():
+def test_recipe_editor_menu_metadata_state_is_hidden_outside_the_main_form():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     js = read_text("PushShoppingList/static/js/app.js")
     restaurant_panel = template.index("recipeEditRestaurantMenuSourceDetails")
     menu_item_panel = template.index("recipeEditMenuItemDetails")
     recipe_amount = template.index("recipeEditScaleMultiplier")
-    source_files_panel = template.index("recipeEditSourceFilesDetails")
+    source_document_state = template.index("recipeEditSourceDocumentState")
     menu_item_markup = template[menu_item_panel:recipe_amount]
 
-    assert source_files_panel < restaurant_panel < menu_item_panel < recipe_amount
+    assert source_document_state < restaurant_panel < menu_item_panel < recipe_amount
+    assert "recipeEditSourceFilesDetails" not in template
+    assert "Technical Details" not in template
     assert "Restaurant / Menu Source Info" not in template
     assert "Menu Item Details" not in template
     assert 'class="recipe-edit-menu-metadata-state"' in template
@@ -671,9 +673,8 @@ def test_recipe_editor_menu_metadata_state_is_hidden_outside_technical_details()
     assert "function recipeMenuMetadataStateAvailable()" in js
     organizer = js[js.index("function organizeRecipeEditInformationCard"):js.index("function organizeRecipeEditAiAssistant")]
     assert "appendRecipeEditWorkspaceChildren(menuMetadataState, [restaurantDetails, menuItemDetails]);" in organizer
-    technical_children = organizer[organizer.index("appendRecipeEditWorkspaceChildren(technicalBody"):organizer.index("grid.replaceChildren()")]
-    assert "restaurantDetails" not in technical_children
-    assert "menuItemDetails" not in technical_children
+    assert "technicalBody" not in organizer
+    assert "appendRecipeEditWorkspaceChildren(descriptionRow, [descriptionField, titleField])" in organizer
     assert "return payload;" in js[js.index("function collectRecipeMenuMetadataPayload"):js.index("function currentRecipeEditorPdfFieldValues")]
 
 

@@ -24221,7 +24221,6 @@ async function openRecipeEditor(button, options = {}) {
     initRecipeEditContextPanels();
     rememberRecipeEditorReturnState(button, url);
     recipeEditInferenceContext = {};
-    syncRecipeEditSourceFilesDetails();
     setRecipeEditStatus("Loading recipe...");
     modal.classList.add("open");
     modal.setAttribute("aria-hidden", "false");
@@ -24926,7 +24925,6 @@ function populateRecipeEditor(recipe, originalUrl, options = {}) {
         inputText: options.scaleInputText,
     });
     updateRecipeEditorPdfControls(recipe);
-    syncRecipeEditSourceFilesDetails();
     populateRecipeMenuMetadata(recipe);
     setRecipeEditorCoverImage(coverImage, recipe.recipe_title || recipe.display_name || "Recipe title image");
     renderRecipeEditMultiselect("cuisine");
@@ -26355,20 +26353,6 @@ function updateRecipeEditorPdfControls(recipe, options = {}) {
         }
     }
     syncRecipeEditDocumentRows();
-}
-
-function syncRecipeEditSourceFilesDetails() {
-    const details = document.getElementById("recipeEditSourceFilesDetails");
-
-    if (!details) {
-        return;
-    }
-
-    const mobile = window.matchMedia
-        ? window.matchMedia("(max-width: 760px)").matches
-        : window.innerWidth <= 760;
-
-    details.open = false;
 }
 
 function recipeEditTabKey(value) {
@@ -28372,8 +28356,6 @@ function organizeRecipeEditInformationCard() {
     const inactiveField = recipeEditFieldContainer("recipeEditInactiveTime");
     const priceField = recipeEditFieldContainer("recipeEditMenuPrice");
     const ratingField = document.querySelector(".recipe-edit-rating-field");
-    const technicalDetails = document.getElementById("recipeEditSourceFilesDetails");
-    const technicalBody = technicalDetails ? technicalDetails.querySelector(".recipe-edit-file-groups") : null;
     const restaurantDetails = document.getElementById("recipeEditRestaurantMenuSourceDetails");
     const menuItemDetails = document.getElementById("recipeEditMenuItemDetails");
     const scaleField = recipeEditFieldContainer("recipeEditScaleMultiplier");
@@ -28388,8 +28370,6 @@ function organizeRecipeEditInformationCard() {
     const customCategoriesField = recipeEditFieldContainer("recipeEditCategoryCustomCategories");
     const categoryMenu = categoriesPanel?.querySelector(".recipe-edit-category-menu-wrap");
     const prepTimeGroupInput = document.getElementById("recipeEditCategoryPrepTimeGroup");
-    const mobilePdfActions = grid.querySelector(".recipe-edit-mobile-pdf-actions");
-    const legacyPdfActions = document.getElementById("recipeEditLegacyPdfActions");
     const infoActions = infoPanel.querySelector(".recipe-edit-info-actions");
     const detailsMenu = infoPanel.querySelector(".recipe-edit-info-menu-wrap");
     const panelHeading = infoPanel.querySelector(".recipe-edit-panel-heading");
@@ -28594,7 +28574,8 @@ function organizeRecipeEditInformationCard() {
 
     const descriptionRow = document.createElement("div");
     descriptionRow.className = "recipe-edit-description-row";
-    appendRecipeEditWorkspaceChildren(descriptionRow, [descriptionField]);
+    descriptionField?.classList.remove("recipe-edit-wide");
+    appendRecipeEditWorkspaceChildren(descriptionRow, [descriptionField, titleField]);
     if (descriptionField && !descriptionField.querySelector("[data-recipe-edit-description-count]")) {
         const counter = document.createElement("span");
         counter.className = "recipe-edit-description-count";
@@ -28620,13 +28601,6 @@ function organizeRecipeEditInformationCard() {
         normalizeRecipeEditPriceDisplay();
     }
 
-    if (technicalDetails) {
-        const summaryLabel = technicalDetails.querySelector("summary > span:first-child");
-        if (summaryLabel) {
-            summaryLabel.textContent = "Technical Details";
-        }
-        technicalDetails.open = false;
-    }
     let menuMetadataState = infoPanel.querySelector("[data-recipe-edit-menu-metadata-state]");
     if (!menuMetadataState) {
         menuMetadataState = document.createElement("div");
@@ -28636,19 +28610,12 @@ function organizeRecipeEditInformationCard() {
         infoPanel.appendChild(menuMetadataState);
     }
     appendRecipeEditWorkspaceChildren(menuMetadataState, [restaurantDetails, menuItemDetails]);
-    appendRecipeEditWorkspaceChildren(technicalBody, [
-        titleField,
-        mobilePdfActions,
-        legacyPdfActions,
-    ]);
-
     grid.replaceChildren();
     appendRecipeEditWorkspaceChildren(grid, [
         primaryRow,
         descriptionRow,
         detailsSection,
         categoriesPanel,
-        technicalDetails,
     ]);
     setRecipeEditTimeBreakdownExpanded(loadRecipeEditTimeBreakdownExpanded());
     bindRecipeEditTotalTimeCalculation();
@@ -37498,67 +37465,114 @@ function organizeRecipeEditStandaloneWorkspace() {
     }
 }
 
+const RECIPE_EDIT_LOGICAL_DOCUMENTS = [
+    {
+        key: "source",
+        label: "Source PDF",
+        localInputId: "recipeEditSourcePdfPath",
+        localLinkId: "recipeEditSourcePdfPathLink",
+        cloudInputId: "recipeEditSourceCloudflarePdfUrl",
+        cloudLinkId: "recipeEditSourceCloudflarePdfUrlLink",
+    },
+    {
+        key: "generated",
+        label: "Generated Recipe PDF",
+        localInputId: "recipeEditGeneratedPdfPath",
+        localLinkId: "recipeEditGeneratedPdfPathLink",
+        cloudInputId: "recipeEditGeneratedCloudflarePdfUrl",
+        cloudLinkId: "recipeEditGeneratedCloudflarePdfUrlLink",
+    },
+];
+
+function recipeEditDocumentLinkTarget(linkId) {
+    const link = document.getElementById(linkId);
+    const href = String(link?.dataset.recipePdfUrl || link?.getAttribute("href") || "").trim();
+    return link && !link.hidden && href && href !== "#" ? href : "";
+}
+
+function recipeEditLogicalDocumentViewModels() {
+    return RECIPE_EDIT_LOGICAL_DOCUMENTS.map(definition => {
+        const localValue = recipeEditInputValue(definition.localInputId);
+        const cloudValue = recipeEditInputValue(definition.cloudInputId);
+        const localHref = localValue ? recipeEditDocumentLinkTarget(definition.localLinkId) : "";
+        const cloudHref = cloudValue ? recipeEditDocumentLinkTarget(definition.cloudLinkId) : "";
+        const hasLocal = Boolean(localValue);
+        const hasCloudBackup = Boolean(cloudValue);
+        const available = hasLocal || hasCloudBackup;
+        const filenameSource = localValue || cloudValue;
+        const availability = hasLocal && hasCloudBackup
+            ? "Available locally and from cloud backup"
+            : hasCloudBackup
+                ? "Available from cloud backup"
+                : hasLocal
+                    ? "Available locally"
+                    : "Unavailable";
+        return {
+            ...definition,
+            available,
+            hasLocal,
+            hasCloudBackup,
+            filename: available ? recipeEditDocumentDisplayValue(filenameSource, definition.localInputId) : "Unavailable",
+            availability,
+            openHref: cloudHref || localHref,
+            downloadHref: localHref || cloudHref,
+            locations: {
+                local: { value: localValue, href: localHref },
+                cloud: { value: cloudValue, href: cloudHref },
+            },
+        };
+    });
+}
+
+function recipeEditLogicalDocumentViewModel(kind) {
+    return recipeEditLogicalDocumentViewModels().find(documentView => documentView.key === kind) || null;
+}
+
 function syncRecipeEditDocumentRows() {
     const rows = Array.from(document.querySelectorAll("[data-recipe-edit-document-row]"));
+    const logicalDocuments = new Map(recipeEditLogicalDocumentViewModels().map(documentView => [documentView.key, documentView]));
     rows.forEach(row => {
-        const inputId = row.dataset.documentInputId || "";
-        const linkId = row.dataset.documentLinkId || "";
+        const logicalKind = row.dataset.documentLogicalKind || "";
         const status = row.querySelector("[data-document-status]");
         const open = row.querySelector("[data-document-open]");
-        const download = row.querySelector("[data-document-download]");
-        const external = row.querySelector("[data-document-external]");
-        const cloudUpload = row.querySelector("[data-document-cloud-upload]");
-        const copy = row.querySelector("[data-document-copy]");
-        const input = document.getElementById(inputId);
-        const sourceValue = inputId === "recipeEditSourceUrl"
-            ? recipeEditorSourceUrlForOpen()
-            : (input ? String(input.value || "").trim() : "");
-        const linked = document.getElementById(linkId);
-        const href = linked && linked.href && !linked.hidden ? linked.href : "";
-        const canOpen = Boolean(href && href !== "#" && sourceValue);
-        const hasValue = Boolean(sourceValue);
+        const cloudStatus = row.querySelector("[data-document-cloud-status]");
+        const logicalDocument = logicalDocuments.get(logicalKind);
+        if (logicalDocument) {
+            row.classList.toggle("is-available", logicalDocument.available);
+            row.hidden = !logicalDocument.available;
+            row.setAttribute("aria-label", `${logicalDocument.label}: ${logicalDocument.availability}`);
+            if (status) {
+                status.textContent = logicalDocument.filename;
+                status.title = logicalDocument.availability;
+            }
+            if (cloudStatus) cloudStatus.hidden = !logicalDocument.hasCloudBackup;
+            if (open) {
+                open.hidden = !logicalDocument.openHref;
+                open.href = logicalDocument.openHref || "#";
+                open.dataset.recipePdfUrl = logicalDocument.openHref || "";
+            }
+            return;
+        }
 
+        const inputId = row.dataset.documentInputId || "";
+        const input = document.getElementById(inputId);
+        const rawSourceValue = input ? String(input.value || "").trim() : "";
+        const sourceValue = isLegitimateWebUrl(rawSourceValue) ? rawSourceValue : "";
+        const href = isLegitimateWebUrl(sourceValue) ? sourceValue : "";
+        const hasValue = Boolean(sourceValue);
         row.classList.toggle("is-available", hasValue);
         row.hidden = !hasValue;
         row.dataset.documentValue = sourceValue;
-
         if (status) {
             status.textContent = recipeEditDocumentDisplayValue(sourceValue, inputId);
             status.title = `${sourceValue} (click to copy)`;
             status.dataset.copyValue = sourceValue;
         }
-
         if (open) {
-            open.hidden = !hasValue;
-            if (canOpen) {
-                open.href = href;
-            } else {
-                open.removeAttribute("href");
-            }
-            open.setAttribute("aria-disabled", canOpen ? "false" : "true");
-            open.title = canOpen ? `Open ${sourceValue}` : "This source is not currently openable";
-        }
-
-        if (download) {
-            const downloadable = canOpen && !["recipeEditSourceUrl", "recipeEditSourceMenuUrl"].includes(inputId);
-            download.hidden = !downloadable;
-            download.href = downloadable ? href : "#";
-        }
-
-        if (external) {
-            const externalHref = isLegitimateWebUrl(sourceValue) ? sourceValue : "";
-            external.hidden = !externalHref;
-            external.href = externalHref || "#";
-        }
-
-        if (cloudUpload) {
-            const cloudflareSource = recipeEditInputValue("recipeEditSourceCloudflarePdfUrl");
-            cloudUpload.hidden = !hasValue || Boolean(cloudflareSource);
-        }
-
-        if (copy) {
-            copy.disabled = !hasValue;
-            copy.dataset.copyValue = sourceValue;
+            open.hidden = !href;
+            open.href = href || "#";
+            open.setAttribute("aria-disabled", href ? "false" : "true");
+            open.title = href ? `Open ${sourceValue}` : "This source is not currently openable";
         }
     });
 
@@ -37569,11 +37583,12 @@ function syncRecipeEditDocumentRows() {
             empty = document.createElement("span");
             empty.className = "recipe-edit-context-empty";
             empty.dataset.recipeEditDocumentEmpty = "";
-            empty.textContent = "No source documents are available yet.";
+            empty.textContent = "No source links or documents are available yet.";
             list.appendChild(empty);
         }
         empty.hidden = rows.some(row => !row.hidden);
     }
+    syncRecipeSourceDocumentModalRows();
 }
 
 function openRecipeSourceDocumentsHelp(button) {
@@ -37622,36 +37637,69 @@ function updateRecipeSourceDocumentsModalState(form = recipeSourceDocumentsForm(
 }
 
 function syncRecipeSourceDocumentModalRows(form = recipeSourceDocumentsForm()) {
-    const linkIds = {
-        recipeEditSourcePdfPath: "recipeEditSourcePdfPathLink",
-        recipeEditGeneratedPdfPath: "recipeEditGeneratedPdfPathLink",
-        recipeEditSourceCloudflarePdfUrl: "recipeEditSourceCloudflarePdfUrlLink",
-        recipeEditGeneratedCloudflarePdfUrl: "recipeEditGeneratedCloudflarePdfUrlLink",
-    };
+    if (!form) return;
+    const logicalDocuments = new Map(recipeEditLogicalDocumentViewModels().map(documentView => [documentView.key, documentView]));
     form?.querySelectorAll("[data-source-document-modal-row]").forEach(row => {
-        const inputId = row.dataset.documentInputId;
-        const value = recipeEditInputValue(inputId);
+        const documentView = logicalDocuments.get(row.dataset.documentLogicalKind || "");
+        if (!documentView) return;
+        const filename = row.querySelector("[data-source-document-modal-filename]");
         const status = row.querySelector("[data-source-document-modal-status]");
+        const cloudStatus = row.querySelector("[data-source-document-modal-cloud-status]");
         const open = row.querySelector("[data-source-document-modal-open]");
         const download = row.querySelector("[data-source-document-modal-download]");
         const actions = row.querySelector("[data-source-document-modal-actions]");
-        const linked = document.getElementById(linkIds[inputId]);
-        const href = linked && !linked.hidden ? linked.href : "";
-        if (status) {
-            status.textContent = value ? recipeEditDocumentDisplayValue(value, inputId) : "Unavailable";
-            status.title = value || "";
+        row.setAttribute("aria-label", `${documentView.label}: ${documentView.availability}`);
+        if (filename) {
+            filename.textContent = documentView.filename;
+            filename.title = documentView.filename;
         }
+        if (status) {
+            status.textContent = documentView.availability;
+            status.title = documentView.availability;
+        }
+        if (cloudStatus) cloudStatus.hidden = !documentView.hasCloudBackup;
         if (open) {
-            open.hidden = !value || !href || href === "#";
-            open.href = !open.hidden ? href : "#";
+            open.hidden = !documentView.openHref;
+            open.href = documentView.openHref || "#";
+            open.dataset.recipePdfUrl = documentView.openHref || "";
         }
         if (download) {
-            download.hidden = !value || !href || href === "#";
-            download.href = !download.hidden ? href : "#";
+            download.hidden = !documentView.downloadHref;
+            download.href = documentView.downloadHref || "#";
+            download.toggleAttribute("download", Boolean(documentView.locations.local.href));
         }
         if (actions) {
             actions.hidden = !Array.from(actions.querySelectorAll("a, button")).some(action => !action.hidden);
         }
+    });
+
+    const canViewTechnicalValues = document.body?.dataset.isGuestDemo !== "true"
+        && Boolean(String(document.body?.dataset.userId || "").trim());
+    const technicalValues = form.querySelector("[data-source-documents-technical-values]");
+    const restricted = form.querySelector("[data-source-documents-technical-restricted]");
+    if (technicalValues) technicalValues.hidden = !canViewTechnicalValues;
+    if (restricted) restricted.hidden = canViewTechnicalValues;
+    form.querySelectorAll("[data-source-document-technical-row]").forEach(row => {
+        const documentView = logicalDocuments.get(row.dataset.documentLogicalKind || "");
+        const location = documentView?.locations[row.dataset.documentLocation || ""] || { value: "", href: "" };
+        const value = row.querySelector("[data-source-document-technical-value]");
+        const copy = row.querySelector("[data-source-document-technical-copy]");
+        const open = row.querySelector("[data-source-document-technical-open]");
+        const refresh = row.querySelector("[data-source-document-refresh]");
+        if (value) {
+            value.textContent = location.value || "Unavailable";
+            value.title = location.value || "Unavailable";
+        }
+        if (copy) {
+            copy.disabled = !location.value || !canViewTechnicalValues;
+            copy.dataset.copyValue = canViewTechnicalValues ? location.value : "";
+        }
+        if (open) {
+            open.hidden = !location.href || !canViewTechnicalValues;
+            open.href = location.href || "#";
+            open.dataset.recipePdfUrl = location.href || "";
+        }
+        if (refresh) refresh.disabled = !documentView?.hasLocal || !canViewTechnicalValues;
     });
 }
 
@@ -37661,10 +37709,11 @@ function editRecipeSourceDocuments(button, event = null) {
     const modal = document.querySelector("[data-source-documents-edit-modal]");
     const form = recipeSourceDocumentsForm();
     if (!modal || !form) return false;
+    const userFacingUrl = value => isLegitimateWebUrl(value) ? String(value || "").trim() : "";
     const initial = {
-        document_source_url: recipeEditInputValue("recipeEditDocumentSourceUrl") || recipeEditorSourceUrlForOpen(),
-        source_menu_url: recipeEditInputValue("recipeEditSourceMenuUrl"),
-        menu_item_url: recipeEditInputValue("recipeEditMenuItemUrl"),
+        document_source_url: userFacingUrl(recipeEditInputValue("recipeEditDocumentSourceUrl") || recipeEditorSourceUrlForOpen()),
+        source_menu_url: userFacingUrl(recipeEditInputValue("recipeEditSourceMenuUrl")),
+        menu_item_url: userFacingUrl(recipeEditInputValue("recipeEditMenuItemUrl")),
     };
     form.querySelectorAll("[data-source-documents-edit-field]").forEach(input => {
         input.value = initial[input.dataset.sourceDocumentsEditField] || "";
@@ -37699,13 +37748,6 @@ function closeRecipeSourceDocumentsModal(options = {}) {
     recipeSourceDocumentsTrigger = null;
     trigger?.focus({ preventScroll: true });
     return false;
-}
-
-function copyRecipeSourceDocumentsField(button) {
-    const form = button?.closest("[data-source-documents-edit-form]");
-    const field = form?.querySelector(`[data-source-documents-edit-field="${button.dataset.sourceDocumentsCopy}"]`);
-    button.dataset.copyValue = String(field?.value || "").trim();
-    return copyRecipeEditorDocumentValue(button);
 }
 
 async function saveRecipeSourceDocuments(form) {

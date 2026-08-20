@@ -151,7 +151,7 @@ def test_recipe_editor_redesign_preserves_core_fields_and_actions():
     assert 'data-recipe-edit-tab="nutrition"' in template
     assert 'data-recipe-edit-tab="notes"' in template
     assert "recipe-edit-source-documents-card" in template
-    assert "data-document-download" in template
+    assert "data-source-document-modal-download" in template
     assert "recipe-edit-restaurant-card" in template
     organizer = script[
         script.index("function organizeRecipeEditStandaloneWorkspace()"):
@@ -665,18 +665,18 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     assert "justify-self: start;" in rating_rule
     assert "appendRecipeEditWorkspaceChildren(selectors, [cookbookField, sectionField, priceField])" in organizer
     assert "appendRecipeEditWorkspaceChildren(primaryRow, [identity, selectors, mobileImageSlot])" in organizer
-    assert "appendRecipeEditWorkspaceChildren(descriptionRow, [descriptionField])" in organizer
+    assert "appendRecipeEditWorkspaceChildren(descriptionRow, [descriptionField, titleField])" in organizer
     assert 'class="recipe-edit-rating-label">Rating</span>' in template
     assert 'shell.rating_control("recipeEditRatingStars", "Recipe rating", mode="recipe")' in template
     assert 'shell.rating_control("recipeEditRestaurantRatingStars", "Restaurant rating", mode="restaurant")' in template
     assert 'data-rating-toggle-selected="true"' in macros
     assert 'class="recipe-edit-rating-clear"' not in macros
-    assert "appendRecipeEditWorkspaceChildren(technicalBody, [\n        titleField," in organizer
+    assert "technicalBody" not in organizer
     assert "detailsSection," in organizer
     assert "categoriesPanel," in organizer
     assert "tagRow" not in organizer
     assert "if (infoActions) infoActions.hidden = true;" in organizer
-    assert "technicalDetails.open = false;" in organizer
+    assert "technicalDetails" not in organizer
     assert "grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(130px, .62fr);" in hierarchy_css
     assert ".recipe-edit-info-panel-organized .recipe-edit-metadata-heading {" in css
     assert ".recipe-edit-description-row {\n    grid-template-columns: minmax(0, 1fr);" in hierarchy_css
@@ -684,9 +684,7 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     assert ".recipe-edit-price-prefix {" not in css
     price_styles = css[
         css.index(".recipe-edit-standalone-page .recipe-edit-price-control {"):
-        css.index(
-            ".recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-source-files-details {"
-        )
+        css.index(".recipe-edit-standalone-page .recipe-edit-rating-field {")
     ]
     assert "display: flex;" in price_styles
     assert "border-right" not in price_styles
@@ -2115,20 +2113,13 @@ def test_source_documents_card_uses_compact_rows_and_edit_modal():
     card_start = template.index('<details class="recipe-edit-context-card recipe-edit-source-documents-card"')
     card_end = template.index('<div class="recipe-edit-source-documents-modal-backdrop"', card_start)
     card = template[card_start:card_end]
-    expected_labels = (
-        "Source URL",
-        "Source Menu URL",
-        "Source PDF",
-        "Cloudflare Source PDF",
-        "Generated PDF",
-        "Cloudflare Generated PDF",
-    )
+    expected_labels = ("Source URL", "Source Menu URL", "Source PDF", "Generated Recipe PDF")
 
     assert "recipe-edit-source-documents-help" in card
     assert "recipeEditSourceDocumentsHelp" in card
     assert 'role="dialog"' in card
     assert "Original webpage the recipe was imported from." in card
-    assert "Use Open to view a document." in card
+    assert "Cloud backups are shown as the status" in card
     assert "recipe-edit-context-chevron" not in card
     assert '<summary class="recipe-edit-source-documents-header">' in card
     assert 'ontoggle="if (!this.open) closeRecipeSourceDocumentsHelp()"' in card
@@ -2141,35 +2132,35 @@ def test_source_documents_card_uses_compact_rows_and_edit_modal():
     assert card.count("recipe-edit-document-icon") == len(expected_labels)
     assert card.count("recipe-edit-document-identity") == len(expected_labels)
     assert "recipe-edit-document-more" not in card
-    assert card.count("data-document-open hidden") == len(expected_labels)
-    assert card.count("recipe-edit-document-secondary") == 6
+    assert card.count("data-document-open aria-label") == len(expected_labels)
+    assert "recipe-edit-document-secondary" not in card
     assert card.count('shell.svg_icon("link")') == 2
-    assert card.count('data-document-external title=') == 2
-    assert card.count('shell.svg_icon("external-link")') == 4
-    assert 'aria-label="Open source URL in new tab"' in card
-    assert 'aria-label="Open source menu URL in new tab"' in card
-    assert 'external.href = externalHref || "#";' in script
-    assert card.count('shell.svg_icon("document")') == 4
-    assert card.count('shell.svg_icon("external-link")') == 4
-    assert card.count('shell.svg_icon("download")') == 1
-    assert card.count('shell.svg_icon("cloud-upload")') == 1
+    assert card.count('shell.svg_icon("document")') == 2
+    assert card.count("data-document-logical-kind") == 2
+    assert card.count("Cloud backup available") == 2
     assert all(label in card for label in expected_labels)
+    assert "Cloudflare Source PDF" not in card
+    assert "Cloudflare Generated PDF" not in card
     assert 'row.hidden = !hasValue;' in script
     assert 'status.title = `${sourceValue} (click to copy)`;' in script
-    assert 'open.setAttribute("aria-disabled", canOpen ? "false" : "true");' in script
+    assert 'open.setAttribute("aria-disabled", href ? "false" : "true");' in script
     assert ".recipe-edit-standalone-page .recipe-edit-document-row {" in css
     assert "grid-template-columns: 32px minmax(0, 1fr) auto 28px;" in css
     assert "text-overflow: ellipsis;" in css
-    assert ".recipe-edit-standalone-page .recipe-edit-document-secondary {" in css
-    assert 'data-document-input-id="recipeEditGeneratedPdfPath"] { order: 4; }' in css
+    assert "const RECIPE_EDIT_LOGICAL_DOCUMENTS" in script
+    assert "function recipeEditLogicalDocumentViewModels()" in script
+    assert "openHref: cloudHref || localHref" in script
+    assert "downloadHref: localHref || cloudHref" in script
     assert "function recipeEditDocumentSlug(value, fallback = \"document\")" in script
     assert "function toggleRecipeSourceDocumentsHelp" in script
     assert "function editRecipeSourceDocuments(button, event = null)" in script
+    assert "const userFacingUrl = value => isLegitimateWebUrl(value)" in script
     assert "Edit Source &amp; Documents" in template
     assert 'data-source-documents-edit-modal' in template
     assert 'aria-modal="true"' in template
     assert 'fetch("/api/recipe/source-documents"' in script
     assert "Advanced Document Management" in template
+    assert template.count('data-source-documents-edit-field="') == 3
     assert "Regenerate PDF" in template
     assert "Refresh Upload" in template
     assert "function uploadRecipeSourcePdfToCloudflare" in script
@@ -2178,14 +2169,18 @@ def test_source_documents_card_uses_compact_rows_and_edit_modal():
     modal_start = template.index('<div class="recipe-edit-source-documents-modal-backdrop"')
     modal_end = template.index('<details class="recipe-edit-context-card recipe-edit-restaurant-card"', modal_start)
     modal = template[modal_start:modal_end]
+    assert "Source PDF local path" in modal
+    assert "Generated PDF Cloudflare URL or object path" in modal
+    assert "data-source-document-technical-copy" in modal
+    assert "data-source-documents-technical-restricted" in modal
     record_loop_start = modal.index('{% for record in')
     record_loop_end = modal.index('{% endfor %}', record_loop_start)
     record_loop = modal[record_loop_start:record_loop_end]
     assert 'data-source-document-modal-actions' in record_loop
     assert record_loop.index('data-source-document-modal-open') < record_loop.index('data-source-document-modal-download')
     assert record_loop.index('data-source-document-modal-download') < record_loop.index('Regenerate PDF')
-    assert 'class="action-management" onclick="return createRecipeEditorPdf(this)"' in record_loop
-    assert 'class="action-management" onclick="return uploadRecipeSourcePdfToCloudflare(this)"' in modal
+    assert 'onclick="return createRecipeEditorPdf(this)"' in record_loop
+    assert "data-source-document-refresh" in modal
     assert 'class="secondary" onclick="return closeRecipeSourceDocumentsModal' in modal
     assert modal.index('data-source-documents-edit-save') < modal.index('>Cancel</button>')
     assert 'actions.hidden = !Array.from(actions.querySelectorAll("a, button")).some(action => !action.hidden);' in script
@@ -2884,7 +2879,7 @@ def test_recipe_editor_redesign_javascript_wiring():
     assert 'description: document.getElementById("recipeEditDescription")' in script
     assert "data-recipe-edit-health-item" in script
     assert "data-health-status" in script
-    assert "data-document-download" in script
+    assert "data-source-document-modal-download" in script
     assert "recipeBreadcrumbName.textContent" in script
     assert "[\"initRecipeEditTabs\", initRecipeEditTabs]" in script
     assert "[\"initRecipeEditContextPanels\", initRecipeEditContextPanels]" in script
