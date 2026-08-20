@@ -1718,6 +1718,52 @@ def test_recipe_details_and_classification_controls_are_transparent_until_active
     assert "background-color: color-mix(in srgb, var(--app-primary-soft) 24%, transparent) !important;" in styles
 
 
+def test_recipe_description_is_transparent_until_hover_or_focus():
+    template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    css = read_text("PushShoppingList/static/css/app.css")
+    marker = "/* Recipe description: transparent card-integrated editing surface. */"
+    styles = css[css.index(marker):]
+
+    description_markup = template[
+        template.index('<textarea name="description"'):
+        template.index("</textarea>", template.index('<textarea name="description"'))
+    ]
+    assert 'id="recipeEditDescription"' in description_markup
+    assert 'placeholder="Add a description"' in description_markup
+    assert "maxlength=" not in description_markup
+
+    resting_rule = styles[:styles.index("}")]
+    for declaration in (
+        "border: 1px solid transparent;",
+        "border-radius: 7px;",
+        "background-color: transparent;",
+        "background-image: none;",
+        "box-shadow: none;",
+        "cursor: text;",
+        "transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease;",
+    ):
+        assert declaration in resting_rule
+
+    assert ".recipe-edit-description-row > label:hover #recipeEditDescription" in styles
+    assert ".recipe-edit-description-row > label:focus-within #recipeEditDescription" in styles
+    assert "):hover," in styles
+    assert "):focus {" in styles
+    assert "):focus-visible {" in styles
+    assert "border-color: var(--app-primary-hover);" in styles
+    assert "box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-primary-hover) 34%, transparent);" in styles
+    assert "outline: 2px solid var(--app-focus);" in styles
+    assert "#recipeEditDescription::placeholder" in styles
+    assert "#recipeEditDescription:is(:disabled, [readonly])" in styles
+    assert "#recipeEditDescription[readonly]" in styles
+    assert "#recipeEditDescription:-webkit-autofill" in styles
+    assert ".recipe-edit-description-count" in styles
+    assert "background: transparent;" in styles
+    assert "@media (prefers-reduced-motion: reduce)" in styles
+    assert "@media (forced-colors: active)" in styles
+    assert '[aria-invalid="true"]' in styles
+    assert '[data-recipe-edit-validation-invalid="true"]' in styles
+
+
 def test_recipe_editor_standard_fields_are_quiet_until_active():
     css = read_text("PushShoppingList/static/css/app.css")
     marker = "/* Recipe workspace: keep standard fields quiet until they are active or invalid. */"
