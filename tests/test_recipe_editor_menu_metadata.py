@@ -674,7 +674,8 @@ def test_recipe_editor_menu_metadata_state_is_hidden_outside_the_main_form():
     organizer = js[js.index("function organizeRecipeEditInformationCard"):js.index("function organizeRecipeEditAiAssistant")]
     assert "appendRecipeEditWorkspaceChildren(menuMetadataState, [restaurantDetails, menuItemDetails]);" in organizer
     assert "technicalBody" not in organizer
-    assert "appendRecipeEditWorkspaceChildren(descriptionRow, [descriptionField, titleField])" in organizer
+    assert "appendRecipeEditWorkspaceChildren(descriptionRow, [descriptionField])" in organizer
+    assert "titleField" not in organizer
     assert "return payload;" in js[js.index("function collectRecipeMenuMetadataPayload"):js.index("function currentRecipeEditorPdfFieldValues")]
 
 

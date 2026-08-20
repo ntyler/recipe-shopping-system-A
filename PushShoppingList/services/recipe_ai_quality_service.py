@@ -743,7 +743,7 @@ def build_recipe_ai_quality_report(url):
     }
 
     health = [
-        _health_item("title", "Title", _first(recipe.get("recipe_title"), recipe.get("display_name")), raw, provenance, {"key": "focus_field", "label": "Review Title", "target": "recipeEditTitleInput"}),
+        _health_item("title", "Title", _first(recipe.get("recipe_title"), recipe.get("display_name")), raw, provenance, {"key": "focus_field", "label": "Review Title", "target": "recipeEditDisplayName"}),
         _health_item("ingredients", "Ingredients", ingredients, raw, provenance, {"key": "switch_tab", "label": "Review Ingredients", "target": "ingredients"}),
         _health_item("instructions", "Instructions", instructions, raw, provenance, {"key": "switch_tab", "label": "Review Instructions", "target": "instructions"}),
         _health_item("equipment", "Equipment", recipe.get("equipment"), raw, provenance, {"key": "switch_tab", "label": "Review Equipment", "target": "equipment"}),

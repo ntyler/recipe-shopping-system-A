@@ -24894,12 +24894,11 @@ function populateRecipeEditor(recipe, originalUrl, options = {}) {
 
     setValue("recipeEditOriginalUrl", originalUrl);
     setValue("recipeEditId", recipe.recipe_id || recipe.id || "");
-    setValue("recipeEditDisplayName", recipe.display_name || "");
+    setRecipeEditCanonicalTitleState(recipe);
     const recipeBreadcrumbName = document.getElementById("recipeEditBreadcrumbName");
     if (recipeBreadcrumbName) {
         recipeBreadcrumbName.textContent = String(recipe.display_name || recipe.recipe_title || "Recipe").trim() || "Recipe";
     }
-    setValue("recipeEditTitleInput", recipe.recipe_title || "");
     setValue("recipeEditDescription", recipe.description || "");
     setValue("recipeEditCuisineTags", cuisineCategories.join(", "));
     setValue("recipeEditDietaryPreferences", dietaryPreferences.join(", "));
@@ -26443,6 +26442,29 @@ function recipeEditInputValue(id) {
     return input ? String(input.value || "").trim() : "";
 }
 
+function recipeEditCanonicalTitleControl() {
+    return document.getElementById("recipeEditDisplayName");
+}
+
+function setRecipeEditCanonicalTitleState(recipe = {}) {
+    const input = recipeEditCanonicalTitleControl();
+    if (!input) return;
+    const recipeTitle = String(recipe.recipe_title || "").trim();
+    const displayName = String(recipe.display_name || recipeTitle).trim();
+    input.value = displayName;
+    input.dataset.recipeEditLoadedDisplayName = displayName;
+    input.dataset.recipeEditLoadedTitle = recipeTitle || displayName;
+}
+
+function recipeEditCanonicalTitleValue() {
+    const input = recipeEditCanonicalTitleControl();
+    if (!input) return "";
+    const currentValue = String(input.value || "").trim();
+    const loadedDisplayName = String(input.dataset.recipeEditLoadedDisplayName || "").trim();
+    const loadedTitle = String(input.dataset.recipeEditLoadedTitle || "").trim();
+    return currentValue === loadedDisplayName ? (loadedTitle || currentValue) : currentValue;
+}
+
 function recipeEditFieldContainer(id) {
     const input = document.getElementById(id);
     return input
@@ -27385,6 +27407,9 @@ function bindRecipeEditContentSizing() {
         form.dataset.recipeEditContentSizingBound = "true";
         form.querySelectorAll(RECIPE_EDIT_CONTENT_SIZED_INPUT_SELECTOR).forEach(input => {
             input.addEventListener("input", () => resizeRecipeEditContentSizedInput(input));
+        });
+        form.addEventListener("reset", () => {
+            window.requestAnimationFrame(() => syncRecipeEditContentSizedInputs(form));
         });
         if (!recipeEditUsesNativeContentSizing()) {
             window.addEventListener("resize", () => syncRecipeEditContentSizedInputs(form), { passive: true });
@@ -28344,7 +28369,6 @@ function organizeRecipeEditInformationCard() {
     infoPanel.classList.add("recipe-edit-info-panel-organized");
 
     const nameField = recipeEditFieldContainer("recipeEditDisplayName");
-    const titleField = recipeEditFieldContainer("recipeEditTitleInput");
     const descriptionField = recipeEditFieldContainer("recipeEditDescription");
     const cookbookField = document.getElementById("recipeEditCookbookField");
     const sectionField = document.getElementById("recipeEditCategoryMenuSectionField");
@@ -28575,7 +28599,7 @@ function organizeRecipeEditInformationCard() {
     const descriptionRow = document.createElement("div");
     descriptionRow.className = "recipe-edit-description-row";
     descriptionField?.classList.remove("recipe-edit-wide");
-    appendRecipeEditWorkspaceChildren(descriptionRow, [descriptionField, titleField]);
+    appendRecipeEditWorkspaceChildren(descriptionRow, [descriptionField]);
     if (descriptionField && !descriptionField.querySelector("[data-recipe-edit-description-count]")) {
         const counter = document.createElement("span");
         counter.className = "recipe-edit-description-count";
@@ -37892,7 +37916,7 @@ function recipeEditDocumentDisplayValue(value, inputId = "") {
         return `${recipeEditRestaurantSourceSlug()}-menu.pdf`;
     }
     if (["recipeEditGeneratedPdfPath", "recipeEditGeneratedCloudflarePdfUrl"].includes(inputId)) {
-        const recipeName = recipeEditInputValue("recipeEditTitleInput") || recipeEditInputValue("recipeEditDisplayName");
+        const recipeName = recipeEditCanonicalTitleValue();
         return `${recipeEditDocumentSlug(recipeName, "generated-recipe")}.pdf`;
     }
     try {
@@ -41184,7 +41208,7 @@ function recipeEditCompletenessStatus(label, complete) {
 
 function recipeEditHealthChecks() {
     return [
-        ["Title", Boolean(recipeEditInputValue("recipeEditTitleInput") || recipeEditInputValue("recipeEditDisplayName"))],
+        ["Title", Boolean(recipeEditCanonicalTitleValue())],
         ["Description", Boolean(recipeEditInputValue("recipeEditDescription") || recipeEditInputValue("recipeEditMenuDescription"))],
         ["Ingredients", collectRecipeIngredientRows().length > 0],
         ["Instructions", collectRecipeInstructionRows().length > 0],
@@ -42358,7 +42382,7 @@ function recipeEditorControlForFieldPath(path, form = document.getElementById("r
     const parts = normalized.split(".").filter(Boolean);
     const topLevelIds = {
         display_name: "recipeEditDisplayName",
-        recipe_title: "recipeEditTitleInput",
+        recipe_title: "recipeEditDisplayName",
         description: "recipeEditDescription",
         source_url: "recipeEditSourceUrl",
         servings: "recipeEditServings",
@@ -42493,7 +42517,7 @@ function validateRecipeEditor(form, payload) {
     const errors = [];
     validateRecipeEditScaleField(errors);
     const recipe = payload && payload.recipe && typeof payload.recipe === "object" ? payload.recipe : {};
-    const title = document.getElementById("recipeEditTitleInput");
+    const title = recipeEditCanonicalTitleControl();
     if (!String(recipe.recipe_title || "").trim()) {
         addRecipeEditorValidationError(errors, "Enter a recipe title.", title, "recipe_title");
     }
@@ -43454,9 +43478,8 @@ async function uploadRecipeCoverImage(input) {
 
     const originalUrl = recipeEditorCurrentUrl();
     const sourceUrl = recipeEditorSourceUrlForSave() || originalUrl;
-    const titleInput = document.getElementById("recipeEditTitleInput");
     const displayInput = document.getElementById("recipeEditDisplayName");
-    const fallbackAlt = (titleInput ? titleInput.value.trim() : "")
+    const fallbackAlt = recipeEditCanonicalTitleValue()
         || (displayInput ? displayInput.value.trim() : "")
         || "Recipe title image";
 
@@ -43553,9 +43576,8 @@ async function generateRecipeCoverImage(button) {
     if (recipeCoverImageGenerationPending) return false;
     closeRecipeImageChangeActions();
     const originalUrl = recipeEditorCurrentUrl();
-    const titleInput = document.getElementById("recipeEditTitleInput");
     const displayInput = document.getElementById("recipeEditDisplayName");
-    const fallbackAlt = (titleInput ? titleInput.value.trim() : "")
+    const fallbackAlt = recipeEditCanonicalTitleValue()
         || (displayInput ? displayInput.value.trim() : "")
         || "Recipe title image";
     const currentCoverImage = collectRecipeEditorCoverImage();
@@ -44235,9 +44257,7 @@ function foodReviewPayloadFromRow(row) {
         payload.review_reason = review.reason || "";
     }
 
-    payload.recipe_title = document.getElementById("recipeEditTitleInput")
-        ? document.getElementById("recipeEditTitleInput").value.trim()
-        : "";
+    payload.recipe_title = recipeEditCanonicalTitleValue();
     payload.display_name = document.getElementById("recipeEditDisplayName")
         ? document.getElementById("recipeEditDisplayName").value.trim()
         : "";
@@ -53358,9 +53378,8 @@ async function confirmDeleteRecipeFromEditor(button, event = null) {
     }
 
     const urlInput = document.getElementById("recipeEditOriginalUrl");
-    const titleInput = document.getElementById("recipeEditTitleInput");
     const url = urlInput ? urlInput.value.trim() : "";
-    const title = titleInput ? titleInput.value.trim() : "";
+    const title = recipeEditCanonicalTitleValue();
 
     if (!url) {
         setRecipeEditStatus("Unable to delete recipe: missing recipe URL.", true);
@@ -58014,7 +58033,7 @@ function collectRecipeEditorPayload() {
         recipe: {
             recipe_id: recipeId,
             display_name: document.getElementById("recipeEditDisplayName").value.trim(),
-            recipe_title: document.getElementById("recipeEditTitleInput").value.trim(),
+            recipe_title: recipeEditCanonicalTitleValue(),
             description: document.getElementById("recipeEditDescription")
                 ? document.getElementById("recipeEditDescription").value.trim()
                 : "",
@@ -60758,10 +60777,9 @@ function recipeTitleImageUrlFromCard(card) {
 
 function recipeTitleImageAltFromCard(card) {
     if (recipeImageGenerationCardIsEditor(card)) {
-        const titleInput = document.getElementById("recipeEditTitleInput");
         const displayInput = document.getElementById("recipeEditDisplayName");
 
-        return (titleInput ? titleInput.value.trim() : "")
+        return recipeEditCanonicalTitleValue()
             || (displayInput ? displayInput.value.trim() : "")
             || "Recipe title image";
     }

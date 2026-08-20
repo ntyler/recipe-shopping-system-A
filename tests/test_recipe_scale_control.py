@@ -125,8 +125,8 @@ def test_recipe_servings_and_scale_share_a_quiet_equal_height_control_family():
     assert scale_rule
     scale_body = scale_rule.group("body")
     assert "width: fit-content;" in scale_body
-    assert "min-width: 64px;" in scale_body
-    assert "max-width: 100%;" in scale_body
+    assert "min-width: 42px;" in scale_body
+    assert "max-width: 96px;" in scale_body
     assert "justify-self: start;" in scale_body
     button_rule = re.search(
         r"\.recipe-edit-servings-stepper\s*>\s*button\s*\{(?P<body>.*?)\}",
@@ -173,8 +173,9 @@ def test_recipe_servings_and_scale_share_a_quiet_equal_height_control_family():
     assert scale_input_rule
     assert "field-sizing: content;" in scale_input_rule.group("body")
     assert "width: auto;" in scale_input_rule.group("body")
-    assert "min-width: 64px;" in scale_input_rule.group("body")
-    assert "max-width: 170px;" in scale_input_rule.group("body")
+    assert "min-width: 40px;" in scale_input_rule.group("body")
+    assert "max-width: 94px;" in scale_input_rule.group("body")
+    assert "box-sizing: border-box;" in scale_input_rule.group("body")
     assert "padding: 0 10px;" in scale_input_rule.group("body")
     assert ":is(.recipe-edit-servings-stepper, .recipe-edit-scale-control):focus-within" in styles
     assert ".recipe-edit-scale-control #recipeEditScaleMultiplier" in styles
@@ -199,6 +200,7 @@ def test_recipe_scale_parser_accepts_required_decimal_matrix_and_existing_fracti
         "2",
         "2.5",
         "3",
+        "10",
         "1/2",
         "3/4",
         "1 1/2",
@@ -221,6 +223,7 @@ def test_recipe_scale_parser_accepts_required_decimal_matrix_and_existing_fracti
         2,
         2.5,
         3,
+        10,
         0.5,
         0.75,
         1.5,
@@ -338,7 +341,7 @@ function snapshot() {
 
 populateRecipeScalingControls({ selected_multiplier: 1, base_servings: "4" }, "4");
 const initial = snapshot();
-const values = ["0.25", "0.5", "0.75", "1", "1.25", "1.5", "2", "2.5", "3"];
+const values = ["0.25", "0.5", "0.75", "1", "1.25", "1.5", "2", "2.5", "3", "10"];
 const scaled = values.map(value => {
     scaleInput.value = value;
     applyRecipeScaleMultiplier(scaleInput);
@@ -364,6 +367,7 @@ process.stdout.write(JSON.stringify({ initial, scaled, invalidDraft }));
         "2",
         "2.5",
         "3",
+        "10",
     ]
     assert [snapshot["active"] for snapshot in result["scaled"]] == [
         "0.25",
@@ -375,6 +379,7 @@ process.stdout.write(JSON.stringify({ initial, scaled, invalidDraft }));
         "2",
         "2.5",
         "3",
+        "10",
     ]
     assert [snapshot["quantity"] for snapshot in result["scaled"]] == [
         "1/8",
@@ -386,6 +391,7 @@ process.stdout.write(JSON.stringify({ initial, scaled, invalidDraft }));
         "1",
         "1 1/4",
         "1 1/2",
+        "5",
     ]
     assert [snapshot["shoppingMultiplier"] for snapshot in result["scaled"]] == [
         "0.25",
@@ -397,6 +403,7 @@ process.stdout.write(JSON.stringify({ initial, scaled, invalidDraft }));
         "2",
         "2.5",
         "3",
+        "10",
     ]
     assert all(snapshot["servings"] == "4" for snapshot in result["scaled"])
     assert all(
@@ -409,10 +416,10 @@ process.stdout.write(JSON.stringify({ initial, scaled, invalidDraft }));
     )
 
     assert result["invalidDraft"]["text"] == "."
-    assert result["invalidDraft"]["active"] == "3"
+    assert result["invalidDraft"]["active"] == "10"
     assert result["invalidDraft"]["servings"] == "4"
-    assert result["invalidDraft"]["quantity"] == "1 1/2"
-    assert result["invalidDraft"]["shoppingMultiplier"] == "3"
+    assert result["invalidDraft"]["quantity"] == "5"
+    assert result["invalidDraft"]["shoppingMultiplier"] == "10"
     assert result["invalidDraft"]["errorVisible"] is False
     assert result["invalidDraft"]["invalid"] is None
     assert result["invalidDraft"]["payload"]["selected_multiplier"] == 1
@@ -624,7 +631,7 @@ process.stdout.write(JSON.stringify({
         "field": "scaling.selected_multiplier",
     }
     assert validator.index("validateRecipeEditScaleField(errors)") < validator.index(
-        'document.getElementById("recipeEditTitleInput")'
+        "recipeEditCanonicalTitleControl()"
     )
     assert "showRecipeEditorValidationErrors(errors)" in validator
     assert 'firstControl.focus({ preventScroll: true })' in reveal

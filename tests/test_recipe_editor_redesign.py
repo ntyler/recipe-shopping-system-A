@@ -511,7 +511,6 @@ def test_recipe_editor_header_actions_match_the_mockup_order_and_icons():
 
     for field_id in [
         "recipeEditDisplayName",
-        "recipeEditTitleInput",
         "recipeEditDescription",
         "recipeEditSourceUrl",
         "recipeEditSourceMenuUrl",
@@ -534,6 +533,8 @@ def test_recipe_editor_header_actions_match_the_mockup_order_and_icons():
         "recipeEditInferPreviewOnly",
     ]:
         assert f'id="{field_id}"' in template
+    assert 'id="recipeEditTitleInput"' not in template
+    assert 'name="recipe_title"' not in template
 
     assert "inferMissingRecipeDetails(this)" in template
     assert "confirmDeleteRecipeFromEditor(this, event)" in template
@@ -665,7 +666,8 @@ def test_recipe_information_card_matches_compact_mockup_structure():
     assert "justify-self: start;" in rating_rule
     assert "appendRecipeEditWorkspaceChildren(selectors, [cookbookField, sectionField, priceField])" in organizer
     assert "appendRecipeEditWorkspaceChildren(primaryRow, [identity, selectors, mobileImageSlot])" in organizer
-    assert "appendRecipeEditWorkspaceChildren(descriptionRow, [descriptionField, titleField])" in organizer
+    assert "appendRecipeEditWorkspaceChildren(descriptionRow, [descriptionField])" in organizer
+    assert "titleField" not in organizer
     assert 'class="recipe-edit-rating-label">Rating</span>' in template
     assert 'shell.rating_control("recipeEditRatingStars", "Recipe rating", mode="recipe")' in template
     assert 'shell.rating_control("recipeEditRestaurantRatingStars", "Restaurant rating", mode="restaurant")' in template
@@ -888,6 +890,8 @@ def test_requested_recipe_detail_inputs_size_to_their_content():
     assert 'window.CSS.supports("field-sizing", "content")' in script
     assert "function bindRecipeEditContentSizing()" in script
     assert "bindRecipeEditContentSizing();" in script
+    assert 'form.addEventListener("reset"' in script
+    assert "window.requestAnimationFrame(() => syncRecipeEditContentSizedInputs(form))" in script
 
 
 def test_recipe_content_sizing_fallback_measures_and_bounds_width():
@@ -916,11 +920,11 @@ const computedStyle = {
     font: "700 13px Arial",
     letterSpacing: "normal",
     paddingLeft: "10px",
-    paddingRight: "38px",
+    paddingRight: "10px",
     borderLeftWidth: "0px",
     borderRightWidth: "0px",
-    minWidth: "64px",
-    maxWidth: "170px",
+    minWidth: "40px",
+    maxWidth: "94px",
 };
 const window = {
     CSS: { supports() { return false; } },
@@ -941,6 +945,13 @@ const document = {
 ''' + helper + r'''
 resizeRecipeEditContentSizedInput(input);
 const shortWidth = input.style.width;
+const requestedWidths = Object.fromEntries(
+    ["0.5", "0.75", "1", "1.25", "2", "10"].map(value => {
+        input.value = value;
+        resizeRecipeEditContentSizedInput(input);
+        return [value, input.style.width];
+    })
+);
 input.value = "123456789012345";
 resizeRecipeEditContentSizedInput(input);
 const longWidth = input.style.width;
@@ -951,7 +962,13 @@ const legacyModalWidth = input.style.width;
 standaloneEditorActive = true;
 window.CSS.supports = () => true;
 resizeRecipeEditContentSizedInput(input);
-process.stdout.write(JSON.stringify({ shortWidth, longWidth, legacyModalWidth, nativeWidth: input.style.width }));
+process.stdout.write(JSON.stringify({
+    shortWidth,
+    requestedWidths,
+    longWidth,
+    legacyModalWidth,
+    nativeWidth: input.style.width,
+}));
 '''
     completed = subprocess.run(
         [node],
@@ -965,9 +982,17 @@ process.stdout.write(JSON.stringify({ shortWidth, longWidth, legacyModalWidth, n
 
     assert completed.returncode == 0, completed.stderr
     assert json.loads(completed.stdout) == {
-        "shortWidth": "64px",
-        "longWidth": "170px",
-        "legacyModalWidth": "170px",
+        "shortWidth": "40px",
+        "requestedWidths": {
+            "0.5": "46px",
+            "0.75": "54px",
+            "1": "40px",
+            "1.25": "54px",
+            "2": "40px",
+            "10": "40px",
+        },
+        "longWidth": "94px",
+        "legacyModalWidth": "94px",
         "nativeWidth": "",
     }
 
@@ -1480,6 +1505,68 @@ def test_recipe_name_is_directly_editable_without_a_pencil_control():
     assert 'input.dataset.recipeEditNameOriginalValue' in binder
     assert ".recipe-edit-summary-name-edit" not in css
     assert "#recipeEditDisplayName:focus-visible" in css
+
+
+def test_duplicate_recipe_title_control_is_removed_without_losing_the_saved_title():
+    node = shutil.which("node")
+    template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    script = read_text("PushShoppingList/static/js/app.js")
+    quality_service = read_text("PushShoppingList/services/recipe_ai_quality_service.py")
+    organizer = script[
+        script.index("function organizeRecipeEditInformationCard()"):
+        script.index("function organizeRecipeEditAiAssistant()")
+    ]
+
+    assert '<span>Recipe Title</span>' not in template
+    assert 'id="recipeEditTitleInput"' not in template
+    assert 'name="recipe_title"' not in template
+    assert template.count('id="recipeEditDisplayName"') == 1
+    assert template.count('name="display_name"') == 1
+    assert "recipeEditTitleInput" not in script
+    assert "appendRecipeEditWorkspaceChildren(descriptionRow, [descriptionField])" in organizer
+    assert "recipe_title: recipeEditCanonicalTitleValue()," in script
+    assert 'recipe_title: "recipeEditDisplayName"' in script
+    assert '"target": "recipeEditDisplayName"' in quality_service
+
+    if not node:
+        return
+    helper = script[
+        script.index("function recipeEditCanonicalTitleControl()"):
+        script.index("function recipeEditFieldContainer(")
+    ]
+    harness = r'''
+const canonical = { value: "", dataset: {} };
+const document = {
+    getElementById(id) { return id === "recipeEditDisplayName" ? canonical : null; },
+};
+''' + helper + r'''
+setRecipeEditCanonicalTitleState({
+    display_name: "Pantry display label",
+    recipe_title: "Papas a la Huancaína",
+});
+const unchanged = recipeEditCanonicalTitleValue();
+canonical.value = "Papas rellenas";
+const renamed = recipeEditCanonicalTitleValue();
+canonical.value = "";
+const cleared = recipeEditCanonicalTitleValue();
+process.stdout.write(JSON.stringify({ unchanged, renamed, cleared }));
+'''
+    completed = subprocess.run(
+        [node],
+        input=harness,
+        text=True,
+        encoding="utf-8",
+        capture_output=True,
+        check=False,
+        timeout=10,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout) == {
+        "unchanged": "Papas a la Huancaína",
+        "renamed": "Papas rellenas",
+        "cleared": "",
+    }
 
 
 def test_recipe_header_rating_stays_five_star_and_independent_from_restaurant_rating():
