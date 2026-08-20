@@ -245,7 +245,6 @@ def test_recipe_editor_renders_compact_classification_token_controls():
     assert ".recipe-edit-multiselect-option.is-selected" in category_css
     assert 'content: "✓";' in category_css
     assert "@container recipe-details (max-width: 940px)" in category_css
-    assert "@container recipe-details (max-width: 820px)" in category_css
     assert "@container recipe-details (max-width: 620px)" in category_css
     assert "@container recipe-details (max-width: 520px)" in category_css
     assert "@media (max-width: 1100px)" in category_css
@@ -263,12 +262,6 @@ def test_recipe_editor_renders_compact_classification_token_controls():
     assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in classification_container
     assert "column-gap: clamp(24px, 3vw, 32px);" in classification_container
     assert ".recipe-edit-details-primary-grid" not in classification_container
-
-    details_container = category_css[
-        category_css.index("@container recipe-details (max-width: 820px)"):
-        category_css.index("@container recipe-details (max-width: 620px)")
-    ]
-    assert ".recipe-edit-details-primary-grid" in details_container
 
     narrow_classification_container = category_css[
         category_css.index("@container recipe-details (max-width: 620px)"):

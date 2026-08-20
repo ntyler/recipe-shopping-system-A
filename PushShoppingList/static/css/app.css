@@ -57751,7 +57751,14 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
 }
 
 body.recipe-edit-standalone-page .recipe-edit-time-breakdown-group {
-    display: contents;
+    display: flex;
+    min-width: 0;
+    max-width: 100%;
+    flex: 0 1 auto;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    column-gap: var(--recipe-edit-details-column-gap, 32px);
+    row-gap: 18px;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-time-breakdown-group[hidden] {
@@ -77568,27 +77575,26 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
     :is(.recipe-edit-details-primary-grid, .recipe-edit-classification-grid) {
-    display: grid;
     width: min(100%, 960px);
     max-width: 100%;
     min-width: 0;
     align-items: start;
     justify-self: start;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-classification-grid {
+    display: grid;
     row-gap: 22px;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-details-primary-grid {
-    grid-template-columns:
-        minmax(145px, 1.25fr)
-        minmax(72px, .65fr)
-        repeat(4, minmax(88px, 1fr))
-        minmax(112px, 1fr);
-    column-gap: clamp(24px, 1.7vw, 32px);
-}
-
-body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
-    .recipe-edit-details-primary-grid.recipe-edit-time-breakdown-collapsed {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    --recipe-edit-details-column-gap: clamp(28px, 2.5vw, 40px);
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    column-gap: var(--recipe-edit-details-column-gap);
+    row-gap: 18px;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
@@ -77663,6 +77669,17 @@ body.recipe-edit-standalone-page .recipe-edit-info-panel-organized .recipe-edit-
     border: 0;
     background: transparent;
     text-align: left;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+    .recipe-edit-details-primary-grid > .recipe-edit-detail-field,
+body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+    .recipe-edit-details-primary-grid .recipe-edit-time-breakdown-group
+    > .recipe-edit-detail-field {
+    width: fit-content;
+    min-width: 0;
+    max-width: 100%;
+    flex: 0 1 auto;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
@@ -78547,11 +78564,6 @@ body.recipe-edit-standalone-page [data-recipe-edit-category-field].is-ai-suggest
 
 @media (max-width: 1100px) {
     body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
-        .recipe-edit-details-primary-grid {
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-    }
-
-    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
         :is(.recipe-edit-classification-primary-grid, .recipe-edit-classification-secondary-grid) {
         grid-template-columns: repeat(2, minmax(0, 1fr));
         column-gap: clamp(24px, 3vw, 32px);
@@ -78569,27 +78581,6 @@ body.recipe-edit-standalone-page [data-recipe-edit-category-field].is-ai-suggest
         grid-column: 1 / -1;
     }
 
-    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
-        .recipe-edit-details-primary-grid.recipe-edit-time-breakdown-collapsed {
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-    }
-}
-
-@container recipe-details (max-width: 820px) {
-    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
-        .recipe-edit-details-primary-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
-        .recipe-edit-details-primary-grid .recipe-edit-total-time-field {
-        grid-column: auto;
-    }
-
-    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
-        .recipe-edit-details-primary-grid.recipe-edit-time-breakdown-collapsed {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
 }
 
 @container recipe-details (max-width: 620px) {
@@ -78601,7 +78592,7 @@ body.recipe-edit-standalone-page [data-recipe-edit-category-field].is-ai-suggest
 
 @container recipe-details (max-width: 520px) {
     body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
-        :is(.recipe-edit-details-primary-grid, .recipe-edit-classification-grid) {
+        .recipe-edit-classification-grid {
         grid-template-columns: minmax(0, 1fr);
     }
 
@@ -78628,20 +78619,19 @@ body.recipe-edit-standalone-page [data-recipe-edit-category-field].is-ai-suggest
         justify-self: stretch;
     }
 
-    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
-        .recipe-edit-details-primary-grid .recipe-edit-total-time-field {
-        grid-column: auto;
-    }
-
-    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
-        .recipe-edit-details-primary-grid.recipe-edit-time-breakdown-collapsed {
-        grid-template-columns: minmax(0, 1fr);
-    }
 }
 
 @media (max-width: 640px) {
     body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
-        :is(.recipe-edit-details-primary-grid, .recipe-edit-classification-grid) {
+        .recipe-edit-details-primary-grid
+        .recipe-edit-time-breakdown-group:not([hidden]) {
+        display: grid;
+        flex-basis: 100%;
+        grid-template-columns: repeat(2, max-content);
+    }
+
+    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
+        .recipe-edit-classification-grid {
         grid-template-columns: minmax(0, 1fr);
     }
 
@@ -78666,11 +78656,6 @@ body.recipe-edit-standalone-page [data-recipe-edit-category-field].is-ai-suggest
         min-width: 0;
         max-width: 100%;
         justify-self: stretch;
-    }
-
-    body.recipe-edit-standalone-page .recipe-edit-info-panel-organized
-        .recipe-edit-details-primary-grid.recipe-edit-time-breakdown-collapsed {
-        grid-template-columns: minmax(0, 1fr);
     }
 
     body.recipe-edit-standalone-page .recipe-edit-info-panel-organized

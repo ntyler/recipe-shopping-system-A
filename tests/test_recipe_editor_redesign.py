@@ -1151,10 +1151,16 @@ def test_recipe_details_match_classification_layout_and_field_order():
     primary_grid_rule = styles[
         primary_grid_start:styles.index("}", primary_grid_start)
     ]
-    assert "minmax(145px, 1.25fr)" in primary_grid_rule
-    assert "minmax(72px, .65fr)" in primary_grid_rule
-    assert "repeat(4, minmax(88px, 1fr))" in primary_grid_rule
-    assert "minmax(112px, 1fr)" in primary_grid_rule
+    assert "--recipe-edit-details-column-gap: clamp(28px, 2.5vw, 40px);" in primary_grid_rule
+    assert "display: flex;" in primary_grid_rule
+    assert "align-items: flex-start;" in primary_grid_rule
+    assert "justify-content: flex-start;" in primary_grid_rule
+    assert "flex-wrap: wrap;" in primary_grid_rule
+    assert "column-gap: var(--recipe-edit-details-column-gap);" in primary_grid_rule
+    assert "row-gap: 18px;" in primary_grid_rule
+    assert "grid-template-columns" not in primary_grid_rule
+    assert "justify-content: space-between" not in primary_grid_rule
+    assert re.search(r"(^|[;\s])order\s*:", primary_grid_rule) is None
     assert "width: min(100%, 960px);" in styles
     assert (
         "grid-template-columns: minmax(180px, 220px) repeat(2, minmax(260px, 320px));"
@@ -1162,28 +1168,42 @@ def test_recipe_details_match_classification_layout_and_field_order():
     )
     assert "row-gap: 22px;" in styles
     assert "column-gap: clamp(32px, 2vw, 40px);" in styles
-    assert "column-gap: clamp(24px, 1.7vw, 32px);" in primary_grid_rule
     assert "gap: 8px;" in styles
     assert ".recipe-edit-details-primary-grid .recipe-edit-metadata-heading" in styles
     assert "min-height: 22px;" in styles
 
-    collapsed_rules = re.findall(
-        r"\.recipe-edit-details-primary-grid\.recipe-edit-time-breakdown-collapsed\s*\{([^{}]*)\}",
+    details_rules = re.findall(
+        r"([^{}]*\.recipe-edit-details-primary-grid[^{}]*)\{([^{}]*)\}",
         styles,
     )
-    assert len(collapsed_rules) >= 5
-    assert any(
-        "grid-template-columns: repeat(4, minmax(0, 1fr));" in rule
-        for rule in collapsed_rules
+    assert details_rules
+    assert all("1fr" not in declarations for _, declarations in details_rules)
+    assert all("justify-content: space-between" not in declarations for _, declarations in details_rules)
+    assert all(
+        re.search(r"(^|[;\s])order\s*:", declarations) is None
+        for _, declarations in details_rules
     )
-    assert sum(
-        "grid-template-columns: repeat(2, minmax(0, 1fr));" in rule
-        for rule in collapsed_rules
-    ) >= 1
-    assert sum(
-        "grid-template-columns: minmax(0, 1fr);" in rule
-        for rule in collapsed_rules
-    ) >= 2
+    assert ".recipe-edit-details-primary-grid.recipe-edit-time-breakdown-collapsed" not in styles
+
+    item_rule_start = styles.index(
+        ".recipe-edit-details-primary-grid > .recipe-edit-detail-field,"
+    )
+    item_rule = styles[item_rule_start:styles.index("}", item_rule_start)]
+    assert ".recipe-edit-time-breakdown-group" in item_rule
+    assert "width: fit-content;" in item_rule
+    assert "max-width: 100%;" in item_rule
+    assert "flex: 0 1 auto;" in item_rule
+
+    mobile_start = styles.index("@media (max-width: 640px)")
+    mobile_end = styles.index(
+        "/* Recipe description: transparent card-integrated editing surface. */",
+        mobile_start,
+    )
+    mobile_styles = styles[mobile_start:mobile_end]
+    assert ".recipe-edit-time-breakdown-group:not([hidden])" in mobile_styles
+    assert "display: grid;" in mobile_styles
+    assert "flex-basis: 100%;" in mobile_styles
+    assert "grid-template-columns: repeat(2, max-content);" in mobile_styles
 
 
 def test_recipe_time_breakdown_is_one_accessible_persisted_disclosure():
@@ -1233,11 +1253,20 @@ def test_recipe_time_breakdown_is_one_accessible_persisted_disclosure():
     assert disclosure.count("catch (_error)") == 2
 
     assert ".recipe-edit-time-breakdown-group[hidden]" in css
-    assert "display: contents;" in css
+    group_style_start = css.index(
+        "body.recipe-edit-standalone-page .recipe-edit-time-breakdown-group {"
+    )
+    group_style = css[group_style_start:css.index("}", group_style_start)]
+    assert "display: flex;" in group_style
+    assert "max-width: 100%;" in group_style
+    assert "flex: 0 1 auto;" in group_style
+    assert "flex-wrap: wrap;" in group_style
+    assert "column-gap: var(--recipe-edit-details-column-gap, 32px);" in group_style
+    assert "row-gap: 18px;" in group_style
     assert ".recipe-edit-time-breakdown-toggle:focus-visible" in css
     assert 'recipe-edit-time-breakdown-toggle[aria-expanded="true"]' in css
     assert ".recipe-edit-time-breakdown-group > .recipe-edit-detail-field" in css
-    assert ".recipe-edit-details-primary-grid.recipe-edit-time-breakdown-collapsed" in css
+    assert ".recipe-edit-details-primary-grid.recipe-edit-time-breakdown-collapsed" not in css
 
 
 def test_recipe_time_breakdown_toggle_preserves_values_and_calculation():
