@@ -3289,6 +3289,252 @@ def test_recipe_editor_uses_the_recipes_page_card_visual_system_in_both_themes()
     assert "opacity: 1 !important;" in workspace
 
 
+def test_recipe_editor_tab_surfaces_reuse_shared_neutral_border_token():
+    css = read_text("PushShoppingList/static/css/app.css")
+
+    def rule(selector, start=0):
+        rule_start = css.index(selector, start)
+        return css[rule_start:css.index("}", rule_start)]
+
+    assert "--app-border-subtle: #dfe6e2;" in css
+    theme_rule = rule(
+        "body.recipe-edit-standalone-page :is(\n"
+        "    .recipe-edit-standalone-shell,\n"
+        "    .recipe-edit-floating-menu,\n"
+        "    .recipe-edit-ingredient-action-tooltip"
+    )
+    assert "--recipe-editor-border: var(--app-border-subtle);" in theme_rule
+    assert "--recipe-editor-border-soft: var(--app-border-subtle);" in theme_rule
+
+    shared_card_rule = rule(
+        "body.recipe-edit-standalone-page :is(\n"
+        "    .recipe-edit-info-panel,\n"
+        "    .recipe-edit-tabs-card,"
+    )
+    assert "border: 1px solid var(--recipe-editor-border);" in shared_card_rule
+
+    quiet_boundary_start = css.index(
+        "/* Ingredient editor v108: one quiet boundary per complete ingredient group. */"
+    )
+    tab_bar_rule = rule(
+        "body.recipe-edit-standalone-page .recipe-edit-tab-bar {",
+        quiet_boundary_start,
+    )
+    assert "var(--recipe-editor-border-soft) 58%" in tab_bar_rule
+    ingredient_header_rule = rule(
+        "body.recipe-edit-standalone-page .recipe-edit-ingredient-table-head {",
+        quiet_boundary_start,
+    )
+    assert "var(--recipe-editor-border) 68%" in ingredient_header_rule
+    ingredient_group_rule = rule(
+        "body.recipe-edit-standalone-page .recipe-edit-tabs-card .recipe-edit-ingredients-section\n"
+        "    #recipeEditIngredients\n"
+        "    > :is(",
+        quiet_boundary_start,
+    )
+    assert "var(--recipe-editor-border-soft) 22%" in ingredient_group_rule
+    assert "border-right: 0 !important;" in ingredient_group_rule
+    assert "border-left: 0 !important;" in ingredient_group_rule
+
+    ingredient_image_rule = rule(
+        "body.recipe-edit-standalone-page #recipeEditIngredients > "
+        ".recipe-edit-ingredient-row > .recipe-ingredient-image-panel {",
+        css.index("/* Ingredient editor v10: read-first rows and compact inline alternatives. */"),
+    )
+    assert "border: 1px solid var(--recipe-editor-border);" in ingredient_image_rule
+    ingredient_image_cell_rule = rule(
+        ".recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > "
+        ".recipe-ingredient-image-panel.recipe-edit-row-image-panel {"
+    )
+    ingredient_row_media_rule = rule(
+        ".recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > "
+        ".recipe-edit-row-number,\n"
+        ".recipe-edit-standalone-page #recipeEditIngredients > .recipe-edit-ingredient-row > "
+        ".recipe-ingredient-image-panel.recipe-edit-row-image-panel {"
+    )
+    assert "border: 1px solid var(--recipe-editor-border);" in ingredient_image_cell_rule
+    assert "border: 1px solid var(--recipe-editor-border);" in ingredient_row_media_rule
+    alternative_field_selector = (
+        "body.recipe-edit-standalone-page .recipe-edit-alternative-edit-field "
+        ":is(input, textarea, select),\n"
+        "body.recipe-edit-standalone-page .recipe-edit-alternative-edit-field "
+        ".recipe-edit-store-section-trigger {"
+    )
+    alternative_field_first = css.index(alternative_field_selector)
+    alternative_field_rules = (
+        rule(alternative_field_selector, alternative_field_first),
+        rule(
+            alternative_field_selector,
+            alternative_field_first + len(alternative_field_selector),
+        ),
+    )
+    assert all(
+        "border: 1px solid var(--recipe-editor-border);" in item
+        for item in alternative_field_rules
+    )
+    assert "var(--recipe-editor-border-soft) 78%" in rule(
+        "body.recipe-edit-standalone-page .recipe-edit-alternative-source-details,\n"
+        "body.recipe-edit-standalone-page .recipe-edit-alternative-explanation-block {"
+    )
+    assert "border: 1px solid var(--recipe-editor-border);" in rule(
+        "body.recipe-edit-standalone-page .recipe-edit-alternative-metadata-inputs "
+        ".recipe-edit-optional-label {"
+    )
+    assert "border: 1px solid var(--recipe-editor-border);" in rule(
+        ".recipe-edit-ingredient-master-media {"
+    )
+    assert "var(--recipe-editor-border) 82%" in rule(
+        "body.recipe-edit-standalone-page #recipeEditIngredients\n"
+        "    .recipe-edit-ingredient-option-divider\n"
+        "    > .recipe-edit-option-selection {"
+    )
+    alternatives_header_rule = rule(
+        "body.recipe-edit-standalone-page .recipe-edit-ingredient-alternatives-dialog-header {"
+    )
+    assert "border-bottom: 1px solid var(--recipe-editor-border-soft);" in alternatives_header_rule
+    modal_table_rule = rule(
+        "body.recipe-edit-standalone-page #recipeEditIngredients dialog.recipe-edit-ingredient-edit-panel\n"
+        "    :is(\n"
+        "        .recipe-edit-ingredient-modal-selected-option-columns,"
+    )
+    assert "border-bottom: 1px solid var(--recipe-editor-border-soft);" in modal_table_rule
+
+    instructions_start = css.index("/* Instruction editor v1: compact shared-grid step workspace. */")
+    instructions_toolbar_rule = rule(
+        ".recipe-edit-standalone-page .recipe-edit-instructions-section > .instructions-toolbar {",
+        instructions_start,
+    )
+    assert "border-bottom: 1px solid var(--recipe-editor-border-soft);" in instructions_toolbar_rule
+    instructions_list_rule = rule(
+        ".recipe-edit-standalone-page #recipeEditInstructions {",
+        instructions_start,
+    )
+    assert "border: 1px solid var(--recipe-editor-border);" in instructions_list_rule
+    instructions_row_selector = (
+        ".recipe-edit-standalone-page #recipeEditInstructions > .recipe-edit-instruction-row {"
+    )
+    instructions_row_first = css.index(instructions_row_selector, instructions_start)
+    instructions_row_rule = rule(
+        instructions_row_selector,
+        instructions_row_first + len(instructions_row_selector),
+    )
+    assert "border-bottom: 1px solid var(--recipe-editor-border-soft);" in instructions_row_rule
+    reorder_selector = (
+        ".recipe-edit-standalone-page .instructions-toolbar "
+        ".recipe-edit-instruction-reorder-toggle {"
+    )
+    reorder_first = css.index(reorder_selector, instructions_start)
+    reorder_rule = rule(
+        reorder_selector,
+        reorder_first + len(reorder_selector),
+    )
+    assert "border-color: var(--recipe-editor-border);" in reorder_rule
+    assert "var(--app-primary)" in rule(
+        ".recipe-edit-standalone-page .instructions-toolbar "
+        ".recipe-edit-instruction-reorder-toggle.is-active {",
+        instructions_start,
+    )
+
+    shared_rows_rule = rule(
+        ".recipe-edit-standalone-page #recipeEditEquipment > .recipe-edit-equipment-row,\n"
+        ".recipe-edit-standalone-page #recipeEditInstructions > .recipe-edit-instruction-row,\n"
+        ".recipe-edit-standalone-page #recipeEditNutrition > .recipe-edit-nutrition-row {"
+    )
+    assert "border-bottom: 1px solid var(--recipe-editor-border-soft);" in shared_rows_rule
+    shared_lists_rule = rule(
+        ".recipe-edit-standalone-page :is(\n"
+        "    .recipe-edit-equipment,\n"
+        "    .recipe-edit-instructions,\n"
+        "    .recipe-edit-nutrition,"
+    )
+    assert "border: 1px solid var(--recipe-editor-border);" in shared_lists_rule
+    shared_headers_rule = rule(
+        ".recipe-edit-standalone-page :is(\n"
+        "    .recipe-edit-equipment-header,\n"
+        "    .recipe-edit-instructions-header,\n"
+        "    .recipe-edit-nutrition-header,"
+    )
+    assert "border-bottom: 1px solid var(--recipe-editor-border-soft);" in shared_headers_rule
+    shared_actions_rule = rule(
+        ".recipe-edit-standalone-page .recipe-edit-tabs-card "
+        ".recipe-edit-section-actions > button,"
+    )
+    assert "border: 1px solid var(--recipe-editor-border);" in shared_actions_rule
+
+    provider_select_rule = rule(
+        ".recipe-edit-standalone-page .recipe-edit-tabs-card :is(\n"
+        "    .recipe-edit-instructions-section,\n"
+        "    .recipe-edit-equipment-section\n"
+        ") :is(\n"
+        "    .recipe-image-provider-inline-field select,\n"
+        "    .recipe-step-image-file-input\n"
+        "):not("
+    )
+    assert "border-color: var(--recipe-editor-border);" in provider_select_rule
+    assert ":focus," in provider_select_rule
+    assert ":focus-visible," in provider_select_rule
+    assert ":disabled," in provider_select_rule
+    assert "[readonly]," in provider_select_rule
+
+    ingredient_modal_header_rule = rule(
+        "body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-header {"
+    )
+    ingredient_modal_surface_rule = rule(
+        "body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-section-surface {"
+    )
+    ingredient_modal_footer_rule = rule(
+        "body.recipe-edit-standalone-page .recipe-edit-ingredient-modal-footer {"
+    )
+    ingredient_match_detail_rule = rule(
+        ".recipe-edit-standalone-page .recipe-edit-ingredient-match-details-grid > div {"
+    )
+    assert "border-bottom: 1px solid var(--recipe-editor-border-soft);" in ingredient_modal_header_rule
+    assert "var(--recipe-editor-border-soft) 88%" in ingredient_modal_surface_rule
+    assert "border-top: 1px solid var(--recipe-editor-border-soft);" in ingredient_modal_footer_rule
+    assert "border: 1px solid var(--recipe-editor-border);" in ingredient_match_detail_rule
+
+    notes_card_rule = rule(".recipe-edit-standalone-page .recipe-edit-notes-card {")
+    notes_header_rule = rule(
+        ".recipe-edit-standalone-page .recipe-edit-notes-card > .recipe-edit-notes-card-header {"
+    )
+    quick_add_rule = rule(
+        ".recipe-edit-standalone-page .recipe-edit-recipe-notes-section .recipe-edit-note-presets {"
+    )
+    quick_add_button_rule = rule(
+        ".recipe-edit-standalone-page .recipe-edit-recipe-notes-section "
+        ".recipe-edit-note-presets button {"
+    )
+    assert "border: 1px solid var(--recipe-editor-border);" in notes_card_rule
+    assert "border-bottom: 1px solid var(--recipe-editor-border-soft);" in notes_header_rule
+    assert "border-bottom: 1px solid var(--recipe-editor-border-soft);" in quick_add_rule
+    assert "border-color: var(--recipe-editor-border);" in quick_add_button_rule
+    assert "border: 1px dashed var(--recipe-editor-border);" in rule(
+        ".recipe-edit-recipe-notes-empty {"
+    )
+    reflection_selector = (
+        ".recipe-edit-standalone-page .recipe-edit-reflection-note-main "
+        "> textarea[data-field=\"text\"]:not("
+    )
+    reflection_first = css.index(reflection_selector)
+    reflection_rule = rule(
+        reflection_selector,
+        reflection_first,
+    )
+    assert "border-color: var(--recipe-editor-border);" in reflection_rule
+    assert ":focus," in reflection_rule
+    assert ":focus-visible," in reflection_rule
+    assert '[aria-invalid="true"],' in reflection_rule
+    assert '[data-recipe-edit-validation-invalid="true"]' in reflection_rule
+    existing_dialog_focus_rule = rule(
+        ".recipe-edit-dialog input:focus,\n"
+        ".recipe-edit-dialog textarea:focus,\n"
+        ".recipe-edit-dialog select:focus {"
+    )
+    assert "border-color: #5b8cff;" in existing_dialog_focus_rule
+    assert "rgba(91, 140, 255, 0.18)" in existing_dialog_focus_rule
+    assert "border: 1px solid #284058;" in rule(".recipe-edit-note-count {")
+
+
 def test_recipe_editor_is_readable_at_native_desktop_zoom():
     css = read_text("PushShoppingList/static/css/app.css")
     marker = "/* Recipe workspace v16: native-zoom readability and container-aware context rail. */"

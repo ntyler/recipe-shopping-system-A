@@ -2384,7 +2384,7 @@ def test_mobile_ingredient_header_uses_one_layout_in_every_fold_state():
     assert "width: 40px !important;" in image
     assert "height: 40px !important;" in image
     assert "overflow: hidden;" in image
-    assert "border: 1px solid var(--app-border-strong);" in image
+    assert "border: 1px solid var(--recipe-editor-border);" in image
     assert "border-radius: 8px;" in image
     assert ".recipe-edit-ingredient-status-summary" not in v39
     assert ".recipe-edit-ingredient-type-summary" not in v39
