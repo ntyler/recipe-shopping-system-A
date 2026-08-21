@@ -13,26 +13,88 @@ from copy import deepcopy
 
 
 OPTION_TYPES = {"original", "recipe_choice", "substitution", "custom"}
+CANONICAL_INGREDIENT_OPTION_ALIASES = {
+    "recipe_ingredient_id": ("recipeIngredientId", "ingredient_requirement_id", "ingredientRequirementId"),
+    "row_id": ("rowId",),
+    "source_text": ("sourceText",),
+    "original_text": ("originalText",),
+    "default_option_id": (
+        "defaultOptionId",
+        "selected_option_id",
+        "selectedOptionId",
+        "preferred_option_id",
+        "preferredOptionId",
+    ),
+    "original_option_id": ("originalOptionId",),
+    "original_option_label": ("originalOptionLabel",),
+    "original_is_default": ("originalIsDefault",),
+    "selection_required": ("selectionRequired", "required_selection", "requiredSelection"),
+    "alternative_id": ("alternativeId", "group_id", "groupId", "substitution_group_id", "substitutionGroupId"),
+    "substitution_id": ("substitutionId",),
+    "option_id": ("optionId",),
+    "alternative_order": ("alternativeOrder", "option_order", "optionOrder", "sort_order", "sortOrder"),
+    "alternative_component_order": (
+        "alternativeComponentOrder",
+        "component_order",
+        "componentOrder",
+    ),
+    "alternative_label": ("alternativeLabel", "option_label", "optionLabel"),
+    "option_type": ("optionType",),
+    "recipe_authored": ("recipeAuthored",),
+    "is_default": ("isDefault",),
+    "preferred": ("selected", "is_selected", "isSelected"),
+    "purchasable_item": ("purchasableItem", "buy_as", "buyAs"),
+    "store_section": ("storeSection",),
+    "ingredient_image_url": ("ingredientImageUrl", "image_url", "imageUrl"),
+    "section": ("ingredientType",),
+}
 GROUP_ONLY_ITEM_FIELDS = {
     "substitutions",
     "substitution_options",
+    "substitutionOptions",
     "alternatives",
+    "alternative_options",
+    "alternativeOptions",
     "ingredient_requirement_id",
+    "ingredientRequirementId",
     "default_option_id",
+    "defaultOptionId",
+    "selected_option_id",
+    "selectedOptionId",
+    "preferred_option_id",
+    "preferredOptionId",
     "original_option_id",
+    "originalOptionId",
     "original_option_label",
+    "originalOptionLabel",
     "original_is_default",
+    "originalIsDefault",
     "selection_required",
+    "selectionRequired",
+    "required_selection",
+    "requiredSelection",
     "alternative_id",
+    "alternativeId",
     "group_id",
+    "groupId",
     "substitution_group_id",
+    "substitutionGroupId",
     "alternative_order",
+    "alternativeOrder",
     "alternative_component_order",
+    "alternativeComponentOrder",
     "alternative_label",
+    "alternativeLabel",
     "option_type",
+    "optionType",
     "recipe_authored",
+    "recipeAuthored",
     "is_default",
+    "isDefault",
     "preferred",
+    "selected",
+    "is_selected",
+    "isSelected",
 }
 
 
@@ -56,9 +118,45 @@ def truthy(value):
     return clean_text(value).lower() in {"1", "true", "yes", "y", "on"}
 
 
+def canonical_ingredient_option_aliases(item):
+    """Mirror supported legacy/camel fields without deleting their source keys."""
+    if not isinstance(item, dict):
+        return item
+    normalized = deepcopy(item)
+    for canonical, aliases in CANONICAL_INGREDIENT_OPTION_ALIASES.items():
+        current = normalized.get(canonical)
+        if current is not None and (not isinstance(current, str) or current.strip()):
+            continue
+        for alias in aliases:
+            if alias not in normalized:
+                continue
+            value = normalized.get(alias)
+            if value is None or (isinstance(value, str) and not value.strip()):
+                continue
+            normalized[canonical] = deepcopy(value)
+            break
+    return normalized
+
+
+def usable_substitution_value(value):
+    if isinstance(value, list):
+        return any(usable_substitution_value(entry) for entry in value)
+    if isinstance(value, dict):
+        component_values = (
+            value.get("ingredients"),
+            value.get("components"),
+            value.get("replacements"),
+        )
+        return any(usable_substitution_value(entry) for entry in component_values) or bool(
+            ingredient_name(value)
+        )
+    return bool(clean_text(value))
+
+
 def ingredient_name(item):
     if not isinstance(item, dict):
         return clean_text(item)
+    item = canonical_ingredient_option_aliases(item)
     return clean_text(
         item.get("ingredient")
         or item.get("name")
@@ -71,6 +169,7 @@ def ingredient_name(item):
 def shopping_item_name(item):
     if not isinstance(item, dict):
         return clean_text(item)
+    item = canonical_ingredient_option_aliases(item)
     return clean_text(
         item.get("purchasable_item")
         or item.get("buy_as")
@@ -87,7 +186,7 @@ def stable_identifier(prefix, *values):
 
 
 def requirement_id(item, index=0):
-    item = item if isinstance(item, dict) else {}
+    item = canonical_ingredient_option_aliases(item) if isinstance(item, dict) else {}
     return clean_text(
         item.get("ingredient_requirement_id")
         or item.get("recipe_ingredient_id")
@@ -108,13 +207,19 @@ def original_option_id(item, index=0):
 
 
 def substitution_rows(item):
-    item = item if isinstance(item, dict) else {}
-    value = (
-        item.get("substitutions")
-        or item.get("substitution_options")
-        or item.get("alternatives")
-        or []
-    )
+    item = canonical_ingredient_option_aliases(item) if isinstance(item, dict) else {}
+    value = next((
+        candidate
+        for candidate in (
+            item.get("substitutions"),
+            item.get("substitution_options"),
+            item.get("substitutionOptions"),
+            item.get("alternatives"),
+            item.get("alternative_options"),
+            item.get("alternativeOptions"),
+        )
+        if usable_substitution_value(candidate)
+    ), [])
     if isinstance(value, str):
         value = [part for part in re.split(r"[\r\n;]+", value) if clean_text(part)]
     if not isinstance(value, list):
@@ -133,11 +238,13 @@ def substitution_rows(item):
                 })
             continue
 
+        option = canonical_ingredient_option_aliases(option)
         components = next(
             (
                 option.get(field)
                 for field in ("ingredients", "components", "replacements")
                 if isinstance(option.get(field), list)
+                and usable_substitution_value(option.get(field))
             ),
             None,
         )
@@ -160,9 +267,11 @@ def substitution_rows(item):
             or option.get("group_id")
             or option.get("id")
             or option.get("substitution_id")
+            or option.get("option_id")
         )
         for component_index, component in enumerate(components):
             component = component if isinstance(component, dict) else {"ingredient": component}
+            component = canonical_ingredient_option_aliases(component)
             row = {
                 **shared,
                 **component,
@@ -214,7 +323,7 @@ def alternative_option_type(rows):
 
 
 def grouped_substitution_rows(item, index=0):
-    item = item if isinstance(item, dict) else {}
+    item = canonical_ingredient_option_aliases(item) if isinstance(item, dict) else {}
     parent_id = requirement_id(item, index)
     groups = []
     by_id = {}
@@ -226,6 +335,7 @@ def grouped_substitution_rows(item, index=0):
             or row.get("group_id")
             or row.get("substitution_group_id")
             or row.get("substitution_id")
+            or row.get("option_id")
             or row.get("id")
         )
         if not group_id:
@@ -310,7 +420,7 @@ def option_item(item):
 
 def ingredient_requirement(item, index=0):
     item = item if isinstance(item, dict) else {"ingredient": item}
-    item = deepcopy(item)
+    item = canonical_ingredient_option_aliases(item)
     req_id = requirement_id(item, index)
     original_id = original_option_id(item, index)
     groups = grouped_substitution_rows(item, index)
@@ -468,7 +578,7 @@ def migrate_ingredient_requirement(item, index=0):
     if not isinstance(item, dict):
         return item
 
-    migrated = deepcopy(item)
+    migrated = canonical_ingredient_option_aliases(item)
     req_id = requirement_id(migrated, index)
     migrated["recipe_ingredient_id"] = clean_text(
         migrated.get("recipe_ingredient_id")
@@ -513,7 +623,13 @@ def migrate_ingredient_requirement(item, index=0):
         else bool(flat_rows)
     )
     default_option_id = clean_text(migrated.get("default_option_id"))
-    if (
+    if truthy(migrated.get("original_is_default")):
+        default_option_id = (
+            explicit_original_group["id"]
+            if explicit_original_group
+            else original_option_id(migrated, index)
+        )
+    elif (
         explicit_original_group
         and (
             not default_option_id

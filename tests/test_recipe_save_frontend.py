@@ -253,7 +253,13 @@ def test_ingredient_modal_uses_scoped_persistence_without_saving_unrelated_recip
     assert 'recipe_ingredient_id: create ? ""' in creation
     assert 'row.dataset.recipeIngredientNew = isNewIngredient ? "true" : "false";' in script
     assert 'row.dataset.recipeIngredientPersistedIndex = String(persistedIndex);' in script
-    assert "addRecipeIngredientRow(item, { persistedIndex: index });" in script
+    population = script[
+        script.index("function populateRecipeEditor"):
+        script.index("function replaceRecipeEditorIngredients")
+    ]
+    assert "addRecipeIngredientRow(item, {" in population
+    assert "persistedIndex: index," in population
+    assert "deferChoiceInitialization: true," in population
     assert script.count("markRecipeIngredientRowsPersisted();") >= 2
 
 
@@ -308,6 +314,45 @@ def test_live_payload_preserves_nested_ids_order_and_metadata():
     assert 'const promptText = document.getElementById("recipeEditCoverPromptText")' in script
     assert "coverImage.prompt = prompt" in script
     assert '/^(?:not available|n\\/?a|none|null)$/i' in script
+
+    ingredient_row_markup = script[
+        script.index("function addRecipeIngredientRow"):
+        script.index("function bindRecipeIngredientSummaryUpdates")
+    ]
+    for field in ("default_option_id", "selection_required"):
+        assert f'data-field="{field}"' in ingredient_row_markup
+
+    substitution_row_markup = script[
+        script.index("function recipeIngredientSubstitutionOptionRowHtml"):
+        script.index("function recipeIngredientSubstitutionOptionsHtml")
+    ]
+    for field in (
+        "id",
+        "substitution_id",
+        "alternative_id",
+        "alternative_order",
+        "alternative_component_order",
+        "option_type",
+        "is_default",
+        "preferred",
+    ):
+        assert f'data-field="{field}"' in substitution_row_markup
+
+    substitution_collection = script[
+        script.index("function collectRecipeIngredientSubstitutionRows"):
+        script.index("function collectRecipeIngredientRows")
+    ]
+    assert "recipeIngredientSubstitutionDomGroups(optionRows).forEach" in substitution_collection
+    assert "orderField.value = String(groupIndex);" in substitution_collection
+    assert "componentOrderField.value = String(componentIndex);" in substitution_collection
+    assert "const option = fieldValuesFromRow(optionRow);" in substitution_collection
+    assert 'option.alternative_id = String(option.alternative_id || "").trim();' in substitution_collection
+    assert 'option.alternative_order = String(option.alternative_order ?? "").trim();' in substitution_collection
+    assert (
+        'option.alternative_component_order = String(option.alternative_component_order ?? "").trim();'
+        in substitution_collection
+    )
+    assert "return canonicalRecipeIngredientAmountForSave(option);" in substitution_collection
 
 
 def test_recipe_row_field_updates_do_not_target_nested_option_fields():

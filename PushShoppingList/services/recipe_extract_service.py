@@ -10295,6 +10295,16 @@ def normalize_substitution_option_row(option, parent_item=None, source_note=""):
     parent_item = parent_item if isinstance(parent_item, dict) else {}
     source_note = clean_recipe_text(source_note)
     raw_option = option if isinstance(option, dict) else {}
+    def option_bool(field, default=True):
+        value = raw_option.get(field)
+        if value is None:
+            return default
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return value != 0
+        return str(value).strip().lower() in {"1", "true", "yes", "y", "on"}
+
     name = substitution_option_name(option)
     if not name:
         return []
@@ -10375,10 +10385,10 @@ def normalize_substitution_option_row(option, parent_item=None, source_note=""):
                 or raw_option.get("is_preferred")
                 or ""
             ).strip().lower() in {"1", "true", "yes", "y", "on"},
-            "inferred": bool(raw_option.get("inferred", True)),
+            "inferred": option_bool("inferred"),
             "warning": clean_recipe_text(raw_option.get("warning") or ""),
             "food_review": raw_option.get("food_review") if isinstance(raw_option.get("food_review"), dict) else {},
-            "optional": bool(raw_option.get("optional", True)),
+            "optional": option_bool("optional"),
             "store_section": store_section,
             "store_section_custom": store_section_custom,
             "store_section_order": STORE_SECTION_ORDER.get(store_section, STORE_SECTION_ORDER["MISC"]),

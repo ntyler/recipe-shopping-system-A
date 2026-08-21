@@ -287,6 +287,7 @@ def _requirement_metadata(item, *, explicit_original, malformed):
                     "recipe_ingredient_id",
                     "source_text",
                     "default_option_id",
+                    "original_is_default",
                     "selection_required",
                 )
                 if key in item
@@ -764,6 +765,13 @@ def legacy_ingredients_from_requirements(requirements):
             )
         else:
             parent.pop("selection_required", None)
+        if "original_is_default" in legacy_parent:
+            parent["original_is_default"] = bool(
+                original
+                and clean_text(original.get("id")) == relational_default
+            )
+        else:
+            parent.pop("original_is_default", None)
 
         substitutions = []
         for option_index, option in enumerate(substitution_options):

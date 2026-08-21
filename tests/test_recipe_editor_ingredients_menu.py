@@ -5304,8 +5304,11 @@ def test_mobile_ingredient_cards_expose_and_honor_the_compact_collapse_controls(
         script.index("function collapseOtherRecipeIngredientRows")
     ]
     assert "const syncHeaders = event => {" in mobile_header_setup
+    assert "const choiceExpansionState = event && typeof event.matches" in mobile_header_setup
+    assert "captureRecipeIngredientChoiceExpansionState()" in mobile_header_setup
     assert "const shouldCollapse = recipeIngredientsShouldStartCollapsed();" in mobile_header_setup
     assert "setRecipeIngredientsCollapsed(shouldCollapse);" in mobile_header_setup
+    assert "restoreRecipeIngredientChoiceExpansionState(choiceExpansionState);" in mobile_header_setup
 
     mobile_start = css.index("/* Ingredient editor v24: real mobile folding for the current card-based layout. */")
     mobile_css = css[mobile_start:]
@@ -6326,6 +6329,9 @@ def test_recipe_editor_phase_two_recipe_view_reuses_shared_rows_handlers_and_opt
     groups_start = script.index("function recipeIngredientRecipeViewChoiceGroups")
     groups_end = script.index("function createRecipeIngredientRecipeViewItem", groups_start)
     groups = script[groups_start:groups_end]
+    model_start = script.index("function recipeIngredientPresentationModel")
+    model_end = script.index("function recipeIngredientRecipeViewChoiceGroups", model_start)
+    model = script[model_start:model_end]
     toggle_start = script.index("function toggleRecipeIngredientRecipeView")
     toggle_end = script.index("function editRecipeIngredientFromRecipeView", toggle_start)
     toggle = script[toggle_start:toggle_end]
@@ -6351,9 +6357,12 @@ def test_recipe_editor_phase_two_recipe_view_reuses_shared_rows_handlers_and_opt
     assert 'disclosure.setAttribute("aria-expanded", String(expanded));' in item
     assert 'disclosure.setAttribute("aria-controls", choices?.id || "");' in item
 
-    assert "recipeIngredientCompactChoiceSummary(parentValues, alternativeGroups)" in groups
-    assert "recipeIngredientSelectedChoice(" in groups
-    assert "group.rows.map(fieldValuesFromRow)" in groups
+    assert "recipeIngredientPresentationModel(" in groups
+    assert "groups: presentation.groups" in groups
+    assert "selectedChoice: presentation.selectedChoice" in groups
+    assert "recipeIngredientCompactChoiceSummary(parentValues, alternativeGroups)" in model
+    assert "recipeIngredientSelectedChoice(" in model
+    assert "group.rows.map(fieldValuesFromRow)" in model
     assert "group.values.forEach(values =>" in script
     assert "label.textContent = recipeIngredientOptionTypeLabel(group.isDefaultOption);" in script
     assert "recipeIngredientChoiceItemSummary(" in script
@@ -6688,7 +6697,7 @@ def test_mobile_collapsed_choice_header_does_not_leave_an_orphaned_divider():
     assert "border-bottom: 0;" in collapsed_choice_css
 
 
-def test_single_component_choice_stays_on_the_parent_row_with_the_shared_header():
+def test_table_choice_uses_parent_only_and_reserves_component_projections_for_store_view():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
@@ -6702,7 +6711,14 @@ def test_single_component_choice_stays_on_the_parent_row_with_the_shared_header(
     ]
 
     assert "return rows.length > 1 ? rows : [];" in sync_line_items
-    assert "const renderedRows = projectedRows;" in sync_line_items
+    assert "const renderedRows = recipeEditIngredientColumnView.groupByStoreSection" in sync_line_items
+    assert "? projectedRows" in sync_line_items
+    assert ": [];" in sync_line_items
+    assert "if (!renderedRows.length)" in sync_line_items
+    assert "const relocatesExpandedChoice = Boolean(" in sync_line_items
+    assert "parentDisclosure || row" in sync_line_items
+    assert "lineItems?.remove();" in sync_line_items
+    assert 'row.classList.remove("has-selected-option-line-items");' in sync_line_items
     assert '"has-mobile-implicit-default-line-item"' not in sync_line_items
     assert "const expandedAtSelectedLineItem = Boolean(" in sync_line_items
     assert "lineItems.contains(row.recipeIngredientExpansionAnchor)" in sync_line_items

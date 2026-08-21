@@ -1206,6 +1206,216 @@ def test_single_component_alternative_preserves_normalized_fields_across_two_sav
     assert second_alternative["preferred"] is True
 
 
+def test_grouped_choice_selection_and_component_metadata_survive_two_saves(
+    monkeypatch,
+    tmp_path,
+):
+    configure_recipe_save_storage(monkeypatch, tmp_path)
+    url = "https://example.test/grouped-choice-two-save-round-trip"
+    seed_recipe(
+        url,
+        ingredients=[{
+            "id": "ingredient-broth-choice",
+            "recipe_ingredient_id": "requirement-broth-choice",
+            "ingredient": "Broth choice",
+        }],
+        instructions=[{"step_number": 1, "instruction": "Simmer."}],
+    )
+    grouped_choice = {
+        "id": "ingredient-broth-choice",
+        "recipe_ingredient_id": "requirement-broth-choice",
+        "ingredient": "Broth choice",
+        "original_text": "Choose a broth base",
+        "source_text": "Choose a broth base",
+        "default_option_id": "option-chicken-base",
+        "selection_required": True,
+        "substitutions": [
+            {
+                "id": "option-item-chicken-broth",
+                "substitution_id": "substitution-chicken-broth",
+                "alternative_id": "option-chicken-base",
+                "alternative_order": 0,
+                "alternative_component_order": 0,
+                "alternative_label": "Chicken broth base",
+                "option_type": "original",
+                "is_default": True,
+                "preferred": True,
+                "ingredient": "Chicken broth",
+                "quantity": "2",
+                "unit": "cup",
+                "purchasable_item": "Low-sodium chicken broth",
+            },
+            {
+                "id": "option-item-garlic",
+                "substitution_id": "substitution-garlic",
+                "alternative_id": "option-chicken-base",
+                "alternative_order": 0,
+                "alternative_component_order": 1,
+                "alternative_label": "Chicken broth base",
+                "option_type": "original",
+                "is_default": True,
+                "preferred": True,
+                "ingredient": "Garlic",
+                "quantity": "1",
+                "unit": "clove",
+                "purchasable_item": "Garlic",
+            },
+            {
+                "id": "option-item-vegetable-broth",
+                "substitution_id": "substitution-vegetable-broth",
+                "alternative_id": "option-vegetable-base",
+                "alternative_order": 1,
+                "alternative_component_order": 0,
+                "alternative_label": "Vegetable broth base",
+                "option_type": "recipe_choice",
+                "is_default": False,
+                "preferred": False,
+                "ingredient": "Vegetable broth",
+                "quantity": "2",
+                "unit": "cup",
+                "purchasable_item": "Vegetable broth",
+            },
+        ],
+    }
+
+    first_result = recipe_edit_service.save_editable_recipe(
+        url,
+        editable_payload(url, ingredients=[grouped_choice]),
+        require_existing=True,
+    )
+    assert first_result["ok"] is True
+    first_ingredient = recipe_edit_service.load_recipe_output(url)["ingredients"][0]
+
+    second_result = recipe_edit_service.save_editable_recipe(
+        url,
+        editable_payload(url, ingredients=[first_ingredient]),
+        require_existing=True,
+    )
+    assert second_result["ok"] is True
+    second_ingredient = recipe_edit_service.load_recipe_output(url)["ingredients"][0]
+
+    assert first_ingredient["recipe_ingredient_id"] == "requirement-broth-choice"
+    assert first_ingredient["default_option_id"] == "option-chicken-base"
+    assert first_ingredient["selection_required"] is True
+    assert second_ingredient["recipe_ingredient_id"] == first_ingredient["recipe_ingredient_id"]
+    assert second_ingredient["default_option_id"] == first_ingredient["default_option_id"]
+    assert second_ingredient["selection_required"] is first_ingredient["selection_required"]
+
+    preserved_fields = (
+        "id",
+        "substitution_id",
+        "alternative_id",
+        "alternative_order",
+        "alternative_component_order",
+        "alternative_label",
+        "option_type",
+        "is_default",
+        "preferred",
+        "ingredient",
+        "quantity",
+        "unit",
+        "purchasable_item",
+    )
+    first_components = [
+        {field: component.get(field) for field in preserved_fields}
+        for component in first_ingredient["substitutions"]
+    ]
+    second_components = [
+        {field: component.get(field) for field in preserved_fields}
+        for component in second_ingredient["substitutions"]
+    ]
+
+    assert first_components == [
+        {field: component.get(field) for field in preserved_fields}
+        for component in grouped_choice["substitutions"]
+    ]
+    assert second_components == first_components
+    assert [component["alternative_id"] for component in second_components] == [
+        "option-chicken-base",
+        "option-chicken-base",
+        "option-vegetable-base",
+    ]
+    assert [component["alternative_component_order"] for component in second_components] == [
+        0,
+        1,
+        0,
+    ]
+
+
+def test_new_implicit_original_selection_is_canonicalized_across_two_saves(
+    monkeypatch,
+    tmp_path,
+):
+    configure_recipe_save_storage(monkeypatch, tmp_path)
+    url = "https://example.test/new-implicit-original-two-save-round-trip"
+    seed_recipe(
+        url,
+        ingredients=[{"id": "ingredient-existing", "ingredient": "Flour"}],
+        instructions=[{"step_number": 1, "instruction": "Mix."}],
+    )
+    submitted = {
+        "ingredient": "Cream",
+        "original_text": "1 cup cream",
+        "source_text": "1 cup cream",
+        "quantity": "1",
+        "unit": "cup",
+        "default_option_id": "original:ingredient-local-preview",
+        "original_is_default": True,
+        "selection_required": True,
+        "substitutions": [{
+            "alternative_id": "alternative-coconut-cream",
+            "alternative_order": 0,
+            "alternative_component_order": 0,
+            "alternative_label": "Coconut cream",
+            "option_type": "substitution",
+            "is_default": False,
+            "preferred": False,
+            "ingredient": "Coconut cream",
+            "quantity": "1",
+            "unit": "cup",
+        }],
+    }
+    existing = {
+        "id": "ingredient-existing",
+        "recipe_ingredient_id": "ingredient-existing",
+        "ingredient": "Flour",
+        "quantity": "1",
+        "unit": "cup",
+    }
+
+    first_result = recipe_edit_service.save_editable_recipe(
+        url,
+        editable_payload(url, ingredients=[existing, submitted]),
+        require_existing=True,
+    )
+    assert first_result["ok"] is True
+    first_recipe = recipe_edit_service.load_recipe_output(url)
+    first = first_recipe["ingredients"][1]
+    canonical_original_id = f"original:{first['recipe_ingredient_id']}"
+
+    assert first["recipe_ingredient_id"].startswith("requirement-")
+    assert first["default_option_id"] == canonical_original_id
+    assert first["default_option_id"] != submitted["default_option_id"]
+    assert first["original_is_default"] is True
+    assert first["selection_required"] is True
+    assert first["substitutions"][0]["alternative_id"] == "alternative-coconut-cream"
+    assert first["substitutions"][0]["preferred"] is False
+
+    second_result = recipe_edit_service.save_editable_recipe(
+        url,
+        editable_payload(url, ingredients=first_recipe["ingredients"]),
+        require_existing=True,
+    )
+    assert second_result["ok"] is True
+    second = recipe_edit_service.load_recipe_output(url)["ingredients"][1]
+
+    assert second["recipe_ingredient_id"] == first["recipe_ingredient_id"]
+    assert second["default_option_id"] == canonical_original_id
+    assert second["original_is_default"] is True
+    assert second["selection_required"] is True
+    assert second["substitutions"] == first["substitutions"]
+
+
 def test_read_first_ingredient_and_multi_component_alternative_preserve_normalized_fields(
     monkeypatch,
     tmp_path,

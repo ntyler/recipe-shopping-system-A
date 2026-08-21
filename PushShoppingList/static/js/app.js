@@ -24844,6 +24844,23 @@ function populateRecipeEditor(recipe, originalUrl, options = {}) {
     const previousOriginalSnapshot = recipeEditOriginalSnapshot;
     const previousRecipeId = document.getElementById("recipeEditId")?.value || "";
     const previousOriginalUrl = document.getElementById("recipeEditOriginalUrl")?.value || "";
+    const incomingRecipeId = String(recipe.recipe_id || recipe.id || "").trim();
+    const incomingOriginalUrl = String(originalUrl || recipe.source_url || "").trim();
+    const sameRecipeForIngredientState = Boolean(
+        (
+            previousRecipeId
+            && incomingRecipeId
+            && String(previousRecipeId).trim() === incomingRecipeId
+        )
+        || (
+            previousOriginalUrl
+            && incomingOriginalUrl
+            && String(previousOriginalUrl).trim() === incomingOriginalUrl
+        )
+    );
+    const ingredientChoiceExpansionState = sameRecipeForIngredientState
+        ? captureRecipeIngredientChoiceExpansionState()
+        : new Map();
     const previousCategoryValues = form ? form.dataset.originalCategoryValues : undefined;
     const previousCategorySources = form ? form.dataset.originalCategorySources : undefined;
     const previousCategoryUserSet = form ? form.dataset.categoryUserSet : undefined;
@@ -24942,9 +24959,13 @@ function populateRecipeEditor(recipe, originalUrl, options = {}) {
         const hasIngredients = Boolean(recipe.ingredients && recipe.ingredients.length);
         if (hasIngredients) {
             (recipe.ingredients || []).forEach((item, index) => {
-                addRecipeIngredientRow(item, { persistedIndex: index });
+                addRecipeIngredientRow(item, {
+                    persistedIndex: index,
+                    deferChoiceInitialization: true,
+                });
             });
             setRecipeIngredientsCollapsed(recipeIngredientsShouldStartCollapsed());
+            restoreRecipeIngredientChoiceExpansionState(ingredientChoiceExpansionState);
         } else {
             setRecipeIngredientsCollapsed(false);
             addEmptyRecipeIngredientRow();
@@ -25033,14 +25054,18 @@ function replaceRecipeEditorIngredients(ingredients = []) {
         return false;
     }
 
+    const ingredientChoiceExpansionState = captureRecipeIngredientChoiceExpansionState();
     ingredientWrap.innerHTML = "";
     const hasIngredients = Boolean(Array.isArray(ingredients) && ingredients.length);
-    (hasIngredients ? ingredients : []).forEach(item => addRecipeIngredientRow(item));
+    (hasIngredients ? ingredients : []).forEach(item => addRecipeIngredientRow(item, {
+        deferChoiceInitialization: true,
+    }));
     if (!ingredientWrap.querySelector(".recipe-edit-ingredient-row")) {
         setRecipeIngredientsCollapsed(false);
         addEmptyRecipeIngredientRow();
     } else {
         setRecipeIngredientsCollapsed(recipeIngredientsShouldStartCollapsed());
+        restoreRecipeIngredientChoiceExpansionState(ingredientChoiceExpansionState);
     }
     updateRecipeIngredientRowIndexes();
     updateRecipeEditorDirtyState();
@@ -31067,15 +31092,35 @@ function recipeIngredientRecipeViewHasContent(values = {}, alternativeGroups = [
     ].some(field => String(values[field] || "").trim());
 }
 
-function recipeIngredientRecipeViewChoiceGroups(row, parentValues, alternativeGroups) {
+function recipeIngredientPresentationModel(row, parentValues, alternativeGroups) {
     const summary = recipeIngredientCompactChoiceSummary(parentValues, alternativeGroups);
     if (!alternativeGroups.length) {
-        return { groups: [], selectedChoice: null, summary };
+        return {
+            kind: recipeIngredientIsOptional(parentValues) ? "optional" : "standard",
+            groups: [],
+            selectedChoice: null,
+            summary,
+            hasGroup: false,
+            selectionRequired: false,
+            requiredUnresolved: false,
+            parentLabel: "",
+            helperText: "",
+            statusText: "",
+            optionCount: 0,
+            alternativeCount: 0,
+            expanded: false,
+        };
     }
     const selectedChoice = recipeIngredientSelectedChoice(
         row,
         parentValues,
         alternativeGroups,
+    );
+    const defaultOptionId = String(
+        row?.querySelector('[data-field="default_option_id"]')?.value || "",
+    ).trim();
+    const selectionRequired = recipeIngredientMatchFlag(
+        row?.querySelector('[data-field="selection_required"]')?.value,
     );
     const groups = [];
     if (!summary.hasExplicitOriginalGroup) {
@@ -31084,6 +31129,7 @@ function recipeIngredientRecipeViewChoiceGroups(row, parentValues, alternativeGr
             rows: [],
             values: [parentValues],
             isDefaultOption: true,
+            kind: "group-option",
         });
     }
     alternativeGroups.forEach(group => {
@@ -31095,21 +31141,54 @@ function recipeIngredientRecipeViewChoiceGroups(row, parentValues, alternativeGr
             isDefaultOption: values.some(value => (
                 String(value.option_type || "").trim() === "original"
             )),
+            kind: "group-option",
         });
     });
     if (summary.hasExplicitOriginalGroup && !groups.some(group => group.isDefaultOption) && groups.length) {
         groups[0].isDefaultOption = true;
     }
     groups.forEach(group => {
-        group.isSelected = selectedChoice
-            ? (
+        group.isDefault = Boolean(group.id && group.id === defaultOptionId);
+        group.isSelected = Boolean(
+            selectedChoice
+            && (
                 group.rows.length
                     ? Boolean(group.id && group.id === selectedChoice.id)
                     : selectedChoice.rows.length === 0
             )
-            : group.isDefaultOption;
+        );
     });
-    return { groups, selectedChoice, summary };
+    const requiredUnresolved = Boolean(selectionRequired && !selectedChoice);
+    return {
+        kind: "group-parent",
+        groups,
+        selectedChoice,
+        summary,
+        hasGroup: true,
+        selectionRequired,
+        requiredUnresolved,
+        parentLabel: selectedChoice?.isDefaultOption
+            ? "DEFAULT OPTION"
+            : "INGREDIENT CHOICE",
+        helperText: requiredUnresolved ? "Choose one option" : "",
+        statusText: requiredUnresolved ? "Selection required" : "",
+        optionCount: groups.length,
+        alternativeCount: alternativeGroups.length,
+        expanded: recipeIngredientExpansionIsOpen(row),
+    };
+}
+
+function recipeIngredientRecipeViewChoiceGroups(row, parentValues, alternativeGroups) {
+    const presentation = recipeIngredientPresentationModel(
+        row,
+        parentValues,
+        alternativeGroups,
+    );
+    return {
+        groups: presentation.groups,
+        selectedChoice: presentation.selectedChoice,
+        summary: presentation.summary,
+    };
 }
 
 function createRecipeIngredientRecipeViewItem(row) {
@@ -32552,7 +32631,13 @@ function recipeIngredientBuiltInType(value) {
 }
 
 function recipeIngredientTypeValue(values = {}) {
-    const explicitType = String(values.section || values.ingredient_type || values.type || "").trim();
+    const explicitType = String(
+        values.section
+        || values.ingredient_type
+        || values.ingredientType
+        || values.type
+        || ""
+    ).trim();
     const optional = values.optional === true
         || ["1", "true", "yes", "on"].includes(String(values.optional || "").trim().toLowerCase());
     if (!explicitType && optional) {
@@ -33861,19 +33946,6 @@ function createRecipeIngredientReadCell(className = "", options = {}) {
     ].filter(Boolean).join(" ");
     readCell.setAttribute("role", "cell");
     readCell.innerHTML = `
-        <div class="recipe-edit-ingredient-choice-parent"
-             data-ingredient-choice-parent
-             aria-live="polite"
-             hidden>
-            <span class="recipe-edit-ingredient-choice-parent-label">INGREDIENT CHOICE</span>
-            <strong data-ingredient-choice-original-text></strong>
-            <span class="recipe-edit-ingredient-choice-parent-helper">Choose one option</span>
-            <span class="recipe-edit-ingredient-choice-parent-meta">
-                <span data-ingredient-choice-selected-summary></span>
-                <span class="recipe-edit-ingredient-choice-parent-separator" aria-hidden="true"></span>
-                <span data-ingredient-choice-option-count></span>
-            </span>
-        </div>
         <input type="text"
                class="recipe-edit-ingredient-inline-control recipe-edit-ingredient-inline-name"
                data-ingredient-read-name
@@ -34898,8 +34970,7 @@ function ensureRecipeIngredientSelectedChoiceGroupHeader(row) {
         header = document.createElement("div");
         header.className = "recipe-edit-selected-choice-group-header";
         header.dataset.ingredientSelectedChoiceGroupHeader = "";
-        header.setAttribute("role", "cell");
-        header.setAttribute("aria-colspan", "11");
+        header.setAttribute("role", "presentation");
         header.hidden = true;
         header.innerHTML = `
             <div class="recipe-edit-selected-choice-group-copy">
@@ -34913,6 +34984,12 @@ function ensureRecipeIngredientSelectedChoiceGroupHeader(row) {
                            autocomplete="off"
                            spellcheck="true">
                 </label>
+                <span class="recipe-edit-selected-choice-group-helper"
+                      data-ingredient-selected-choice-group-helper
+                      hidden></span>
+                <span class="recipe-edit-selected-choice-group-status"
+                      data-ingredient-selected-choice-group-status
+                      hidden></span>
             </div>
         `;
         row.insertBefore(header, row.firstChild);
@@ -34948,10 +35025,40 @@ function syncRecipeIngredientSelectedOptionLineItems(
         )
         : "";
     const selectionDetails = String(selectedChoice?.summary || "").trim();
-    const renderedRows = projectedRows;
+    // The normal Table view renders every option through the shared expansion
+    // panel. Selected-component projections are only needed by the specialized
+    // Store Section grouping, where the shared parent header is intentionally
+    // replaced by grouped component rows.
+    const renderedRows = recipeEditIngredientColumnView.groupByStoreSection
+        ? projectedRows
+        : [];
     let lineItems = row.querySelector(
         ":scope > [data-ingredient-selected-option-line-items]",
     );
+    if (!renderedRows.length) {
+        const expansionPanel = row.recipeIngredientSubstitutionPanel;
+        const relocatesExpandedChoice = Boolean(
+            row.recipeIngredientExpansionAnchor
+            && row.recipeIngredientExpansionAnchor !== row
+            && expansionPanel
+            && !expansionPanel.hidden
+        );
+        if (relocatesExpandedChoice) {
+            resetRecipeIngredientExpansionMount(row, expansionPanel, { hide: false });
+            const parentDisclosure = row.querySelector(
+                "[data-ingredient-substitutions-toggle]",
+            );
+            mountRecipeIngredientExpansion(
+                row,
+                expansionPanel,
+                parentDisclosure || row,
+            );
+            expansionPanel.hidden = false;
+        }
+        lineItems?.remove();
+        row.classList.remove("has-selected-option-line-items");
+        return;
+    }
     if (!lineItems && renderedRows.length) {
         lineItems = document.createElement("div");
         lineItems.className = "recipe-edit-selected-option-line-items";
@@ -48349,12 +48456,41 @@ function recipeIngredientSubstitutions(item = {}) {
     return recipeIngredientSubstitutionRows(item).map(option => option.ingredient).filter(Boolean);
 }
 
-function recipeIngredientSubstitutionAlternativeId(option = {}) {
+function recipeIngredientStablePresentationId(prefix, ...values) {
+    const seed = values
+        .flat(Infinity)
+        .map(value => String(value ?? "").trim().toLowerCase())
+        .join("\u001f");
+    let hash = 2166136261;
+    for (let index = 0; index < seed.length; index += 1) {
+        hash ^= seed.charCodeAt(index);
+        hash = Math.imul(hash, 16777619);
+    }
+    return `${String(prefix || "item").trim() || "item"}-${(hash >>> 0)
+        .toString(16)
+        .padStart(8, "0")}`;
+}
+
+function recipeIngredientSubstitutionGroupId(option = {}) {
     return String(
         option.alternative_id
         || option.alternativeId
         || option.substitution_group_id
+        || option.substitutionGroupId
         || option.group_id
+        || option.groupId
+        || ""
+    ).trim();
+}
+
+function recipeIngredientSubstitutionAlternativeId(option = {}) {
+    return String(
+        recipeIngredientSubstitutionGroupId(option)
+        || option.option_id
+        || option.optionId
+        || option.substitution_id
+        || option.substitutionId
+        || option.id
         || ""
     ).trim();
 }
@@ -48387,12 +48523,80 @@ function nextRecipeIngredientAlternativeId() {
 }
 
 function recipeIngredientSubstitutionRows(item = {}) {
-    const value = item && typeof item === "object"
-        ? (item.substitutions || item.substitution_options || item.alternatives || [])
+    const values = item && typeof item === "object"
+        ? [
+            item.substitutions,
+            item.substitution_options,
+            item.substitutionOptions,
+            item.alternatives,
+            item.alternative_options,
+            item.alternativeOptions,
+        ]
         : [];
-    const rows = Array.isArray(value) ? value : String(value || "").split(/\r?\n|;/);
+    const hasUsableValue = candidate => {
+        if (Array.isArray(candidate)) {
+            return candidate.some(hasUsableValue);
+        }
+        if (candidate && typeof candidate === "object") {
+            const components = [
+                candidate.ingredients,
+                candidate.components,
+                candidate.replacements,
+            ];
+            if (components.some(hasUsableValue)) {
+                return true;
+            }
+            return [
+                candidate.ingredient,
+                candidate.name,
+                candidate.substitute,
+                candidate.option,
+                candidate.text,
+                candidate.purchasable_item,
+                candidate.purchasableItem,
+                candidate.buy_as,
+                candidate.buyAs,
+            ].some(value => Boolean(String(value || "").trim()));
+        }
+        return Boolean(String(candidate || "").trim());
+    };
+    const value = values.find(hasUsableValue) || [];
+    const rows = Array.isArray(value)
+        ? value
+        : (value && typeof value === "object")
+            ? [value]
+            : String(value || "").split(/\r?\n|;/);
 
-    const normalizeObjectOption = option => {
+    const itemIdentity = [
+        item.recipe_ingredient_id,
+        item.recipeIngredientId,
+        item.id,
+        item.row_id,
+        item.rowId,
+        item.source_text,
+        item.sourceText,
+        item.original_text,
+        item.originalText,
+        item.ingredient,
+        item.name,
+        item.quantity,
+        item.unit,
+        item.__recipePresentationIndex,
+    ];
+    const fallbackAlternativeId = (option, alternativeIndex, componentIndex = 0) => (
+        recipeIngredientStablePresentationId(
+            "alternative",
+            itemIdentity,
+            alternativeIndex,
+            option?.alternative_label,
+            option?.alternativeLabel,
+            option?.label,
+            option?.ingredient,
+            option?.name,
+            componentIndex,
+        )
+    );
+    const normalizeObjectOption = (option, context = {}) => {
         if (option && typeof option === "object") {
             const ingredient = String(
                 option.ingredient
@@ -48407,15 +48611,86 @@ function recipeIngredientSubstitutionRows(item = {}) {
             if (!ingredient) {
                 return null;
             }
+            const alternativeIndex = Number.isInteger(context.alternativeIndex)
+                ? context.alternativeIndex
+                : 0;
+            const componentIndex = Number.isInteger(context.componentIndex)
+                ? context.componentIndex
+                : 0;
+            const alternativeId = recipeIngredientSubstitutionAlternativeId(option)
+                || String(context.alternativeId || "").trim()
+                || fallbackAlternativeId(option, alternativeIndex, componentIndex);
             return {
                 ...option,
+                id: option.id || option.option_id || option.optionId || "",
+                substitution_id:
+                    option.substitution_id
+                    || option.substitutionId
+                    || "",
+                alternative_id: alternativeId,
+                alternative_order:
+                    option.alternative_order
+                    ?? option.alternativeOrder
+                    ?? option.option_order
+                    ?? option.optionOrder
+                    ?? option.sort_order
+                    ?? option.sortOrder
+                    ?? alternativeIndex,
+                alternative_component_order:
+                    option.alternative_component_order
+                    ?? option.alternativeComponentOrder
+                    ?? option.component_order
+                    ?? option.componentOrder
+                    ?? componentIndex,
+                alternative_label:
+                    option.alternative_label
+                    || option.alternativeLabel
+                    || option.option_label
+                    || option.optionLabel
+                    || option.label
+                    || "",
+                option_type: option.option_type || option.optionType || "",
+                recipe_authored:
+                    option.recipe_authored
+                    ?? option.recipeAuthored
+                    ?? false,
+                is_default:
+                    option.is_default
+                    ?? option.isDefault
+                    ?? false,
+                preferred:
+                    option.preferred
+                    ?? option.selected
+                    ?? option.is_selected
+                    ?? option.isSelected
+                    ?? false,
                 ingredient,
-                original_text: option.original_text || option.source_note || option.text || ingredient,
+                original_text:
+                    option.original_text
+                    || option.originalText
+                    || option.source_note
+                    || option.sourceNote
+                    || option.text
+                    || ingredient,
                 preparation: option.preparation || option.notes || option.reason || "",
-                purchasable_item: option.purchasable_item || option.buy_as || ingredient,
-                store_section: option.store_section || item.store_section || "",
-                optional: option.optional !== false,
-                inferred: option.inferred !== false,
+                purchasable_item:
+                    option.purchasable_item
+                    || option.purchasableItem
+                    || option.buy_as
+                    || option.buyAs
+                    || ingredient,
+                store_section:
+                    option.store_section
+                    || option.storeSection
+                    || item.store_section
+                    || item.storeSection
+                    || "",
+                optional: option.optional === undefined || option.optional === null
+                    ? true
+                    : recipeIngredientMatchFlag(option.optional),
+                inferred: option.inferred === undefined || option.inferred === null
+                    ? true
+                    : recipeIngredientMatchFlag(option.inferred),
             };
         }
         return null;
@@ -48424,10 +48699,10 @@ function recipeIngredientSubstitutionRows(item = {}) {
     return rows.flatMap((option, alternativeIndex) => {
         if (option && typeof option === "object") {
             const components = [option.ingredients, option.components, option.replacements]
-                .find(candidate => Array.isArray(candidate));
+                .find(candidate => Array.isArray(candidate) && candidate.some(hasUsableValue));
             if (components) {
                 const alternativeId = recipeIngredientSubstitutionAlternativeId(option)
-                    || String(option.id || `alternative-${alternativeIndex + 1}`).trim();
+                    || fallbackAlternativeId(option, alternativeIndex);
                 return components.map((component, componentIndex) => {
                     const componentOption = component && typeof component === "object"
                         ? component
@@ -48435,23 +48710,39 @@ function recipeIngredientSubstitutionRows(item = {}) {
                     const merged = {
                         ...option,
                         ...componentOption,
-                        alternative_id: recipeIngredientSubstitutionAlternativeId(componentOption) || alternativeId,
-                        alternative_order: componentOption.alternative_order ?? option.alternative_order ?? alternativeIndex,
+                        alternative_id: recipeIngredientSubstitutionGroupId(componentOption) || alternativeId,
+                        alternative_order:
+                            componentOption.alternative_order
+                            ?? componentOption.alternativeOrder
+                            ?? option.alternative_order
+                            ?? option.alternativeOrder
+                            ?? alternativeIndex,
                         alternative_component_order:
                             componentOption.alternative_component_order
+                            ?? componentOption.alternativeComponentOrder
                             ?? componentOption.component_order
+                            ?? componentOption.componentOrder
                             ?? componentIndex,
                     };
                     delete merged.ingredients;
                     delete merged.components;
                     delete merged.replacements;
-                    merged.id = componentOption.id || "";
-                    merged.substitution_id = componentOption.substitution_id || "";
-                    return normalizeObjectOption(merged);
+                    merged.id = componentOption.id || componentOption.option_id || componentOption.optionId || "";
+                    merged.substitution_id = componentOption.substitution_id || componentOption.substitutionId || "";
+                    return normalizeObjectOption(merged, {
+                        alternativeId,
+                        alternativeIndex,
+                        componentIndex,
+                    });
                 }).filter(Boolean);
             }
 
-            const normalized = normalizeObjectOption(option);
+            const normalized = normalizeObjectOption(option, {
+                alternativeId: recipeIngredientSubstitutionAlternativeId(option)
+                    || fallbackAlternativeId(option, alternativeIndex),
+                alternativeIndex,
+                componentIndex: 0,
+            });
             return normalized ? [normalized] : [];
         }
 
@@ -48459,7 +48750,14 @@ function recipeIngredientSubstitutionRows(item = {}) {
             .split(/\s+or\s+|\/|\r?\n|;/i)
             .map(name => String(name || "").trim())
             .filter(Boolean)
-            .map(name => ({
+            .map((name, stringIndex) => ({
+                alternative_id: fallbackAlternativeId(
+                    { ingredient: name },
+                    alternativeIndex,
+                    stringIndex,
+                ),
+                alternative_order: alternativeIndex + stringIndex,
+                alternative_component_order: 0,
                 ingredient: name,
                 original_text: name,
                 preparation: "",
@@ -48507,9 +48805,13 @@ function recipeIngredientImageCandidateUrl(value) {
 
     const directFields = [
         "ingredient_image_url",
+        "ingredientImageUrl",
         "image_url",
+        "imageUrl",
         "thumbnail_url",
+        "thumbnailUrl",
         "thumb_url",
+        "thumbUrl",
         "src",
         "url",
         "path",
@@ -48537,9 +48839,13 @@ function recipeIngredientImageCandidateUrl(value) {
 function recipeIngredientImageUrl(item = {}) {
     const candidates = [
         item.ingredient_image_url,
+        item.ingredientImageUrl,
         item.image_url,
+        item.imageUrl,
         item.thumbnail_url,
+        item.thumbnailUrl,
         item.thumb_url,
+        item.thumbUrl,
         item.image,
         item.ingredient_image,
         item.thumbnail,
@@ -49251,9 +49557,20 @@ function addRecipeIngredientRow(item = {}, options = {}) {
             ...item,
             id: "",
             recipe_ingredient_id: "",
+            recipeIngredientId: "",
+            ingredient_requirement_id: "",
+            ingredientRequirementId: "",
             row_id: "",
+            rowId: "",
         };
     }
+    const presentationIndex = persistedIndex >= 0
+        ? persistedIndex
+        : wrap.querySelectorAll(":scope > .recipe-edit-ingredient-row").length;
+    const presentationItem = {
+        ...item,
+        __recipePresentationIndex: presentationIndex,
+    };
     const row = document.createElement("div");
     const baseQuantity = item.base_quantity !== undefined && item.base_quantity !== null
         ? item.base_quantity
@@ -49267,9 +49584,76 @@ function addRecipeIngredientRow(item = {}, options = {}) {
     const ingredientImageGeneratedAt = item.ingredient_image_generated_at || item.image_generated_at || "";
     const ingredientImagePrompt = item.ingredient_image_prompt || item.image_prompt || "";
     const extractionWarning = recipeIngredientExtractionWarning(item);
-    const substitutionOptions = recipeIngredientSubstitutionRows(item);
+    const substitutionOptions = recipeIngredientSubstitutionRows(presentationItem);
     const substitutionGroupCount = recipeIngredientSubstitutionGroups(substitutionOptions).length;
     const substitutionCountText = substitutionGroupCount ? `(${substitutionGroupCount})` : "";
+    const itemAliasValue = aliases => aliases
+        .map(alias => item[alias])
+        .find(value => value !== undefined && value !== null && String(value).trim() !== "");
+    const recipeIngredientId = String(
+        itemAliasValue([
+            "recipe_ingredient_id",
+            "recipeIngredientId",
+            "ingredient_requirement_id",
+            "ingredientRequirementId",
+        ])
+        || "",
+    ).trim();
+    let defaultOptionId = String(
+        itemAliasValue([
+            "default_option_id",
+            "defaultOptionId",
+            "selected_option_id",
+            "selectedOptionId",
+            "preferred_option_id",
+            "preferredOptionId",
+        ])
+        || "",
+    ).trim();
+    const hasExplicitOriginalOption = substitutionOptions.some(option => (
+        String(option.option_type || "").trim().toLowerCase() === "original"
+    ));
+    const explicitOriginalGroupId = recipeIngredientSubstitutionAlternativeId(
+        substitutionOptions.find(option => (
+            String(option.option_type || "").trim().toLowerCase() === "original"
+        )) || {},
+    );
+    const explicitOriginalOptionId = String(
+        itemAliasValue(["original_option_id", "originalOptionId"])
+        || "",
+    ).trim();
+    const originalOptionId = hasExplicitOriginalOption
+        ? explicitOriginalGroupId
+        : explicitOriginalOptionId || (
+                (defaultOptionId.startsWith("original:") && defaultOptionId)
+                || `original:${recipeIngredientId || recipeIngredientStablePresentationId(
+                    "ingredient",
+                    item.source_text,
+                    item.sourceText,
+                    item.original_text,
+                    item.originalText,
+                    item.ingredient,
+                    item.name,
+                    item.quantity,
+                    item.unit,
+                    presentationIndex,
+                )}`
+            );
+    const originalIsDefault = recipeIngredientMatchFlag(
+        item.original_is_default ?? item.originalIsDefault,
+    ) || Boolean(originalOptionId && defaultOptionId === originalOptionId);
+    if (originalIsDefault && originalOptionId) {
+        defaultOptionId = originalOptionId;
+    }
+    const explicitSelectionRequired = [
+        item.selection_required,
+        item.selectionRequired,
+        item.required_selection,
+        item.requiredSelection,
+    ].find(value => value !== undefined && value !== null && String(value).trim() !== "");
+    const selectionRequired = explicitSelectionRequired !== undefined
+        ? recipeIngredientMatchFlag(explicitSelectionRequired)
+        : substitutionOptions.length > 0;
     const ingredientType = recipeIngredientTypeValue(item);
     const recipeUrl = recipeEditorCurrentUrl();
     ensureRecipeIngredientUnitOption();
@@ -49404,7 +49788,7 @@ function addRecipeIngredientRow(item = {}, options = {}) {
                     </button>
                 </div>
                 <div class="recipe-edit-substitution-list" data-ingredient-substitution-list>
-                    ${recipeIngredientSubstitutionOptionsHtml(item)}
+                    ${recipeIngredientSubstitutionOptionsHtml(presentationItem)}
                 </div>
                 <div class="recipe-edit-substitution-empty" data-ingredient-substitution-empty ${substitutionOptions.length ? "hidden" : ""}>
                     <strong>No alternatives have been added.</strong>
@@ -49520,11 +49904,18 @@ function addRecipeIngredientRow(item = {}, options = {}) {
             </div>
         </div>
         <input type="hidden" data-field="id" value="${escapeAttribute(item.id || "")}">
-        <input type="hidden" data-field="recipe_ingredient_id" value="${escapeAttribute(item.recipe_ingredient_id || "")}">
-        <input type="hidden" data-field="source_text" value="${escapeAttribute(item.source_text || item.original_text || "")}">
-        <input type="hidden" data-field="default_option_id" value="${escapeAttribute(item.default_option_id || "")}">
-        <input type="hidden" data-original-option-id value="${escapeAttribute(item.original_option_id || "")}">
-        <input type="hidden" data-field="selection_required" value="${escapeAttribute(recipeIngredientMatchFlag(item.selection_required) || substitutionOptions.length ? "true" : "false")}">
+        <input type="hidden" data-field="recipe_ingredient_id" value="${escapeAttribute(recipeIngredientId)}">
+        <input type="hidden" data-field="source_text" value="${escapeAttribute(
+            item.source_text
+            || item.sourceText
+            || item.original_text
+            || item.originalText
+            || ""
+        )}">
+        <input type="hidden" data-field="default_option_id" value="${escapeAttribute(defaultOptionId)}">
+        <input type="hidden" data-original-option-id value="${escapeAttribute(originalOptionId)}">
+        <input type="hidden" data-field="original_is_default" value="${escapeAttribute(originalIsDefault ? "true" : "false")}">
+        <input type="hidden" data-field="selection_required" value="${escapeAttribute(selectionRequired ? "true" : "false")}">
         <input type="hidden" data-field="ingredient_id" value="${escapeAttribute(item.ingredient_id || item.master_ingredient_id || "")}">
         <input type="hidden" data-field="base_quantity" value="${escapeAttribute(baseQuantity || "")}">
         <input type="hidden" data-field="base_unit" value="${escapeAttribute(baseUnit || "")}">
@@ -49585,6 +49976,9 @@ function addRecipeIngredientRow(item = {}, options = {}) {
     }
     initDeferredImages(row);
     refreshRecipeImageProviderSelectors(row);
+    if (!options.deferChoiceInitialization) {
+        initializeRecipeIngredientRequiredChoice(row);
+    }
     if (options && options.expanded) {
         expandRecipeIngredientRow(row);
         setRecipeIngredientEditMode(row, true);
@@ -49700,8 +50094,8 @@ function recipeIngredientExpansionSelectedOptionSummary(row, control = null) {
     if (!recipeEditIngredientColumnView.groupByStoreSection) {
         return null;
     }
-    // Single-component choices stay on the parent row, so any visible selected
-    // summary here represents a real component of a multi-ingredient option.
+    // Store Section grouping projects only real components of a
+    // multi-ingredient option; the normal Table view uses the shared panel.
     return recipeIngredientSelectedOptionSummaries(row).find(summary => (
         !summary.classList.contains("is-ingredient-column-grouped-away")
     )) || null;
@@ -50128,6 +50522,11 @@ function setRecipeIngredientSubstitutionsExpanded(row, control, shouldOpen, opti
     const restoreOtherEdits = options.restoreOtherEdits !== false;
     closeRecipeEditRowMenus();
     if (shouldOpen) {
+        if (isRecipeIngredientRowCollapsed(row)) {
+            row.classList.remove("recipe-edit-row-collapsed");
+            row.classList.add("recipe-edit-row-expanded");
+            updateRecipeIngredientRowCollapseToggle(row);
+        }
         document.querySelectorAll("#recipeEditIngredients > .recipe-edit-ingredient-row.is-editing").forEach(editingRow => {
             setRecipeIngredientEditMode(editingRow, false, { restore: restoreOtherEdits });
         });
@@ -50150,6 +50549,118 @@ function setRecipeIngredientSubstitutionsExpanded(row, control, shouldOpen, opti
         );
     }
     updateRecipeIngredientSubstitutionState(row, optionsButton || control);
+    return true;
+}
+
+function recipeIngredientChoiceExpansionStateKeys(row, rowIndex = -1) {
+    if (!row) {
+        return [];
+    }
+    const keys = [];
+    const expansionId = ensureRecipeIngredientExpansionId(row);
+    if (expansionId) {
+        keys.push(expansionId);
+    }
+    const persistedIndex = Number.parseInt(
+        String(row.dataset.recipeIngredientPersistedIndex ?? ""),
+        10,
+    );
+    const fieldValue = fieldName => String(
+        recipeIngredientDirectField(row, fieldName)?.value || "",
+    ).trim();
+    const sourceIdentity = fieldValue("source_text")
+        || fieldValue("original_text")
+        || fieldValue("ingredient");
+    const semanticId = recipeIngredientStablePresentationId(
+        "ingredient-state",
+        sourceIdentity,
+    );
+    const positions = [
+        ["persisted", persistedIndex],
+        ["current", rowIndex],
+    ];
+    positions.forEach(([kind, position]) => {
+        if (Number.isInteger(position) && position >= 0) {
+            keys.push(`ingredient-${kind}-position:${position}:${semanticId}`);
+        }
+    });
+    return [...new Set(keys)];
+}
+
+function captureRecipeIngredientChoiceExpansionState() {
+    const state = new Map();
+    recipeEditIngredientRows().forEach((row, rowIndex) => {
+        const stateKeys = recipeIngredientChoiceExpansionStateKeys(row, rowIndex);
+        if (!stateKeys.length) {
+            return;
+        }
+        const panel = recipeIngredientSubstitutionContainer(row);
+        const expanded = Boolean(
+            panel
+            && !panel.hidden
+            && row.recipeIngredientActiveExpansionId
+            && recipeEditExpandedIngredientIds.has(row.recipeIngredientActiveExpansionId),
+        );
+        const saved = {
+            initialized: Boolean(
+                row.dataset.ingredientRequiredChoiceInitialized === "true"
+                || row.classList.contains("has-ingredient-choice")
+            ),
+            expanded,
+        };
+        stateKeys.forEach(stateKey => state.set(stateKey, saved));
+    });
+    return state;
+}
+
+function restoreRecipeIngredientChoiceExpansionState(state = new Map()) {
+    const savedState = state instanceof Map ? state : new Map();
+    recipeEditIngredientRows().forEach((row, rowIndex) => {
+        const saved = recipeIngredientChoiceExpansionStateKeys(row, rowIndex)
+            .map(stateKey => savedState.get(stateKey))
+            .find(Boolean);
+        if (saved?.initialized) {
+            row.dataset.ingredientRequiredChoiceInitialized = "true";
+        }
+        if (saved?.expanded && row.classList.contains("has-ingredient-choice")) {
+            const disclosure = row.querySelector("[data-ingredient-substitutions-toggle]");
+            if (disclosure) {
+                setRecipeIngredientSubstitutionsExpanded(row, disclosure, true, {
+                    restoreOtherEdits: false,
+                });
+            }
+            return;
+        }
+        if (!saved?.initialized) {
+            initializeRecipeIngredientRequiredChoice(row);
+        }
+    });
+}
+
+function initializeRecipeIngredientRequiredChoice(row) {
+    if (!row || row.dataset.ingredientRequiredChoiceInitialized === "true") {
+        return false;
+    }
+    const optionRows = [...row.querySelectorAll("[data-substitution-option-row]")];
+    const presentation = recipeIngredientPresentationModel(
+        row,
+        recipeIngredientChoiceParentValues(row),
+        recipeIngredientSubstitutionDomGroups(optionRows),
+    );
+    if (!presentation.hasGroup) {
+        return false;
+    }
+    row.dataset.ingredientRequiredChoiceInitialized = "true";
+    if (!presentation.requiredUnresolved || presentation.expanded) {
+        return false;
+    }
+    const disclosure = row.querySelector("[data-ingredient-substitutions-toggle]");
+    if (!disclosure) {
+        return false;
+    }
+    setRecipeIngredientSubstitutionsExpanded(row, disclosure, true, {
+        restoreOtherEdits: false,
+    });
     return true;
 }
 
@@ -50514,7 +51025,7 @@ function updateRecipeIngredientOptionSelectionState(option, selected) {
     if (label) label.textContent = isSelected ? "Selected" : "Use this option";
 }
 
-function updateRecipeIngredientAlternativeCard(card, groupIndex = 0) {
+function updateRecipeIngredientAlternativeCard(card, groupIndex = 0, options = {}) {
     const rows = card ? [...card.querySelectorAll("[data-substitution-option-row]")] : [];
     if (!rows.length) {
         return;
@@ -50523,7 +51034,10 @@ function updateRecipeIngredientAlternativeCard(card, groupIndex = 0) {
     const rowValues = rows.map(fieldValuesFromRow);
     const firstValues = rowValues[0];
     const singleIngredient = rows.length === 1;
-    const preferred = rows.some(optionRow => Boolean(fieldValuesFromRow(optionRow).preferred));
+    const rowPreferred = rows.some(optionRow => Boolean(fieldValuesFromRow(optionRow).preferred));
+    const preferred = options.selected === undefined
+        ? rowPreferred
+        : Boolean(options.selected);
     const recommendation = recipeIngredientAlternativeRecommendation(firstValues, preferred);
     const confidencePercent = recipeIngredientSubstitutionConfidencePercent(firstValues);
     const title = card.querySelector("[data-alternative-card-title]");
@@ -50591,7 +51105,6 @@ function updateRecipeIngredientAlternativeCard(card, groupIndex = 0) {
             labelElement.classList.add("recipe-edit-alternative-preferred-field");
             labelElement.hidden = index > 0;
         }
-        input.checked = preferred;
     });
     const ingredientRow = card.closest(".recipe-edit-ingredient-row:not([data-substitution-option-row])");
     const ingredientValues = recipeIngredientChoiceParentValues(ingredientRow);
@@ -51022,6 +51535,7 @@ function duplicateRecipeIngredientAlternative(button) {
             alternative_order: groupIndex,
             alternative_component_order: componentIndex,
             preferred: false,
+            is_default: false,
         };
         return recipeIngredientSubstitutionOptionRowHtml(values, componentIndex, {
             index: groupIndex,
@@ -51249,8 +51763,24 @@ function removeRecipeIngredientAlternative(button, options = {}) {
     if (options.confirm !== false && !window.confirm("Delete this replacement group and all of its ingredients?")) {
         return false;
     }
+    const removedOptionRows = [...card.querySelectorAll("[data-substitution-option-row]")];
+    const removedOptionId = String(
+        card.dataset.alternativeId
+        || removedOptionRows[0]?.querySelector('[data-field="alternative_id"]')?.value
+        || "",
+    ).trim();
+    const removedWasSelected = removedOptionRows.some(optionRow => {
+        const values = fieldValuesFromRow(optionRow);
+        return recipeIngredientMatchFlag(values.preferred)
+            || recipeIngredientMatchFlag(values.is_default);
+    });
     card.querySelectorAll("[data-substitution-option-row]").forEach(optionRow => optionRow.remove());
     card.remove();
+    reconcileRecipeIngredientSelectionAfterOptionRemoval(
+        ingredientRow,
+        removedOptionId,
+        removedWasSelected,
+    );
     closeRecipeEditRowMenus();
     updateRecipeIngredientSubstitutionState(ingredientRow);
     updateRecipeIngredientSummary(ingredientRow);
@@ -51380,7 +51910,13 @@ function recipeIngredientSelectedChoice(row, originalValues, alternativeGroups) 
     }
     if (!selectedGroup) {
         selectedGroup = alternativeGroups.find(group => (
-            group.rows.some(optionRow => Boolean(fieldValuesFromRow(optionRow).preferred))
+            group.rows.some(optionRow => {
+                const values = fieldValuesFromRow(optionRow);
+                return Boolean(
+                    recipeIngredientMatchFlag(values.preferred)
+                    || recipeIngredientMatchFlag(values.is_default)
+                );
+            })
         ));
     }
     if (selectedGroup) {
@@ -51415,6 +51951,15 @@ function setRecipeIngredientDefaultOption(row, alternativeGroups, optionId, sele
     if (!row) return false;
     const defaultField = row.querySelector('[data-field="default_option_id"]');
     if (defaultField) defaultField.value = optionId || "";
+    const originalOptionId = String(
+        row.querySelector("[data-original-option-id]")?.value || "",
+    ).trim();
+    const originalDefaultField = row.querySelector('[data-field="original_is_default"]');
+    if (originalDefaultField) {
+        originalDefaultField.value = originalOptionId && optionId === originalOptionId
+            ? "true"
+            : "false";
+    }
     alternativeGroups.forEach((group, groupIndex) => {
         group.rows.forEach(optionRow => {
             const isSelected = groupIndex === selectedGroupIndex;
@@ -51673,7 +52218,11 @@ function materializeRecipeIngredientDefaultOption(control) {
     const optionRow = list.querySelector(":scope > [data-substitution-option-row]");
     organizeRecipeEditSubstitutionOptionRow(optionRow);
     bindRecipeIngredientSubstitutionRow(optionRow);
-    if (selected && defaultField) defaultField.value = alternativeId;
+    if (selected && defaultField) {
+        defaultField.value = alternativeId;
+        const originalDefaultField = row.querySelector('[data-field="original_is_default"]');
+        if (originalDefaultField) originalDefaultField.value = "false";
+    }
     if (selectionField) selectionField.value = "true";
     updateRecipeIngredientSubstitutionState(row);
     updateRecipeIngredientSummary(row);
@@ -51759,7 +52308,11 @@ function addRecipeIngredientDefaultComponent(button) {
     });
     const defaultField = row.querySelector('[data-field="default_option_id"]');
     const selectionField = row.querySelector('[data-field="selection_required"]');
-    if (defaultField) defaultField.value = alternativeId;
+    if (defaultField) {
+        defaultField.value = alternativeId;
+        const originalDefaultField = row.querySelector('[data-field="original_is_default"]');
+        if (originalDefaultField) originalDefaultField.value = "false";
+    }
     if (selectionField) selectionField.value = "true";
     updateRecipeIngredientSubstitutionState(row);
     const defaultCard = recipeIngredientSubstitutionContainer(row)
@@ -51806,37 +52359,33 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
         && row.recipeIngredientExpansionAnchor === row
     );
     const parentValues = recipeIngredientChoiceParentValues(row);
-    const requirementChoiceSummary = recipeIngredientCompactChoiceSummary(
-        parentValues,
-        alternativeGroups,
-    );
-    const selectedChoice = recipeIngredientSelectedChoice(
+    const presentation = recipeIngredientPresentationModel(
         row,
         parentValues,
         alternativeGroups,
     );
+    const requirementChoiceSummary = presentation.summary;
+    const selectedChoice = presentation.selectedChoice;
     const selectedDetails = String(selectedChoice?.summary || "").trim();
     const selectedSummary = String(
         selectedChoice?.ingredientSummary || selectedDetails,
     ).trim();
-    const selectedLabel = String(selectedChoice?.selectionLabel || "").trim();
     const ingredientField = row.querySelector('[data-field="ingredient"]');
     const ingredientName = String(ingredientField ? ingredientField.value : "").trim() || "ingredient";
     const originalRecipeText = String(
         parentValues.source_text || parentValues.original_text || "",
     ).trim();
     const choiceTitle = originalRecipeText || ingredientName;
-    const choiceParent = row.querySelector("[data-ingredient-choice-parent]");
     const hasSelectedChoice = Boolean(selectedChoice?.values?.length);
-    const showsChoiceSummary = Boolean(
-        alternativeCount && !hasSelectedChoice,
+    const projectedSelectedChoiceRows = recipeIngredientSelectedOptionProjectionRows(
+        selectedChoice,
     );
     const hidesSelectedChoiceHeaderInStoreSectionView = Boolean(
         recipeEditIngredientColumnView.groupByStoreSection
+        && projectedSelectedChoiceRows.length > 0
     );
     const showsSelectedChoiceGroup = Boolean(
-        alternativeCount
-        && hasSelectedChoice
+        presentation.hasGroup
         && !hidesSelectedChoiceHeaderInStoreSectionView,
     );
     const selectedChoiceGroupHeader = showsSelectedChoiceGroup
@@ -51854,9 +52403,15 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
         const groupTitle = selectedChoiceGroupHeader.querySelector(
             "[data-ingredient-selected-choice-group-title]",
         );
+        const groupHelper = selectedChoiceGroupHeader.querySelector(
+            "[data-ingredient-selected-choice-group-helper]",
+        );
+        const groupStatus = selectedChoiceGroupHeader.querySelector(
+            "[data-ingredient-selected-choice-group-status]",
+        );
         selectedChoiceGroupHeader.hidden = !showsSelectedChoiceGroup;
         if (groupLabel) {
-            groupLabel.textContent = selectedLabel;
+            groupLabel.textContent = presentation.parentLabel;
         }
         if (groupTitle) {
             if (document.activeElement !== groupTitle) {
@@ -51865,8 +52420,16 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
                 resizeRecipeIngredientChoiceTitleInput(groupTitle);
             }
             groupTitle.title = selectedDetails
-                ? `${selectedLabel}: ${choiceTitle} (${selectedDetails})`
-                : `${selectedLabel}: ${choiceTitle}`;
+                ? `${presentation.parentLabel}: ${choiceTitle} (${selectedDetails})`
+                : `${presentation.parentLabel}: ${choiceTitle}`;
+        }
+        if (groupHelper) {
+            groupHelper.textContent = presentation.helperText;
+            groupHelper.hidden = !presentation.helperText;
+        }
+        if (groupStatus) {
+            groupStatus.textContent = presentation.statusText;
+            groupStatus.hidden = !presentation.statusText;
         }
         const groupEditButton = selectedChoiceGroupHeader.querySelector(
             "[data-ingredient-choice-title-edit]",
@@ -51884,10 +52447,7 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
         "has-selected-ingredient-choice",
         Boolean(alternativeCount && hasSelectedChoice),
     );
-    row.classList.toggle(
-        "shows-ingredient-choice-summary",
-        showsChoiceSummary,
-    );
+    row.classList.remove("shows-ingredient-choice-summary");
     row.classList.toggle(
         "has-selected-choice-group-header",
         showsSelectedChoiceGroup,
@@ -51896,22 +52456,11 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
         "has-selected-default-choice",
         Boolean(showsSelectedChoiceGroup && selectedChoice?.isDefaultOption),
     );
-    if (choiceParent) {
-        const originalText = choiceParent.querySelector("[data-ingredient-choice-original-text]");
-        const selected = choiceParent.querySelector("[data-ingredient-choice-selected-summary]");
-        const optionCount = choiceParent.querySelector("[data-ingredient-choice-option-count]");
-        choiceParent.hidden = !showsChoiceSummary;
-        if (originalText) {
-            originalText.textContent = choiceTitle;
-            originalText.title = choiceTitle;
-        }
-        if (selected) {
-            selected.textContent = selectedSummary
-                ? `Selected: ${selectedSummary}`
-                : "Selection required";
-        }
-        if (optionCount) optionCount.textContent = requirementChoiceSummary.label;
-    }
+    row.classList.toggle(
+        "has-required-unresolved-choice",
+        presentation.requiredUnresolved,
+    );
+    row.dataset.ingredientPresentationKind = presentation.kind;
     row.recipeIngredientInlineSummarySourceRow = selectedChoice?.rows[0] || null;
     row.classList.toggle(
         "recipe-edit-summary-uses-selected-option",
@@ -51959,7 +52508,14 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
     const cards = ensureRecipeIngredientAlternativeCards(container);
     cards.forEach((card, groupIndex) => {
         card.dataset.alternativeGroupIndex = String(groupIndex);
-        updateRecipeIngredientAlternativeCard(card, groupIndex);
+        const optionPresentation = presentation.groups.find(group => (
+            group.rows.length
+            && group.id
+            && group.id === String(card.dataset.alternativeId || "").trim()
+        ));
+        updateRecipeIngredientAlternativeCard(card, groupIndex, {
+            selected: optionPresentation?.isSelected,
+        });
     });
     ensureRecipeIngredientChoiceOverview(container, row, alternativeGroups, cards);
 
@@ -52114,6 +52670,8 @@ function addRecipeIngredientSubstitutionRow(button) {
         }
         if (defaultField && !String(defaultField.value || "").trim() && originalOptionId) {
             defaultField.value = originalOptionId;
+            const originalDefaultField = row.querySelector('[data-field="original_is_default"]');
+            if (originalDefaultField) originalDefaultField.value = "true";
         }
     }
     list.insertAdjacentHTML("beforeend", recipeIngredientSubstitutionOptionRowHtml({
@@ -52154,6 +52712,54 @@ function addRecipeIngredientSubstitutionRow(button) {
     return false;
 }
 
+function reconcileRecipeIngredientSelectionAfterOptionRemoval(
+    row,
+    removedOptionId = "",
+    removedWasSelected = false,
+) {
+    if (!row) return;
+    const optionContainer = recipeIngredientSubstitutionContainer(row) || row;
+    const optionRows = [...optionContainer.querySelectorAll("[data-substitution-option-row]")];
+    const remainingGroups = recipeIngredientSubstitutionDomGroups(optionRows);
+    const hasRemainingRemovedGroup = removedOptionId && remainingGroups.some(group => (
+        group.alternativeId === removedOptionId
+    ));
+    if (hasRemainingRemovedGroup) return;
+
+    const defaultField = row.querySelector('[data-field="default_option_id"]');
+    const defaultOptionId = String(defaultField?.value || "").trim();
+    const originalOptionId = String(
+        row.querySelector("[data-original-option-id]")?.value || "",
+    ).trim();
+    const noOptionsRemain = remainingGroups.length === 0;
+    const defaultMatchesRemainingOption = Boolean(
+        defaultOptionId
+        && (
+            defaultOptionId === originalOptionId
+            || remainingGroups.some(group => group.alternativeId === defaultOptionId)
+        ),
+    );
+    const removedSelectedGroup = Boolean(
+        (removedOptionId && defaultOptionId === removedOptionId)
+        || (removedWasSelected && !defaultMatchesRemainingOption),
+    );
+    if (noOptionsRemain || removedSelectedGroup) {
+        if (defaultField) defaultField.value = "";
+        const originalDefaultField = row.querySelector('[data-field="original_is_default"]');
+        if (originalDefaultField) originalDefaultField.value = "false";
+        optionRows.forEach(optionRow => {
+            const defaultInput = optionRow.querySelector('[data-field="is_default"]');
+            const preferredInput = optionRow.querySelector('[data-field="preferred"]');
+            if (defaultInput) defaultInput.value = "false";
+            if (preferredInput) preferredInput.checked = false;
+        });
+    }
+    if (noOptionsRemain) {
+        const selectionField = row.querySelector('[data-field="selection_required"]');
+        if (selectionField) selectionField.value = "false";
+    }
+}
+
 function removeRecipeIngredientSubstitutionRow(button) {
     const optionRow = button
         ? (button.closest("[data-substitution-option-row]") || recipeEditActionRowFromButton(button))
@@ -52161,10 +52767,20 @@ function removeRecipeIngredientSubstitutionRow(button) {
     const row = recipeIngredientParentRowFromControl(optionRow);
     const optionsMenu = recipeIngredientOptionsMenuForRow(row, button);
     const restoreFocus = Boolean(optionRow && optionRow.contains(document.activeElement));
+    const removedValues = optionRow ? fieldValuesFromRow(optionRow) : {};
+    const removedOptionId = String(removedValues.alternative_id || "").trim();
+    const removedWasSelected = recipeIngredientMatchFlag(removedValues.preferred)
+        || recipeIngredientMatchFlag(removedValues.is_default);
 
     if (optionRow) {
         optionRow.remove();
     }
+
+    reconcileRecipeIngredientSelectionAfterOptionRemoval(
+        row,
+        removedOptionId,
+        removedWasSelected,
+    );
 
     updateRecipeIngredientSubstitutionState(row, button);
     updateRecipeIngredientSummary(row);
@@ -53501,10 +54117,14 @@ function initializeRecipeIngredientMobileHeaderLayout() {
 
     recipeIngredientMobileHeaderMediaQuery = window.matchMedia("(max-width: 767px)");
     const syncHeaders = event => {
+        const choiceExpansionState = event && typeof event.matches === "boolean"
+            ? captureRecipeIngredientChoiceExpansionState()
+            : null;
         recipeEditIngredientRows().forEach(syncRecipeIngredientMobileHeader);
         if (event && typeof event.matches === "boolean") {
             const shouldCollapse = recipeIngredientsShouldStartCollapsed();
             setRecipeIngredientsCollapsed(shouldCollapse);
+            restoreRecipeIngredientChoiceExpansionState(choiceExpansionState);
         }
     };
     if (typeof recipeIngredientMobileHeaderMediaQuery.addEventListener === "function") {
@@ -53673,6 +54293,16 @@ function setRecipeIngredientsCollapsed(collapsed) {
     const expandRows = !collapsed && recipeIngredientMobileAccordionIsActive();
 
     recipeEditIngredientRows().forEach(row => {
+        const substitutions = recipeIngredientSubstitutionContainer(row);
+        if (collapsed && substitutions && !substitutions.hidden) {
+            const disclosure = row.querySelector("[data-ingredient-substitutions-toggle]");
+            setRecipeIngredientSubstitutionsExpanded(
+                row,
+                disclosure,
+                false,
+                { restoreOtherEdits: false },
+            );
+        }
         row.classList.remove("recipe-edit-row-collapsed");
         row.classList.toggle("recipe-edit-row-expanded", expandRows);
         updateRecipeIngredientRowCollapseToggle(row);

@@ -1,4 +1,6 @@
 import json
+import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -259,6 +261,84 @@ def test_migration_keeps_existing_flat_rows_and_adds_stable_group_metadata():
     assert {row["alternative_id"] for row in migrated["substitutions"]} == {"milk-lemon"}
     assert [row["alternative_order"] for row in migrated["substitutions"]] == [2, 2]
     assert [row["alternative_component_order"] for row in migrated["substitutions"]] == [0, 1]
+
+
+def test_camel_case_legacy_choices_survive_the_real_editor_load_boundary(monkeypatch):
+    monkeypatch.setattr(recipe_edit_service, "recipe_edit_ingredient_master_lookup", lambda *args, **kwargs: {})
+    fixture = {
+        "recipeIngredientId": "requirement-legacy-cream",
+        "ingredient": "Cream",
+        "sourceText": "1 cup cream",
+        "defaultOptionId": "legacy-coconut",
+        "selectionRequired": True,
+        "substitutions": {"components": []},
+        "substitutionOptions": [{
+            "alternativeId": "legacy-coconut",
+            "alternativeOrder": 3,
+            "alternativeLabel": "Coconut blend",
+            "optionType": "substitution",
+            "ingredients": [],
+            "components": [
+                {
+                    "name": "Water",
+                    "alternativeComponentOrder": 1,
+                    "purchasableItem": "Filtered water",
+                },
+                {
+                    "name": "Coconut milk",
+                    "alternativeComponentOrder": 0,
+                    "storeSection": "International",
+                    "optional": "false",
+                    "inferred": "false",
+                },
+            ],
+        }],
+    }
+
+    migrated = migrate_ingredient_requirement(fixture)
+    editor_row = recipe_edit_service.normalize_edit_ingredients([fixture])[0]
+    flat_option_id = migrate_ingredient_requirement({
+        "ingredient": "Milk",
+        "defaultOptionId": "legacy-soy",
+        "alternatives": [{"optionId": "legacy-soy", "name": "Soy milk"}],
+    })
+    optional_choice = recipe_edit_service.normalize_edit_ingredients([{
+        "ingredient": "Milk",
+        "selectionRequired": False,
+        "substitutionOptions": [{"alternativeId": "legacy-soy", "name": "Soy milk"}],
+    }])[0]
+    original_default = recipe_edit_service.normalize_edit_ingredients([{
+        "recipeIngredientId": "requirement-legacy-broth",
+        "ingredient": "Chicken broth",
+        "originalIsDefault": True,
+        "selectionRequired": True,
+        "substitutionOptions": [{
+            "alternativeId": "legacy-vegetable-broth",
+            "name": "Vegetable broth",
+        }],
+    }])[0]
+
+    assert migrated["recipe_ingredient_id"] == "requirement-legacy-cream"
+    assert migrated["default_option_id"] == "legacy-coconut"
+    assert migrated["selection_required"] is True
+    assert editor_row["default_option_id"] == "legacy-coconut"
+    assert editor_row["selection_required"] is True
+    substitutions = editor_row["substitutions"]
+    assert [row["ingredient"] for row in substitutions] == ["Coconut milk", "Water"]
+    assert {row["alternative_id"] for row in substitutions} == {"legacy-coconut"}
+    assert [row["alternative_component_order"] for row in substitutions] == [0, 1]
+    assert {row["alternative_order"] for row in substitutions} == {3}
+    assert {row["alternative_label"] for row in substitutions} == {"Coconut blend"}
+    assert {row["option_type"] for row in substitutions} == {"substitution"}
+    assert substitutions[0]["store_section"] == "International"
+    assert substitutions[0]["optional"] is False
+    assert substitutions[0]["inferred"] is False
+    assert substitutions[1]["purchasable_item"] == "Filtered water"
+    assert flat_option_id["default_option_id"] == "legacy-soy"
+    assert flat_option_id["substitutions"][0]["alternative_id"] == "legacy-soy"
+    assert optional_choice["selection_required"] is False
+    assert original_default["original_is_default"] is True
+    assert original_default["default_option_id"] == "original:requirement-legacy-broth"
 
 
 def test_pdf_keeps_one_for_one_and_one_for_many_alternatives_grouped():
@@ -532,7 +612,9 @@ def test_editor_option_selection_is_always_visible_and_directly_changeable():
     assert 'control.setAttribute("aria-pressed", String(isSelected));' in script
     assert 'option.classList.toggle("is-selected-option", isSelected);' in script
     assert 'defaultInput.value = isSelected ? "true" : "false";' in script
-    assert 'data-original-option-id value="${escapeAttribute(item.original_option_id || "")}"' in script
+    assert 'data-original-option-id value="${escapeAttribute(originalOptionId)}"' in script
+    assert 'data-field="original_is_default" value="${escapeAttribute(originalIsDefault ? "true" : "false")}"' in script
+    assert 'originalDefaultField.value = originalOptionId && optionId === originalOptionId' in script
     assert '"original_option_id": original_option_id(item, index),' in service
     assert "Ingredient editor v54: persistent, directly changeable option selection." in css
     assert ".recipe-edit-option-selection.is-selected" in css
@@ -606,7 +688,7 @@ def test_selecting_an_option_resolves_its_parent_from_projected_store_section_ro
     assert 'option.closest(".recipe-edit-ingredient-row:not([data-substitution-option-row])")' not in selection
 
 
-def test_group_parent_uses_authoritative_recipe_text_and_choice_only_metadata():
+def test_every_group_uses_one_authoritative_parent_summary_without_child_cells():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
@@ -622,36 +704,927 @@ def test_group_parent_uses_authoritative_recipe_text_and_choice_only_metadata():
         script.index("function organizeRecipeEditIngredientRow"):
         script.index("function organizeRecipeEditCompactRowActions")
     ]
-    source_first_css = css[css.index("/* Ingredient editor v57:"):]
+    add_row = script[
+        script.index("function addRecipeIngredientRow"):
+        script.index("function bindRecipeIngredientSummaryUpdates")
+    ]
+    populate = script[
+        script.index("function populateRecipeEditor"):
+        script.index("function replaceRecipeEditorIngredients")
+    ]
+    replace = script[
+        script.index("function replaceRecipeEditorIngredients"):
+        script.index("function replaceRecipeEditorRecipeNotes")
+    ]
+    header = script[
+        script.index("function ensureRecipeIngredientSelectedChoiceGroupHeader"):
+        script.index("function recipeIngredientSelectedOptionProjectionRows")
+    ]
 
-    assert "INGREDIENT CHOICE" in read_cell
-    assert "Choose one option" in read_cell
-    assert "data-ingredient-choice-original-text" in read_cell
-    assert "data-ingredient-choice-selected-summary" in read_cell
-    assert "data-ingredient-choice-option-count" in read_cell
+    assert "data-ingredient-choice-parent" not in read_cell
+    assert "recipe-edit-ingredient-choice-parent" not in css
+    assert "data-ingredient-selected-choice-group-label" in header
+    assert "data-ingredient-selected-choice-group-title" in header
+    assert "data-ingredient-selected-choice-group-helper" in header
+    assert "data-ingredient-selected-choice-group-status" in header
+    for child_cell in (
+        "recipe-edit-ingredient-image-cell",
+        "recipe-edit-ingredient-quantity-summary",
+        "recipe-edit-ingredient-unit-summary",
+        "recipe-edit-ingredient-size-summary",
+        "recipe-edit-ingredient-store-summary",
+        "recipe-edit-ingredient-type-summary",
+    ):
+        assert child_cell not in header
     assert "parentValues.source_text || parentValues.original_text" in state
-    assert "originalText.textContent = choiceTitle;" in state
     assert "row.classList.toggle(\"has-ingredient-choice\", alternativeCount > 0);" in state
     assert '"has-selected-ingredient-choice"' in state
-    assert '"shows-ingredient-choice-summary"' in state
-    assert "choiceParent.hidden = !showsChoiceSummary;" in state
-    assert "Selected: ${selectedSummary}" in state
-    assert "optionCount.textContent = requirementChoiceSummary.label;" in state
+    assert 'row.classList.remove("shows-ingredient-choice-summary");' in state
+    assert "presentation.hasGroup" in state
+    assert "groupLabel.textContent = presentation.parentLabel;" in state
+    assert "groupHelper.textContent = presentation.helperText;" in state
+    assert "groupStatus.textContent = presentation.statusText;" in state
+    assert '"has-required-unresolved-choice"' in state
     assert 'label: `${summaries.length} option${summaries.length === 1 ? "" : "s"}`' in script
     assert 'row.addEventListener("click"' in organizer
     assert "[data-ingredient-substitutions], .recipe-edit-row-handle" in organizer
+    assert "initializeRecipeIngredientRequiredChoice(row);" not in organizer
+    assert 'substitutions.setAttribute("role", "region");' in organizer
+    assert 'substitutions.removeAttribute("aria-colspan");' in organizer
+    assert 'optionsButton.type = "button";' in organizer
+    assert 'optionsButton.setAttribute("aria-expanded", "false");' in organizer
+    assert 'optionsButton.setAttribute("aria-controls", substitutions.id);' in organizer
+    assert "if (!options.deferChoiceInitialization)" in add_row
+    assert "initializeRecipeIngredientRequiredChoice(row);" in add_row
+    for bulk_population in (populate, replace):
+        assert "deferChoiceInitialization: true" in bulk_population
+        assert bulk_population.index("setRecipeIngredientsCollapsed(") < bulk_population.index(
+            "restoreRecipeIngredientChoiceExpansionState("
+        )
+    assert 'header.setAttribute("role", "presentation");' in header
+    assert 'header.setAttribute("role", "cell");' not in header
+    assert "aria-colspan" not in header
+    assert ".recipe-edit-selected-choice-group-helper" in css
+    assert ".recipe-edit-selected-choice-group-status" in css
+    assert "color: var(--app-warning);" in css
 
-    assert ".recipe-edit-ingredient-row.shows-ingredient-choice-summary" in source_first_css
-    assert "> :not(.recipe-edit-ingredient-choice-parent)" in source_first_css
-    for column in ("status", "quantity", "unit", "size", "store", "type"):
-        assert f'[data-ingredient-column="{column}"]' in source_first_css
-    assert "grid-column: 3 / -3 !important;" in source_first_css
-    assert "background: var(--app-surface);" in source_first_css
-    assert "box-shadow: inset 3px 0 0" in source_first_css
-    assert "grid-template-areas:" not in source_first_css
-    assert "display: flex;" in source_first_css
-    assert "text-overflow: ellipsis;" in source_first_css
-    assert "background: transparent !important;" in source_first_css
+
+def test_presentation_model_normalizes_standard_optional_default_and_choice_states():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for the client presentation-model contract")
+
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    model = script[
+        script.index("function recipeIngredientPresentationModel"):
+        script.index("function recipeIngredientRecipeViewChoiceGroups")
+    ]
+    legacy_normalizer = script[
+        script.index("function recipeIngredientStablePresentationId"):
+        script.index("function recipeIngredientSubstitutionsText")
+    ]
+    harness = model + legacy_normalizer + r"""
+function recipeIngredientCompactChoiceSummary(parentValues, groups) {
+    const explicit = Boolean(parentValues.explicitOriginal);
+    return {
+        hasExplicitOriginalGroup: explicit,
+        label: `${groups.length + (explicit ? 0 : 1)} options`,
+        summary: "summary",
+    };
+}
+function recipeIngredientSelectedChoice(row) { return row.selectedChoice; }
+function recipeIngredientIsOptional(values) { return Boolean(values.optional); }
+function recipeIngredientMatchFlag(value) {
+    return value === true || String(value || "").toLowerCase() === "true";
+}
+function recipeIngredientExpansionIsOpen(row) { return Boolean(row.expanded); }
+function fieldValuesFromRow(row) { return row; }
+function makeRow({defaultId = "", originalId = "original:req", required = false, selectedChoice = null, expanded = false} = {}) {
+    const fields = {
+        '[data-field="default_option_id"]': {value: defaultId},
+        '[data-field="selection_required"]': {value: required ? "true" : "false"},
+        '[data-original-option-id]': {value: originalId},
+    };
+    return {selectedChoice, expanded, querySelector: selector => fields[selector] || null};
+}
+const alternative = {alternativeId: "alt", rows: [{ingredient: "Alternative", option_type: "substitution"}]};
+const explicitOriginal = {alternativeId: "original-group", rows: [{ingredient: "Original", option_type: "original"}]};
+const standard = recipeIngredientPresentationModel(makeRow(), {ingredient: "Flour"}, []);
+const optional = recipeIngredientPresentationModel(makeRow(), {ingredient: "Salt", optional: true}, []);
+const unresolved = recipeIngredientPresentationModel(
+    makeRow({required: true}),
+    {ingredient: "Broth"},
+    [alternative],
+);
+const selectedDefault = recipeIngredientPresentationModel(
+    makeRow({
+        defaultId: "original:req",
+        required: true,
+        selectedChoice: {id: "original:req", rows: [], values: [{}], isDefaultOption: true},
+    }),
+    {ingredient: "Butter"},
+    [alternative],
+);
+const selectedChoice = recipeIngredientPresentationModel(
+    makeRow({
+        defaultId: "alt",
+        required: true,
+        selectedChoice: {id: "alt", rows: alternative.rows, values: alternative.rows, isDefaultOption: false},
+    }),
+    {ingredient: "Broth"},
+    [alternative],
+);
+const currentNormalizedChoice = recipeIngredientPresentationModel(
+    makeRow({
+        defaultId: "original-group",
+        required: true,
+        selectedChoice: {id: "original-group", rows: explicitOriginal.rows, values: explicitOriginal.rows, isDefaultOption: true},
+    }),
+    {ingredient: "Corn choice", explicitOriginal: true},
+    [explicitOriginal, alternative],
+);
+const legacyRows = recipeIngredientSubstitutionRows({
+    substitutions: [],
+    alternatives: [{name: "Vegetable broth", group_id: "legacy-broth"}],
+});
+process.stdout.write(JSON.stringify({
+    standard,
+    optional,
+    unresolved,
+    selectedDefault,
+    selectedChoice,
+    currentNormalizedChoice,
+    legacyRows,
+    legacyGroupId: recipeIngredientSubstitutionAlternativeId(legacyRows[0]),
+}));
+"""
+    completed = subprocess.run(
+        [node, "-e", harness],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    result = json.loads(completed.stdout)
+
+    assert result["standard"]["kind"] == "standard"
+    assert result["standard"]["optionCount"] == 0
+    assert result["optional"]["kind"] == "optional"
+    assert result["optional"]["optionCount"] == 0
+    assert result["unresolved"]["kind"] == "group-parent"
+    assert result["unresolved"]["parentLabel"] == "INGREDIENT CHOICE"
+    assert result["unresolved"]["optionCount"] == 2
+    assert result["unresolved"]["requiredUnresolved"] is True
+    assert result["unresolved"]["statusText"] == "Selection required"
+    assert all(not option["isSelected"] for option in result["unresolved"]["groups"])
+    assert all(not option["isDefault"] for option in result["unresolved"]["groups"])
+    assert result["selectedDefault"]["parentLabel"] == "DEFAULT OPTION"
+    assert result["selectedDefault"]["groups"][0]["isSelected"] is True
+    assert result["selectedChoice"]["parentLabel"] == "INGREDIENT CHOICE"
+    assert result["selectedChoice"]["groups"][1]["isSelected"] is True
+    assert result["currentNormalizedChoice"]["optionCount"] == 2
+    assert len(result["legacyRows"]) == 1
+    assert result["legacyRows"][0]["ingredient"] == "Vegetable broth"
+    assert result["legacyGroupId"] == "legacy-broth"
+
+
+def test_legacy_camel_case_alternatives_get_stable_canonical_group_ids():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for the legacy ingredient-option contract")
+
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    normalizer = script[
+        script.index("function recipeIngredientStablePresentationId"):
+        script.index("function recipeIngredientSubstitutionsText")
+    ]
+    harness = normalizer + r"""
+function recipeIngredientMatchFlag(value) {
+    if (value === true || value === 1) return true;
+    return ["1", "true", "yes", "on", "best", "best match"].includes(
+        String(value || "").trim().toLowerCase(),
+    );
+}
+const legacyRequirement = {
+    recipeIngredientId: "ingredient-cream",
+    ingredient: "Cream",
+    sourceText: "1 cup cream",
+    quantity: "1",
+    unit: "cup",
+    alternatives: [
+        {
+            alternativeId: "legacy-oat-blend",
+            alternativeLabel: "Oat blend",
+            alternativeOrder: 3,
+            components: [
+                {
+                    optionId: "legacy-oats",
+                    name: "Oats",
+                    optionType: "substitution",
+                    alternativeComponentOrder: 0,
+                    recipeAuthored: true,
+                    purchasableItem: "Rolled oats",
+                    storeSection: "Breakfast",
+                    ingredientImageUrl: "/static/oats.webp",
+                    ingredientType: "optional",
+                    optional: "false",
+                    inferred: "false",
+                },
+                {
+                    name: "Water",
+                    optionType: "substitution",
+                    alternativeComponentOrder: 1,
+                },
+            ],
+        },
+        {
+            alternativeLabel: "Coconut blend",
+            alternativeOrder: 4,
+            components: [
+                {name: "Coconut milk", alternativeComponentOrder: 0},
+                {name: "Water", alternativeComponentOrder: 1},
+            ],
+        },
+    ],
+};
+const first = recipeIngredientSubstitutionRows(legacyRequirement);
+const repeated = recipeIngredientSubstitutionRows({...legacyRequirement});
+const groups = recipeIngredientSubstitutionGroups(first);
+const singleCamelContainer = recipeIngredientSubstitutionRows({
+    ingredient: "Milk",
+    substitutions: {},
+    substitution_options: [null],
+    substitutionOptions: {
+        name: "Soy milk",
+        optionType: "substitution",
+        substitutionId: "legacy-soy-milk",
+    },
+});
+const placeholderFallback = recipeIngredientSubstitutionRows({
+    ingredient: "Broth",
+    substitutions: {components: []},
+    alternatives: [{name: "Vegetable broth"}],
+});
+const nestedComponentFallback = recipeIngredientSubstitutionRows({
+    ingredient: "Milk",
+    alternatives: [{
+        alternativeId: "legacy-soy",
+        ingredients: [],
+        components: [{name: "Soy milk"}],
+    }],
+});
+process.stdout.write(JSON.stringify({
+    first,
+    repeated,
+    groups,
+    singleCamelContainer,
+    placeholderFallback,
+    nestedComponentFallback,
+}));
+"""
+    completed = subprocess.run(
+        [node, "-e", harness],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    result = json.loads(completed.stdout)
+
+    first = result["first"]
+    repeated = result["repeated"]
+    assert len(first) == 4
+    assert [row["alternative_id"] for row in first] == [
+        row["alternative_id"] for row in repeated
+    ]
+    assert all(row["alternative_id"].strip() for row in first)
+    assert first[0]["alternative_id"] == "legacy-oat-blend"
+    assert first[1]["alternative_id"] == "legacy-oat-blend"
+    assert first[0]["id"] == "legacy-oats"
+    assert first[0]["alternative_label"] == "Oat blend"
+    assert first[0]["alternative_order"] == 3
+    assert first[0]["alternative_component_order"] == 0
+    assert first[0]["option_type"] == "substitution"
+    assert first[0]["recipe_authored"] is True
+    assert first[0]["purchasable_item"] == "Rolled oats"
+    assert first[0]["store_section"] == "Breakfast"
+    assert first[0]["ingredientImageUrl"] == "/static/oats.webp"
+    assert first[0]["ingredientType"] == "optional"
+    assert first[0]["optional"] is False
+    assert first[0]["inferred"] is False
+    synthesized_id = first[2]["alternative_id"]
+    assert synthesized_id.startswith("alternative-")
+    assert first[3]["alternative_id"] == synthesized_id
+    assert [group["alternativeId"] for group in result["groups"]] == [
+        "legacy-oat-blend",
+        synthesized_id,
+    ]
+    assert len(result["singleCamelContainer"]) == 1
+    assert result["singleCamelContainer"][0]["ingredient"] == "Soy milk"
+    assert result["singleCamelContainer"][0]["alternative_id"] == "legacy-soy-milk"
+    assert result["singleCamelContainer"][0]["option_type"] == "substitution"
+    assert [row["ingredient"] for row in result["placeholderFallback"]] == ["Vegetable broth"]
+    assert [row["ingredient"] for row in result["nestedComponentFallback"]] == ["Soy milk"]
+
+    assert "item.ingredientImageUrl" in script
+    assert "item.imageUrl" in script
+    assert "values.ingredientType" in script
+
+
+def test_legacy_parent_defaults_select_normalized_child_and_keep_choice_required():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for the legacy ingredient-option contract")
+
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    normalizer = script[
+        script.index("function recipeIngredientStablePresentationId"):
+        script.index("function recipeIngredientSubstitutionsText")
+    ]
+    add_start = script.index("function addRecipeIngredientRow")
+    add_probe = (
+        script[add_start:script.index("    const ingredientType =", add_start)]
+        + r"""
+    return {
+        substitutionOptions,
+        defaultOptionId,
+        originalOptionId,
+        selectionRequired,
+    };
+}
+"""
+    )
+    selected_choice = script[
+        script.index("function recipeIngredientSelectedChoice"):
+        script.index("function setRecipeIngredientDefaultOption")
+    ]
+    harness = normalizer + add_probe + selected_choice + r"""
+global.document = {
+    getElementById: id => id === "recipeEditIngredients"
+        ? {querySelectorAll: () => []}
+        : null,
+    createElement: () => ({}),
+};
+function recipeIngredientImageUrl() { return ""; }
+function recipeImageVariantUrl() { return ""; }
+function recipeImageVariantSrcSet() { return ""; }
+function recipeIngredientExtractionWarning() { return ""; }
+function recipeIngredientMatchFlag(value) {
+    if (value === true || value === 1) return true;
+    return ["1", "true", "yes", "on", "best", "best match"].includes(
+        String(value || "").trim().toLowerCase(),
+    );
+}
+function fieldValuesFromRow(row) { return row; }
+function recipeIngredientChoiceItemSummary(value) { return value.ingredient || ""; }
+function recipeIngredientOptionItemDisplay(value) { return value.ingredient || ""; }
+function recipeIngredientOptionTypeLabel(isDefaultOption) {
+    return isDefaultOption ? "DEFAULT OPTION" : "ALTERNATIVE OPTION";
+}
+
+const requirement = {
+    ingredient: "Cream",
+    sourceText: "1 cup cream",
+    quantity: "1",
+    unit: "cup",
+    defaultOptionId: "legacy-coconut-blend",
+    alternatives: [{
+        alternativeId: "legacy-coconut-blend",
+        alternativeLabel: "Coconut blend",
+        components: [
+            {name: "Coconut milk", optionType: "substitution"},
+            {name: "Water", optionType: "substitution"},
+        ],
+    }],
+};
+const initialized = addRecipeIngredientRow(requirement, {persistedIndex: 0});
+const repeated = addRecipeIngredientRow({...requirement}, {persistedIndex: 0});
+const optedOut = addRecipeIngredientRow(
+    {...requirement, selectionRequired: false},
+    {persistedIndex: 0},
+);
+const legacyOptedOut = addRecipeIngredientRow(
+    {...requirement, requiredSelection: false},
+    {persistedIndex: 0},
+);
+const legacyOriginalDefault = addRecipeIngredientRow(
+    {
+        ...requirement,
+        defaultOptionId: "",
+        originalIsDefault: true,
+    },
+    {persistedIndex: 0},
+);
+const explicitOriginalDefault = addRecipeIngredientRow(
+    {
+        ...requirement,
+        defaultOptionId: "",
+        originalOptionId: "original:requirement-legacy-cream",
+        originalIsDefault: true,
+        alternatives: [{
+            alternativeId: "explicit-original-cream",
+            optionType: "original",
+            components: [{name: "Cream"}, {name: "Water"}],
+        }, {
+            alternativeId: "explicit-coconut-cream",
+            optionType: "recipe_choice",
+            name: "Coconut cream",
+        }],
+    },
+    {persistedIndex: 0},
+);
+const newStandard = addRecipeIngredientRow({
+    ingredient: "New ingredient",
+    original_text: "1 cup new ingredient",
+    quantity: "1",
+    unit: "cup",
+});
+const groups = recipeIngredientSubstitutionGroups(initialized.substitutionOptions);
+const fields = {
+    '[data-field="default_option_id"]': {value: initialized.defaultOptionId},
+    '[data-original-option-id]': {value: initialized.originalOptionId},
+};
+const selected = recipeIngredientSelectedChoice(
+    {querySelector: selector => fields[selector] || null},
+    requirement,
+    groups,
+);
+const unresolvedFields = {
+    '[data-field="default_option_id"]': {value: ""},
+    '[data-original-option-id]': {value: initialized.originalOptionId},
+};
+const unresolved = recipeIngredientSelectedChoice(
+    {querySelector: selector => unresolvedFields[selector] || null},
+    requirement,
+    [{
+        alternativeId: "unselected-option",
+        rows: [{
+            ingredient: "Vegetable broth",
+            preferred: false,
+            is_default: "false",
+            option_type: "substitution",
+        }],
+    }],
+);
+process.stdout.write(JSON.stringify({
+    initialized,
+    repeated,
+    optedOut,
+    legacyOptedOut,
+    legacyOriginalDefault,
+    explicitOriginalDefault,
+    newStandard,
+    selected,
+    unresolved,
+}));
+"""
+    completed = subprocess.run(
+        [node, "-e", harness],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    result = json.loads(completed.stdout)
+
+    initialized = result["initialized"]
+    assert initialized["selectionRequired"] is True
+    assert result["optedOut"]["selectionRequired"] is False
+    assert result["legacyOptedOut"]["selectionRequired"] is False
+    assert result["legacyOriginalDefault"]["defaultOptionId"] == result["legacyOriginalDefault"]["originalOptionId"]
+    assert result["explicitOriginalDefault"]["originalOptionId"] == "explicit-original-cream"
+    assert result["explicitOriginalDefault"]["defaultOptionId"] == "explicit-original-cream"
+    assert result["newStandard"]["selectionRequired"] is False
+    assert result["newStandard"]["substitutionOptions"] == []
+    assert result["newStandard"]["originalOptionId"].startswith("original:ingredient-")
+    assert initialized["defaultOptionId"] == "legacy-coconut-blend"
+    assert initialized["originalOptionId"].startswith("original:ingredient-")
+    assert initialized["originalOptionId"] == result["repeated"]["originalOptionId"]
+    assert initialized["originalOptionId"] != initialized["defaultOptionId"]
+    assert all(not row["preferred"] for row in initialized["substitutionOptions"])
+    assert result["selected"]["id"] == "legacy-coconut-blend"
+    assert [value["ingredient"] for value in result["selected"]["values"]] == [
+        "Coconut milk",
+        "Water",
+    ]
+    assert result["unresolved"] is None
+
+    card_update = script[
+        script.index("function updateRecipeIngredientAlternativeCard"):
+        script.index("function createRecipeIngredientAlternativeCard")
+    ]
+    substitution_state = script[
+        script.index("function updateRecipeIngredientSubstitutionState"):
+        script.index("function addRecipeIngredientSubstitutionRow")
+    ]
+    assert "options.selected === undefined" in card_update
+    assert "Boolean(options.selected)" in card_update
+    assert "input.checked = preferred" not in card_update
+    assert "selected: optionPresentation?.isSelected" in substitution_state
+
+
+def test_removing_or_duplicating_choices_keeps_selection_metadata_consistent():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for the option-removal contract")
+
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    helper = script[
+        script.index("function reconcileRecipeIngredientSelectionAfterOptionRemoval"):
+        script.index("function removeRecipeIngredientSubstitutionRow")
+    ]
+    duplicate = script[
+        script.index("function duplicateRecipeIngredientAlternative"):
+        script.index("function addRecipeIngredientAlternativeComponent")
+    ]
+    assert "preferred: false" in duplicate
+    assert "is_default: false" in duplicate
+
+    harness = helper + r"""
+function recipeIngredientMatchFlag(value) {
+    return value === true || ["1", "true", "yes", "on"].includes(
+        String(value || "").trim().toLowerCase(),
+    );
+}
+function recipeIngredientSubstitutionContainer(row) { return row.optionContainer || row; }
+function recipeIngredientSubstitutionDomGroups(rows) {
+    const groups = new Map();
+    rows.forEach(row => {
+        const id = row.querySelector('[data-field="alternative_id"]')?.value || "";
+        if (!groups.has(id)) groups.set(id, {alternativeId: id, rows: []});
+        groups.get(id).rows.push(row);
+    });
+    return [...groups.values()];
+}
+function option(id, {preferred = false, isDefault = false} = {}) {
+    const fields = {
+        alternative_id: {value: id},
+        preferred: {checked: preferred},
+        is_default: {value: isDefault ? "true" : "false"},
+    };
+    return {
+        querySelector: selector => {
+            const name = selector.match(/data-field="([^"]+)"/)?.[1];
+            return fields[name] || null;
+        },
+        fields,
+    };
+}
+function parent(options, {
+    defaultId = "",
+    originalId = "original:req",
+    originalDefault = false,
+    required = true,
+} = {}) {
+    const fields = {
+        default_option_id: {value: defaultId},
+        original_is_default: {value: originalDefault ? "true" : "false"},
+        selection_required: {value: required ? "true" : "false"},
+    };
+    return {
+        querySelectorAll: selector => selector === "[data-substitution-option-row]" ? options : [],
+        querySelector: selector => {
+            if (selector === "[data-original-option-id]") return {value: originalId};
+            const name = selector.match(/data-field="([^"]+)"/)?.[1];
+            return fields[name] || null;
+        },
+        fields,
+    };
+}
+
+const remainingAfterSelectedDelete = option("other", {preferred: true, isDefault: true});
+const selectedDeleted = parent([remainingAfterSelectedDelete], {defaultId: "selected"});
+reconcileRecipeIngredientSelectionAfterOptionRemoval(selectedDeleted, "selected", true);
+
+const finalDeleted = parent([], {defaultId: "original:req", originalDefault: true});
+reconcileRecipeIngredientSelectionAfterOptionRemoval(finalDeleted, "alternative", false);
+
+const remainingComponent = option("selected", {preferred: true, isDefault: true});
+const componentDeleted = parent([remainingComponent], {defaultId: "selected"});
+reconcileRecipeIngredientSelectionAfterOptionRemoval(componentDeleted, "selected", true);
+
+const selectedKept = option("selected", {preferred: true, isDefault: true});
+const unselectedDeleted = parent([selectedKept], {defaultId: "selected"});
+reconcileRecipeIngredientSelectionAfterOptionRemoval(unselectedDeleted, "other", false);
+
+const authoritativeSelected = option("selected", {preferred: true, isDefault: true});
+const staleFlagDeleted = parent([authoritativeSelected], {defaultId: "selected"});
+reconcileRecipeIngredientSelectionAfterOptionRemoval(staleFlagDeleted, "stale", true);
+
+process.stdout.write(JSON.stringify({
+    selectedDeleted: {
+        defaultId: selectedDeleted.fields.default_option_id.value,
+        originalDefault: selectedDeleted.fields.original_is_default.value,
+        required: selectedDeleted.fields.selection_required.value,
+        remainingPreferred: remainingAfterSelectedDelete.fields.preferred.checked,
+        remainingDefault: remainingAfterSelectedDelete.fields.is_default.value,
+    },
+    finalDeleted: {
+        defaultId: finalDeleted.fields.default_option_id.value,
+        originalDefault: finalDeleted.fields.original_is_default.value,
+        required: finalDeleted.fields.selection_required.value,
+    },
+    componentDeleted: {
+        defaultId: componentDeleted.fields.default_option_id.value,
+        required: componentDeleted.fields.selection_required.value,
+        remainingPreferred: remainingComponent.fields.preferred.checked,
+    },
+    unselectedDeleted: {
+        defaultId: unselectedDeleted.fields.default_option_id.value,
+        required: unselectedDeleted.fields.selection_required.value,
+        selectedPreferred: selectedKept.fields.preferred.checked,
+    },
+    staleFlagDeleted: {
+        defaultId: staleFlagDeleted.fields.default_option_id.value,
+        required: staleFlagDeleted.fields.selection_required.value,
+        selectedPreferred: authoritativeSelected.fields.preferred.checked,
+    },
+}));
+"""
+    completed = subprocess.run(
+        [node, "-e", harness],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    result = json.loads(completed.stdout)
+    assert result["selectedDeleted"] == {
+        "defaultId": "",
+        "originalDefault": "false",
+        "required": "true",
+        "remainingPreferred": False,
+        "remainingDefault": "false",
+    }
+    assert result["finalDeleted"] == {
+        "defaultId": "",
+        "originalDefault": "false",
+        "required": "false",
+    }
+    assert result["componentDeleted"] == {
+        "defaultId": "selected",
+        "required": "true",
+        "remainingPreferred": True,
+    }
+    assert result["unselectedDeleted"] == {
+        "defaultId": "selected",
+        "required": "true",
+        "selectedPreferred": True,
+    }
+    assert result["staleFlagDeleted"] == {
+        "defaultId": "selected",
+        "required": "true",
+        "selectedPreferred": True,
+    }
+
+
+def test_required_unresolved_choice_auto_expands_once_without_moving_focus():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    initializer = script[
+        script.index("function initializeRecipeIngredientRequiredChoice"):
+        script.index("function toggleRecipeIngredientSubstitutions")
+    ]
+
+    assert 'row.dataset.ingredientRequiredChoiceInitialized === "true"' in initializer
+    assert 'row.dataset.ingredientRequiredChoiceInitialized = "true";' in initializer
+    assert "presentation.requiredUnresolved" in initializer
+    assert "presentation.expanded" in initializer
+    assert 'row.querySelector("[data-ingredient-substitutions-toggle]")' in initializer
+    assert "setRecipeIngredientSubstitutionsExpanded(row, disclosure, true" in initializer
+    assert "restoreOtherEdits: false" in initializer
+    assert ".focus(" not in initializer
+    assert ".scrollIntoView(" not in initializer
+
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for the initial disclosure-state contract")
+    harness = initializer + r"""
+const originalFocus = {id: "title"};
+global.document = {activeElement: originalFocus};
+const disclosure = {id: "choice-toggle"};
+const row = {
+    dataset: {},
+    querySelectorAll: () => [],
+    querySelector: selector => selector === "[data-ingredient-substitutions-toggle]"
+        ? disclosure
+        : null,
+};
+const expansions = [];
+function recipeIngredientPresentationModel() {
+    return {hasGroup: true, requiredUnresolved: true, expanded: false};
+}
+function recipeIngredientChoiceParentValues() { return {}; }
+function recipeIngredientSubstitutionDomGroups() { return []; }
+function setRecipeIngredientSubstitutionsExpanded(targetRow, control, open, options) {
+    expansions.push({targetRow: targetRow === row, control: control === disclosure, open, options});
+}
+const first = initializeRecipeIngredientRequiredChoice(row);
+const second = initializeRecipeIngredientRequiredChoice(row);
+process.stdout.write(JSON.stringify({
+    first,
+    second,
+    expansions,
+    focusUnchanged: document.activeElement === originalFocus,
+}));
+"""
+    completed = subprocess.run(
+        [node, "-e", harness],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    result = json.loads(completed.stdout)
+    assert result == {
+        "first": True,
+        "second": False,
+        "expansions": [{
+            "targetRow": True,
+            "control": True,
+            "open": True,
+            "options": {"restoreOtherEdits": False},
+        }],
+        "focusUnchanged": True,
+    }
+
+
+def test_choice_expansion_state_survives_repopulation_without_reopening_collapsed_groups():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for the disclosure-state restore contract")
+
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    stable_id = script[
+        script.index("function recipeIngredientStablePresentationId"):
+        script.index("function recipeIngredientSubstitutionGroupId")
+    ]
+    state_helpers = script[
+        script.index("function recipeIngredientChoiceExpansionStateKeys"):
+        script.index("function initializeRecipeIngredientRequiredChoice")
+    ]
+    harness = stable_id + state_helpers + r"""
+function makeRow(expansionId, {
+    initialized = false,
+    expanded = false,
+    persistedIndex = null,
+    source = "",
+    hasGroup = true,
+} = {}) {
+    const disclosure = {id: `${expansionId}-toggle`};
+    const fields = {
+        source_text: {value: source},
+        original_text: {value: source},
+        ingredient: {value: source},
+        quantity: {value: "1"},
+        unit: {value: "cup"},
+    };
+    return {
+        dataset: {
+            ingredientExpansionId: expansionId,
+            ...(initialized ? {ingredientRequiredChoiceInitialized: "true"} : {}),
+            ...(persistedIndex == null
+                ? {}
+                : {recipeIngredientPersistedIndex: String(persistedIndex)}),
+        },
+        fields,
+        panel: {hidden: !expanded},
+        recipeIngredientActiveExpansionId: expanded ? expansionId : "",
+        disclosure,
+        classList: {
+            contains: className => hasGroup && className === "has-ingredient-choice",
+        },
+        querySelector: selector => selector === "[data-ingredient-substitutions-toggle]"
+            ? disclosure
+            : null,
+    };
+}
+
+const collapsedId = "ingredient-group:collapsed";
+const expandedId = "ingredient-group:expanded";
+let rows = [
+    makeRow(collapsedId, {
+        initialized: true,
+        expanded: false,
+        persistedIndex: 0,
+        source: "Chicken broth",
+    }),
+    makeRow(expandedId, {
+        initialized: true,
+        expanded: true,
+        persistedIndex: 1,
+        source: "Butter",
+    }),
+    makeRow("ingredient-group:late-group", {
+        persistedIndex: 2,
+        source: "Milk",
+        hasGroup: true,
+    }),
+];
+const recipeEditExpandedIngredientIds = new Set([expandedId]);
+function recipeEditIngredientRows() { return rows; }
+function ensureRecipeIngredientExpansionId(row) { return row.dataset.ingredientExpansionId; }
+function recipeIngredientSubstitutionContainer(row) { return row.panel; }
+function recipeIngredientDirectField(row, fieldName) { return row.fields[fieldName] || null; }
+
+const captured = captureRecipeIngredientChoiceExpansionState();
+rows = [
+    makeRow("ingredient-group:requirement-broth", {
+        persistedIndex: 0,
+        source: "Chicken broth",
+    }),
+    makeRow("ingredient-group:requirement-butter", {
+        persistedIndex: 1,
+        source: "Butter",
+    }),
+    makeRow("ingredient-group:requirement-milk", {
+        persistedIndex: 2,
+        source: "Milk",
+    }),
+    makeRow("ingredient-group:new", {
+        persistedIndex: 3,
+        source: "A genuinely new ingredient",
+    }),
+];
+const expansionCalls = [];
+const initializationCalls = [];
+function setRecipeIngredientSubstitutionsExpanded(row, control, open, options) {
+    expansionCalls.push({
+        expansionId: row.dataset.ingredientExpansionId,
+        correctControl: control === row.disclosure,
+        open,
+        options,
+    });
+}
+function initializeRecipeIngredientRequiredChoice(row) {
+    initializationCalls.push(row.dataset.ingredientExpansionId);
+}
+
+restoreRecipeIngredientChoiceExpansionState(captured);
+process.stdout.write(JSON.stringify({
+    capturedKeys: [...captured.keys()],
+    restoredInitializationFlags: rows.slice(0, 3).map(
+        row => row.dataset.ingredientRequiredChoiceInitialized,
+    ),
+    expansionCalls,
+    initializationCalls,
+}));
+"""
+    completed = subprocess.run(
+        [node, "-e", harness],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    result = json.loads(completed.stdout)
+
+    assert "ingredient-group:collapsed" in result["capturedKeys"]
+    assert "ingredient-group:expanded" in result["capturedKeys"]
+    assert any(
+        key.startswith("ingredient-persisted-position:0:ingredient-state-")
+        for key in result["capturedKeys"]
+    )
+    assert any(
+        key.startswith("ingredient-current-position:1:ingredient-state-")
+        for key in result["capturedKeys"]
+    )
+    assert result["restoredInitializationFlags"] == ["true", "true", "true"]
+    assert result["expansionCalls"] == [{
+        "expansionId": "ingredient-group:requirement-butter",
+        "correctControl": True,
+        "open": True,
+        "options": {"restoreOtherEdits": False},
+    }]
+    assert result["initializationCalls"] == ["ingredient-group:new"]
+
+
+def test_group_parent_drag_binds_to_top_level_row_and_keeps_option_children_contained():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    group_drag = script[
+        script.index("function ensureRecipeIngredientChoiceGroupDragHandle"):
+        script.index("function ensureRecipeIngredientChoiceTitleActions")
+    ]
+    organizer = script[
+        script.index("function organizeRecipeEditIngredientRow"):
+        script.index("function organizeRecipeEditCompactRowActions")
+    ]
+    drop_guard = script[
+        script.index("function recipeEditCanDropOnRow"):
+        script.index("function recipeEditDropShouldInsertAfter")
+    ]
+    drop = script[
+        script.index("function dropRecipeEditRow"):
+        script.index("function updateRecipeEditRowOrder")
+    ]
+
+    assert "bindRecipeEditDragAndDrop(row, handle);" in group_drag
+    assert "row.appendChild(substitutions);" in organizer
+    assert "row.recipeIngredientSubstitutionPanel = substitutions;" in organizer
+    assert "substitutions.recipeIngredientChoiceParentRow = row;" in organizer
+    assert "sourceRow.parentElement === resolvedTarget.parentElement" in drop_guard
+    assert "recipeEditMoveSelectorForRow(sourceRow) === recipeEditMoveSelectorForRow(resolvedTarget)" in drop_guard
+    assert "resolvedTarget.after(sourceRow);" in drop
+    assert "resolvedTarget.before(sourceRow);" in drop
 
 
 def test_selected_group_summary_uses_preparation_when_it_distinguishes_options():
@@ -672,7 +1645,7 @@ def test_selected_group_summary_uses_preparation_when_it_distinguishes_options()
     assert "recipeIngredientChoiceItemSummary(" in selected_choice
 
 
-def test_collapsed_selected_group_projects_each_ingredient_as_a_normal_line_item():
+def test_group_parent_is_canonical_in_table_and_store_section_projects_children():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
@@ -725,7 +1698,10 @@ def test_collapsed_selected_group_projects_each_ingredient_as_a_normal_line_item
     assert "return rows.length > 1 ? rows : [];" in selected_line_items
     assert "isPrimaryOriginalComponent" not in selected_line_items
     assert "recipeIngredientSelectedOptionProjectionRows(" in selected_line_items
-    assert "const renderedRows = projectedRows;" in selected_line_items
+    assert "const renderedRows = recipeEditIngredientColumnView.groupByStoreSection" in selected_line_items
+    assert "? projectedRows" in selected_line_items
+    assert ": [];" in selected_line_items
+    assert "if (!lineItems && renderedRows.length)" in selected_line_items
     assert "data-ingredient-selected-option-line-items" in selected_line_items
     assert "createRecipeIngredientOptionRowSummary(" in selected_line_items
     assert "summary.recipeIngredientOptionSourceRow = sourceRow;" in selected_line_items
@@ -746,21 +1722,24 @@ def test_collapsed_selected_group_projects_each_ingredient_as_a_normal_line_item
     assert "isDefaultOption," in selected_choice
     assert "syncRecipeIngredientSelectedOptionLineItems(" in substitution_state
     assert "function ensureRecipeIngredientSelectedChoiceGroupHeader" in script
-    assert "groupLabel.textContent = selectedLabel;" in substitution_state
+    assert "groupLabel.textContent = presentation.parentLabel;" in substitution_state
     assert "groupTitle.value = choiceTitle;" in substitution_state
     assert "groupTitle.dataset.ingredientChoiceSourceTitle = choiceTitle;" in substitution_state
     assert "document.activeElement !== groupTitle" in substitution_state
+    assert "groupHelper.textContent = presentation.helperText;" in substitution_state
+    assert "groupStatus.textContent = presentation.statusText;" in substitution_state
     assert '"has-selected-choice-group-header"' in substitution_state
-    assert "alternativeCount && !hasSelectedChoice" in substitution_state
     assert "alternativeCount && hasSelectedChoice" in substitution_state
     assert "alternativeCount && hasSelectedChoice && !isExpanded" not in substitution_state
+    assert "alternativeCount && !hasSelectedChoice" not in substitution_state
     assert "selectedChoiceUsesParentIngredientRow" not in substitution_state
     assert (
-        "alternativeCount\n"
-        "        && hasSelectedChoice\n"
+        "presentation.hasGroup\n"
         "        && !hidesSelectedChoiceHeaderInStoreSectionView"
         in substitution_state
     )
+    assert "const projectedSelectedChoiceRows = recipeIngredientSelectedOptionProjectionRows(" in substitution_state
+    assert "&& projectedSelectedChoiceRows.length > 0" in substitution_state
     assert "row?.recipeIngredientInlineSummarySourceRow" in column_source
     assert 'label.textContent = alternativeCount ? optionLabel : "None";' in substitution_state
     assert 'label.textContent += " · Selected";' not in substitution_state
@@ -877,6 +1856,42 @@ def test_standard_and_choice_rows_share_the_same_faint_group_boundary():
     assert "border-bottom: 1px solid color-mix(" in rule
     assert "var(--recipe-editor-border-soft) 22%" in rule
     assert "var(--app-border)" not in rule
+
+
+def test_grouped_ingredient_v109_keeps_one_mobile_parent_count_and_auto_height():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    v108_marker = "/* Ingredient editor v108: one quiet boundary per complete ingredient group. */"
+    v109_marker = "/* Ingredient editor v109: every grouped ingredient keeps one canonical parent row. */"
+
+    assert css.index(v109_marker) > css.index(v108_marker)
+    v109 = css[css.index(v109_marker):]
+
+    for hidden_direct_source in (
+        ".recipe-edit-row-handle,",
+        "[data-ingredient-column],",
+        ".recipe-edit-ingredient-mobile-quantity-summary",
+    ):
+        assert hidden_direct_source in v109
+    assert "> .recipe-edit-ingredient-row.has-selected-choice-group-header" in v109
+    assert "display: none !important;" in v109
+
+    assert "@media (max-width: 767px)" in v109
+    assert "#recipeEditIngredients.recipe-edit-ingredients-collapsed" in v109
+    assert ".has-selected-choice-group-header:not(.recipe-edit-row-expanded)" in v109
+    assert ".has-selected-choice-group-header.recipe-edit-row-collapsed" in v109
+    assert "grid-template-rows: auto !important;" in v109
+    assert "> :not(.recipe-edit-selected-choice-group-header)" in v109
+
+    assert (
+        "grid-template-columns: 40px minmax(0, 1fr) "
+        "minmax(64px, max-content) 96px !important;"
+    ) in v109
+    assert ".recipe-edit-ingredient-options-copy" in v109
+    assert "display: inline-flex !important;" in v109
+    assert "min-width: 64px !important;" in v109
+    assert "min-height: 40px;" in v109
+    assert "[data-ingredient-options-label]" in v109
+    assert "[data-ingredient-options-summary]" in v109
 
 
 def test_collapsed_default_choice_has_one_parent_gap_before_its_ingredient_group():
@@ -1233,9 +2248,9 @@ def test_editor_reuses_one_grid_contract_for_parent_and_nested_ingredient_rows()
     assert "> .recipe-edit-row-handle" in v51
     assert "width: 28px;" in v51
     assert ".recipe-edit-alternative-component-image-cell" in v51
-    assert "width: 48px !important;" in v51
-    assert "height: 48px !important;" in v51
-    assert "border: 1px solid var(--app-border-strong);" in v51
+    assert "width: var(--recipe-edit-thumbnail-size, 64px) !important;" in v51
+    assert "height: var(--recipe-edit-thumbnail-size, 64px) !important;" in v51
+    assert "border: 1px solid var(--recipe-editor-border);" in v51
     assert "> .recipe-ingredient-image" in v51
 
     choice_overview = script[
@@ -1412,17 +2427,19 @@ def test_selected_choice_header_shows_option_state_without_losing_editable_sourc
     assert 'return isDefaultOption ? "DEFAULT OPTION" : "ALTERNATIVE OPTION";' in labels
     assert "selectionLabel: recipeIngredientOptionTypeLabel(true)" in selection
     assert "selectionLabel: recipeIngredientOptionTypeLabel(isDefaultOption)" in selection
-    assert "groupLabel.textContent = selectedLabel;" in state
+    assert "groupLabel.textContent = presentation.parentLabel;" in state
     assert "groupTitle.value = choiceTitle;" in state
     assert "groupTitle.dataset.ingredientChoiceSourceTitle = choiceTitle;" in state
     assert "parentValues.source_text || parentValues.original_text" in state
-    assert "`${selectedLabel}: ${choiceTitle} (${selectedDetails})`" in state
+    assert "`${presentation.parentLabel}: ${choiceTitle} (${selectedDetails})`" in state
+    assert "groupHelper.textContent = presentation.helperText;" in state
+    assert "groupStatus.textContent = presentation.statusText;" in state
     assert "input.dataset.ingredientChoiceSourceTitle ?? input.value" in title_editor
     assert "input.value = sourceTitle;" in title_editor
     assert "input.dataset.ingredientChoiceSourceTitle = nextValue;" in title_editor
 
 
-def test_selected_choice_header_remains_visible_for_single_ingredient_alternatives():
+def test_group_header_remains_visible_for_selected_and_unresolved_single_ingredient_options():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     state = script[
         script.index("function updateRecipeIngredientSubstitutionState"):
@@ -1430,9 +2447,12 @@ def test_selected_choice_header_remains_visible_for_single_ingredient_alternativ
     ]
 
     assert "const showsSelectedChoiceGroup = Boolean(" in state
-    assert "alternativeCount" in state
-    assert "&& hasSelectedChoice" in state
+    assert "presentation.hasGroup" in state
     assert "&& !hidesSelectedChoiceHeaderInStoreSectionView" in state
+    assert "&& hasSelectedChoice" not in state[
+        state.index("const showsSelectedChoiceGroup = Boolean("):
+        state.index("const selectedChoiceGroupHeader")
+    ]
     assert "selectedChoiceUsesParentIngredientRow" not in state
 
 

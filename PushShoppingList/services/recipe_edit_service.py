@@ -11800,6 +11800,7 @@ def normalize_edit_ingredients(ingredients, recipe_url=None):
             "source_text": item.get("source_text") or item.get("original_text") or "",
             "default_option_id": item.get("default_option_id") or "",
             "original_option_id": original_option_id(item, index),
+            "original_is_default": truthy(item.get("original_is_default")),
             "selection_required": truthy(item.get("selection_required")),
             "quantity": item.get("quantity") or "",
             "quantity_text": item.get("quantity_text") or "",
@@ -12102,6 +12103,25 @@ def normalize_ingredient_substitutions(value, existing_value=None, parent_item=N
             else metadata_by_name.get(name_key, {})
         )
         merged = {**metadata, **row}
+        # The extraction normalizer may infer these editable fields again. Keep
+        # an explicit legacy/current option value when one was already supplied.
+        for field in (
+            "ingredient_id",
+            "master_ingredient_id",
+            "purchasable_item",
+            "buy_as",
+            "store_section",
+            "section",
+            "ingredient_image_url",
+            "image_url",
+            "ingredient_image_generated_at",
+            "ingredient_image_prompt",
+        ):
+            metadata_value = metadata.get(field)
+            if metadata_value is not None and (
+                not isinstance(metadata_value, str) or metadata_value.strip()
+            ):
+                merged[field] = deepcopy(metadata_value)
         option_identity_keys = {
             instruction_match_text_key(merged.get(field))
             for field in (
@@ -12332,6 +12352,11 @@ def sanitize_ingredients(value, existing_value=None):
             "default_option_id": nullable_string(
                 item.get("default_option_id")
                 or existing.get("default_option_id")
+            ),
+            "original_is_default": truthy(
+                item.get("original_is_default")
+                if "original_is_default" in item
+                else existing.get("original_is_default")
             ),
             "selection_required": truthy(
                 item.get("selection_required")
