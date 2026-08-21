@@ -1645,7 +1645,7 @@ def test_selected_group_summary_uses_preparation_when_it_distinguishes_options()
     assert "recipeIngredientChoiceItemSummary(" in selected_choice
 
 
-def test_group_parent_is_canonical_in_table_and_store_section_projects_children():
+def test_group_parent_keeps_active_rows_collapsed_and_store_section_projects_children():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
@@ -1696,16 +1696,25 @@ def test_group_parent_is_canonical_in_table_and_store_section_projects_children(
     assert "const rows = Array.isArray(selectedChoice?.rows)" in selected_line_items
     assert "? selectedChoice.rows" in selected_line_items
     assert "return rows.length > 1 ? rows : [];" in selected_line_items
+    assert "function recipeIngredientSelectedOptionActiveRows" in selected_line_items
+    assert "? selectedChoice.rows.filter(Boolean)" in selected_line_items
+    assert "if (rows.length)" in selected_line_items
+    assert "return selectedChoice && values.length === 1 && row ? [row] : [];" in selected_line_items
     assert "isPrimaryOriginalComponent" not in selected_line_items
     assert "recipeIngredientSelectedOptionProjectionRows(" in selected_line_items
+    assert "recipeIngredientSelectedOptionActiveRows(row, selectedChoice)" in selected_line_items
     assert "const renderedRows = recipeEditIngredientColumnView.groupByStoreSection" in selected_line_items
     assert "? projectedRows" in selected_line_items
-    assert ": [];" in selected_line_items
+    assert ": activeRows;" in selected_line_items
     assert "if (!lineItems && renderedRows.length)" in selected_line_items
     assert "data-ingredient-selected-option-line-items" in selected_line_items
     assert "createRecipeIngredientOptionRowSummary(" in selected_line_items
     assert "summary.recipeIngredientOptionSourceRow = sourceRow;" in selected_line_items
+    assert "const isImplicitOriginal = sourceRow === row;" in selected_line_items
     assert "bindRecipeEditDragAndDrop(" in selected_line_items
+    assert "if (isImplicitOriginal)" in selected_line_items
+    assert "handleCell.replaceChildren();" in selected_line_items
+    assert 'handleCell.setAttribute("aria-hidden", "true");' in selected_line_items
     assert "actions.appendChild(editButton);" in selected_line_items
     assert "const menuWrap = sourceMenuWrap.cloneNode(true);" in selected_line_items
     assert "actions.appendChild(menuWrap);" in selected_line_items
@@ -1713,11 +1722,12 @@ def test_group_parent_is_canonical_in_table_and_store_section_projects_children(
     assert 'data-recipe-ingredient-inline-field="ingredient"' in selected_line_items
     assert "bindRecipeIngredientInlineEditor(row, summary);" in selected_line_items
     assert "openRecipeIngredientOptionModal(editButton)" in selected_line_items
+    assert "openRecipeIngredientDefaultOptionModal(editButton)" in selected_line_items
     assert "const expandedAtSelectedLineItem = Boolean(" in selected_line_items
     assert "const keepsGroupedSelectedRowsVisible = Boolean(" in selected_line_items
     assert "&& recipeEditIngredientColumnView.groupByStoreSection" in selected_line_items
     assert "&& !keepsGroupedSelectedRowsVisible" in selected_line_items
-    assert "projectedRows.length > 0 || expandedAtSelectedLineItem" in selected_line_items
+    assert "renderedRows.length > 0 || expandedAtSelectedLineItem" in selected_line_items
     assert "isDefaultOption: true" in selected_choice
     assert "isDefaultOption," in selected_choice
     assert "syncRecipeIngredientSelectedOptionLineItems(" in substitution_state
@@ -1781,6 +1791,178 @@ def test_group_parent_is_canonical_in_table_and_store_section_projects_children(
     assert ".recipe-edit-selected-option-line-items" in active_option_stack
     assert "> .recipe-edit-selected-option-line-item" in active_option_stack
     assert "grid-row: auto !important;" in active_option_stack
+
+
+def test_active_option_rows_resolve_explicit_implicit_switch_and_unresolved_sources():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for the collapsed active-option contract")
+
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    active_rows = script[
+        script.index("function recipeIngredientSelectedOptionActiveRows"):
+        script.index("function syncRecipeIngredientSelectedOptionLineItems")
+    ]
+    sync = script[
+        script.index("function syncRecipeIngredientSelectedOptionLineItems"):
+        script.index("function organizeRecipeEditSubstitutionOptionRow")
+    ]
+    harness = active_rows + r"""
+const parent = { id: "corn-group" };
+const fresh = [{id: "corn"}, {id: "cumin"}, {id: "onion"}];
+const frozen = [{id: "frozen-corn"}, {id: "frozen-onion"}];
+const selectedFresh = {rows: fresh, values: fresh};
+const selectedFrozen = {rows: frozen, values: frozen};
+const implicitOriginal = {rows: [], values: [{id: "butter"}]};
+
+const collapsedFresh = recipeIngredientSelectedOptionActiveRows(parent, selectedFresh);
+const repeatedFresh = recipeIngredientSelectedOptionActiveRows(parent, selectedFresh);
+const collapsedFrozen = recipeIngredientSelectedOptionActiveRows(parent, selectedFrozen);
+const implicit = recipeIngredientSelectedOptionActiveRows(parent, implicitOriginal);
+const unresolved = recipeIngredientSelectedOptionActiveRows(parent, null);
+process.stdout.write(JSON.stringify({
+    collapsedFresh: collapsedFresh.map(row => row.id),
+    repeatedFresh: repeatedFresh.map(row => row.id),
+    collapsedFrozen: collapsedFrozen.map(row => row.id),
+    implicit: implicit.map(row => row.id),
+    unresolved,
+}));
+"""
+    completed = subprocess.run(
+        [node, "-e", harness],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert json.loads(completed.stdout) == {
+        "collapsedFresh": ["corn", "cumin", "onion"],
+        "repeatedFresh": ["corn", "cumin", "onion"],
+        "collapsedFrozen": ["frozen-corn", "frozen-onion"],
+        "implicit": ["corn-group"],
+        "unresolved": [],
+    }
+    assert "const activeRows = recipeIngredientSelectedOptionActiveRows(row, selectedChoice);" in sync
+    assert "? projectedRows\n        : activeRows;" in sync
+    assert "row.insertBefore(lineItems, optionsPanel || null);" in sync
+    assert "lineItems.hidden = (" in sync
+    assert "expanded\n        && !expandedAtSelectedLineItem" in sync
+    assert "renderedRows.length > 0 || expandedAtSelectedLineItem" in sync
+
+
+def test_corn_fixture_collapsed_view_keeps_all_selected_components(monkeypatch):
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for the Corn collapse regression")
+
+    monkeypatch.setattr(
+        recipe_edit_service,
+        "recipe_edit_ingredient_master_lookup",
+        lambda *args, **kwargs: {},
+    )
+
+    fixture = json.loads(
+        (ROOT / "tests/fixtures/corn_spoon_bread_requirements.json").read_text(
+            encoding="utf-8",
+        )
+    )
+    corn = next(
+        ingredient
+        for ingredient in fixture["ingredients"]
+        if ingredient.get("original_text") == "1 cup fresh or frozen corn"
+    )
+    default_id = corn["default_option_id"]
+    selected = [
+        row
+        for row in corn["substitutions"]
+        if row["alternative_id"] == default_id
+    ]
+    alternatives = [
+        row
+        for row in corn["substitutions"]
+        if row["alternative_id"] != default_id
+    ]
+    normalized = recipe_edit_service.normalize_edit_ingredients([corn])[0]
+
+    assert corn["selection_required"] is True
+    assert [row["ingredient"] for row in selected] == ["corn", "cumin", "onion"]
+    assert [row["ingredient"] for row in alternatives] == ["corn", "onion"]
+    assert normalized["default_option_id"] == default_id
+    assert len(normalized["substitutions"]) == 5
+
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    selected_choice = script[
+        script.index("function recipeIngredientSelectedChoice"):
+        script.index("function setRecipeIngredientDefaultOption")
+    ]
+    active_rows = script[
+        script.index("function recipeIngredientSelectedOptionActiveRows"):
+        script.index("function syncRecipeIngredientSelectedOptionLineItems")
+    ]
+    harness = selected_choice + active_rows + f"""
+function fieldValuesFromRow(row) {{ return row; }}
+function recipeIngredientChoiceItemSummary(value) {{ return value.ingredient || ""; }}
+function recipeIngredientOptionItemDisplay(value) {{ return value.ingredient || ""; }}
+function recipeIngredientOptionTypeLabel(isDefaultOption) {{
+    return isDefaultOption ? "DEFAULT OPTION" : "ALTERNATIVE OPTION";
+}}
+function recipeIngredientMatchFlag(value) {{
+    if (value === true || value === 1) return true;
+    return ["1", "true", "yes", "on"].includes(
+        String(value || "").trim().toLowerCase(),
+    );
+}}
+
+const substitutions = {json.dumps(corn["substitutions"])};
+const defaultOptionId = {json.dumps(default_id)};
+const groups = Array.from(
+    substitutions.reduce((grouped, option) => {{
+        const id = option.alternative_id;
+        if (!grouped.has(id)) grouped.set(id, {{alternativeId: id, rows: []}});
+        grouped.get(id).rows.push(option);
+        return grouped;
+    }}, new Map()).values(),
+);
+const parent = {{
+    id: "corn-group",
+    querySelector(selector) {{
+        if (selector === '[data-field="default_option_id"]') {{
+            return {{value: defaultOptionId}};
+        }}
+        if (selector === "[data-original-option-id]") {{
+            return {{value: "original:requirement-1b9b67bcc2c17d1f"}};
+        }}
+        return null;
+    }},
+}};
+const choice = recipeIngredientSelectedChoice(
+    parent,
+    {json.dumps({key: corn.get(key, "") for key in ("ingredient", "quantity", "unit", "preparation")})},
+    groups,
+);
+const rows = recipeIngredientSelectedOptionActiveRows(parent, choice);
+process.stdout.write(JSON.stringify({{
+    selectedId: choice && choice.id,
+    label: choice && choice.selectionLabel,
+    names: rows.map(row => row.ingredient),
+    optionCount: groups.length,
+}}));
+"""
+    completed = subprocess.run(
+        [node, "-e", harness],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert json.loads(completed.stdout) == {
+        "selectedId": default_id,
+        "label": "DEFAULT OPTION",
+        "names": ["corn", "cumin", "onion"],
+        "optionCount": 2,
+    }
 
 
 def test_collapsed_choice_option_count_aligns_with_desktop_row_cells():

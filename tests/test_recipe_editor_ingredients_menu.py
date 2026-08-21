@@ -6684,10 +6684,15 @@ def test_mobile_saved_multi_ingredient_choice_rows_do_not_share_grid_cells_or_hi
     assert "white-space: nowrap;" in mobile_amount_rule
 
 
-def test_mobile_collapsed_choice_header_does_not_leave_an_orphaned_divider():
+def test_mobile_expanded_choice_hides_compact_rows_without_an_orphaned_divider():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
     collapsed_choice_css = css[css.index("/* Ingredient editor v89:"):]
+    sync = script[
+        script.index("function syncRecipeIngredientSelectedOptionLineItems"):
+        script.index("function organizeRecipeEditSubstitutionOptionRow")
+    ]
 
     assert "@media (max-width: 767px)" in collapsed_choice_css
     assert "> .recipe-edit-ingredient-row.has-selected-choice-group-header:has(" in collapsed_choice_css
@@ -6695,9 +6700,13 @@ def test_mobile_collapsed_choice_header_does_not_leave_an_orphaned_divider():
     assert "> .recipe-edit-ingredient-mobile-header" in collapsed_choice_css
     assert "> .recipe-edit-selected-choice-group-header" in collapsed_choice_css
     assert "border-bottom: 0;" in collapsed_choice_css
+    assert "const activeRows = recipeIngredientSelectedOptionActiveRows(row, selectedChoice);" in sync
+    assert "? projectedRows\n        : activeRows;" in sync
+    assert "lineItems.hidden = (" in sync
+    assert "expanded\n        && !expandedAtSelectedLineItem" in sync
 
 
-def test_table_choice_uses_parent_only_and_reserves_component_projections_for_store_view():
+def test_table_choice_keeps_active_rows_outside_collapsible_alternatives_panel():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
@@ -6711,9 +6720,11 @@ def test_table_choice_uses_parent_only_and_reserves_component_projections_for_st
     ]
 
     assert "return rows.length > 1 ? rows : [];" in sync_line_items
+    assert "function recipeIngredientSelectedOptionActiveRows" in sync_line_items
+    assert "return selectedChoice && values.length === 1 && row ? [row] : [];" in sync_line_items
     assert "const renderedRows = recipeEditIngredientColumnView.groupByStoreSection" in sync_line_items
     assert "? projectedRows" in sync_line_items
-    assert ": [];" in sync_line_items
+    assert ": activeRows;" in sync_line_items
     assert "if (!renderedRows.length)" in sync_line_items
     assert "const relocatesExpandedChoice = Boolean(" in sync_line_items
     assert "parentDisclosure || row" in sync_line_items
@@ -6725,7 +6736,7 @@ def test_table_choice_uses_parent_only_and_reserves_component_projections_for_st
     assert "const keepsGroupedSelectedRowsVisible = Boolean(" in sync_line_items
     assert "&& recipeEditIngredientColumnView.groupByStoreSection" in sync_line_items
     assert "&& !keepsGroupedSelectedRowsVisible" in sync_line_items
-    assert "projectedRows.length > 0 || expandedAtSelectedLineItem" in sync_line_items
+    assert "renderedRows.length > 0 || expandedAtSelectedLineItem" in sync_line_items
     assert "const preservesExpandedChoice = Boolean(" in sync_line_items
     assert "mountRecipeIngredientExpansion(" in sync_line_items
     assert "nextToggle || nextSummary" in sync_line_items

@@ -34636,6 +34636,7 @@ function syncRecipeIngredientSelectedOptionToggles(row) {
 function createRecipeIngredientSelectedOptionLineItem(row, sourceRow, options = {}) {
     const selectionState = String(options.selectionState || "").trim();
     const selectionDetails = String(options.selectionDetails || "").trim();
+    const isImplicitOriginal = sourceRow === row;
     const summary = createRecipeIngredientOptionRowSummary(
         "recipe-edit-selected-option-line-item",
     );
@@ -34649,16 +34650,21 @@ function createRecipeIngredientSelectedOptionLineItem(row, sourceRow, options = 
         ".recipe-edit-alternative-component-handle-cell",
     );
     if (handleCell) {
-        handleCell.innerHTML = `
-            <span class="recipe-edit-row-handle recipe-edit-substitution-handle"
-                  aria-label="Reorder selected ingredient">
-                ${recipeEditSvgIcon("drag")}
-            </span>
-        `;
-        bindRecipeEditDragAndDrop(
-            sourceRow,
-            handleCell.querySelector(".recipe-edit-row-handle"),
-        );
+        if (isImplicitOriginal) {
+            handleCell.replaceChildren();
+            handleCell.setAttribute("aria-hidden", "true");
+        } else {
+            handleCell.innerHTML = `
+                <span class="recipe-edit-row-handle recipe-edit-substitution-handle"
+                      aria-label="Reorder selected ingredient">
+                    ${recipeEditSvgIcon("drag")}
+                </span>
+            `;
+            bindRecipeEditDragAndDrop(
+                sourceRow,
+                handleCell.querySelector(".recipe-edit-row-handle"),
+            );
+        }
     }
 
     const actions = summary.querySelector(".recipe-edit-alternative-component-actions");
@@ -34666,7 +34672,9 @@ function createRecipeIngredientSelectedOptionLineItem(row, sourceRow, options = 
         actions.classList.add("recipe-edit-compact-row-actions");
         const editButton = createRecipeIngredientEditActionButton();
         editButton.addEventListener("click", () => {
-            return openRecipeIngredientOptionModal(editButton);
+            return isImplicitOriginal
+                ? openRecipeIngredientDefaultOptionModal(editButton)
+                : openRecipeIngredientOptionModal(editButton);
         });
         actions.appendChild(editButton);
 
@@ -35009,6 +35017,19 @@ function recipeIngredientSelectedOptionProjectionRows(selectedChoice) {
     return rows.length > 1 ? rows : [];
 }
 
+function recipeIngredientSelectedOptionActiveRows(row, selectedChoice) {
+    const rows = Array.isArray(selectedChoice?.rows)
+        ? selectedChoice.rows.filter(Boolean)
+        : [];
+    if (rows.length) {
+        return rows;
+    }
+    const values = Array.isArray(selectedChoice?.values)
+        ? selectedChoice.values
+        : [];
+    return selectedChoice && values.length === 1 && row ? [row] : [];
+}
+
 function syncRecipeIngredientSelectedOptionLineItems(
     row,
     selectedChoice,
@@ -35018,6 +35039,7 @@ function syncRecipeIngredientSelectedOptionLineItems(
         return;
     }
     const projectedRows = recipeIngredientSelectedOptionProjectionRows(selectedChoice);
+    const activeRows = recipeIngredientSelectedOptionActiveRows(row, selectedChoice);
     const selectionState = selectedChoice
         ? (
             selectedChoice.selectionLabel
@@ -35025,13 +35047,12 @@ function syncRecipeIngredientSelectedOptionLineItems(
         )
         : "";
     const selectionDetails = String(selectedChoice?.summary || "").trim();
-    // The normal Table view renders every option through the shared expansion
-    // panel. Selected-component projections are only needed by the specialized
-    // Store Section grouping, where the shared parent header is intentionally
-    // replaced by grouped component rows.
+    // Table view keeps the active option outside the disclosure-controlled
+    // alternatives panel so collapsing comparisons never hides recipe inputs.
+    // Store Section view keeps its existing multi-component projections.
     const renderedRows = recipeEditIngredientColumnView.groupByStoreSection
         ? projectedRows
-        : [];
+        : activeRows;
     let lineItems = row.querySelector(
         ":scope > [data-ingredient-selected-option-line-items]",
     );
@@ -35157,7 +35178,7 @@ function syncRecipeIngredientSelectedOptionLineItems(
     ) || !hasRenderedRows;
     row.classList.toggle(
         "has-selected-option-line-items",
-        projectedRows.length > 0 || expandedAtSelectedLineItem,
+        renderedRows.length > 0 || expandedAtSelectedLineItem,
     );
 }
 
