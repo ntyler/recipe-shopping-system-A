@@ -29300,6 +29300,26 @@ function recipeIngredientColumnViewSelectedOptionLineItems(row) {
         : [];
 }
 
+function recipeIngredientColumnViewIngredientCount(row) {
+    if (!row) return 0;
+    if (row.hasAttribute?.("data-recipe-ingredient-column-group-projection")) {
+        return 1;
+    }
+    if (!row.classList?.contains("has-ingredient-choice")) {
+        return 1;
+    }
+    return recipeIngredientColumnViewSelectedOptionLineItems(row).filter(lineItem => (
+        !lineItem.classList.contains("is-ingredient-column-grouped-away")
+    )).length;
+}
+
+function recipeIngredientColumnViewIngredientTotal(rows = []) {
+    return rows.reduce(
+        (total, row) => total + recipeIngredientColumnViewIngredientCount(row),
+        0,
+    );
+}
+
 function createRecipeIngredientColumnViewGroupProjection(list, parentRow, lineItem) {
     const sourceRow = recipeIngredientColumnViewSourceRow(lineItem);
     if (!list || !parentRow || !sourceRow || sourceRow === lineItem) return null;
@@ -29412,7 +29432,8 @@ function prepareRecipeIngredientColumnViewDisplayRows(list, rows) {
         let projectionAnchor = parentRow;
         parentRow.classList.toggle(
             "is-ingredient-store-section-grouped-choice",
-            lineItems.length > 0,
+            lineItems.length > 0
+                && !parentRow.classList.contains("has-selected-choice-group-header"),
         );
         lineItems.forEach(lineItem => {
             const componentSection = recipeIngredientColumnViewEntry(lineItem, "store");
@@ -29491,7 +29512,10 @@ function recipeIngredientColumnViewOptions(columnKey) {
     recipeIngredientColumnViewDisplayRows().forEach(row => {
         const entry = recipeIngredientColumnViewEntry(row, columnKey);
         const option = optionsByKey.get(entry.key) || { ...entry, count: 0 };
-        option.count += 1;
+        option.count += recipeEditIngredientColumnView.groupByStoreSection
+            && columnKey === "store"
+            ? recipeIngredientColumnViewIngredientCount(row)
+            : 1;
         optionsByKey.set(entry.key, option);
     });
     const storeOrder = new Map(
@@ -29742,7 +29766,11 @@ function renderRecipeIngredientColumnViewGroupHeaders(list, sortedRows) {
     const counts = new Map();
     visibleRows.forEach(entry => {
         const section = recipeIngredientColumnViewEntry(entry.row, "store");
-        counts.set(section.key, (counts.get(section.key) || 0) + 1);
+        counts.set(
+            section.key,
+            (counts.get(section.key) || 0)
+                + recipeIngredientColumnViewIngredientCount(entry.row),
+        );
     });
 
     let currentKey = null;
@@ -29925,9 +29953,15 @@ function applyRecipeIngredientColumnView(options = {}) {
             }
         });
     }
-    const visibleCount = displayRows.filter(row => (
+    const visibleRows = displayRows.filter(row => (
         !row.classList.contains("is-ingredient-column-filtered")
-    )).length;
+    ));
+    const visibleCount = recipeEditIngredientColumnView.groupByStoreSection
+        ? recipeIngredientColumnViewIngredientTotal(visibleRows)
+        : visibleRows.length;
+    const totalCount = recipeEditIngredientColumnView.groupByStoreSection
+        ? recipeIngredientColumnViewIngredientTotal(displayRows)
+        : displayRows.length;
     const active = recipeIngredientColumnViewIsActive();
     list.dataset.recipeIngredientColumnViewActive = String(active);
     const emptyState = ensureRecipeIngredientColumnViewEmptyState();
@@ -29941,10 +29975,10 @@ function applyRecipeIngredientColumnView(options = {}) {
     if (options.announce) {
         setRecipeEditIngredientColumnStatus(
             active
-                ? `Showing ${visibleCount} of ${displayRows.length} ingredients. ${
+                ? `Showing ${visibleCount} of ${totalCount} ingredients. ${
                     recipeIngredientColumnViewDescription()
                 }.`
-                : `Showing all ${displayRows.length} ingredients in manual recipe order.`,
+                : `Showing all ${totalCount} ingredients in manual recipe order.`,
         );
     }
     return false;
@@ -29985,10 +30019,15 @@ function syncRecipeIngredientColumnViewMenuState(menu) {
     const sortContext = recipeIngredientColumnViewSortContext(columnKey);
     const currentSortMode = sortContext?.sort.mode || "manual";
     const viewRows = recipeIngredientColumnViewDisplayRows();
-    const visibleCount = viewRows.filter(row => (
+    const visibleRows = viewRows.filter(row => (
         !row.classList.contains("is-ingredient-column-filtered")
-    )).length;
-    const totalCount = viewRows.length;
+    ));
+    const visibleCount = recipeEditIngredientColumnView.groupByStoreSection
+        ? recipeIngredientColumnViewIngredientTotal(visibleRows)
+        : visibleRows.length;
+    const totalCount = recipeEditIngredientColumnView.groupByStoreSection
+        ? recipeIngredientColumnViewIngredientTotal(viewRows)
+        : viewRows.length;
     const summary = menu.querySelector("[data-recipe-ingredient-column-view-summary]");
     if (summary) summary.textContent = `${visibleCount} of ${totalCount}`;
     const hideEmptyFields = menu.querySelector(
@@ -30079,10 +30118,15 @@ function renderRecipeIngredientColumnViewMenu(menu) {
     const sortContext = recipeIngredientColumnViewSortContext(columnKey);
     const currentSortMode = sortContext?.sort.mode || "manual";
     const viewRows = recipeIngredientColumnViewDisplayRows();
-    const visibleCount = viewRows.filter(row => (
+    const visibleRows = viewRows.filter(row => (
         !row.classList.contains("is-ingredient-column-filtered")
-    )).length;
-    const totalCount = viewRows.length;
+    ));
+    const visibleCount = recipeEditIngredientColumnView.groupByStoreSection
+        ? recipeIngredientColumnViewIngredientTotal(visibleRows)
+        : visibleRows.length;
+    const totalCount = recipeEditIngredientColumnView.groupByStoreSection
+        ? recipeIngredientColumnViewIngredientTotal(viewRows)
+        : viewRows.length;
     const sortOptions = [
         ["manual", "Manual recipe order"],
         ...(columnKey === "store" ? [["store", "Store order"]] : []),
@@ -30248,11 +30292,17 @@ function renderRecipeIngredientColumnViewMenu(menu) {
         });
     menu.querySelector("[data-recipe-ingredient-column-view-group-store]")
         ?.addEventListener("change", event => {
+            const ingredientChoiceExpansionState = (
+                captureRecipeIngredientChoiceExpansionState()
+            );
             recipeEditIngredientColumnView.groupByStoreSection = Boolean(
                 event.currentTarget.checked,
             );
             saveRecipeEditIngredientDisplayPreferences();
             applyRecipeIngredientColumnView({ announce: true });
+            restoreRecipeIngredientChoiceExpansionState(
+                ingredientChoiceExpansionState,
+            );
             syncRecipeIngredientColumnViewOpenMenu({ render: true });
         });
     menu.querySelectorAll("[data-recipe-ingredient-column-view-filter]").forEach(input => {
@@ -35038,7 +35088,6 @@ function syncRecipeIngredientSelectedOptionLineItems(
     if (!row) {
         return;
     }
-    const projectedRows = recipeIngredientSelectedOptionProjectionRows(selectedChoice);
     const activeRows = recipeIngredientSelectedOptionActiveRows(row, selectedChoice);
     const selectionState = selectedChoice
         ? (
@@ -35047,17 +35096,24 @@ function syncRecipeIngredientSelectedOptionLineItems(
         )
         : "";
     const selectionDetails = String(selectedChoice?.summary || "").trim();
-    // Table view keeps the active option outside the disclosure-controlled
-    // alternatives panel so collapsing comparisons never hides recipe inputs.
-    // Store Section view keeps its existing multi-component projections.
-    const renderedRows = recipeEditIngredientColumnView.groupByStoreSection
-        ? projectedRows
-        : activeRows;
+    // Every view keeps the same active option outside the disclosure-controlled
+    // alternatives panel. Store Section grouping only changes where those rows
+    // are placed; it never changes which recipe ingredients are active.
+    const renderedRows = activeRows;
+    const expansionPanel = row.recipeIngredientSubstitutionPanel || row.querySelector(
+        ":scope > [data-ingredient-substitutions]",
+    );
+    expansionPanel?.classList.toggle(
+        "has-section-placed-selected-option",
+        Boolean(
+            recipeEditIngredientColumnView.groupByStoreSection
+            && renderedRows.length > 0
+        ),
+    );
     let lineItems = row.querySelector(
         ":scope > [data-ingredient-selected-option-line-items]",
     );
     if (!renderedRows.length) {
-        const expansionPanel = row.recipeIngredientSubstitutionPanel;
         const relocatesExpandedChoice = Boolean(
             row.recipeIngredientExpansionAnchor
             && row.recipeIngredientExpansionAnchor !== row
@@ -35100,7 +35156,6 @@ function syncRecipeIngredientSelectedOptionLineItems(
     const needsRebuild = currentRows.length !== renderedRows.length
         || currentRows.some((sourceRow, index) => sourceRow !== renderedRows[index]);
     if (needsRebuild) {
-        const expansionPanel = row.recipeIngredientSubstitutionPanel;
         const preservesExpandedChoice = Boolean(
             row.recipeIngredientExpansionAnchor
             && lineItems.contains(row.recipeIngredientExpansionAnchor)

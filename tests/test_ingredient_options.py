@@ -1703,9 +1703,8 @@ def test_group_parent_keeps_active_rows_collapsed_and_store_section_projects_chi
     assert "isPrimaryOriginalComponent" not in selected_line_items
     assert "recipeIngredientSelectedOptionProjectionRows(" in selected_line_items
     assert "recipeIngredientSelectedOptionActiveRows(row, selectedChoice)" in selected_line_items
-    assert "const renderedRows = recipeEditIngredientColumnView.groupByStoreSection" in selected_line_items
-    assert "? projectedRows" in selected_line_items
-    assert ": activeRows;" in selected_line_items
+    assert "const renderedRows = activeRows;" in selected_line_items
+    assert "groupByStoreSection\n        ? projectedRows" not in selected_line_items
     assert "if (!lineItems && renderedRows.length)" in selected_line_items
     assert "data-ingredient-selected-option-line-items" in selected_line_items
     assert "createRecipeIngredientOptionRowSummary(" in selected_line_items
@@ -1844,7 +1843,8 @@ process.stdout.write(JSON.stringify({
         "unresolved": [],
     }
     assert "const activeRows = recipeIngredientSelectedOptionActiveRows(row, selectedChoice);" in sync
-    assert "? projectedRows\n        : activeRows;" in sync
+    assert "const renderedRows = activeRows;" in sync
+    assert "groupByStoreSection\n        ? projectedRows" not in sync
     assert "row.insertBefore(lineItems, optionsPanel || null);" in sync
     assert "lineItems.hidden = (" in sync
     assert "expanded\n        && !expandedAtSelectedLineItem" in sync
@@ -1962,6 +1962,107 @@ process.stdout.write(JSON.stringify({{
         "label": "DEFAULT OPTION",
         "names": ["corn", "cumin", "onion"],
         "optionCount": 2,
+    }
+
+
+def test_butter_fixture_grouped_view_keeps_implicit_default_as_active_row(monkeypatch):
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for the Store Section choice regression")
+
+    monkeypatch.setattr(
+        recipe_edit_service,
+        "recipe_edit_ingredient_master_lookup",
+        lambda *args, **kwargs: {},
+    )
+
+    fixture = json.loads(
+        (ROOT / "tests/fixtures/corn_spoon_bread_requirements.json").read_text(
+            encoding="utf-8",
+        )
+    )
+    butter = next(
+        ingredient
+        for ingredient in fixture["ingredients"]
+        if ingredient.get("original_text") == "1/2 cup butter (melted)"
+    )
+    normalized = recipe_edit_service.normalize_edit_ingredients([butter])[0]
+
+    assert butter["selection_required"] is True
+    assert butter["default_option_id"].startswith("original:")
+    assert butter["ingredient"] == "butter"
+    assert butter["substitutions"][0]["ingredient"] == "unsalted butter"
+    assert normalized["default_option_id"] == butter["default_option_id"]
+    assert normalized["ingredient"] == "butter"
+
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    selected_choice = script[
+        script.index("function recipeIngredientSelectedChoice"):
+        script.index("function setRecipeIngredientDefaultOption")
+    ]
+    active_rows = script[
+        script.index("function recipeIngredientSelectedOptionProjectionRows"):
+        script.index("function syncRecipeIngredientSelectedOptionLineItems")
+    ]
+    default_id = butter["default_option_id"]
+    original_id = f"original:{butter['recipe_ingredient_id']}"
+    harness = selected_choice + active_rows + f"""
+function fieldValuesFromRow(row) {{ return row; }}
+function recipeIngredientChoiceItemSummary(value) {{ return value.ingredient || ""; }}
+function recipeIngredientOptionItemDisplay(value) {{ return value.ingredient || ""; }}
+function recipeIngredientOptionTypeLabel(isDefaultOption) {{
+    return isDefaultOption ? "DEFAULT OPTION" : "ALTERNATIVE OPTION";
+}}
+function recipeIngredientMatchFlag(value) {{
+    if (value === true || value === 1) return true;
+    return ["1", "true", "yes", "on"].includes(
+        String(value || "").trim().toLowerCase(),
+    );
+}}
+
+const parentValues = {json.dumps({key: butter.get(key, "") for key in ("ingredient", "quantity", "unit", "preparation")})};
+const alternativeRows = {json.dumps(butter["substitutions"])};
+const groups = [{{
+    alternativeId: alternativeRows[0].alternative_id,
+    rows: alternativeRows,
+}}];
+const parent = {{
+    id: "butter-group",
+    querySelector(selector) {{
+        if (selector === '[data-field="default_option_id"]') {{
+            return {{value: {json.dumps(default_id)}}};
+        }}
+        if (selector === "[data-original-option-id]") {{
+            return {{value: {json.dumps(original_id)}}};
+        }}
+        return null;
+    }},
+}};
+const choice = recipeIngredientSelectedChoice(parent, parentValues, groups);
+const projectedRows = recipeIngredientSelectedOptionProjectionRows(choice);
+const activeRows = recipeIngredientSelectedOptionActiveRows(parent, choice);
+process.stdout.write(JSON.stringify({{
+    selectedId: choice && choice.id,
+    selectedValues: choice && choice.values.map(value => value.ingredient),
+    selectedRows: choice && choice.rows.map(value => value.ingredient),
+    projectedRows: projectedRows.map(row => row.id || row.ingredient),
+    activeRows: activeRows.map(row => row.id || row.ingredient),
+}}));
+"""
+    completed = subprocess.run(
+        [node, "-e", harness],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert json.loads(completed.stdout) == {
+        "selectedId": default_id,
+        "selectedValues": ["butter"],
+        "selectedRows": [],
+        "projectedRows": [],
+        "activeRows": ["butter-group"],
     }
 
 

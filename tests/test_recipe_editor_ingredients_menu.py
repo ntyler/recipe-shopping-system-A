@@ -1039,6 +1039,11 @@ def test_store_section_grouping_projects_selected_components_into_their_own_sect
     assert "const parentSection = recipeIngredientColumnViewEntry(parentRow, \"store\");" in projection_view
     assert "const componentSection = recipeIngredientColumnViewEntry(lineItem, \"store\");" in projection_view
     assert "if (componentSection.key === parentSection.key) return;" in projection_view
+    assert (
+        'lineItems.length > 0\n'
+        '                && !parentRow.classList.contains("has-selected-choice-group-header")'
+        in projection_view
+    )
 
     sync_start = script.index("function syncRecipeIngredientSelectedOptionLineItems")
     sync_end = script.index("function organizeRecipeEditSubstitutionOptionRow", sync_start)
@@ -1053,6 +1058,169 @@ def test_store_section_grouping_projects_selected_components_into_their_own_sect
         ".recipe-edit-selected-option-line-item.is-ingredient-column-grouped-away"
     ):]
     assert "display: none !important;" in grouped_away[:200]
+
+
+def test_store_section_counts_use_visible_active_leaf_ingredients():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for Store Section count coverage")
+
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    count_helpers = script[
+        script.index("function recipeIngredientColumnViewSelectedOptionLineItems"):
+        script.index("function createRecipeIngredientColumnViewGroupProjection")
+    ]
+    options = script[
+        script.index("function recipeIngredientColumnViewOptions"):
+        script.index("function recipeIngredientColumnViewIsActive")
+    ]
+    group_headers = script[
+        script.index("function renderRecipeIngredientColumnViewGroupHeaders"):
+        script.index("function applyRecipeIngredientColumnView")
+    ]
+    harness = count_helpers + r"""
+function classes(...names) {
+    const values = new Set(names);
+    return { contains(name) { return values.has(name); } };
+}
+function ingredientRow(id, { choice = false, projection = false, lineItems = [] } = {}) {
+    return {
+        id,
+        classList: classes(...(choice ? ["has-ingredient-choice"] : [])),
+        hasAttribute(name) {
+            return projection && name === "data-recipe-ingredient-column-group-projection";
+        },
+        querySelectorAll() { return lineItems; },
+    };
+}
+function lineItem(id, groupedAway = false) {
+    return {
+        id,
+        classList: classes(...(groupedAway ? ["is-ingredient-column-grouped-away"] : [])),
+    };
+}
+
+const egg = ingredientRow("egg");
+const sourCream = ingredientRow("sour-cream");
+const optionalStandard = ingredientRow("optional-standard");
+const butter = ingredientRow("butter-group", {
+    choice: true,
+    lineItems: [lineItem("butter")],
+});
+const unresolved = ingredientRow("required-unresolved", { choice: true });
+const sameSectionChoice = ingredientRow("same-section-group", {
+    choice: true,
+    lineItems: [lineItem("first"), lineItem("second"), lineItem("third")],
+});
+const corn = ingredientRow("corn-group", {
+    choice: true,
+    lineItems: [
+        lineItem("corn"),
+        lineItem("cumin", true),
+        lineItem("onion", true),
+    ],
+});
+const cuminProjection = ingredientRow("cumin-projection", { projection: true });
+const onionProjection = ingredientRow("onion-projection", { projection: true });
+const hiddenExpandedAlternative = ingredientRow("unsalted-butter-alternative");
+
+const dairyRows = [egg, sourCream, butter];
+const crossSectionRows = [corn, cuminProjection, onionProjection];
+process.stdout.write(JSON.stringify({
+    standard: recipeIngredientColumnViewIngredientCount(egg),
+    optionalStandard: recipeIngredientColumnViewIngredientCount(optionalStandard),
+    implicitDefault: recipeIngredientColumnViewIngredientCount(butter),
+    unresolved: recipeIngredientColumnViewIngredientCount(unresolved),
+    sameSectionChoice: recipeIngredientColumnViewIngredientCount(sameSectionChoice),
+    sameSectionPart: recipeIngredientColumnViewIngredientCount(corn),
+    projection: recipeIngredientColumnViewIngredientCount(cuminProjection),
+    dairyTotal: recipeIngredientColumnViewIngredientTotal(dairyRows),
+    crossSectionTotal: recipeIngredientColumnViewIngredientTotal(crossSectionRows),
+    repeatedTotal: recipeIngredientColumnViewIngredientTotal(crossSectionRows),
+    collapsedTotalWithoutAlternative: recipeIngredientColumnViewIngredientTotal(dairyRows),
+    expandedTotalWithoutAlternative: recipeIngredientColumnViewIngredientTotal(dairyRows),
+    excludedAlternative: hiddenExpandedAlternative.id,
+}));
+"""
+    completed = subprocess.run(
+        [node],
+        input=harness,
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout) == {
+        "standard": 1,
+        "optionalStandard": 1,
+        "implicitDefault": 1,
+        "unresolved": 0,
+        "sameSectionChoice": 3,
+        "sameSectionPart": 1,
+        "projection": 1,
+        "dairyTotal": 3,
+        "crossSectionTotal": 3,
+        "repeatedTotal": 3,
+        "collapsedTotalWithoutAlternative": 3,
+        "expandedTotalWithoutAlternative": 3,
+        "excludedAlternative": "unsalted-butter-alternative",
+    }
+    assert (
+        'recipeEditIngredientColumnView.groupByStoreSection\n'
+        '            && columnKey === "store"'
+        in options
+    )
+    assert "recipeIngredientColumnViewIngredientCount(entry.row)" in group_headers
+    assert "recipeIngredientColumnViewIngredientTotal" in script
+
+
+def test_store_section_grouping_toggle_preserves_choice_expansion_state():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    handler_start = script.index(
+        'menu.querySelector("[data-recipe-ingredient-column-view-group-store]")'
+    )
+    handler_end = script.index(
+        'menu.querySelectorAll("[data-recipe-ingredient-column-view-filter]")',
+        handler_start,
+    )
+    handler = script[handler_start:handler_end]
+
+    assert "captureRecipeIngredientChoiceExpansionState()" in handler
+    assert "applyRecipeIngredientColumnView({ announce: true });" in handler
+    assert "restoreRecipeIngredientChoiceExpansionState(" in handler
+    assert handler.index("captureRecipeIngredientChoiceExpansionState()") < handler.index(
+        "applyRecipeIngredientColumnView({ announce: true });"
+    )
+    assert handler.index("applyRecipeIngredientColumnView({ announce: true });") < handler.index(
+        "restoreRecipeIngredientChoiceExpansionState("
+    )
+
+
+def test_grouped_expansion_does_not_duplicate_section_placed_selected_rows():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    sync = script[
+        script.index("function syncRecipeIngredientSelectedOptionLineItems"):
+        script.index("function organizeRecipeEditSubstitutionOptionRow")
+    ]
+    suppression = css[css.index(
+        "/* Ingredient editor v110: Store Section placement owns the selected ingredient rows. */"
+    ):]
+
+    assert '"has-section-placed-selected-option"' in sync
+    assert "recipeEditIngredientColumnView.groupByStoreSection" in sync
+    assert "&& renderedRows.length > 0" in sync
+    assert ".has-section-placed-selected-option" in suppression
+    assert ":not(" in suppression
+    assert ".recipe-edit-ingredient-modal-options-panel" in suppression
+    assert "> .recipe-edit-ingredient-choice-overview.is-selected-option" in suppression
+    assert ".recipe-edit-default-option-summary" in suppression
+    assert "> .recipe-edit-alternative-card.is-selected-option" in suppression
+    assert ".recipe-edit-alternative-components" in suppression
+    assert "display: none !important;" in suppression
 
 
 def test_grouped_projected_selected_components_inherit_their_choice_state_badge():
@@ -6701,12 +6869,13 @@ def test_mobile_expanded_choice_hides_compact_rows_without_an_orphaned_divider()
     assert "> .recipe-edit-selected-choice-group-header" in collapsed_choice_css
     assert "border-bottom: 0;" in collapsed_choice_css
     assert "const activeRows = recipeIngredientSelectedOptionActiveRows(row, selectedChoice);" in sync
-    assert "? projectedRows\n        : activeRows;" in sync
+    assert "const renderedRows = activeRows;" in sync
+    assert "groupByStoreSection\n        ? projectedRows" not in sync
     assert "lineItems.hidden = (" in sync
     assert "expanded\n        && !expandedAtSelectedLineItem" in sync
 
 
-def test_table_choice_keeps_active_rows_outside_collapsible_alternatives_panel():
+def test_every_table_grouping_mode_keeps_active_rows_outside_collapsible_alternatives_panel():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
@@ -6722,9 +6891,8 @@ def test_table_choice_keeps_active_rows_outside_collapsible_alternatives_panel()
     assert "return rows.length > 1 ? rows : [];" in sync_line_items
     assert "function recipeIngredientSelectedOptionActiveRows" in sync_line_items
     assert "return selectedChoice && values.length === 1 && row ? [row] : [];" in sync_line_items
-    assert "const renderedRows = recipeEditIngredientColumnView.groupByStoreSection" in sync_line_items
-    assert "? projectedRows" in sync_line_items
-    assert ": activeRows;" in sync_line_items
+    assert "const renderedRows = activeRows;" in sync_line_items
+    assert "groupByStoreSection\n        ? projectedRows" not in sync_line_items
     assert "if (!renderedRows.length)" in sync_line_items
     assert "const relocatesExpandedChoice = Boolean(" in sync_line_items
     assert "parentDisclosure || row" in sync_line_items

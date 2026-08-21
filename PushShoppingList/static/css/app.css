@@ -78966,3 +78966,20 @@ body.recipe-edit-standalone-page #recipeEditIngredients
         display: none !important;
     }
 }
+
+/* Ingredient editor v110: Store Section placement owns the selected ingredient rows. */
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-ingredient-options-panel.has-section-placed-selected-option:not(
+        .recipe-edit-ingredient-modal-options-panel
+    )
+    > .recipe-edit-ingredient-choice-overview.is-selected-option
+    .recipe-edit-default-option-summary,
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-ingredient-options-panel.has-section-placed-selected-option:not(
+        .recipe-edit-ingredient-modal-options-panel
+    )
+    > .recipe-edit-substitution-list
+    > .recipe-edit-alternative-card.is-selected-option
+    .recipe-edit-alternative-components {
+    display: none !important;
+}
