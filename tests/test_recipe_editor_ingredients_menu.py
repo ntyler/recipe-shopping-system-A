@@ -21,7 +21,33 @@ def javascript_function_source(script, function_name):
     """Extract one top-level JavaScript function for a focused Node harness."""
     marker = f"function {function_name}("
     start = script.index(marker)
-    body_start = script.index("{", start)
+    parameter_start = script.index("(", start)
+    parameter_depth = 0
+    parameter_quote = None
+    parameter_escaped = False
+    parameter_end = None
+    for index in range(parameter_start, len(script)):
+        character = script[index]
+        if parameter_quote:
+            if parameter_escaped:
+                parameter_escaped = False
+            elif character == "\\":
+                parameter_escaped = True
+            elif character == parameter_quote:
+                parameter_quote = None
+            continue
+        if character in "'\"`":
+            parameter_quote = character
+        elif character == "(":
+            parameter_depth += 1
+        elif character == ")":
+            parameter_depth -= 1
+            if parameter_depth == 0:
+                parameter_end = index
+                break
+    if parameter_end is None:
+        raise AssertionError(f"Could not parse parameters for JavaScript function {function_name}")
+    body_start = script.index("{", parameter_end)
     depth = 0
     quote = None
     escaped = False
@@ -1118,6 +1144,10 @@ def test_store_section_counts_use_visible_active_leaf_ingredients():
         script,
         "recipeIngredientColumnViewIngredientEntries",
     )
+    choice_entries_function = javascript_function_source(
+        script,
+        "recipeIngredientColumnViewChoiceEntries",
+    )
     stable_function = ""
     if "function recipeIngredientColumnViewEntryStableId" in script:
         stable_function = javascript_function_source(
@@ -1153,6 +1183,16 @@ function selectedLineItem(source, optionId) {
             ingredientOptionId: optionId,
             ingredientSelectedOptionId: optionId,
         },
+        classList: classes(),
+        querySelector() { return null; },
+        closest() { return null; },
+    };
+}
+function alternativeSummary(source) {
+    return {
+        id: `display-${source.id}`,
+        recipeIngredientOptionSourceRow: source,
+        dataset: {},
         classList: classes(),
         querySelector() { return null; },
         closest() { return null; },
@@ -1214,7 +1254,28 @@ function recipeIngredientColumnViewEntryStableId(source, parent, optionId, manua
 function recipeIngredientStablePresentationId(value, prefix = "ingredient") {
     return String(value && (value.id || value.recipe_ingredient_id) || `${prefix}-legacy`);
 }
-""" + stable_function + "\n" + entries_function + r"""
+function recipeIngredientColumnViewChoiceOptions(row) { return row.presentation(); }
+function recipeIngredientColumnViewOptionSummary(parent, source, selected) {
+    if (selected) {
+        return parent.lineItems.find(item => item.recipeIngredientOptionSourceRow === source) || null;
+    }
+    return source.displayRow || source;
+}
+function recipeIngredientColumnViewOptionComponentOrder(source) {
+    const order = Number(source.alternative_component_order);
+    return Number.isInteger(order) ? order : Number.MAX_SAFE_INTEGER;
+}
+function recipeIngredientColumnViewOptionAnchor(_parent, entries) {
+    return [...entries].sort((left, right) => (
+        left.componentOrder - right.componentOrder
+        || left.stableId.localeCompare(right.stableId)
+    ))[0] || null;
+}
+function recipeIngredientColumnViewOptionHeader() { return null; }
+function recipeIngredientOptionTypeLabel(isDefault) {
+    return isDefault ? "DEFAULT OPTION" : "ALTERNATIVE OPTION";
+}
+""" + stable_function + "\n" + choice_entries_function + "\n" + entries_function + r"""
 
 const cannedCorn = ingredientRow("ingredient-canned-corn", "Canned cream-style corn", "CANNED");
 const egg = ingredientRow("ingredient-egg", "Egg", "DAIRY & EGGS");
@@ -1232,6 +1293,20 @@ const onionSource = sourceRow("component-onion", "Onion", "PRODUCE", {
     alternative_id: "option-corn-default",
     alternative_component_order: 2,
 });
+const frozenCornSource = sourceRow(
+    "component-frozen-corn",
+    "Frozen corn",
+    "FROZEN",
+    {alternative_id: "option-corn-frozen", alternative_component_order: 0},
+);
+const alternativeOnionSource = sourceRow(
+    "component-alternative-onion",
+    "Onion",
+    "PRODUCE",
+    {alternative_id: "option-corn-frozen", alternative_component_order: 1},
+);
+frozenCornSource.displayRow = alternativeSummary(frozenCornSource);
+alternativeOnionSource.displayRow = alternativeSummary(alternativeOnionSource);
 const corn = ingredientRow("requirement-corn", "Corn choice", "PRODUCE", {
     choice: true,
     optionId: "option-corn-default",
@@ -1240,25 +1315,97 @@ const corn = ingredientRow("requirement-corn", "Corn choice", "PRODUCE", {
         selectedLineItem(cuminSource, "option-corn-default"),
         selectedLineItem(onionSource, "option-corn-default"),
     ],
-    alternativeRows: [sourceRow("component-frozen-corn", "Frozen corn", "FROZEN")],
+    alternativeRows: [frozenCornSource, alternativeOnionSource],
 });
+corn.presentation = () => {
+    const selectedChoice = {
+        id: "option-corn-default",
+        rows: [cornSource, cuminSource, onionSource],
+        values: [cornSource, cuminSource, onionSource],
+        isDefaultOption: true,
+        isSelected: true,
+        selectionLabel: "DEFAULT OPTION",
+    };
+    const alternative = {
+        id: "option-corn-frozen",
+        rows: [frozenCornSource, alternativeOnionSource],
+        values: [frozenCornSource, alternativeOnionSource],
+        isDefaultOption: false,
+        isSelected: false,
+    };
+    return {
+        selectedChoice,
+        groups: [selectedChoice, alternative],
+        expanded: corn.expanded,
+        requiredUnresolved: false,
+    };
+};
 // Reproduce the regression trigger: the parent points at its first selected row.
 corn.recipeIngredientInlineSummarySourceRow = cornSource;
 
+const unsaltedButterSource = sourceRow(
+    "component-unsalted",
+    "Unsalted butter",
+    "DAIRY & EGGS",
+    {alternative_id: "option-unsalted", alternative_component_order: 0},
+);
+unsaltedButterSource.displayRow = alternativeSummary(unsaltedButterSource);
 const butter = ingredientRow("requirement-butter", "Butter", "DAIRY & EGGS", {
     choice: true,
     optionId: "original:requirement-butter",
     originalOptionId: "original:requirement-butter",
-    alternativeRows: [sourceRow("component-unsalted", "Unsalted butter", "DAIRY & EGGS")],
+    alternativeRows: [unsaltedButterSource],
 });
 butter.lineItems = [selectedLineItem(butter, "original:requirement-butter")];
+butter.presentation = () => {
+    const selectedChoice = {
+        id: "original:requirement-butter",
+        rows: [butter],
+        values: [butter],
+        isDefaultOption: true,
+        isSelected: true,
+        selectionLabel: "DEFAULT OPTION",
+    };
+    const alternative = {
+        id: "option-unsalted",
+        rows: butter.alternativeRows,
+        values: butter.alternativeRows,
+        isDefaultOption: false,
+        isSelected: false,
+    };
+    return {
+        selectedChoice,
+        groups: [selectedChoice, alternative],
+        expanded: butter.expanded,
+        requiredUnresolved: false,
+    };
+};
 
+const requiredChoice = sourceRow(
+    "component-required-choice",
+    "Required choice",
+    "PRODUCE",
+    {alternative_id: "option-required", alternative_component_order: 0},
+);
+requiredChoice.displayRow = alternativeSummary(requiredChoice);
 const unresolved = ingredientRow(
     "requirement-unresolved",
     "Selection required",
     "PRODUCE",
-    {choice: true},
+    {choice: true, alternativeRows: [requiredChoice]},
 );
+unresolved.presentation = () => ({
+    selectedChoice: null,
+    groups: [{
+        id: "option-required",
+        rows: [requiredChoice],
+        values: [requiredChoice],
+        isDefaultOption: false,
+        isSelected: false,
+    }],
+    expanded: false,
+    requiredUnresolved: true,
+});
 const rows = [cannedCorn, egg, sourCream, corn, butter, unresolved];
 let recipeEditIngredientColumnView = {groupByStoreSection: false};
 function snapshot({grouped, expanded}) {
@@ -1267,18 +1414,24 @@ function snapshot({grouped, expanded}) {
     butter.expanded = expanded;
     corn.classList.toggle("recipe-edit-substitutions-open", expanded);
     butter.classList.toggle("recipe-edit-substitutions-open", expanded);
-    const entries = recipeIngredientColumnViewIngredientEntries(rows);
+    const entries = recipeIngredientColumnViewIngredientEntries(rows, {
+        includeAlternatives: grouped,
+    });
     const activeEntries = entries.filter(entry => entry.counted !== false);
     const counts = {};
     activeEntries.forEach(entry => {
         counts[entry.store.value] = (counts[entry.store.value] || 0) + 1;
     });
     const cumin = entries.find(entry => entry.sourceRow.id === "component-cumin");
-    const unresolvedEntry = entries.find(entry => (
+    const unresolvedEntries = entries.filter(entry => (
         entry.parentRow.id === "requirement-unresolved"
     ));
     return {
         sourceIds: activeEntries.map(entry => entry.sourceRow.id),
+        visibleSourceIds: entries.map(entry => entry.sourceRow.id),
+        inactiveSourceIds: entries
+            .filter(entry => entry.counted === false)
+            .map(entry => entry.sourceRow.id),
         keys: activeEntries.map(entry => entry.key),
         counts,
         cuminSection: cumin && cumin.store.value,
@@ -1286,9 +1439,25 @@ function snapshot({grouped, expanded}) {
         cornOptionIds: entries
             .filter(entry => entry.parentRow.id === "requirement-corn")
             .map(entry => entry.optionId),
-        unresolvedCounted: unresolvedEntry && unresolvedEntry.counted,
-        duplicateSourceCount: activeEntries.length - new Set(
-            activeEntries.map(entry => entry.sourceRow.id),
+        alternativeStores: Object.fromEntries(entries
+            .filter(entry => (
+                entry.selected === false
+                && entry.parentRow.classList.contains("has-ingredient-choice")
+            ))
+            .map(entry => [entry.sourceRow.id, entry.store.value])),
+        alternativeSummariesOmitStore: entries
+            .filter(entry => (
+                entry.selected === false
+                && entry.parentRow.classList.contains("has-ingredient-choice")
+            ))
+            .every(entry => (
+                entry.row !== entry.sourceRow
+                && !entry.row.store_section
+                && !entry.row.storeSection
+            )),
+        unresolvedCounted: unresolvedEntries.map(entry => entry.counted),
+        duplicateSourceCount: entries.length - new Set(
+            entries.map(entry => entry.sourceRow.id),
         ).size,
     };
 }
@@ -1338,7 +1507,9 @@ process.stdout.write(JSON.stringify({
     assert baseline["cuminSection"] == "SPICES & SEASONINGS"
     assert baseline["cuminParent"] == "requirement-corn"
     assert baseline["cornOptionIds"] == ["option-corn-default"] * 3
-    assert baseline["unresolvedCounted"] is False
+    assert baseline["visibleSourceIds"] == expected_source_ids
+    assert baseline["inactiveSourceIds"] == []
+    assert baseline["unresolvedCounted"] == []
     assert baseline["duplicateSourceCount"] == 0
     for state in (
         "collapsedGrouped",
@@ -1346,10 +1517,192 @@ process.stdout.write(JSON.stringify({
         "repeatedGrouped",
         "restoredUngrouped",
     ):
-        assert result[state] == baseline
+        assert result[state]["sourceIds"] == expected_source_ids
+        assert result[state]["counts"] == expected_counts
+        assert result[state]["cuminSection"] == "SPICES & SEASONINGS"
+        assert result[state]["cuminParent"] == "requirement-corn"
+        assert result[state]["duplicateSourceCount"] == 0
+
+    collapsed_grouped = result["collapsedGrouped"]
+    assert collapsed_grouped["visibleSourceIds"] == [
+        *expected_source_ids,
+        "component-required-choice",
+    ]
+    assert collapsed_grouped["inactiveSourceIds"] == ["component-required-choice"]
+    assert collapsed_grouped["unresolvedCounted"] == [False]
+    assert collapsed_grouped["alternativeStores"] == {
+        "component-required-choice": "PRODUCE",
+    }
+    assert collapsed_grouped["alternativeSummariesOmitStore"] is True
+    assert collapsed_grouped["cornOptionIds"] == ["option-corn-default"] * 3
+    assert result["repeatedGrouped"] == collapsed_grouped
+
+    expanded_grouped = result["expandedGrouped"]
+    assert expanded_grouped["visibleSourceIds"] == [
+        "ingredient-canned-corn",
+        "ingredient-egg",
+        "ingredient-sour-cream",
+        "component-corn",
+        "component-cumin",
+        "component-onion",
+        "component-frozen-corn",
+        "component-alternative-onion",
+        "requirement-butter",
+        "component-unsalted",
+        "component-required-choice",
+    ]
+    assert expanded_grouped["inactiveSourceIds"] == [
+        "component-frozen-corn",
+        "component-alternative-onion",
+        "component-unsalted",
+        "component-required-choice",
+    ]
+    assert expanded_grouped["cornOptionIds"] == [
+        "option-corn-default",
+        "option-corn-default",
+        "option-corn-default",
+        "option-corn-frozen",
+        "option-corn-frozen",
+    ]
+    assert expanded_grouped["unresolvedCounted"] == [False]
+    assert expanded_grouped["alternativeStores"] == {
+        "component-frozen-corn": "FROZEN",
+        "component-alternative-onion": "PRODUCE",
+        "component-unsalted": "DAIRY & EGGS",
+        "component-required-choice": "PRODUCE",
+    }
+    assert expanded_grouped["alternativeSummariesOmitStore"] is True
+    assert result["restoredUngrouped"] == baseline
 
 
-def test_cross_section_option_fragments_move_and_restore_the_same_line_item_nodes():
+def test_grouped_section_headers_precede_their_actual_ingredient_rows_and_active_counts():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for grouped Store Section order coverage")
+
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    reconcile = javascript_function_source(
+        script,
+        "reconcileRecipeIngredientColumnViewOrder",
+    )
+    render_headers = javascript_function_source(
+        script,
+        "renderRecipeIngredientColumnViewGroupHeaders",
+    )
+    harness = r"""
+class FakeNode {
+    constructor(id = "") {
+        this.id = id;
+        this.children = [];
+        this.parentNode = null;
+        this.dataset = {};
+        this.attributes = {};
+        this.style = {removeProperty() {}};
+        this.className = "";
+        this.innerHTML = "";
+    }
+    append(...nodes) { nodes.forEach(node => this.insertBefore(node, null)); }
+    insertBefore(node, reference) {
+        node.remove();
+        const index = reference ? this.children.indexOf(reference) : -1;
+        node.parentNode = this;
+        if (index < 0) this.children.push(node);
+        else this.children.splice(index, 0, node);
+        return node;
+    }
+    remove() {
+        if (!this.parentNode) return;
+        const index = this.parentNode.children.indexOf(this);
+        if (index >= 0) this.parentNode.children.splice(index, 1);
+        this.parentNode = null;
+    }
+    setAttribute(name, value) { this.attributes[name] = String(value); }
+    get firstChild() { return this.children[0] || null; }
+    get nextSibling() {
+        if (!this.parentNode) return null;
+        const index = this.parentNode.children.indexOf(this);
+        return this.parentNode.children[index + 1] || null;
+    }
+}
+const document = {
+    activeElement: null,
+    createElement() { return new FakeNode("section-header"); },
+};
+const recipeEditIngredientColumnView = {groupByStoreSection: true};
+function recipeIngredientColumnViewEntry(row) { return row.store; }
+function recipeIngredientColumnViewIngredientCount(row) {
+    return (row.recipeIngredientColumnViewEntries || [{counted: true}])
+        .filter(entry => entry.counted !== false).length;
+}
+function recipeIngredientStoreSectionIconHtml() { return ""; }
+function escapeHtml(value) { return String(value); }
+""" + reconcile + "\n" + render_headers + r"""
+
+function ingredient(id, key, label, counted = true) {
+    const row = new FakeNode(id);
+    row.store = {key, label, value: label};
+    row.recipeIngredientColumnViewEntries = [{counted, filtered: false}];
+    return row;
+}
+const butter = ingredient("butter", "dairy", "Dairy & Eggs");
+const egg = ingredient("egg", "dairy", "Dairy & Eggs");
+const sourCream = ingredient("sour-cream", "dairy", "Dairy & Eggs");
+const cannedCorn = ingredient("canned-corn", "canned", "Canned Goods");
+const corn = ingredient("corn", "produce", "Produce");
+const onion = ingredient("onion", "produce", "Produce");
+const cumin = ingredient("cumin", "spices", "Spices");
+const list = new FakeNode("ingredients");
+const rows = [butter, egg, sourCream, cannedCorn, corn, onion, cumin];
+list.append(...rows);
+renderRecipeIngredientColumnViewGroupHeaders(
+    list,
+    rows.map((row, index) => ({row, index, filtered: false})),
+);
+process.stdout.write(JSON.stringify({
+    sequence: list.children.map(item => (
+        item.dataset.recipeIngredientColumnGroupHeader
+            ? `header:${item.dataset.recipeIngredientColumnGroupHeader}`
+            : item.id
+    )),
+    labels: list.children
+        .filter(item => item.dataset.recipeIngredientColumnGroupHeader)
+        .map(item => item.attributes["aria-label"]),
+}));
+"""
+    completed = subprocess.run(
+        [node, "-e", harness],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout) == {
+        "sequence": [
+            "header:dairy",
+            "butter",
+            "egg",
+            "sour-cream",
+            "header:canned",
+            "canned-corn",
+            "header:produce",
+            "corn",
+            "onion",
+            "header:spices",
+            "cumin",
+        ],
+        "labels": [
+            "Dairy & Eggs, 3 ingredients",
+            "Canned Goods, 1 ingredient",
+            "Produce, 2 ingredients",
+            "Spices, 1 ingredient",
+        ],
+    }
+
+
+def test_grouped_option_rows_move_without_parent_summaries_and_restore_exact_nodes():
     node = shutil.which("node")
     if not node:
         pytest.skip("Node.js is required for Store Section fragment coverage")
@@ -1362,6 +1715,26 @@ def test_cross_section_option_fragments_move_and_restore_the_same_line_item_node
     clear_fragments = javascript_function_source(
         script,
         "clearRecipeIngredientColumnViewSectionFragments",
+    )
+    move_node = javascript_function_source(
+        script,
+        "moveRecipeIngredientColumnViewNode",
+    )
+    source_carrier = javascript_function_source(
+        script,
+        "setRecipeIngredientColumnViewSourceCarrier",
+    )
+    display_rows = javascript_function_source(
+        script,
+        "recipeIngredientColumnViewDisplayRows",
+    )
+    ensure_option_row_id = javascript_function_source(
+        script,
+        "ensureRecipeIngredientColumnViewOptionRowId",
+    )
+    bind_option_selection = javascript_function_source(
+        script,
+        "bindRecipeIngredientColumnViewOptionSelection",
     )
     harness = r"""
 function classes(...initial) {
@@ -1385,6 +1758,9 @@ class FakeNode {
         this.attributes = {};
         this.parentNode = null;
         this.textContent = "";
+            this.hidden = false;
+            this.className = "";
+            this.listeners = [];
     }
     append(...nodes) {
         nodes.filter(Boolean).forEach(node => {
@@ -1397,6 +1773,14 @@ class FakeNode {
         this.append(node);
         return node;
     }
+    insertBefore(node, reference) {
+        node.remove();
+        const index = reference ? this.children.indexOf(reference) : -1;
+        node.parentNode = this;
+        if (index < 0) this.children.push(node);
+        else this.children.splice(index, 0, node);
+        return node;
+    }
     remove() {
         if (!this.parentNode) return;
         const index = this.parentNode.children.indexOf(this);
@@ -1404,6 +1788,45 @@ class FakeNode {
         this.parentNode = null;
     }
     setAttribute(name, value) { this.attributes[name] = String(value); }
+    getAttribute(name) { return this.attributes[name] ?? null; }
+    removeAttribute(name) {
+        delete this.attributes[name];
+        const datasetKeys = {
+            "data-recipe-ingredient-column-option-row": "recipeIngredientColumnOptionRow",
+            "data-recipe-ingredient-option-member-id": "recipeIngredientOptionMemberId",
+            "data-recipe-ingredient-option-id": "recipeIngredientOptionId",
+            "data-recipe-ingredient-option-anchor": "recipeIngredientOptionAnchor",
+        };
+        if (datasetKeys[name]) delete this.dataset[datasetKeys[name]];
+    }
+    hasAttribute(name) {
+        if (name === "data-recipe-ingredient-column-option-row") {
+            return Object.hasOwn(this.dataset, "recipeIngredientColumnOptionRow");
+        }
+        return Object.hasOwn(this.attributes, name);
+    }
+        toggleAttribute(name, enabled) {
+            if (enabled) this.setAttribute(name, "");
+            else this.removeAttribute(name);
+        }
+        addEventListener(type, listener, capture = false) {
+            this.listeners.push({type, listener, capture});
+        }
+    replaceWith(node) {
+        if (!this.parentNode) return;
+        this.parentNode.insertBefore(node, this);
+        this.remove();
+    }
+    matches() { return false; }
+    get parentElement() { return this.parentNode; }
+    get firstChild() { return this.children[0] || null; }
+    get firstElementChild() { return this.firstChild; }
+    get lastElementChild() { return this.children[this.children.length - 1] || null; }
+    get nextSibling() {
+        if (!this.parentNode) return null;
+        const index = this.parentNode.children.indexOf(this);
+        return this.parentNode.children[index + 1] || null;
+    }
     querySelector(selector) {
         if (selector.includes("ingredient-selected-option-block")) {
             return this.selectedBlock || null;
@@ -1421,6 +1844,11 @@ class FakeNode {
         if (selector.includes("ingredient-option-label")) {
             return this.optionLabel || null;
         }
+        if (selector.includes("alternative-component-summary")) {
+            return this.children.find(child => (
+                Object.hasOwn(child.dataset, "alternativeComponentSummary")
+            )) || null;
+        }
         return null;
     }
     querySelectorAll(selector) {
@@ -1434,10 +1862,23 @@ class FakeNode {
                 Object.hasOwn(child.dataset, "ingredientSelectedOptionLineItem")
             ));
         }
+        if (selector.includes("recipe-ingredient-column-option-row")) {
+            return this.children.filter(child => (
+                Object.hasOwn(child.dataset, "recipeIngredientColumnOptionRow")
+            ));
+        }
+        if (selector.includes("is-recipe-ingredient-column-source-carrier")) {
+            return this.children.filter(child => (
+                child.classList.contains("is-recipe-ingredient-column-source-carrier")
+            ));
+        }
         return [];
     }
 }
-const document = {createElement() { return new FakeNode("fragment"); }};
+const document = {
+    createElement() { return new FakeNode("generated"); },
+    createComment() { return new FakeNode("comment"); },
+};
 function createRecipeIngredientOptionHeader({label}) {
     const header = new FakeNode("context-header");
     header.dataset.ingredientOptionHeader = "";
@@ -1451,7 +1892,17 @@ function renderRecipeIngredientOptionBlock(block, {header, ingredientContent, ac
 function recipeIngredientColumnViewEntryStableId(source, parent) {
     return String(source && source.id || parent && parent.id || "ingredient");
 }
-""" + sync_fragments + "\n" + clear_fragments + r"""
+    function recipeIngredientSubstitutionContainer() { return null; }
+    function syncRecipeIngredientColumnViewOptionMetadata() {}
+    const delegatedOptionSelections = [];
+    function selectRecipeIngredientColumnViewOption(action, event) {
+        delegatedOptionSelections.push({action, event});
+    }
+function recipeIngredientExpansionIsOpen() { return false; }
+function ensureRecipeIngredientExpansionId(row) { return `expansion-${row.id}`; }
+const recipeEditExpandedIngredientIds = new Set();
+const recipeEditIngredientColumnView = {groupByStoreSection: false};
+""" + display_rows + "\n" + ensure_option_row_id + "\n" + move_node + "\n" + bind_option_selection + "\n" + source_carrier + "\n" + sync_fragments + "\n" + clear_fragments + r"""
 
 function lineItem(id) {
     const row = new FakeNode(id);
@@ -1471,94 +1922,259 @@ function selectedBlock(id, rows) {
     block.append(header, ...rows, action);
     return {block, header, action};
 }
-function entry(row, parentRow, store, manualIndex, optionId) {
+function entry(
+    row,
+    sourceRow,
+    parentRow,
+    store,
+    manualIndex,
+    optionId,
+    {selected = true, counted = true, anchor = false} = {},
+) {
     return {
         key: row.id,
         row,
-        sourceRow: row.recipeIngredientOptionSourceRow,
+        sourceRow,
         parentRow,
         optionId,
         store: {key: store.toLowerCase(), label: store, value: store},
         manualIndex,
+        selected,
+        active: selected,
+        counted,
+        anchor,
+        stableId: sourceRow.id || row.id,
+        componentOrder: manualIndex,
+        optionLabel: selected ? "DEFAULT OPTION" : "ALTERNATIVE OPTION",
+        expanded: !selected,
         filtered: false,
     };
 }
 function ids(node) { return node.children.map(child => child.id); }
+function optionRows(node) {
+    return node.children.filter(child => (
+        Object.hasOwn(child.dataset, "recipeIngredientColumnOptionRow")
+    ));
+}
+function sourceOption(id, summaryId) {
+    const source = new FakeNode(id);
+    source.dataset.substitutionOptionRow = "";
+    const summary = new FakeNode(summaryId);
+    summary.dataset.alternativeComponentSummary = "";
+    summary.recipeIngredientOptionSourceRow = source;
+    source.append(summary);
+    return {source, summary};
+}
 
 const corn = lineItem("corn");
 const cumin = lineItem("cumin");
 const onion = lineItem("onion");
 const parent = new FakeNode("requirement-corn");
-parent.classList.add("has-ingredient-choice");
+parent.classList.add("has-ingredient-choice", "recipe-edit-ingredient-row");
 const selected = selectedBlock("selected-corn", [corn, cumin, onion]);
 parent.selectedBlock = selected.block;
-parent.append(selected.block);
+const frozenCorn = sourceOption("source-frozen-corn", "frozen-corn");
+const alternativeOnion = sourceOption("source-alternative-onion", "alternative-onion");
+const alternatives = new FakeNode("corn-alternatives");
+alternatives.append(frozenCorn.source, alternativeOnion.source);
+parent.append(selected.block, alternatives);
 const butter = lineItem("butter");
 const butterParent = new FakeNode("requirement-butter");
-butterParent.classList.add("has-ingredient-choice");
+butterParent.classList.add("has-ingredient-choice", "recipe-edit-ingredient-row");
 const selectedButter = selectedBlock("selected-butter", [butter]);
 butterParent.selectedBlock = selectedButter.block;
-butterParent.append(selectedButter.block);
+const unsaltedButter = sourceOption("source-unsalted-butter", "unsalted-butter");
+const butterAlternatives = new FakeNode("butter-alternatives");
+butterAlternatives.append(unsaltedButter.source);
+butterParent.append(selectedButter.block, butterAlternatives);
 const list = new FakeNode("ingredient-list");
 list.append(parent, butterParent);
-const entries = [
-    entry(corn, parent, "PRODUCE", 0, "option-corn-default"),
-    entry(cumin, parent, "SPICES & SEASONINGS", 1, "option-corn-default"),
-    entry(onion, parent, "PRODUCE", 2, "option-corn-default"),
-    entry(butter, butterParent, "DAIRY & EGGS", 3, "original:requirement-butter"),
+const selectedEntries = [
+    entry(
+        corn,
+        corn.recipeIngredientOptionSourceRow,
+        parent,
+        "PRODUCE",
+        0,
+        "option-corn-default",
+        {anchor: true},
+    ),
+    entry(cumin, cumin.recipeIngredientOptionSourceRow, parent, "SPICES & SEASONINGS", 1, "option-corn-default"),
+    entry(onion, onion.recipeIngredientOptionSourceRow, parent, "PRODUCE", 2, "option-corn-default"),
+    entry(
+        butter,
+        butter.recipeIngredientOptionSourceRow,
+        butterParent,
+        "DAIRY & EGGS",
+        3,
+        "original:requirement-butter",
+        {anchor: true},
+    ),
+];
+const alternativeEntries = [
+    entry(
+        frozenCorn.summary,
+        frozenCorn.source,
+        parent,
+        "FROZEN",
+        4,
+        "option-frozen-corn",
+        {selected: false, counted: false},
+    ),
+    entry(
+        alternativeOnion.summary,
+        alternativeOnion.source,
+        parent,
+        "PRODUCE",
+        5,
+        "option-frozen-corn",
+        {selected: false, counted: false},
+    ),
+    entry(
+        unsaltedButter.summary,
+        unsaltedButter.source,
+        butterParent,
+        "DAIRY & EGGS",
+        6,
+        "option-unsalted-butter",
+        {selected: false, counted: false},
+    ),
 ];
 
-syncRecipeIngredientColumnViewSectionFragments(list, [parent, butterParent], entries);
-const fragment = list.querySelectorAll(
-    ":scope > [data-recipe-ingredient-column-section-fragment]"
-)[0];
-const grouped = {
-    selected: ids(selected.block),
-    fragment: ids(fragment),
-    fragmentSection: fragment.dataset.recipeIngredientColumnSectionKey,
-    uniqueRows: new Set([
-        ...selected.block.querySelectorAll("[data-ingredient-selected-option-line-item]"),
-        ...fragment.querySelectorAll("[data-ingredient-selected-option-line-item]"),
-    ]).size,
-    cuminIsOriginalNode: fragment.children.includes(cumin),
+syncRecipeIngredientColumnViewSectionFragments(
+    list,
+    [parent, butterParent],
+    selectedEntries,
+);
+const groupedSelectionAction = {
+    closest(selector) {
+        if (selector.includes("ingredient-option-select")) return this;
+        if (selector.includes("recipe-ingredient-column-option-row")) return corn;
+        return null;
+    },
 };
-const sameSection = {
-    selected: ids(selectedButter.block),
-    fragmentCount: list.querySelectorAll(
-        ":scope > [data-recipe-ingredient-column-section-fragment]"
-    ).filter(candidate => (
-        candidate.recipeIngredientColumnViewParentRow === butterParent
-    )).length,
-    butterIsOriginalNode: selectedButter.block.children.includes(butter),
+list.listeners.find(item => item.type === "click").listener({
+    target: groupedSelectionAction,
+});
+const collapsedRows = optionRows(list);
+const collapsed = {
+    directIds: collapsedRows.map(row => row.id),
+    parentSummaryVisible: recipeIngredientColumnViewDisplayRows(list).includes(parent),
+    butterSummaryVisible: recipeIngredientColumnViewDisplayRows(list).includes(butterParent),
+    allSelectedAreOriginalNodes: [corn, cumin, onion, butter].every(row => (
+        collapsedRows.includes(row)
+    )),
+    alternativeSourcesIntact: frozenCorn.source.children.includes(frozenCorn.summary)
+        && alternativeOnion.source.children.includes(alternativeOnion.summary)
+        && unsaltedButter.source.children.includes(unsaltedButter.summary),
+    uniqueRows: new Set(collapsedRows).size,
+    stores: Object.fromEntries(collapsedRows.map(row => [
+        row.id,
+        row.recipeIngredientColumnViewEntry?.store?.value || null,
+    ])),
+    optionIds: collapsedRows.map(row => (
+        row.recipeIngredientColumnViewEntry?.optionId || null
+    )),
+    stableKeysAreUnique: new Set(collapsedRows.map(row => (
+        row.recipeIngredientColumnViewEntry?.key || null
+    ))).size === collapsedRows.length,
+    stableDatasets: collapsedRows.every(row => (
+        row.dataset.recipeIngredientOptionMemberId
+        === row.recipeIngredientColumnViewEntry?.stableId
+        && row.dataset.recipeIngredientOptionId
+        === row.recipeIngredientColumnViewEntry?.optionId
+        && row.dataset.recipeIngredientOptionAnchor
+        === String(row.recipeIngredientColumnViewEntry?.anchor)
+    )),
 };
 
 clearRecipeIngredientColumnViewSectionFragments(list);
-const restored = {
+const restoredCollapsed = {
+    parents: ids(list),
     selected: ids(selected.block),
-    fragmentCount: list.querySelectorAll(
-        ":scope > [data-recipe-ingredient-column-section-fragment]"
-    ).length,
-    uniqueRows: new Set(
-        selected.block.querySelectorAll("[data-ingredient-selected-option-line-item]")
-    ).size,
+    butterSelected: ids(selectedButter.block),
+    directOptionRows: optionRows(list).length,
     canonicalIdentity: selected.block.children[1] === corn
         && selected.block.children[2] === cumin
         && selected.block.children[3] === onion,
+    alternativesRestored: frozenCorn.source.children.includes(frozenCorn.summary)
+        && alternativeOnion.source.children.includes(alternativeOnion.summary)
+        && unsaltedButter.source.children.includes(unsaltedButter.summary),
 };
 
-syncRecipeIngredientColumnViewSectionFragments(list, [parent, butterParent], entries);
+syncRecipeIngredientColumnViewSectionFragments(
+    list,
+    [parent, butterParent],
+    [...selectedEntries, ...alternativeEntries],
+);
+const expandedRows = optionRows(list);
+const expanded = {
+    directIds: expandedRows.map(row => row.id).sort(),
+    parentSummaryVisible: recipeIngredientColumnViewDisplayRows(list).includes(parent),
+    butterSummaryVisible: recipeIngredientColumnViewDisplayRows(list).includes(butterParent),
+    allRowsAreOriginalNodes: [
+        corn,
+        cumin,
+        onion,
+        butter,
+        frozenCorn.summary,
+        alternativeOnion.summary,
+        unsaltedButter.summary,
+    ].every(row => expandedRows.includes(row)),
+    uniqueRows: new Set(expandedRows).size,
+    activeCount: [...selectedEntries, ...alternativeEntries].filter(entry => (
+        entry.counted !== false
+    )).length,
+    frozenSourceWasMoved: !frozenCorn.source.children.includes(frozenCorn.summary),
+    stores: Object.fromEntries(expandedRows.map(row => [
+        row.id,
+        row.recipeIngredientColumnViewEntry?.store?.value || null,
+    ])),
+    activeCountFromRows: expandedRows.filter(row => (
+        row.recipeIngredientColumnViewEntry?.counted !== false
+    )).length,
+    stableDatasets: expandedRows.every(row => (
+        row.dataset.recipeIngredientOptionMemberId
+        === row.recipeIngredientColumnViewEntry?.stableId
+        && row.dataset.recipeIngredientOptionId
+        === row.recipeIngredientColumnViewEntry?.optionId
+    )),
+};
+clearRecipeIngredientColumnViewSectionFragments(list);
+const restoredExpanded = {
+    parents: ids(list),
+    selected: ids(selected.block),
+    butterSelected: ids(selectedButter.block),
+    directOptionRows: optionRows(list).length,
+    alternativesRestored: frozenCorn.source.children.includes(frozenCorn.summary)
+        && alternativeOnion.source.children.includes(alternativeOnion.summary)
+        && unsaltedButter.source.children.includes(unsaltedButter.summary),
+};
+
+syncRecipeIngredientColumnViewSectionFragments(
+    list,
+    [parent, butterParent],
+    selectedEntries,
+);
 clearRecipeIngredientColumnViewSectionFragments(list);
 const repeated = {
+    parents: ids(list),
     selected: ids(selected.block),
-    fragmentCount: list.querySelectorAll(
-        ":scope > [data-recipe-ingredient-column-section-fragment]"
-    ).length,
-    uniqueRows: new Set(
-        selected.block.querySelectorAll("[data-ingredient-selected-option-line-item]")
-    ).size,
+    butterSelected: ids(selectedButter.block),
+    directOptionRows: optionRows(list).length,
+    delegatedListenerCount: list.listeners.filter(item => item.type === "click").length,
+    delegatedListenerUsesCapture: list.listeners.find(item => item.type === "click")?.capture,
+    delegatedSelectionCalls: delegatedOptionSelections.length,
+    selectionBoundOnce: list.recipeIngredientColumnViewOptionSelectionBound === true,
 };
 
-process.stdout.write(JSON.stringify({grouped, sameSection, restored, repeated}));
+process.stdout.write(JSON.stringify({
+    collapsed,
+    restoredCollapsed,
+    expanded,
+    restoredExpanded,
+    repeated,
+}));
 """
     completed = subprocess.run(
         [node, "-e", harness],
@@ -1571,19 +2187,30 @@ process.stdout.write(JSON.stringify({grouped, sameSection, restored, repeated}))
 
     assert completed.returncode == 0, completed.stderr
     assert json.loads(completed.stdout) == {
-        "grouped": {
-            "selected": ["selected-header", "corn", "onion", "selected-action"],
-            "fragment": ["context-header", "cumin"],
-            "fragmentSection": "spices & seasonings",
-            "uniqueRows": 3,
-            "cuminIsOriginalNode": True,
+        "collapsed": {
+            "directIds": ["corn", "cumin", "onion", "butter"],
+            "parentSummaryVisible": False,
+            "butterSummaryVisible": False,
+            "allSelectedAreOriginalNodes": True,
+            "alternativeSourcesIntact": True,
+            "uniqueRows": 4,
+            "stores": {
+                "corn": "PRODUCE",
+                "cumin": "SPICES & SEASONINGS",
+                "onion": "PRODUCE",
+                "butter": "DAIRY & EGGS",
+            },
+            "optionIds": [
+                "option-corn-default",
+                "option-corn-default",
+                "option-corn-default",
+                "original:requirement-butter",
+            ],
+            "stableKeysAreUnique": True,
+            "stableDatasets": True,
         },
-        "sameSection": {
-            "selected": ["selected-header", "butter", "selected-action"],
-            "fragmentCount": 0,
-            "butterIsOriginalNode": True,
-        },
-        "restored": {
+        "restoredCollapsed": {
+            "parents": ["requirement-corn", "requirement-butter"],
             "selected": [
                 "selected-header",
                 "corn",
@@ -1591,11 +2218,54 @@ process.stdout.write(JSON.stringify({grouped, sameSection, restored, repeated}))
                 "onion",
                 "selected-action",
             ],
-            "fragmentCount": 0,
-            "uniqueRows": 3,
+            "butterSelected": ["selected-header", "butter", "selected-action"],
+            "directOptionRows": 0,
             "canonicalIdentity": True,
+            "alternativesRestored": True,
+        },
+        "expanded": {
+            "directIds": [
+                "alternative-onion",
+                "butter",
+                "corn",
+                "cumin",
+                "frozen-corn",
+                "onion",
+                "unsalted-butter",
+            ],
+            "parentSummaryVisible": False,
+            "butterSummaryVisible": False,
+            "allRowsAreOriginalNodes": True,
+            "uniqueRows": 7,
+            "activeCount": 4,
+            "frozenSourceWasMoved": True,
+            "stores": {
+                "corn": "PRODUCE",
+                "cumin": "SPICES & SEASONINGS",
+                "onion": "PRODUCE",
+                "butter": "DAIRY & EGGS",
+                "frozen-corn": "FROZEN",
+                "alternative-onion": "PRODUCE",
+                "unsalted-butter": "DAIRY & EGGS",
+            },
+            "activeCountFromRows": 4,
+            "stableDatasets": True,
+        },
+        "restoredExpanded": {
+            "parents": ["requirement-corn", "requirement-butter"],
+            "selected": [
+                "selected-header",
+                "corn",
+                "cumin",
+                "onion",
+                "selected-action",
+            ],
+            "butterSelected": ["selected-header", "butter", "selected-action"],
+            "directOptionRows": 0,
+            "alternativesRestored": True,
         },
         "repeated": {
+            "parents": ["requirement-corn", "requirement-butter"],
             "selected": [
                 "selected-header",
                 "corn",
@@ -1603,10 +2273,507 @@ process.stdout.write(JSON.stringify({grouped, sameSection, restored, repeated}))
                 "onion",
                 "selected-action",
             ],
-            "fragmentCount": 0,
-            "uniqueRows": 3,
+            "butterSelected": ["selected-header", "butter", "selected-action"],
+            "directOptionRows": 0,
+            "delegatedListenerCount": 1,
+            "delegatedListenerUsesCapture": True,
+            "delegatedSelectionCalls": 1,
+            "selectionBoundOnce": True,
         },
     }
+
+
+def test_grouped_choice_controls_use_one_stable_member_anchor_after_section_reordering():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for grouped choice anchor coverage")
+
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    sync_toggles = javascript_function_source(
+        script,
+        "syncRecipeIngredientSelectedOptionToggles",
+    )
+    alternative_summary_ids = javascript_function_source(
+        script,
+        "recipeIngredientColumnViewAlternativeSummaryIds",
+    )
+    ensure_option_row_id = javascript_function_source(
+        script,
+        "ensureRecipeIngredientColumnViewOptionRowId",
+    )
+    stable_presentation_id = javascript_function_source(
+        script,
+        "recipeIngredientStablePresentationId",
+    )
+    harness = r"""
+function classes(...initial) {
+    const values = new Set(initial);
+    return {
+        contains(name) { return values.has(name); },
+        toggle(name, enabled) {
+            if (enabled) values.add(name);
+            else values.delete(name);
+        },
+    };
+}
+function cell() {
+    return {
+        classList: classes(),
+        attributes: {},
+        setAttribute(name, value) { this.attributes[name] = String(value); },
+    };
+}
+function button() {
+    const owner = cell();
+    const label = {textContent: ""};
+    const detail = {textContent: "", hidden: false};
+    return {
+        hidden: true,
+        disabled: false,
+        title: "",
+        classList: classes(),
+        attributes: {},
+        owner,
+        querySelector(selector) {
+            if (selector.includes("ingredient-options-label")) return label;
+            if (selector.includes("ingredient-options-summary")) return detail;
+            return null;
+        },
+        closest() { return owner; },
+        setAttribute(name, value) { this.attributes[name] = String(value); },
+        getAttribute(name) { return this.attributes[name] ?? null; },
+        removeAttribute(name) { delete this.attributes[name]; },
+    };
+}
+function source(id, order) {
+    return {
+        id,
+        alternative_component_order: order,
+        dataset: {ingredientExpansionId: id},
+    };
+}
+function summary(id, sourceRow) {
+    return {
+        id,
+        recipeIngredientOptionSourceRow: sourceRow,
+        button: button(),
+    };
+}
+function alternativeSource(id, order) {
+    const item = source(id, order);
+    item.groupedSummary = summary("", item);
+    return item;
+}
+function fieldValuesFromRow(row) { return row || {}; }
+function recipeIngredientColumnViewEntryStableId(sourceRow, parentRow) {
+    return String(sourceRow?.id || parentRow?.id || "ingredient");
+}
+function recipeIngredientColumnViewChoiceOptions(row) { return row.presentation; }
+function recipeIngredientColumnViewOptionSummary(_parentRow, sourceRow) {
+    return sourceRow?.groupedSummary || null;
+}
+
+const sourceButtonLabel = {textContent: "2 options"};
+const sourceButtonSummary = {textContent: "", hidden: true};
+const sourceButton = {
+    disabled: false,
+    title: "Show 2 ingredient options",
+    classList: classes("has-selected-option"),
+    attributes: {
+        "aria-controls": "corn-choice-panel",
+        "aria-label": "Show 2 ingredient options",
+    },
+    querySelector(selector) {
+        if (selector.includes("ingredient-options-label")) return sourceButtonLabel;
+        if (selector.includes("ingredient-options-summary")) return sourceButtonSummary;
+        return null;
+    },
+    getAttribute(name) { return this.attributes[name] ?? null; },
+};
+const cornSource = source("component-corn", 0);
+const cuminSource = source("component-cumin", 1);
+const onionSource = source("component-onion", 2);
+const corn = summary("corn", cornSource);
+const cumin = summary("cumin", cuminSource);
+const onion = summary("onion", onionSource);
+const frozenCornSource = alternativeSource("component-frozen-corn", 0);
+const alternativeOnionSource = alternativeSource("component-alternative-onion", 1);
+const parent = {
+    id: "requirement-corn",
+    classList: classes("is-ingredient-store-section-grouped-choice"),
+    recipeIngredientColumnViewEntries: [
+        {
+            row: corn,
+            sourceRow: cornSource,
+            optionId: "option-default",
+            manualIndex: 0,
+            anchor: true,
+        },
+        {row: cumin, sourceRow: cuminSource, optionId: "option-default", manualIndex: 1},
+        {row: onion, sourceRow: onionSource, optionId: "option-default", manualIndex: 2},
+    ],
+    presentation: {
+        groups: [
+            {id: "option-default", rows: [cornSource, cuminSource, onionSource], isSelected: true},
+            {
+                id: "option-frozen",
+                rows: [frozenCornSource, alternativeOnionSource],
+                isSelected: false,
+            },
+        ],
+    },
+    recipeIngredientGroupedChoiceAnchorSummary: corn,
+    querySelector(selector) {
+        return selector.includes("ingredient-substitutions-toggle") ? sourceButton : null;
+    },
+};
+corn.recipeIngredientChoiceParentRow = parent;
+cumin.recipeIngredientChoiceParentRow = parent;
+onion.recipeIngredientChoiceParentRow = parent;
+let summaries = [cumin, onion, corn];
+let expanded = false;
+function recipeIngredientSelectedOptionSummaries() { return summaries; }
+function ensureRecipeIngredientSelectedOptionToggle(_row, item) { return item.button; }
+function recipeIngredientExpansionIsOpen() { return expanded; }
+function recipeIngredientDisclosureActionText(value, isExpanded) {
+    const action = isExpanded ? "Collapse" : "Show";
+    return String(value || "").replace(/^(?:Show|Collapse)/, action);
+}
+""" + stable_presentation_id + "\n" + ensure_option_row_id + "\n" + alternative_summary_ids + "\n" + sync_toggles + r"""
+
+function state() {
+    const visible = summaries.filter(item => !item.button.hidden);
+    const controls = visible.map(item => item.button.getAttribute("aria-controls"));
+    const controlIds = controls.flatMap(value => String(value || "")
+        .split(/\s+/)
+        .filter(Boolean));
+    const alternativeIds = [
+        frozenCornSource.groupedSummary.id,
+        alternativeOnionSource.groupedSummary.id,
+    ];
+    return {
+        visibleIds: visible.map(item => item.id),
+        controls,
+        controlIds,
+        alternativeIds,
+        controlsResolveToAlternatives: controlIds.every(id => alternativeIds.includes(id)),
+        usesSourcePanelFallback: controlIds.includes("corn-choice-panel"),
+        expanded: visible.map(item => item.button.getAttribute("aria-expanded")),
+        labels: visible.map(item => item.button.getAttribute("aria-label")),
+        hiddenCells: summaries
+            .filter(item => item.button.hidden)
+            .every(item => item.button.owner.attributes["aria-hidden"] === "true"),
+    };
+}
+
+syncRecipeIngredientSelectedOptionToggles(parent);
+const collapsed = state();
+summaries = [onion, corn, cumin];
+parent.presentation.groups[1].rows = [alternativeOnionSource, frozenCornSource];
+expanded = true;
+syncRecipeIngredientSelectedOptionToggles(parent);
+const expandedAfterReorder = state();
+process.stdout.write(JSON.stringify({collapsed, expandedAfterReorder}));
+"""
+    completed = subprocess.run(
+        [node, "-e", harness],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    result = json.loads(completed.stdout)
+    collapsed = result["collapsed"]
+    expanded = result["expandedAfterReorder"]
+    assert collapsed["visibleIds"] == ["corn"]
+    assert collapsed["expanded"] == ["false"]
+    assert collapsed["labels"] == ["Show 2 ingredient options"]
+    assert collapsed["hiddenCells"] is True
+    assert len(collapsed["alternativeIds"]) == 2
+    assert len(set(collapsed["alternativeIds"])) == 2
+    assert all(
+        item.startswith("recipeIngredientGroupedOption-")
+        for item in collapsed["alternativeIds"]
+    )
+    assert set(collapsed["controlIds"]) == set(collapsed["alternativeIds"])
+    assert collapsed["controlsResolveToAlternatives"] is True
+    assert collapsed["usesSourcePanelFallback"] is False
+
+    assert expanded["visibleIds"] == ["corn"]
+    assert expanded["expanded"] == ["true"]
+    assert expanded["labels"] == ["Collapse 2 ingredient options"]
+    assert expanded["hiddenCells"] is True
+    assert expanded["alternativeIds"] == collapsed["alternativeIds"]
+    assert set(expanded["controlIds"]) == set(collapsed["alternativeIds"])
+    assert expanded["controlsResolveToAlternatives"] is True
+    assert expanded["usesSourcePanelFallback"] is False
+
+
+def test_grouped_choice_anchor_identity_supports_current_and_idless_legacy_members():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for grouped choice identity coverage")
+
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    helpers = "\n".join(
+        javascript_function_source(script, function_name)
+        for function_name in (
+            "recipeIngredientColumnViewEntryStableId",
+            "recipeIngredientColumnViewOptionComponentOrder",
+            "recipeIngredientColumnViewOptionPrimaryIds",
+            "recipeIngredientColumnViewOptionAnchor",
+        )
+    )
+    harness = r"""
+function fieldValuesFromRow(row) { return row || {}; }
+function recipeIngredientStablePresentationId(...parts) {
+    return parts.map(part => String(part ?? "").trim()).join("|");
+}
+""" + helpers + r"""
+
+const parent = {
+    recipeIngredientId: "requirement-current",
+    primaryIngredientId: "member-current-primary",
+};
+const explicitPrimary = {
+    substitutionId: "member-current-primary",
+    ingredient: "Corn",
+    storeSection: "Produce",
+    alternativeComponentOrder: 2,
+};
+const explicitOther = {
+    substitution_id: "member-current-other",
+    ingredient: "Cumin",
+    store_section: "Spices",
+    alternative_component_order: 0,
+};
+const explicitEntries = [explicitOther, explicitPrimary].map((source, index) => ({
+    sourceRow: source,
+    stableId: recipeIngredientColumnViewEntryStableId(
+        source,
+        parent,
+        "option-current",
+        index,
+    ),
+    componentOrder: recipeIngredientColumnViewOptionComponentOrder(source),
+}));
+
+const legacyParent = {recipeIngredientId: "requirement-legacy"};
+const legacyFirst = {
+    ingredient: "Legacy corn",
+    storeSection: "Produce",
+    alternativeComponentOrder: 0,
+    quantityText: "1 cup",
+};
+const legacySecond = {
+    ingredient: "Legacy cumin",
+    storeSection: "Spices",
+    alternativeComponentOrder: 1,
+};
+function legacyEntry(source, manualIndex) {
+    return {
+        sourceRow: source,
+        stableId: recipeIngredientColumnViewEntryStableId(
+            source,
+            legacyParent,
+            "legacy-option",
+            manualIndex,
+        ),
+        componentOrder: recipeIngredientColumnViewOptionComponentOrder(source),
+    };
+}
+const legacyEntries = [legacyEntry(legacySecond, 8), legacyEntry(legacyFirst, 7)];
+const result = {
+    explicitIds: explicitEntries.map(entry => entry.stableId),
+    explicitAnchor: recipeIngredientColumnViewOptionAnchor(
+        parent,
+        explicitEntries,
+    )?.stableId,
+    legacyStableAcrossViewOrder: legacyEntry(legacyFirst, 0).stableId
+        === legacyEntry(legacyFirst, 99).stableId,
+    legacyIdsUnique: new Set(legacyEntries.map(entry => entry.stableId)).size,
+    legacyAnchor: recipeIngredientColumnViewOptionAnchor(
+        legacyParent,
+        legacyEntries,
+    )?.stableId,
+    legacyExpectedAnchor: legacyEntry(legacyFirst, 1).stableId,
+};
+process.stdout.write(JSON.stringify(result));
+"""
+    completed = subprocess.run(
+        [node, "-e", harness],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    result = json.loads(completed.stdout)
+    assert {
+        key: result[key]
+        for key in (
+            "explicitIds",
+            "explicitAnchor",
+            "legacyStableAcrossViewOrder",
+            "legacyIdsUnique",
+        )
+    } == {
+        "explicitIds": ["member-current-other", "member-current-primary"],
+        "explicitAnchor": "member-current-primary",
+        "legacyStableAcrossViewOrder": True,
+        "legacyIdsUnique": 2,
+    }
+    assert result["legacyAnchor"] == result["legacyExpectedAnchor"]
+
+
+def test_grouped_option_switch_round_trip_keeps_ids_unique_and_idrefs_unambiguous():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for grouped option ID coverage")
+
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    stable_presentation_id = javascript_function_source(
+        script,
+        "recipeIngredientStablePresentationId",
+    )
+    entry_stable_id = javascript_function_source(
+        script,
+        "recipeIngredientColumnViewEntryStableId",
+    )
+    ensure_option_row_id = javascript_function_source(
+        script,
+        "ensureRecipeIngredientColumnViewOptionRowId",
+    )
+    harness = r"""
+function fieldValuesFromRow(row) { return row?.values || {}; }
+""" + stable_presentation_id + "\n" + entry_stable_id + "\n" + ensure_option_row_id + r"""
+
+const parent = {
+    dataset: { ingredientExpansionId: "ingredient-group:requirement-corn" },
+    values: { recipe_ingredient_id: "requirement-corn", ingredient: "corn" },
+};
+const replacementSource = {
+    dataset: { ingredientExpansionId: "ingredient-option:replacement-corn:0" },
+    values: {
+        substitution_id: "replacement-corn-component",
+        ingredient_id: "frozen-corn",
+        ingredient: "frozen corn",
+    },
+};
+const originalOptionId = "option-original";
+const replacementOptionId = "option-replacement";
+const canonicalOriginal = { id: "" };
+const canonicalReplacement = { id: "" };
+
+function assign(summary, optionId, sourceRow, role) {
+    return ensureRecipeIngredientColumnViewOptionRowId(
+        summary,
+        parent,
+        optionId,
+        sourceRow,
+        0,
+        role,
+    );
+}
+
+function disclosureState(connected, controlledIds) {
+    const disclosure = {
+        attributes: {},
+        setAttribute(name, value) { this.attributes[name] = String(value); },
+        getAttribute(name) { return this.attributes[name] || ""; },
+    };
+    disclosure.setAttribute("aria-controls", controlledIds.join(" "));
+    const ids = connected.map(summary => summary.id).filter(Boolean);
+    const references = disclosure.getAttribute("aria-controls")
+        .split(/\s+/)
+        .filter(Boolean);
+    return {
+        ids,
+        references,
+        uniqueIds: new Set(ids).size === ids.length,
+        referenceMatches: references.map(id => ids.filter(value => value === id).length),
+    };
+}
+
+const selectedOriginalFirst = { id: "" };
+const selectedOriginalFirstId = assign(
+    selectedOriginalFirst,
+    originalOptionId,
+    parent,
+    "selected",
+);
+const replacementAlternativeId = assign(
+    canonicalReplacement,
+    replacementOptionId,
+    replacementSource,
+    "alternative",
+);
+const initial = disclosureState(
+    [canonicalOriginal, canonicalReplacement, selectedOriginalFirst],
+    [replacementAlternativeId],
+);
+
+const originalAlternativeId = assign(
+    canonicalOriginal,
+    originalOptionId,
+    parent,
+    "alternative",
+);
+const selectedReplacement = { id: "" };
+const selectedReplacementId = assign(
+    selectedReplacement,
+    replacementOptionId,
+    replacementSource,
+    "selected",
+);
+const switched = disclosureState(
+    [canonicalOriginal, canonicalReplacement, selectedReplacement],
+    [originalAlternativeId],
+);
+
+const selectedOriginalAgain = { id: "" };
+const selectedOriginalAgainId = assign(
+    selectedOriginalAgain,
+    originalOptionId,
+    parent,
+    "selected",
+);
+const roundTrip = disclosureState(
+    [canonicalOriginal, canonicalReplacement, selectedOriginalAgain],
+    [replacementAlternativeId],
+);
+
+process.stdout.write(JSON.stringify({
+    initial,
+    switched,
+    roundTrip,
+    selectedOriginalStable: selectedOriginalFirstId === selectedOriginalAgainId,
+    selectedAndSourceDiffer: selectedReplacementId !== replacementAlternativeId,
+}));
+"""
+    completed = subprocess.run(
+        [node, "-e", harness],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    result = json.loads(completed.stdout)
+    assert result["selectedOriginalStable"] is True
+    assert result["selectedAndSourceDiffer"] is True
+    for state_name in ("initial", "switched", "roundTrip"):
+        state = result[state_name]
+        assert state["uniqueIds"] is True
+        assert state["references"]
+        assert state["referenceMatches"] == [1] * len(state["references"])
 
 
 def test_store_section_grouping_toggle_preserves_choice_expansion_state():
@@ -1700,7 +2867,10 @@ def test_selected_option_block_is_atomic_and_hides_only_its_duplicate_source():
     assert '":scope > [data-ingredient-selected-option-block]"' in selection
     assert "const selectedMenuButton = selectedBlock?.querySelector(" in selection
     assert '"[data-ingredient-substitutions-toggle]"' in selection
-    assert "const focusTarget = selectedMenuButton || disclosure;" in selection
+    assert "const groupedDisclosure = ingredientRow" in selection
+    assert ".recipeIngredientGroupedChoiceAnchorSummary" in selection
+    assert '?.querySelector("[data-ingredient-selected-option-toggle]");' in selection
+    assert "const focusTarget = groupedDisclosure || selectedMenuButton || disclosure;" in selection
     assert '!focusTarget.closest("[hidden], [inert]")' in selection
     assert "focusTarget.focus({ preventScroll: true });" in selection
 
@@ -2051,10 +3221,17 @@ def test_selected_choice_header_uses_a_compact_flat_options_control():
     assert "white-space: nowrap;" in header_controls
 
 
-def test_store_section_grouping_repeats_option_context_without_parent_section_inheritance():
+def test_store_section_grouping_promotes_actual_option_rows_without_context_headers():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
-    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
     entries = javascript_function_source(script, "recipeIngredientColumnViewIngredientEntries")
+    choice_entries = javascript_function_source(
+        script,
+        "recipeIngredientColumnViewChoiceEntries",
+    )
+    display_rows = javascript_function_source(
+        script,
+        "recipeIngredientColumnViewDisplayRows",
+    )
     fragments = javascript_function_source(
         script,
         "syncRecipeIngredientColumnViewSectionFragments",
@@ -2068,36 +3245,48 @@ def test_store_section_grouping_repeats_option_context_without_parent_section_in
         "prepareRecipeIngredientColumnViewDisplayRows",
     )
 
-    assert "recipeIngredientColumnViewSelectedOptionLineItems" in entries
-    assert "sourceRow" in entries
-    assert "parentRow" in entries
-    assert "optionId" in entries
-    assert "store" in entries
-    assert "manualIndex" in entries
-    assert "recipeIngredientColumnViewEntry" in entries
-    assert "parentRow.recipeIngredientInlineSummarySourceRow" not in entries
+    assert "recipeIngredientColumnViewChoiceEntries" in entries
+    assert "options.includeAlternatives" in choice_entries
+    assert "presentation.expanded || presentation.requiredUnresolved" in choice_entries
+    assert "selected: false" in choice_entries
+    assert "counted: false" in choice_entries
+    for field in (
+        "stableId",
+        "sourceRow",
+        "parentRow",
+        "optionId",
+        "componentOrder",
+        "store",
+        "manualIndex",
+        "anchor",
+    ):
+        assert field in choice_entries
+    assert 'row.hasAttribute?.("data-recipe-ingredient-column-option-row")' in display_rows
+    assert '"is-recipe-ingredient-column-source-carrier"' in display_rows
     assert "cloneNode" not in fragments
     assert ".style.order" not in fragments
     assert "replaceChildren" not in fragments
-    assert any(operation in fragments for operation in ("appendChild", "append(", "insertBefore"))
-    assert "data-recipe-ingredient-column-group-projection" not in fragments
+    assert "moveRecipeIngredientColumnViewNode(row, list)" in fragments
+    assert "createRecipeIngredientOptionHeader" not in fragments
+    assert "ingredientOptionContextHeader" not in fragments
     assert "ingredientEntries" in fragments
-    assert '"recipe-edit-selected-option-line-items"' in fragments
+    assert 'row.dataset.recipeIngredientColumnOptionRow = "";' in fragments
+    assert "row.dataset.recipeIngredientOptionMemberId = entry.stableId;" in fragments
+    assert "row.dataset.recipeIngredientOptionId = entry.optionId;" in fragments
+    assert "row.dataset.recipeIngredientOptionAnchor = String(entry.anchor);" in fragments
+    assert "row.recipeIngredientColumnViewEntry = entry;" in fragments
+    assert "setRecipeIngredientColumnViewSourceCarrier(parentRow);" in fragments
     assert "recipeIngredientColumnViewIngredientEntries" in prepare
+    assert "includeAlternatives: recipeEditIngredientColumnView.groupByStoreSection" in prepare
     assert "syncRecipeIngredientColumnViewSectionFragments" in prepare
-    assert "recipeIngredientOptionSourceRows" in restore
-
-    fragment_css = css[css.index(
-        "/* Ingredient editor v113: Store Section grouping owns real ingredient rows. */"
-    ):]
-    assert "display: flex !important;" in fragment_css
-    assert "flex-direction: column;" in fragment_css
-    assert "grid-row: auto !important;" in fragment_css
-    assert ".recipe-edit-ingredient-store-section-option-context" in fragment_css
-    assert "position: static !important;" in fragment_css
+    assert "home.replaceWith(row);" in restore
+    assert 'row.removeAttribute("data-recipe-ingredient-column-option-row");' in restore
+    assert 'row.removeAttribute("data-recipe-ingredient-option-member-id");' in restore
+    assert 'row.removeAttribute("data-recipe-ingredient-option-id");' in restore
+    assert 'row.removeAttribute("data-recipe-ingredient-option-anchor");' in restore
 
 
-def test_store_section_grouping_keeps_same_section_selected_option_header():
+def test_ungrouped_selected_option_block_remains_the_canonical_source_after_grouping():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     grouped_view = javascript_function_source(
         script,
@@ -2112,14 +3301,22 @@ def test_store_section_grouping_keeps_same_section_selected_option_header():
         script.index("function addRecipeIngredientSubstitutionRow")
     ]
 
+    restore = javascript_function_source(
+        script,
+        "clearRecipeIngredientColumnViewSectionFragments",
+    )
+
     assert "ingredientEntries" in grouped_view
-    assert "entriesBySection" in grouped_view
-    assert "hostEntries" in grouped_view
     assert "optionId" in grouped_view
-    assert "store" in grouped_view
     assert "parentRow" in grouped_view
     assert "cloneNode" not in grouped_view
     assert "data-recipe-ingredient-column-group-projection" not in grouped_view
+    assert "entriesBySection" not in grouped_view
+    assert "hostEntries" not in grouped_view
+    assert "createRecipeIngredientOptionHeader" not in grouped_view
+    assert "moveRecipeIngredientColumnViewNode(row, list)" in grouped_view
+    assert "home.replaceWith(row);" in restore
+    assert "delete row.recipeIngredientSelectedOptionBlock;" in restore
     assert "selectedChoiceUsesParentIngredientRow" not in substitution_state
     assert '"has-selected-implicit-default-choice"' not in substitution_state
     assert "hidesSelectedChoiceHeaderInStoreSectionView" not in substitution_state
@@ -2154,7 +3351,9 @@ def test_ingredient_choice_panel_mounts_on_parent_row_after_the_home_marker():
     assert 'fieldValue("recipe_ingredient_id")' in expansion
     assert 'fieldValue("substitution_id")' in expansion
     assert "function recipeIngredientExpansionSelectedOptionSummary" in expansion
-    assert "recipeEditIngredientColumnView.groupByStoreSection" not in expansion
+    assert "recipeEditIngredientColumnView.groupByStoreSection" in expansion
+    assert "row?.recipeIngredientGroupedOptionsExpanded !== undefined" in expansion
+    assert "return Boolean(row.recipeIngredientGroupedOptionsExpanded);" in expansion
     assert "recipeIngredientSelectedOptionSummaries(row).find" not in expansion
     assert "controlledSummary.recipeIngredientChoiceParentRow === row" in expansion
     assert "controlledSummary.recipeIngredientOptionSourceRow !== row" not in expansion
@@ -2173,6 +3372,16 @@ def test_ingredient_choice_panel_mounts_on_parent_row_after_the_home_marker():
     assert "home.after(container);" in expansion
     assert "container.dataset.ingredientExpansionFor = expansionId;" in expansion
     assert "recipeEditExpandedIngredientIds.add(expansionId);" in expansion
+
+    # Grouped choices expose their actual ingredient summaries as direct rows.
+    # Keep the alternatives source panel hidden on the parent carrier and rebuild
+    # the grouped rows instead of mounting that panel beside one promoted child.
+    assert "const groupedStoreSectionChoice = Boolean(" in toggle
+    assert 'row.classList.contains("has-ingredient-choice")' in toggle
+    assert "row.recipeIngredientGroupedOptionsExpanded = Boolean(shouldOpen);" in toggle
+    assert "container.hidden = true;" in toggle
+    assert "updateRecipeIngredientSubstitutionState(row, control);" in toggle
+    assert "applyRecipeIngredientColumnView();" in toggle
 
     assert "mountRecipeIngredientExpansion(row, container, control);" in toggle
     assert "recipeIngredientExpansionIsOpen(row, button)" in toggle
@@ -2603,7 +3812,10 @@ def test_selected_option_switch_hands_focus_to_a_visible_parent_control():
     assert 'ingredientRow.querySelector(\n            ":scope > [data-ingredient-selected-option-block]"' in selection
     assert "const selectedMenuButton = selectedBlock?.querySelector(" in selection
     assert 'ingredientRow.querySelector(\n            "[data-ingredient-substitutions-toggle]"' in selection
-    assert "const focusTarget = selectedMenuButton || disclosure;" in selection
+    assert "const groupedDisclosure = ingredientRow" in selection
+    assert ".recipeIngredientGroupedChoiceAnchorSummary" in selection
+    assert '?.querySelector("[data-ingredient-selected-option-toggle]");' in selection
+    assert "const focusTarget = groupedDisclosure || selectedMenuButton || disclosure;" in selection
     assert "focusTarget?.isConnected" in selection
     assert '!focusTarget.closest("[hidden], [inert]")' in selection
     assert "focusTarget.focus({ preventScroll: true });" in selection
@@ -7907,7 +9119,11 @@ def test_grouping_toggle_restores_one_canonical_selected_option_block_without_du
     assert "ingredientEntries" in fragments
     assert "cloneNode" not in fragments
     assert "replaceChildren" not in fragments
-    assert "recipeIngredientOptionSourceRows" in restore
+    assert "home.replaceWith(row);" in restore
+    assert "row.recipeIngredientOptionSourceRow" in restore
+    assert "recipeIngredientColumnViewPromotedSummary" in restore
+    assert "parentRow.recipeIngredientColumnViewCarrierState" in restore
+    assert "delete row.recipeIngredientColumnViewHome;" in restore
     assert "captureRecipeIngredientChoiceExpansionState()" in handler
     assert "applyRecipeIngredientColumnView({ announce: true });" in handler
     assert "restoreRecipeIngredientChoiceExpansionState(" in handler

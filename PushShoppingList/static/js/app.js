@@ -29261,8 +29261,13 @@ function recipeIngredientColumnViewDisplayRows(list = null) {
     const ingredientList = list || document.getElementById("recipeEditIngredients");
     return ingredientList
         ? [...ingredientList.children].filter(row => (
-            row.classList?.contains("recipe-edit-ingredient-row")
-            || row.hasAttribute?.("data-recipe-ingredient-column-section-fragment")
+            (
+                row.classList?.contains("recipe-edit-ingredient-row")
+                && !row.classList.contains(
+                    "is-recipe-ingredient-column-source-carrier",
+                )
+            )
+            || row.hasAttribute?.("data-recipe-ingredient-column-option-row")
         ))
         : [];
 }
@@ -29288,12 +29293,16 @@ function recipeIngredientColumnViewEntryStableId(
         || values.recipeIngredientId
         || values.substitution_id
         || values.substitutionId
+        || sourceRow?.dataset?.ingredientExpansionId
+        || values.ingredient_id
+        || values.ingredientId
+        || values.master_ingredient_id
+        || values.masterIngredientId
         || values.ingredient_requirement_id
         || values.ingredientRequirementId
         || values.row_id
         || values.rowId
         || values.id
-        || sourceRow?.dataset?.ingredientExpansionId
         || "",
     ).trim();
     if (explicitId) return explicitId;
@@ -29309,46 +29318,243 @@ function recipeIngredientColumnViewEntryStableId(
         || parentRow?.dataset?.ingredientExpansionId
         || "ingredient",
     ).trim();
+    const componentOrder = String(
+        values.alternative_component_order
+        ?? values.alternativeComponentOrder
+        ?? values.component_order
+        ?? values.componentOrder
+        ?? "",
+    ).trim();
     return recipeIngredientStablePresentationId(
         "ingredient-column-entry",
         parentId,
         optionId,
+        componentOrder,
         values.ingredient,
         values.store_section || values.storeSection,
-        manualIndex,
+        values.quantity_text || values.quantityText || values.quantity,
+        values.preparation,
+        // The index is only a last-resort tie breaker for completely empty legacy
+        // rows. Real option members resolve from persisted or semantic identity.
+        Object.values(values).some(value => String(value ?? "").trim())
+            ? ""
+            : manualIndex,
     );
 }
 
-function recipeIngredientColumnViewIngredientEntries(rows = []) {
-    const entries = [];
-    let manualIndex = 0;
-    rows.forEach(parentRow => {
-        if (Array.isArray(parentRow?.recipeIngredientColumnViewEntries)) {
-            parentRow.recipeIngredientColumnViewEntries.forEach(entry => {
-                entries.push(entry);
-                manualIndex = Math.max(manualIndex, Number(entry.manualIndex) + 1 || 0);
-            });
-            return;
-        }
-        const isChoice = parentRow?.classList?.contains("has-ingredient-choice");
-        const selectedRows = isChoice
-            ? recipeIngredientColumnViewSelectedOptionLineItems(parentRow)
-            : [];
-        const optionBlock = parentRow?.querySelector?.(
-            ":scope > [data-ingredient-selected-option-block]",
-        );
-        const optionId = String(
-            optionBlock?.dataset?.optionId
-            || parentRow?.dataset?.ingredientSelectedOptionId
-            || parentRow?.dataset?.ingredientOptionId
-            || selectedRows[0]?.dataset?.ingredientSelectedOptionId
-            || selectedRows[0]?.dataset?.ingredientOptionId
-            || parentRow?.querySelector?.('[data-field="default_option_id"]')?.value
+function recipeIngredientColumnViewOptionComponentOrder(sourceRow) {
+    const values = sourceRow ? fieldValuesFromRow(sourceRow) : {};
+    const value = Number.parseInt(String(
+        values.alternative_component_order
+        ?? values.alternativeComponentOrder
+        ?? values.component_order
+        ?? values.componentOrder
+        ?? "",
+    ), 10);
+    return Number.isInteger(value) && value >= 0
+        ? value
+        : Number.MAX_SAFE_INTEGER;
+}
+
+function recipeIngredientColumnViewOptionPrimaryIds(parentRow, optionEntries = []) {
+    const values = [
+        parentRow ? fieldValuesFromRow(parentRow) : {},
+        ...optionEntries.map(entry => (
+            entry.sourceRow ? fieldValuesFromRow(entry.sourceRow) : {}
+        )),
+    ];
+    return new Set(values.flatMap(item => [
+        item.primary_ingredient_id,
+        item.primaryIngredientId,
+        item.primary_component_id,
+        item.primaryComponentId,
+        item.anchor_ingredient_id,
+        item.anchorIngredientId,
+        item.default_ingredient_id,
+        item.defaultIngredientId,
+    ]).map(value => String(value || "").trim()).filter(Boolean));
+}
+
+function recipeIngredientColumnViewOptionAnchor(parentRow, optionEntries = []) {
+    if (!optionEntries.length) return null;
+    const primaryIds = recipeIngredientColumnViewOptionPrimaryIds(
+        parentRow,
+        optionEntries,
+    );
+    const explicit = optionEntries.find(entry => (
+        primaryIds.has(entry.stableId)
+        || primaryIds.has(String(
+            fieldValuesFromRow(entry.sourceRow).ingredient_id
+            || fieldValuesFromRow(entry.sourceRow).ingredientId
             || "",
-        ).trim();
-        const visibleRows = selectedRows.length ? selectedRows : [parentRow];
-        visibleRows.forEach(row => {
-            const sourceRow = recipeIngredientColumnViewSourceRow(row);
+        ).trim())
+    ));
+    if (explicit) return explicit;
+    return [...optionEntries].sort((left, right) => (
+        left.componentOrder - right.componentOrder
+        || left.stableId.localeCompare(right.stableId, undefined, {
+            numeric: true,
+            sensitivity: "base",
+        })
+    ))[0];
+}
+
+function recipeIngredientColumnViewOptionHeader(parentRow, option = {}) {
+    if (option.selected) {
+        return parentRow?.querySelector?.(
+            ":scope > [data-ingredient-selected-option-block] "
+            + "> [data-ingredient-option-header]",
+        ) || null;
+    }
+    if (option.sourceRow === parentRow) {
+        return recipeIngredientSubstitutionContainer(parentRow)
+            ?.querySelector(
+                ":scope > [data-ingredient-choice-overview] "
+                + "> [data-ingredient-option-header]",
+            ) || null;
+    }
+    return option.sourceRow?.closest?.(".recipe-edit-alternative-card")
+        ?.querySelector(":scope > [data-ingredient-option-header]") || null;
+}
+
+function recipeIngredientColumnViewOptionSummary(parentRow, sourceRow, selected) {
+    if (selected) {
+        return recipeIngredientColumnViewSelectedOptionLineItems(parentRow)
+            .find(summary => summary.recipeIngredientOptionSourceRow === sourceRow)
+            || null;
+    }
+    if (sourceRow === parentRow) {
+        return sourceRow.recipeIngredientColumnViewPromotedSummary
+            || recipeIngredientSubstitutionContainer(parentRow)
+            ?.querySelector(
+                ":scope > [data-ingredient-choice-overview] "
+                + ".recipe-edit-default-option-summary",
+            ) || null;
+    }
+    return sourceRow?.recipeIngredientColumnViewPromotedSummary
+        || sourceRow?.querySelector?.(
+        ":scope > [data-alternative-component-summary]",
+    ) || null;
+}
+
+function ensureRecipeIngredientColumnViewOptionRowId(
+    summary,
+    parentRow,
+    optionId,
+    sourceRow,
+    fallbackIndex = 0,
+    representationRole = "alternative",
+) {
+    if (!summary) return "";
+    if (!summary.id) {
+        summary.id = recipeIngredientStablePresentationId(
+            "recipeIngredientGroupedOption",
+            recipeIngredientColumnViewEntryStableId(
+                parentRow,
+                parentRow,
+                "parent",
+                fallbackIndex,
+            ),
+            optionId,
+            recipeIngredientColumnViewEntryStableId(
+                sourceRow,
+                parentRow,
+                optionId,
+                fallbackIndex,
+            ),
+            String(representationRole || "alternative").trim().toLowerCase(),
+        );
+    }
+    return summary.id;
+}
+
+function recipeIngredientColumnViewAlternativeSummaryIds(parentRow) {
+    const presentation = recipeIngredientColumnViewChoiceOptions(parentRow);
+    let fallbackIndex = 0;
+    return presentation.groups
+        .filter(group => !group.isSelected)
+        .flatMap(group => {
+            const sourceRows = group.rows?.length
+                ? group.rows
+                : (group.values?.length ? [parentRow] : []);
+            return sourceRows.map(sourceRow => {
+                const summary = recipeIngredientColumnViewOptionSummary(
+                    parentRow,
+                    sourceRow,
+                    false,
+                );
+                const id = ensureRecipeIngredientColumnViewOptionRowId(
+                    summary,
+                    parentRow,
+                    String(group.id || "").trim(),
+                    sourceRow,
+                    fallbackIndex,
+                    "alternative",
+                );
+                fallbackIndex += 1;
+                return id;
+            });
+        })
+        .filter(Boolean);
+}
+
+function recipeIngredientColumnViewChoiceOptions(parentRow) {
+    const container = recipeIngredientSubstitutionContainer(parentRow);
+    const list = container?.querySelector("[data-ingredient-substitution-list]");
+    const groups = recipeIngredientSubstitutionDomGroups(
+        list ? [...list.querySelectorAll("[data-substitution-option-row]")] : [],
+    );
+    return recipeIngredientPresentationModel(
+        parentRow,
+        recipeIngredientChoiceParentValues(parentRow),
+        groups,
+    );
+}
+
+function recipeIngredientColumnViewChoiceEntries(
+    parentRow,
+    manualIndex = 0,
+    options = {},
+) {
+    const presentation = recipeIngredientColumnViewChoiceOptions(parentRow);
+    const visibleOptions = [];
+    if (presentation.selectedChoice) {
+        visibleOptions.push({
+            ...presentation.selectedChoice,
+            selected: true,
+            counted: true,
+        });
+    }
+    const includeAlternatives = Boolean(
+        options.includeAlternatives
+        && (presentation.expanded || presentation.requiredUnresolved),
+    );
+    if (includeAlternatives) {
+        presentation.groups.filter(group => !group.isSelected).forEach(group => {
+            visibleOptions.push({
+                ...group,
+                selected: false,
+                counted: false,
+                selectionLabel: recipeIngredientOptionTypeLabel(
+                    group.isDefaultOption,
+                ),
+            });
+        });
+    }
+
+    const entries = [];
+    visibleOptions.forEach(option => {
+        const sourceRows = option.rows?.length
+            ? option.rows
+            : (option.values?.length ? [parentRow] : []);
+        const optionEntries = sourceRows.map(sourceRow => {
+            const row = recipeIngredientColumnViewOptionSummary(
+                parentRow,
+                sourceRow,
+                option.selected,
+            );
+            if (!row) return null;
+            const optionId = String(option.id || "").trim();
             const stableId = recipeIngredientColumnViewEntryStableId(
                 sourceRow,
                 parentRow,
@@ -29362,14 +29568,101 @@ function recipeIngredientColumnViewIngredientEntries(rows = []) {
                 manualIndex,
             );
             const entry = {
-                key: `${parentId}:${optionId || "standard"}:${stableId}`,
+                key: `${parentId}:${optionId || "option"}:${stableId}`,
+                stableId,
                 row,
                 sourceRow,
                 parentRow,
                 optionId,
+                optionHeader: null,
+                optionLabel: String(
+                    option.selectionLabel
+                    || recipeIngredientOptionTypeLabel(option.isDefaultOption),
+                ).trim(),
+                selected: Boolean(option.selected),
+                active: Boolean(option.selected),
+                counted: Boolean(option.counted),
+                expanded: Boolean(presentation.expanded),
+                componentOrder: recipeIngredientColumnViewOptionComponentOrder(
+                    sourceRow,
+                ),
+                // Bucket from the concrete option member, not its synthetic
+                // presentation summary. Alternative summaries intentionally
+                // omit editable Store Section fields.
+                store: recipeIngredientColumnViewEntry(sourceRow, "store"),
+                manualIndex,
+                filtered: false,
+                anchor: false,
+            };
+            row.recipeIngredientColumnViewManualIndex = manualIndex;
+            manualIndex += 1;
+            return entry;
+        }).filter(Boolean);
+        const anchor = recipeIngredientColumnViewOptionAnchor(
+            parentRow,
+            optionEntries,
+        );
+        optionEntries.forEach(entry => {
+            entry.anchor = entry === anchor;
+            entry.optionHeader = recipeIngredientColumnViewOptionHeader(
+                parentRow,
+                { ...option, sourceRow: entry.sourceRow },
+            );
+            entries.push(entry);
+        });
+    });
+    return entries;
+}
+
+function recipeIngredientColumnViewIngredientEntries(rows = [], options = {}) {
+    const entries = [];
+    let manualIndex = 0;
+    rows.forEach(parentRow => {
+        if (Array.isArray(parentRow?.recipeIngredientColumnViewEntries)) {
+            parentRow.recipeIngredientColumnViewEntries.forEach(entry => {
+                entries.push(entry);
+                manualIndex = Math.max(manualIndex, Number(entry.manualIndex) + 1 || 0);
+            });
+            return;
+        }
+        const isChoice = parentRow?.classList?.contains("has-ingredient-choice");
+        if (isChoice) {
+            const choiceEntries = recipeIngredientColumnViewChoiceEntries(
+                parentRow,
+                manualIndex,
+                options,
+            );
+            entries.push(...choiceEntries);
+            manualIndex += choiceEntries.length;
+            return;
+        }
+        [parentRow].forEach(row => {
+            const sourceRow = recipeIngredientColumnViewSourceRow(row);
+            const stableId = recipeIngredientColumnViewEntryStableId(
+                sourceRow,
+                parentRow,
+                "",
+                manualIndex,
+            );
+            const parentId = recipeIngredientColumnViewEntryStableId(
+                parentRow,
+                parentRow,
+                "parent",
+                manualIndex,
+            );
+            const entry = {
+                key: `${parentId}:standard:${stableId}`,
+                stableId,
+                row,
+                sourceRow,
+                parentRow,
+                optionId: "",
                 store: recipeIngredientColumnViewEntry(row, "store"),
                 manualIndex,
-                counted: !isChoice || selectedRows.length > 0,
+                counted: true,
+                active: true,
+                selected: false,
+                anchor: false,
                 filtered: false,
             };
             row.recipeIngredientColumnViewManualIndex = manualIndex;
@@ -29382,63 +29675,358 @@ function recipeIngredientColumnViewIngredientEntries(rows = []) {
 
 function clearRecipeIngredientColumnViewSectionFragments(list) {
     if (!list) return;
-    const fragments = [...list.querySelectorAll(
-        ":scope > [data-recipe-ingredient-column-section-fragment]",
+    const optionRows = [...list.querySelectorAll(
+        ":scope > [data-recipe-ingredient-column-option-row]",
     )];
     const affectedParents = new Set();
-    fragments.forEach(fragment => {
-        const parentRow = fragment.recipeIngredientColumnViewParentRow;
+    list.querySelectorAll(
+        ":scope > .is-recipe-ingredient-column-source-carrier",
+    ).forEach(parentRow => affectedParents.add(parentRow));
+    optionRows.forEach(row => {
+        const parentRow = row.recipeIngredientChoiceParentRow
+            || row.recipeIngredientColumnViewParentRow;
         if (parentRow) affectedParents.add(parentRow);
+        const movedControls = Array.isArray(
+            row.recipeIngredientColumnViewMovedControls,
+        ) ? row.recipeIngredientColumnViewMovedControls : [];
+        movedControls.forEach(control => {
+            [
+                control,
+                ...control.querySelectorAll(
+                    "[data-ingredient-option-select], "
+                    + "[data-set-alternative-preferred]",
+                ),
+            ].filter(action => action.matches?.(
+                "[data-ingredient-option-select], "
+                + "[data-set-alternative-preferred]",
+            )).forEach(action => {
+                const original = action.recipeIngredientColumnViewOriginalOnclick;
+                if (original === null) {
+                    action.removeAttribute("onclick");
+                } else if (original !== undefined) {
+                    action.setAttribute("onclick", original);
+                }
+                delete action.recipeIngredientColumnViewOriginalOnclick;
+            });
+            const home = control.recipeIngredientColumnViewHome;
+            if (home?.parentNode) {
+                home.replaceWith(control);
+            } else {
+                control.remove();
+            }
+            delete control.recipeIngredientColumnViewHome;
+            delete control.recipeIngredientChoiceParentRow;
+            delete control.recipeIngredientOptionSourceRow;
+        });
+        const selectionStatus = row.querySelector(
+            ":scope [data-recipe-ingredient-grouped-selection-status]",
+        );
+        selectionStatus?.remove();
+        const home = row.recipeIngredientColumnViewHome;
+        if (home?.parentNode) {
+            home.replaceWith(row);
+        } else {
+            row.remove();
+        }
+        if (
+            row.recipeIngredientOptionSourceRow
+            && row.recipeIngredientOptionSourceRow
+                .recipeIngredientColumnViewPromotedSummary === row
+        ) {
+            delete row.recipeIngredientOptionSourceRow
+                .recipeIngredientColumnViewPromotedSummary;
+        }
+        row.classList.remove(
+            "is-ingredient-column-filtered",
+            "is-recipe-ingredient-column-option-anchor",
+            "is-recipe-ingredient-column-selected-option",
+        );
+        row.removeAttribute("data-recipe-ingredient-column-option-row");
+        row.removeAttribute("data-recipe-ingredient-option-member-id");
+        row.removeAttribute("data-recipe-ingredient-option-id");
+        row.removeAttribute("data-recipe-ingredient-option-anchor");
+        row.removeAttribute("data-recipe-ingredient-choice-parent-id");
+        row.querySelector(
+            ".recipe-edit-alternative-component-option-spacer",
+        )?.classList.remove("has-recipe-ingredient-grouped-option-menu");
+        delete row.recipeIngredientColumnViewHome;
+        delete row.recipeIngredientColumnViewMovedControls;
+        delete row.recipeIngredientColumnViewEntries;
+        delete row.recipeIngredientColumnViewEntry;
+        delete row.recipeIngredientColumnViewParentRow;
+        delete row.recipeIngredientSelectedOptionBlock;
     });
     affectedParents.forEach(parentRow => {
-        const block = parentRow.querySelector(
-            ":scope > [data-ingredient-selected-option-block]",
+        const carrierState = Array.isArray(
+            parentRow.recipeIngredientColumnViewCarrierState,
+        ) ? parentRow.recipeIngredientColumnViewCarrierState : [];
+        carrierState.forEach(({ node, hidden }) => {
+            if (node) node.hidden = hidden;
+        });
+        if (parentRow.recipeIngredientColumnViewOriginalRole === null) {
+            parentRow.removeAttribute("role");
+        } else if (
+            parentRow.recipeIngredientColumnViewOriginalRole !== undefined
+        ) {
+            parentRow.setAttribute(
+                "role",
+                parentRow.recipeIngredientColumnViewOriginalRole,
+            );
+        }
+        parentRow.classList.remove(
+            "is-recipe-ingredient-column-source-carrier",
+            "is-ingredient-store-section-grouped-choice",
         );
-        if (!block) return;
-        const header = block.querySelector(":scope > [data-ingredient-option-header]");
-        const action = block.querySelector(":scope > [data-ingredient-option-actions]");
-        const rows = [
-            ...block.querySelectorAll(
-                ":scope > [data-ingredient-selected-option-line-item]",
-            ),
-            ...fragments
-                .filter(fragment => (
-                    fragment.recipeIngredientColumnViewParentRow === parentRow
-                ))
-                .flatMap(fragment => [...fragment.querySelectorAll(
-                    ":scope > [data-ingredient-selected-option-line-item]",
-                )]),
-        ];
-        const sourceRows = Array.isArray(block.recipeIngredientOptionSourceRows)
-            ? block.recipeIngredientOptionSourceRows
-            : [];
-        rows.sort((left, right) => {
-            const leftSourceIndex = sourceRows.indexOf(
-                left.recipeIngredientOptionSourceRow,
+        if (
+            !recipeEditIngredientColumnView.groupByStoreSection
+            && parentRow.recipeIngredientGroupedOptionsExpanded !== undefined
+        ) {
+            const expanded = Boolean(
+                parentRow.recipeIngredientGroupedOptionsExpanded,
             );
-            const rightSourceIndex = sourceRows.indexOf(
-                right.recipeIngredientOptionSourceRow,
+            const panel = recipeIngredientSubstitutionContainer(parentRow);
+            const expansionId = ensureRecipeIngredientExpansionId(parentRow);
+            if (panel) panel.hidden = !expanded;
+            parentRow.classList.toggle(
+                "recipe-edit-substitutions-open",
+                expanded,
             );
-            if (leftSourceIndex >= 0 && rightSourceIndex >= 0) {
-                return leftSourceIndex - rightSourceIndex;
+            parentRow.recipeIngredientExpansionAnchor = expanded
+                ? parentRow
+                : null;
+            parentRow.recipeIngredientActiveExpansionId = expanded
+                ? expansionId
+                : "";
+            if (expanded) {
+                recipeEditExpandedIngredientIds.add(expansionId);
+            } else {
+                recipeEditExpandedIngredientIds.delete(expansionId);
             }
-            return Number(left.recipeIngredientColumnViewManualIndex || 0)
-                - Number(right.recipeIngredientColumnViewManualIndex || 0);
-        });
-        rows.forEach(row => {
-            row.classList.remove("is-ingredient-column-filtered");
-            delete row.recipeIngredientColumnViewEntry;
-        });
-        renderRecipeIngredientOptionBlock(block, {
-            header,
-            ingredientContent: rows,
-            actions: [action],
-        });
-        delete block.recipeIngredientColumnViewEntries;
+            delete parentRow.recipeIngredientGroupedOptionsExpanded;
+        }
+        delete parentRow.recipeIngredientColumnViewCarrierState;
+        delete parentRow.recipeIngredientColumnViewOriginalRole;
         delete parentRow.recipeIngredientColumnViewEntries;
-        parentRow.classList.remove("has-store-section-option-fragments");
+        delete parentRow.recipeIngredientGroupedChoiceAnchorSummary;
     });
-    fragments.forEach(fragment => fragment.remove());
+}
+
+function moveRecipeIngredientColumnViewNode(node, target) {
+    if (!node || !target) return false;
+    if (!node.recipeIngredientColumnViewHome) {
+        const home = document.createComment("recipe-ingredient-column-view-home");
+        node.parentNode?.insertBefore(home, node);
+        node.recipeIngredientColumnViewHome = home;
+    }
+    target.appendChild(node);
+    return true;
+}
+
+function selectRecipeIngredientColumnViewOption(control, event = null) {
+    const groupedRow = control?.closest?.(
+        "[data-recipe-ingredient-column-option-row]",
+    );
+    const parentId = String(
+        groupedRow?.dataset?.recipeIngredientChoiceParentId || "",
+    ).trim();
+    const parentRow = control?.recipeIngredientChoiceParentRow
+        || groupedRow?.recipeIngredientChoiceParentRow
+        || [...document.querySelectorAll(
+            "#recipeEditIngredients > .is-recipe-ingredient-column-source-carrier",
+        )].find(row => row.dataset.ingredientExpansionId === parentId)
+        || null;
+    const sourceRow = control?.recipeIngredientOptionSourceRow
+        || groupedRow?.recipeIngredientOptionSourceRow
+        || null;
+    if (!groupedRow || !parentRow) return false;
+
+    const groupedOptionId = String(
+        groupedRow.dataset.recipeIngredientOptionId || "",
+    ).trim();
+    const optionId = groupedOptionId || (sourceRow === parentRow
+        ? String(
+            parentRow.querySelector("[data-original-option-id]")?.value || "",
+        ).trim()
+        : String(
+            sourceRow?.querySelector('[data-field="alternative_id"]')?.value
+            || "",
+        ).trim());
+    if (!optionId) return false;
+
+    event?.preventDefault();
+    event?.stopImmediatePropagation();
+    if (!applyRecipeIngredientOptionSelection(parentRow, optionId)) {
+        return false;
+    }
+    closeRecipeEditRowMenus();
+    setRecipeEditStatus("Ingredient option selected. Save Recipe to keep it.");
+    window.requestAnimationFrame(() => {
+        const disclosure = parentRow.recipeIngredientGroupedChoiceAnchorSummary
+            ?.querySelector("[data-ingredient-selected-option-toggle]");
+        if (
+            disclosure?.isConnected
+            && !disclosure.closest("[hidden], [inert]")
+        ) {
+            disclosure.focus({ preventScroll: true });
+        }
+    });
+    return true;
+}
+
+function bindRecipeIngredientColumnViewOptionSelection(list) {
+    if (!list || list.recipeIngredientColumnViewOptionSelectionBound === true) {
+        return;
+    }
+    // Bind once on the stable rowgroup. Option headers can be rebuilt while
+    // grouping or switching choices, so listeners attached to those transient
+    // controls are not a reliable interaction boundary.
+    list.recipeIngredientColumnViewOptionSelectionBound = true;
+    list.addEventListener("click", event => {
+        const selectionAction = event.target.closest(
+            "[data-ingredient-option-select], [data-set-alternative-preferred]",
+        );
+        if (
+            !selectionAction
+            || !selectionAction.closest(
+                "[data-recipe-ingredient-column-option-row]",
+            )
+        ) {
+            return;
+        }
+        selectRecipeIngredientColumnViewOption(selectionAction, event);
+    }, true);
+}
+
+function setRecipeIngredientColumnViewSourceCarrier(parentRow) {
+    if (!parentRow) return;
+    const panel = recipeIngredientSubstitutionContainer(parentRow);
+    const modal = parentRow.querySelector(
+        ":scope > [data-recipe-ingredient-edit-panel]",
+    );
+    parentRow.recipeIngredientColumnViewOriginalRole = parentRow.hasAttribute("role")
+        ? parentRow.getAttribute("role")
+        : null;
+    parentRow.recipeIngredientColumnViewCarrierState = [...parentRow.children]
+        .filter(node => (
+            node !== modal
+            && !(
+                node.matches?.('input[type="hidden"]')
+                || node.matches?.('select[type="hidden"]')
+            )
+        ))
+        .map(node => ({ node, hidden: node.hidden }));
+    if (parentRow.recipeIngredientGroupedOptionsExpanded === undefined) {
+        parentRow.recipeIngredientGroupedOptionsExpanded = (
+            recipeIngredientExpansionIsOpen(parentRow)
+        );
+    }
+    parentRow.recipeIngredientColumnViewCarrierState.forEach(({ node }) => {
+        node.hidden = true;
+    });
+    if (panel) panel.hidden = true;
+    parentRow.classList.add(
+        "is-recipe-ingredient-column-source-carrier",
+        "is-ingredient-store-section-grouped-choice",
+    );
+    parentRow.setAttribute("role", "presentation");
+}
+
+function recipeIngredientColumnViewMoveControl(row, control, target) {
+    if (!row || !control || !target) return false;
+    if (!moveRecipeIngredientColumnViewNode(control, target)) return false;
+    const controls = Array.isArray(row.recipeIngredientColumnViewMovedControls)
+        ? row.recipeIngredientColumnViewMovedControls
+        : [];
+    if (!controls.includes(control)) controls.push(control);
+    row.recipeIngredientColumnViewMovedControls = controls;
+    control.hidden = false;
+    control.removeAttribute("aria-hidden");
+    control.removeAttribute("inert");
+    control.recipeIngredientChoiceParentRow = (
+        row.recipeIngredientChoiceParentRow
+        || row.recipeIngredientColumnViewParentRow
+        || null
+    );
+    control.recipeIngredientOptionSourceRow = (
+        row.recipeIngredientOptionSourceRow
+        || row.recipeIngredientColumnViewEntry?.sourceRow
+        || null
+    );
+    [
+        control,
+        ...control.querySelectorAll(
+            "[data-ingredient-option-select], [data-set-alternative-preferred]",
+        ),
+    ].filter(action => action.matches?.(
+        "[data-ingredient-option-select], [data-set-alternative-preferred]",
+    )).forEach(action => {
+        if (action.recipeIngredientColumnViewOriginalOnclick === undefined) {
+            action.recipeIngredientColumnViewOriginalOnclick = (
+                action.getAttribute("onclick")
+            );
+        }
+        action.setAttribute(
+            "onclick",
+            "return selectRecipeIngredientColumnViewOption(this, event)",
+        );
+    });
+    return true;
+}
+
+function syncRecipeIngredientColumnViewOptionMetadata(entry) {
+    const row = entry?.row;
+    if (!row) return;
+    const values = fieldValuesFromRow(entry.sourceRow);
+    updateRecipeIngredientOptionRowSummary(row, entry.sourceRow, values, {
+        accessiblePrefix: "Edit ingredient",
+        fallbackName: "Unnamed ingredient",
+        showMetadata: false,
+        selectionState: entry.anchor ? entry.optionLabel : "",
+        selectionDetails: entry.anchor
+            ? String(
+                fieldValuesFromRow(entry.parentRow).source_text
+                || fieldValuesFromRow(entry.parentRow).original_text
+                || "",
+            ).trim()
+            : "",
+    });
+    if (!entry.anchor) return;
+
+    const sourceText = row.querySelector("[data-ingredient-source-text]");
+    if (entry.selected && sourceText) {
+        const selected = document.createElement("span");
+        selected.className = "recipe-edit-grouped-option-selected-status";
+        selected.dataset.recipeIngredientGroupedSelectionStatus = "";
+        selected.setAttribute("role", "status");
+        selected.setAttribute("aria-label", "Selected ingredient option");
+        selected.textContent = "Selected";
+        sourceText.appendChild(selected);
+    }
+
+    const optionCell = row.querySelector(
+        ".recipe-edit-alternative-component-option-spacer",
+    );
+    const header = entry.optionHeader;
+    if (!entry.selected) {
+        recipeIngredientColumnViewMoveControl(
+            row,
+            header?.querySelector(":scope > [data-ingredient-option-select]"),
+            optionCell,
+        );
+    }
+    if (entry.expanded) {
+        const movedMenu = recipeIngredientColumnViewMoveControl(
+            row,
+            header?.querySelector(
+                ":scope > .recipe-edit-alternative-menu-wrap",
+            ),
+            optionCell,
+        );
+        optionCell?.classList.toggle(
+            "has-recipe-ingredient-grouped-option-menu",
+            movedMenu,
+        );
+    }
 }
 
 function syncRecipeIngredientColumnViewSectionFragments(
@@ -29447,6 +30035,7 @@ function syncRecipeIngredientColumnViewSectionFragments(
     ingredientEntries,
 ) {
     if (!list) return;
+    bindRecipeIngredientColumnViewOptionSelection(list);
     rows.forEach(row => {
         delete row.recipeIngredientColumnViewEntries;
     });
@@ -29461,88 +30050,57 @@ function syncRecipeIngredientColumnViewSectionFragments(
             parentRow.recipeIngredientColumnViewEntries = parentEntries;
             return;
         }
-        const block = parentRow.querySelector(
-            ":scope > [data-ingredient-selected-option-block]",
-        );
-        if (!block || !parentEntries.length) {
-            parentRow.recipeIngredientColumnViewEntries = parentEntries;
-            return;
-        }
-        const entriesBySection = new Map();
+        parentRow.recipeIngredientColumnViewEntries = parentEntries;
+        const selectedAnchor = parentEntries.find(entry => (
+            entry.selected && entry.anchor
+        )) || null;
+        parentRow.recipeIngredientGroupedChoiceAnchorSummary = selectedAnchor?.row
+            || null;
         parentEntries.forEach(entry => {
-            const sectionEntries = entriesBySection.get(entry.store.key) || [];
-            sectionEntries.push(entry);
-            entriesBySection.set(entry.store.key, sectionEntries);
-            entry.row.recipeIngredientColumnViewEntry = entry;
+            const row = entry.row;
+            // Keep every promoted presentation row connected to the concrete
+            // ingredient it represents. Grouping, filtering, and row actions
+            // must resolve from that member rather than from summary markup.
+            row.recipeIngredientOptionSourceRow = entry.sourceRow;
+            ensureRecipeIngredientColumnViewOptionRowId(
+                row,
+                parentRow,
+                entry.optionId,
+                entry.sourceRow,
+                entry.manualIndex,
+                entry.selected ? "selected" : "alternative",
+            );
+            row.dataset.recipeIngredientColumnOptionRow = "";
+            row.dataset.recipeIngredientOptionMemberId = entry.stableId;
+            row.dataset.recipeIngredientOptionId = entry.optionId;
+            row.dataset.recipeIngredientOptionAnchor = String(entry.anchor);
+            row.dataset.recipeIngredientChoiceParentId = (
+                ensureRecipeIngredientExpansionId(parentRow)
+            );
+            row.classList.toggle(
+                "is-recipe-ingredient-column-option-anchor",
+                entry.anchor,
+            );
+            row.classList.toggle(
+                "is-recipe-ingredient-column-selected-option",
+                entry.selected,
+            );
+            row.recipeIngredientColumnViewEntry = entry;
+            row.recipeIngredientColumnViewEntries = [entry];
+            row.recipeIngredientColumnViewParentRow = parentRow;
+            row.recipeIngredientChoiceParentRow = parentRow;
+            row.recipeIngredientSelectedOptionBlock = entry.selected
+                ? parentRow.querySelector(
+                    ":scope > [data-ingredient-selected-option-block]",
+                )
+                : null;
+            if (entry.sourceRow && entry.sourceRow !== parentRow) {
+                entry.sourceRow.recipeIngredientColumnViewPromotedSummary = row;
+            }
+            moveRecipeIngredientColumnViewNode(row, list);
+            syncRecipeIngredientColumnViewOptionMetadata(entry);
         });
-        const hostSectionKey = parentEntries[0].store.key;
-        const hostEntries = entriesBySection.get(hostSectionKey) || [];
-        const header = block.querySelector(":scope > [data-ingredient-option-header]");
-        const action = block.querySelector(":scope > [data-ingredient-option-actions]");
-        renderRecipeIngredientOptionBlock(block, {
-            header,
-            ingredientContent: hostEntries.map(entry => entry.row),
-            actions: [action],
-        });
-        block.recipeIngredientColumnViewEntries = hostEntries;
-        parentRow.recipeIngredientColumnViewEntries = hostEntries;
-        entriesBySection.forEach((sectionEntries, sectionKey) => {
-            if (sectionKey === hostSectionKey) return;
-            const fragment = document.createElement("section");
-            const optionLabel = String(
-                header?.querySelector("[data-ingredient-option-label]")?.textContent
-                || "SELECTED OPTION",
-            ).trim();
-            const contextHeader = createRecipeIngredientOptionHeader({
-                label: optionLabel,
-                selected: true,
-            });
-            contextHeader.classList.add(
-                "recipe-edit-ingredient-store-section-option-context",
-            );
-            contextHeader.dataset.ingredientOptionContextHeader = "";
-            fragment.className = [
-                "recipe-edit-ingredient-store-section-option-fragment",
-                "recipe-edit-ingredient-option-group",
-                "recipe-edit-selected-option-line-items",
-                "is-selected-option",
-                block.classList.contains("is-default-option")
-                    ? "is-default-option"
-                    : "",
-            ].join(" ");
-            fragment.dataset.recipeIngredientColumnSectionFragment = "";
-            fragment.dataset.recipeIngredientColumnSectionKey = sectionKey;
-            fragment.dataset.recipeIngredientColumnSectionFragmentKey = [
-                recipeIngredientColumnViewEntryStableId(
-                    parentRow,
-                    parentRow,
-                    "parent",
-                    parentEntries[0].manualIndex,
-                ),
-                parentEntries[0].optionId || "selected",
-                sectionKey,
-            ].join(":");
-            fragment.setAttribute("role", "rowgroup");
-            fragment.setAttribute(
-                "aria-label",
-                `${optionLabel}, selected ingredients in ${sectionEntries[0].store.label}`,
-            );
-            fragment.recipeIngredientColumnViewParentRow = parentRow;
-            fragment.recipeIngredientOptionSourceRow = sectionEntries[0].sourceRow;
-            fragment.recipeIngredientColumnViewEntries = sectionEntries;
-            fragment.recipeIngredientColumnViewManualIndex = Math.min(
-                ...sectionEntries.map(entry => entry.manualIndex),
-            );
-            fragment.append(
-                contextHeader,
-                ...sectionEntries.map(entry => entry.row),
-            );
-            list.appendChild(fragment);
-        });
-        parentRow.classList.toggle(
-            "has-store-section-option-fragments",
-            entriesBySection.size > 1,
-        );
+        setRecipeIngredientColumnViewSourceCarrier(parentRow);
     });
 }
 
@@ -29646,7 +30204,9 @@ function prepareRecipeIngredientColumnViewDisplayRows(list, rows) {
             updateRecipeIngredientSubstitutionState(row);
         }
     });
-    const ingredientEntries = recipeIngredientColumnViewIngredientEntries(rows);
+    const ingredientEntries = recipeIngredientColumnViewIngredientEntries(rows, {
+        includeAlternatives: recipeEditIngredientColumnView.groupByStoreSection,
+    });
     if (recipeEditIngredientColumnView.groupByStoreSection) {
         syncRecipeIngredientColumnViewSectionFragments(
             list,
@@ -34790,13 +35350,29 @@ function updateRecipeIngredientOptionRowSummary(summary, sourceRow, values = {},
 }
 
 function updateRecipeIngredientAlternativeComponentSummary(optionRow) {
-    const summary = optionRow ? optionRow.querySelector("[data-alternative-component-summary]") : null;
+    const summary = optionRow
+        ? (
+            optionRow.querySelector("[data-alternative-component-summary]")
+            || optionRow.recipeIngredientColumnViewPromotedSummary
+        )
+        : null;
     if (!summary) {
         return;
     }
     const values = fieldValuesFromRow(optionRow);
+    const groupedEntry = summary.recipeIngredientColumnViewEntry || null;
     updateRecipeIngredientOptionRowSummary(summary, optionRow, values, {
         role: recipeIngredientAlternativeRoleLabel(optionRow, values),
+        selectionState: groupedEntry?.anchor
+            ? groupedEntry.optionLabel
+            : "",
+        selectionDetails: groupedEntry?.anchor
+            ? String(
+                fieldValuesFromRow(groupedEntry.parentRow).source_text
+                || fieldValuesFromRow(groupedEntry.parentRow).original_text
+                || "",
+            ).trim()
+            : "",
     });
 }
 
@@ -34869,6 +35445,7 @@ function syncRecipeIngredientSelectedOptionToggles(row) {
     const sourceButton = row.querySelector(
         "[data-ingredient-substitutions-toggle]",
     );
+    const groupedAnchor = row.recipeIngredientGroupedChoiceAnchorSummary || null;
     const show = Boolean(
         sourceButton
         && row.classList.contains("is-ingredient-store-section-grouped-choice"),
@@ -34881,10 +35458,14 @@ function syncRecipeIngredientSelectedOptionToggles(row) {
         if (!button || !cell) {
             return;
         }
-        button.hidden = !show;
-        cell.classList.toggle("has-visible-ingredient-selected-option-toggle", show);
-        cell.setAttribute("aria-hidden", String(!show));
-        if (!show) {
+        const showOnSummary = Boolean(show && summary === groupedAnchor);
+        button.hidden = !showOnSummary;
+        cell.classList.toggle(
+            "has-visible-ingredient-selected-option-toggle",
+            showOnSummary,
+        );
+        cell.setAttribute("aria-hidden", String(!showOnSummary));
+        if (!showOnSummary) {
             return;
         }
         const sourceLabel = sourceButton.querySelector(
@@ -34921,7 +35502,12 @@ function syncRecipeIngredientSelectedOptionToggles(row) {
             sourceButton.title,
             isExpanded,
         );
-        const controls = sourceButton.getAttribute("aria-controls");
+        const groupedControls = recipeIngredientColumnViewAlternativeSummaryIds(
+            row,
+        );
+        const controls = groupedControls.length
+            ? groupedControls.join(" ")
+            : sourceButton.getAttribute("aria-controls");
         if (controls) {
             button.setAttribute("aria-controls", controls);
         } else {
@@ -35341,6 +35927,13 @@ function recipeIngredientSelectedOptionBlockFromControl(control) {
     );
     if (directBlock) return directBlock;
 
+    const groupedRow = control?.closest?.(
+        "[data-recipe-ingredient-column-option-row]",
+    );
+    if (groupedRow?.recipeIngredientSelectedOptionBlock) {
+        return groupedRow.recipeIngredientSelectedOptionBlock;
+    }
+
     // Row menus are portaled to <body> while open. Resolve their original
     // selected-option header through the anchor button retained by the menu.
     const menu = control?.closest?.(".recipe-edit-row-menu");
@@ -35516,6 +36109,40 @@ function syncRecipeIngredientSelectedOptionLineItems(
     let lineItems = row.querySelector(
         ":scope > [data-ingredient-selected-option-block]",
     );
+    if (row.classList.contains("is-recipe-ingredient-column-source-carrier")) {
+        const promotedRows = recipeIngredientSelectedOptionSummaries(row)
+            .filter(summary => summary.hasAttribute(
+                "data-recipe-ingredient-column-option-row",
+            ));
+        promotedRows.forEach(summary => {
+            const sourceRow = summary.recipeIngredientOptionSourceRow;
+            if (!sourceRow || !activeRows.includes(sourceRow)) return;
+            summary.dataset.ingredientSelectedChoiceState = selectionState;
+            summary.dataset.ingredientSelectedChoiceDetails = selectionDetails;
+            updateRecipeIngredientOptionRowSummary(
+                summary,
+                sourceRow,
+                fieldValuesFromRow(sourceRow),
+                {
+                    accessiblePrefix: "Edit ingredient",
+                    fallbackName: "Unnamed ingredient",
+                    showMetadata: false,
+                    selectionState: summary.dataset
+                        .recipeIngredientOptionAnchor === "true"
+                        ? selectionState
+                        : "",
+                    selectionDetails,
+                },
+            );
+            syncRecipeIngredientInlineEditor(row, summary);
+        });
+        row.classList.toggle(
+            "has-selected-option-line-items",
+            activeRows.length > 0,
+        );
+        syncRecipeIngredientSelectedOptionToggles(row);
+        return;
+    }
     if (!renderedRows.length) {
         const relocatesExpandedChoice = Boolean(
             row.recipeIngredientExpansionAnchor
@@ -50546,9 +51173,20 @@ function recipeIngredientParentRowFromControl(control) {
         return null;
     }
 
+    if (control.recipeIngredientChoiceParentRow) {
+        return control.recipeIngredientChoiceParentRow;
+    }
+
     const substitutions = control.closest("[data-ingredient-substitutions]");
     if (substitutions?.recipeIngredientChoiceParentRow) {
         return substitutions.recipeIngredientChoiceParentRow;
+    }
+
+    const groupedOptionRow = control.closest(
+        "[data-recipe-ingredient-column-option-row]",
+    );
+    if (groupedOptionRow?.recipeIngredientChoiceParentRow) {
+        return groupedOptionRow.recipeIngredientChoiceParentRow;
     }
 
     const optionRow = control.closest("[data-substitution-option-row]");
@@ -50637,10 +51275,22 @@ function recipeIngredientExpansionAnchorFromControl(row, control = null) {
 }
 
 function recipeIngredientExpansionViewportAnchor(row, control = null) {
+    const groupedRow = control?.closest?.(
+        "[data-recipe-ingredient-column-option-row]",
+    );
+    if (groupedRow?.recipeIngredientChoiceParentRow === row) {
+        return groupedRow;
+    }
     return recipeIngredientExpansionAnchorFromControl(row, control) || row;
 }
 
 function recipeIngredientExpansionIsOpen(row, control = null) {
+    if (
+        recipeEditIngredientColumnView.groupByStoreSection
+        && row?.recipeIngredientGroupedOptionsExpanded !== undefined
+    ) {
+        return Boolean(row.recipeIngredientGroupedOptionsExpanded);
+    }
     const expansionId = recipeIngredientExpansionIdForControl(row, control);
     return Boolean(
         expansionId
@@ -51024,6 +51674,37 @@ function setRecipeIngredientSubstitutionsExpanded(row, control, shouldOpen, opti
 
     const restoreOtherEdits = options.restoreOtherEdits !== false;
     closeRecipeEditRowMenus();
+    const groupedStoreSectionChoice = Boolean(
+        recipeEditIngredientColumnView.groupByStoreSection
+        && row.classList.contains("has-ingredient-choice")
+    );
+    if (groupedStoreSectionChoice) {
+        const expansionId = ensureRecipeIngredientExpansionId(row);
+        if (!shouldOpen) {
+            container.querySelectorAll(".recipe-edit-alternative-card.is-editing")
+                .forEach(card => {
+                    setRecipeIngredientAlternativeEditMode(card, false, {
+                        restore: restoreOtherEdits,
+                    });
+                });
+        }
+        row.recipeIngredientGroupedOptionsExpanded = Boolean(shouldOpen);
+        row.recipeIngredientExpansionAnchor = shouldOpen ? row : null;
+        row.recipeIngredientActiveExpansionId = shouldOpen ? expansionId : "";
+        row.classList.toggle("recipe-edit-substitutions-open", Boolean(shouldOpen));
+        container.hidden = true;
+        if (shouldOpen) {
+            recipeEditExpandedIngredientIds.add(expansionId);
+        } else {
+            recipeEditExpandedIngredientIds.delete(expansionId);
+        }
+        updateRecipeIngredientSubstitutionState(row, control);
+        if (options.refreshGroupedView !== false) {
+            applyRecipeIngredientColumnView();
+            syncRecipeIngredientColumnViewOpenMenu({ render: true });
+        }
+        return true;
+    }
     if (shouldOpen) {
         if (isRecipeIngredientRowCollapsed(row)) {
             row.classList.remove("recipe-edit-row-collapsed");
@@ -51251,6 +51932,14 @@ function recipeIngredientAlternativeCardFromControl(control) {
         return directCard;
     }
 
+    const assignedSourceRow = control?.recipeIngredientOptionSourceRow || null;
+    const assignedCard = assignedSourceRow?.closest?.(
+        ".recipe-edit-alternative-card",
+    );
+    if (assignedCard) {
+        return assignedCard;
+    }
+
     // Selected replacement ingredients are projected into the main ingredient
     // table. Their cloned action menus live outside the alternative card, so
     // resolve the projected component back to its source row before looking up
@@ -51269,6 +51958,9 @@ function recipeIngredientAlternativeCardFromControl(control) {
 }
 
 function recipeIngredientAlternativeComponentFromControl(control) {
+    if (control?.recipeIngredientOptionSourceRow) {
+        return control.recipeIngredientOptionSourceRow;
+    }
     const directRow = control && control.closest ? control.closest("[data-substitution-option-row]") : null;
     if (directRow) {
         return directRow;
@@ -51288,13 +51980,17 @@ function recipeIngredientAlternativeComponentFromControl(control) {
 }
 
 function recipeIngredientProjectedOptionSourceRow(control) {
-    return recipeIngredientProjectedSummaryFromControl(control)
+    return control?.recipeIngredientOptionSourceRow
+        || recipeIngredientProjectedSummaryFromControl(control)
         ?.recipeIngredientOptionSourceRow || null;
 }
 
 function recipeIngredientProjectedSummaryFromControl(control) {
     const directSummary = control && control.closest
-        ? control.closest("[data-ingredient-selected-option-line-item]")
+        ? control.closest(
+            "[data-recipe-ingredient-column-option-row], "
+            + "[data-ingredient-selected-option-line-item]",
+        )
         : null;
     if (directSummary) {
         return directSummary;
@@ -51304,14 +52000,20 @@ function recipeIngredientProjectedSummaryFromControl(control) {
         : null;
     const anchor = menu ? menu.recipeEditAnchorButton : null;
     return anchor && anchor.closest
-        ? anchor.closest("[data-ingredient-selected-option-line-item]")
+        ? anchor.closest(
+            "[data-recipe-ingredient-column-option-row], "
+            + "[data-ingredient-selected-option-line-item]",
+        )
         : null;
 }
 
 function recipeIngredientProjectedColumnDisplayRow(control) {
-    return recipeIngredientProjectedSummaryFromControl(control)?.closest(
-        "[data-recipe-ingredient-column-section-fragment]",
-    ) || null;
+    const summary = recipeIngredientProjectedSummaryFromControl(control);
+    return summary?.matches?.("[data-recipe-ingredient-column-option-row]")
+        ? summary
+        : summary?.closest(
+            "[data-recipe-ingredient-column-option-row]",
+        ) || null;
 }
 
 function recipeIngredientColumnViewManualRowsInSection(displayRow) {
@@ -52064,7 +52766,9 @@ function applyRecipeIngredientOptionSelection(ingredientRow, optionId) {
     // of those projections, the stale projection cleanup moves and hides it.
     // Remember the user's disclosure state and remount the same panel beneath
     // the newly selected choice once the projections have settled.
-    const preserveExpandedOptions = !container.hidden;
+    const preserveExpandedOptions = recipeIngredientExpansionIsOpen(
+        ingredientRow,
+    );
 
     setRecipeIngredientDefaultOption(
         ingredientRow,
@@ -52163,7 +52867,10 @@ function setRecipeIngredientOptionSelected(button) {
         const disclosure = ingredientRow.querySelector(
             "[data-ingredient-substitutions-toggle]",
         );
-        const focusTarget = selectedMenuButton || disclosure;
+        const groupedDisclosure = ingredientRow
+            .recipeIngredientGroupedChoiceAnchorSummary
+            ?.querySelector("[data-ingredient-selected-option-toggle]");
+        const focusTarget = groupedDisclosure || selectedMenuButton || disclosure;
         if (
             focusTarget?.isConnected
             && !focusTarget.closest("[hidden], [inert]")
@@ -53067,7 +53774,12 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
         const groupStatus = selectedChoiceGroupHeader.querySelector(
             "[data-ingredient-selected-choice-group-status]",
         );
-        selectedChoiceGroupHeader.hidden = !showsSelectedChoiceGroup;
+        selectedChoiceGroupHeader.hidden = (
+            !showsSelectedChoiceGroup
+            || row.classList.contains(
+                "is-recipe-ingredient-column-source-carrier",
+            )
+        );
         if (groupLabel) {
             groupLabel.textContent = presentation.parentLabel;
         }

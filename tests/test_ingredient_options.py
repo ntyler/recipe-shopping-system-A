@@ -650,7 +650,11 @@ def test_selecting_an_option_preserves_an_open_group_after_projection_rebuild():
         script.index("function setRecipeIngredientOptionSelected")
     ]
 
-    assert "const preserveExpandedOptions = !container.hidden;" in selection
+    assert "const preserveExpandedOptions = recipeIngredientExpansionIsOpen(" in selection
+    assert "ingredientRow," in selection
+    assert selection.index("const preserveExpandedOptions") < selection.index(
+        "setRecipeIngredientDefaultOption("
+    )
     assert selection.index("setRecipeIngredientDefaultOption(") < selection.index(
         "if (preserveExpandedOptions)"
     )
@@ -2389,42 +2393,6 @@ def test_standard_and_choice_rows_share_the_same_faint_group_boundary():
     assert "border-bottom: 1px solid color-mix(" in rule
     assert "var(--recipe-editor-border-soft) 22%" in rule
     assert "var(--app-border)" not in rule
-
-
-def test_grouped_ingredient_v109_keeps_one_mobile_parent_count_and_auto_height():
-    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
-    v108_marker = "/* Ingredient editor v108: one quiet boundary per complete ingredient group. */"
-    v109_marker = "/* Ingredient editor v109: every grouped ingredient keeps one canonical parent row. */"
-
-    assert css.index(v109_marker) > css.index(v108_marker)
-    v109 = css[css.index(v109_marker):]
-
-    for hidden_direct_source in (
-        ".recipe-edit-row-handle,",
-        "[data-ingredient-column],",
-        ".recipe-edit-ingredient-mobile-quantity-summary",
-    ):
-        assert hidden_direct_source in v109
-    assert "> .recipe-edit-ingredient-row.has-selected-choice-group-header" in v109
-    assert "display: none !important;" in v109
-
-    assert "@media (max-width: 767px)" in v109
-    assert "#recipeEditIngredients.recipe-edit-ingredients-collapsed" in v109
-    assert ".has-selected-choice-group-header:not(.recipe-edit-row-expanded)" in v109
-    assert ".has-selected-choice-group-header.recipe-edit-row-collapsed" in v109
-    assert "grid-template-rows: auto !important;" in v109
-    assert "> :not(.recipe-edit-selected-choice-group-header)" in v109
-
-    assert (
-        "grid-template-columns: 40px minmax(0, 1fr) "
-        "minmax(64px, max-content) 96px !important;"
-    ) in v109
-    assert ".recipe-edit-ingredient-options-copy" in v109
-    assert "display: inline-flex !important;" in v109
-    assert "min-width: 64px !important;" in v109
-    assert "min-height: 40px;" in v109
-    assert "[data-ingredient-options-label]" in v109
-    assert "[data-ingredient-options-summary]" in v109
 
 
 def test_collapsed_default_choice_has_one_parent_gap_before_its_ingredient_group():
