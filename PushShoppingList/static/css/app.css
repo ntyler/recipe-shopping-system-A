@@ -69110,7 +69110,6 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel
 body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel
     > .recipe-edit-substitution-heading {
     display: flex;
-    order: 3;
     min-height: 36px;
     align-items: center;
     padding: 0 14px 0 94px;
@@ -69163,14 +69162,8 @@ body.recipe-edit-standalone-page .recipe-edit-alternative-add-component svg {
 }
 
 body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel
-    > .recipe-edit-ingredient-choice-overview {
-    order: 1;
-}
-
-body.recipe-edit-standalone-page .recipe-edit-ingredient-options-panel
     > .recipe-edit-substitution-list {
     display: grid !important;
-    order: 2;
     min-width: 0;
     gap: 0;
     padding: 0;
@@ -78967,19 +78960,85 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     }
 }
 
-/* Ingredient editor v110: Store Section placement owns the selected ingredient rows. */
+/* Ingredient editor v112: every selected ingredient option renders as one atomic block. */
 body.recipe-edit-standalone-page #recipeEditIngredients
-    .recipe-edit-ingredient-options-panel.has-section-placed-selected-option:not(
-        .recipe-edit-ingredient-modal-options-panel
-    )
-    > .recipe-edit-ingredient-choice-overview.is-selected-option
-    .recipe-edit-default-option-summary,
-body.recipe-edit-standalone-page #recipeEditIngredients
-    .recipe-edit-ingredient-options-panel.has-section-placed-selected-option:not(
-        .recipe-edit-ingredient-modal-options-panel
-    )
-    > .recipe-edit-substitution-list
-    > .recipe-edit-alternative-card.is-selected-option
-    .recipe-edit-alternative-components {
+    .recipe-edit-ingredient-options-panel:not(.recipe-edit-ingredient-modal-options-panel)
+    .is-selected-option-source {
     display: none !important;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-row.has-selected-choice-group-header.has-selected-option-line-items
+    > .recipe-edit-selected-option-line-items {
+    grid-row: 2 !important;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-row.has-selected-choice-group-header.recipe-edit-substitutions-open
+    > .recipe-edit-ingredient-options-panel {
+    grid-row: 3 !important;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-selected-option-line-items
+    > [data-ingredient-option-header] {
+    width: 100%;
+    min-width: 0;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-selected-option-line-items
+    > [data-ingredient-option-actions][hidden] {
+    display: none !important;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-selected-option-line-items
+    > [data-ingredient-option-header]
+    > .recipe-edit-alternative-menu-wrap[hidden] {
+    display: none !important;
+}
+
+@media (min-width: 768px) {
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        > .recipe-edit-ingredient-row.has-selected-choice-group-header {
+        grid-template-rows: auto auto auto !important;
+    }
+}
+
+@media (max-width: 767px) {
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        > .recipe-edit-ingredient-row.has-selected-choice-group-header.recipe-edit-row-expanded {
+        grid-template-rows: auto auto auto auto auto !important;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        > .recipe-edit-ingredient-row.has-selected-choice-group-header
+        > .recipe-edit-ingredient-mobile-header {
+        grid-row: 1 !important;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        > .recipe-edit-ingredient-row.has-selected-choice-group-header.has-selected-option-line-items
+        > .recipe-edit-selected-option-line-items {
+        grid-row: 2 !important;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        > .recipe-edit-ingredient-row.has-selected-choice-group-header.recipe-edit-substitutions-open
+        > .recipe-edit-ingredient-options-panel {
+        grid-row: 3 !important;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        > .recipe-edit-ingredient-row.has-selected-choice-group-header
+        > .recipe-edit-ingredient-preparation-summary {
+        grid-row: 4 !important;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        > .recipe-edit-ingredient-row.has-selected-choice-group-header
+        > .recipe-edit-ingredient-buy-as-summary {
+        grid-row: 5 !important;
+    }
 }

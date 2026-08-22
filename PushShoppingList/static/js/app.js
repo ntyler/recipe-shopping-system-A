@@ -29320,161 +29320,23 @@ function recipeIngredientColumnViewIngredientTotal(rows = []) {
     );
 }
 
-function createRecipeIngredientColumnViewGroupProjection(list, parentRow, lineItem) {
-    const sourceRow = recipeIngredientColumnViewSourceRow(lineItem);
-    if (!list || !parentRow || !sourceRow || sourceRow === lineItem) return null;
-    const projection = document.createElement("div");
-    projection.className = "recipe-edit-ingredient-column-group-projection";
-    projection.dataset.recipeIngredientColumnGroupProjection = "";
-    syncRecipeIngredientColumnViewGroupProjection(
-        projection,
-        parentRow,
-        lineItem,
-    );
-    list.insertAdjacentElement("beforeend", projection);
-    return projection;
-}
-
-function syncRecipeIngredientColumnViewGroupProjection(
-    projection,
-    parentRow,
-    lineItem,
-) {
-    const sourceRow = recipeIngredientColumnViewSourceRow(lineItem);
-    if (!projection || !parentRow || !sourceRow || sourceRow === lineItem) {
-        return null;
-    }
-    const selectionState = String(
-        lineItem.dataset.ingredientSelectedChoiceState || "",
-    ).trim();
-    const selectionDetails = String(
-        lineItem.dataset.ingredientSelectedChoiceDetails || "",
-    ).trim();
-    projection.recipeIngredientOptionSourceRow = sourceRow;
-    projection.recipeIngredientColumnViewParentRow = parentRow;
-    let summary = projection.querySelector(
-        ":scope > [data-ingredient-selected-option-line-item]",
-    );
-    if (
-        !summary
-        || summary.recipeIngredientOptionSourceRow !== sourceRow
-    ) {
-        if (parentRow.recipeIngredientExpansionAnchor === projection) {
-            resetRecipeIngredientExpansionMount(
-                parentRow,
-                parentRow.recipeIngredientSubstitutionPanel,
-            );
-        }
-        summary = createRecipeIngredientSelectedOptionLineItem(parentRow, sourceRow, {
-            selectionState,
-            selectionDetails,
-        });
-        projection.replaceChildren(summary);
-    } else {
-        summary.recipeIngredientChoiceParentRow = parentRow;
-        summary.dataset.ingredientSelectedChoiceState = selectionState;
-        summary.dataset.ingredientSelectedChoiceDetails = selectionDetails;
-        updateRecipeIngredientOptionRowSummary(
-            summary,
-            sourceRow,
-            fieldValuesFromRow(sourceRow),
-            {
-                accessiblePrefix: "Edit ingredient",
-                fallbackName: "Unnamed ingredient",
-                showMetadata: false,
-                selectionState,
-                selectionDetails,
-            },
-        );
-        syncRecipeIngredientInlineEditor(parentRow, summary);
-        ensureRecipeIngredientSelectedOptionToggle(parentRow, summary);
-    }
-    summary.classList.add("is-ingredient-column-group-projection-row");
-    summary.classList.remove("is-ingredient-column-grouped-away");
-    summary.hidden = false;
-    summary.removeAttribute("aria-hidden");
-    projection.dataset.ingredientExpansionId = recipeIngredientExpansionIdForControl(
-        parentRow,
-        summary,
-    );
-    lineItem.classList.add("is-ingredient-column-grouped-away");
-    return projection;
-}
-
 function prepareRecipeIngredientColumnViewDisplayRows(list, rows) {
-    const existingProjections = new Map(
-        [...list.querySelectorAll(
-            ":scope > [data-recipe-ingredient-column-group-projection]",
-        )].map(projection => [
-            projection.recipeIngredientOptionSourceRow,
-            projection,
-        ]),
-    );
-    const retainedProjections = new Set();
     clearRecipeIngredientColumnViewGroupedAwayLineItems(list);
     rows.forEach(row => {
         row.classList.remove("is-ingredient-store-section-grouped-choice");
-        // Grouping changes how every selected choice is presented. Refresh each
-        // choice row before projections are built so the first grouping toggle
-        // cannot retain a stale ungrouped default/alternative summary header.
+        // Grouping changes where the complete parent group is placed, not the
+        // internal order or ownership of its selected option ingredients.
         if (row.classList.contains("has-ingredient-choice")) {
             updateRecipeIngredientSubstitutionState(row);
         }
     });
-    if (!recipeEditIngredientColumnView.groupByStoreSection) {
-        clearRecipeIngredientColumnViewGroupProjections(list);
-        rows.forEach(syncRecipeIngredientSelectedOptionToggles);
-        return recipeIngredientColumnViewDisplayRows(list);
-    }
-    rows.forEach(parentRow => {
-        const parentSection = recipeIngredientColumnViewEntry(parentRow, "store");
-        const lineItems = recipeIngredientColumnViewSelectedOptionLineItems(parentRow);
-        let projectionAnchor = parentRow;
-        parentRow.classList.toggle(
-            "is-ingredient-store-section-grouped-choice",
-            lineItems.length > 0
-                && !parentRow.classList.contains("has-selected-choice-group-header"),
-        );
-        lineItems.forEach(lineItem => {
-            const componentSection = recipeIngredientColumnViewEntry(lineItem, "store");
-            if (componentSection.key === parentSection.key) return;
-            const sourceRow = recipeIngredientColumnViewSourceRow(lineItem);
-            const existingProjection = existingProjections.get(sourceRow);
-            const projection = existingProjection
-                ? syncRecipeIngredientColumnViewGroupProjection(
-                    existingProjection,
-                    parentRow,
-                    lineItem,
-                )
-                : createRecipeIngredientColumnViewGroupProjection(
-                    list,
-                    parentRow,
-                    lineItem,
-                );
-            if (projection) {
-                // Keep projections next to their top-level source row in the
-                // underlying DOM. The grouped view uses that manual order as
-                // its within-section tie-breaker, so moving the source row is
-                // reflected immediately and survives serialization/reload.
-                projectionAnchor.insertAdjacentElement("afterend", projection);
-                projectionAnchor = projection;
-                retainedProjections.add(projection);
-            }
-        });
-        syncRecipeIngredientSelectedOptionToggles(parentRow);
-    });
-    existingProjections.forEach(projection => {
-        if (!retainedProjections.has(projection)) {
-            const parentRow = projection.recipeIngredientColumnViewParentRow;
-            if (parentRow?.recipeIngredientExpansionAnchor === projection) {
-                resetRecipeIngredientExpansionMount(
-                    parentRow,
-                    parentRow.recipeIngredientSubstitutionPanel,
-                );
-            }
-            projection.remove();
-        }
-    });
+    // Older grouped rendering projected individual selected ingredients into
+    // other Store Sections. That split an option header from its rows and made
+    // grouped and ungrouped views maintain different component trees. Retire
+    // any such projections and keep one atomic selected-option block under the
+    // parent group's Store Section.
+    clearRecipeIngredientColumnViewGroupProjections(list);
+    rows.forEach(syncRecipeIngredientSelectedOptionToggles);
     return recipeIngredientColumnViewDisplayRows(list);
 }
 
@@ -35080,6 +34942,162 @@ function recipeIngredientSelectedOptionActiveRows(row, selectedChoice) {
     return selectedChoice && values.length === 1 && row ? [row] : [];
 }
 
+function recipeIngredientSelectedOptionBlockFromControl(control) {
+    const directBlock = control?.closest?.(
+        "[data-ingredient-selected-option-block]",
+    );
+    if (directBlock) return directBlock;
+
+    // Row menus are portaled to <body> while open. Resolve their original
+    // selected-option header through the anchor button retained by the menu.
+    const menu = control?.closest?.(".recipe-edit-row-menu");
+    const anchor = menu?.recipeEditAnchorButton;
+    return anchor?.closest?.("[data-ingredient-selected-option-block]") || null;
+}
+
+function recipeIngredientSelectedOptionSourceCard(control) {
+    const block = recipeIngredientSelectedOptionBlockFromControl(control);
+    const row = recipeIngredientParentRowFromControl(control);
+    const container = recipeIngredientSubstitutionContainer(row, control);
+    const optionId = String(block?.dataset.optionId || "").trim();
+    if (!container || !optionId) return null;
+    return [...container.querySelectorAll(
+        "[data-ingredient-substitution-list] > .recipe-edit-alternative-card",
+    )].find(card => String(card.dataset.alternativeId || "").trim() === optionId) || null;
+}
+
+function editRecipeIngredientSelectedOption(button) {
+    const sourceCard = recipeIngredientSelectedOptionSourceCard(button);
+    const trigger = recipeEditMenuAnchorButtonFromButton(button) || button;
+    if (sourceCard) {
+        const optionRow = sourceCard.querySelector("[data-substitution-option-row]");
+        return openRecipeIngredientOptionModal(trigger, {
+            optionRow,
+            trigger,
+        });
+    }
+    return openRecipeIngredientDefaultOptionModal(trigger);
+}
+
+function duplicateRecipeIngredientSelectedOption(button) {
+    const sourceCard = recipeIngredientSelectedOptionSourceCard(button);
+    return sourceCard
+        ? duplicateRecipeIngredientAlternative(sourceCard)
+        : duplicateRecipeIngredientDefaultOption(button);
+}
+
+function moveRecipeIngredientSelectedOption(button, direction) {
+    const sourceCard = recipeIngredientSelectedOptionSourceCard(button);
+    return sourceCard
+        ? moveRecipeIngredientAlternative(sourceCard, direction)
+        : moveRecipeIngredientDefaultOption(button, direction);
+}
+
+function removeRecipeIngredientSelectedOption(button) {
+    const sourceCard = recipeIngredientSelectedOptionSourceCard(button);
+    return sourceCard
+        ? removeRecipeIngredientAlternative(sourceCard)
+        : removeRecipeIngredientDefaultOption(button);
+}
+
+function addRecipeIngredientSelectedOptionComponent(button) {
+    const sourceCard = recipeIngredientSelectedOptionSourceCard(button);
+    const sourceAction = sourceCard?.querySelector(
+        ":scope > .recipe-edit-alternative-editor > .recipe-edit-alternative-add-component",
+    );
+    return sourceAction
+        ? addRecipeIngredientAlternativeComponent(sourceAction)
+        : addRecipeIngredientDefaultComponent(button);
+}
+
+function ensureRecipeIngredientSelectedOptionBlock(
+    row,
+    selectedChoice,
+    expanded = false,
+) {
+    if (!row || !selectedChoice) return null;
+    const optionsPanel = row.recipeIngredientSubstitutionPanel || row.querySelector(
+        ":scope > [data-ingredient-substitutions]",
+    );
+    let block = row.querySelector(
+        ":scope > [data-ingredient-selected-option-block]",
+    );
+    const home = row.recipeIngredientSubstitutionHome;
+    const homeIsInRow = Boolean(home?.parentNode === row);
+    if (!block) {
+        block = document.createElement("section");
+        block.className = [
+            "recipe-edit-selected-option-line-items",
+            "recipe-edit-ingredient-option-group",
+            "is-selected-option",
+        ].join(" ");
+        block.dataset.ingredientSelectedOptionLineItems = "";
+        block.dataset.ingredientSelectedOptionBlock = "";
+        block.dataset.ingredientOptionBlock = "";
+        // Keep the complete selected block before the panel's home marker. The
+        // panel is moved back after that marker whenever a disclosure closes,
+        // so inserting before the panel itself would let the panel jump ahead
+        // of its selected header and rows on the next expansion.
+        const reference = homeIsInRow
+            ? home
+            : (optionsPanel?.parentNode === row ? optionsPanel : null);
+        row.insertBefore(block, reference);
+    } else if (homeIsInRow && block.nextSibling !== home) {
+        // Normalize rows created by the previous split-block renderer too.
+        row.insertBefore(block, home);
+    }
+
+    const selectionState = String(
+        selectedChoice.selectionLabel
+        || recipeIngredientOptionTypeLabel(selectedChoice.isDefaultOption),
+    ).trim();
+    block.dataset.optionId = String(selectedChoice.id || "").trim();
+    block.dataset.ingredientOptionKind = selectedChoice.isDefaultOption
+        ? "default"
+        : "alternative";
+    block.classList.toggle("is-default-option", Boolean(selectedChoice.isDefaultOption));
+    block.setAttribute("aria-label", `${selectionState}: selected ingredient option`);
+
+    let header = block.querySelector(":scope > [data-ingredient-option-header]");
+    if (!header) {
+        header = createRecipeIngredientOptionHeader({
+            label: selectionState,
+            selected: true,
+            menuKind: "selected",
+        });
+        block.prepend(header);
+    }
+    const label = header.querySelector("[data-ingredient-option-label]");
+    if (label) label.textContent = selectionState;
+    const menu = header.querySelector(":scope > .recipe-edit-alternative-menu-wrap");
+    if (menu) {
+        menu.hidden = !expanded;
+        menu.toggleAttribute("inert", !expanded);
+        menu.setAttribute("aria-hidden", String(!expanded));
+    }
+    if (block.firstElementChild !== header) block.prepend(header);
+
+    let action = block.querySelector(":scope > [data-ingredient-option-actions]");
+    if (!action) {
+        action = document.createElement("button");
+        action.type = "button";
+        action.className = "recipe-edit-alternative-add-component recipe-edit-selected-option-add-component";
+        action.dataset.ingredientOptionActions = "";
+        action.setAttribute("onclick", "return addRecipeIngredientSelectedOptionComponent(this)");
+        action.innerHTML = `
+            <span class="recipe-edit-option-add-content"
+                  data-ingredient-grid-column="ingredient">
+                ${recipeEditSvgIcon("plus")}<span>Add ingredient to this option</span>
+            </span>
+        `;
+        block.appendChild(action);
+    }
+    action.hidden = !expanded;
+    action.setAttribute("aria-hidden", String(!expanded));
+    if (block.lastElementChild !== action) block.appendChild(action);
+    return block;
+}
+
 function syncRecipeIngredientSelectedOptionLineItems(
     row,
     selectedChoice,
@@ -35096,22 +35114,14 @@ function syncRecipeIngredientSelectedOptionLineItems(
         )
         : "";
     const selectionDetails = String(selectedChoice?.summary || "").trim();
-    // Every view keeps the same active option outside the disclosure-controlled
-    // alternatives panel. Store Section grouping only changes where those rows
-    // are placed; it never changes which recipe ingredients are active.
+    // The selected option is one persistent block outside the disclosure-controlled
+    // alternatives region: header, active ingredient rows, then option-level actions.
     const renderedRows = activeRows;
     const expansionPanel = row.recipeIngredientSubstitutionPanel || row.querySelector(
         ":scope > [data-ingredient-substitutions]",
     );
-    expansionPanel?.classList.toggle(
-        "has-section-placed-selected-option",
-        Boolean(
-            recipeEditIngredientColumnView.groupByStoreSection
-            && renderedRows.length > 0
-        ),
-    );
     let lineItems = row.querySelector(
-        ":scope > [data-ingredient-selected-option-line-items]",
+        ":scope > [data-ingredient-selected-option-block]",
     );
     if (!renderedRows.length) {
         const relocatesExpandedChoice = Boolean(
@@ -35137,19 +35147,17 @@ function syncRecipeIngredientSelectedOptionLineItems(
         return;
     }
     if (!lineItems && renderedRows.length) {
-        lineItems = document.createElement("div");
-        lineItems.className = "recipe-edit-selected-option-line-items";
-        lineItems.dataset.ingredientSelectedOptionLineItems = "";
-        lineItems.setAttribute("role", "rowgroup");
-        const optionsPanel = row.querySelector(
-            ":scope > [data-ingredient-substitutions]",
+        lineItems = ensureRecipeIngredientSelectedOptionBlock(
+            row,
+            selectedChoice,
+            expanded,
         );
-        row.insertBefore(lineItems, optionsPanel || null);
     }
     if (!lineItems) {
         row.classList.remove("has-selected-option-line-items");
         return;
     }
+    ensureRecipeIngredientSelectedOptionBlock(row, selectedChoice, expanded);
     const currentRows = Array.isArray(lineItems.recipeIngredientOptionSourceRows)
         ? lineItems.recipeIngredientOptionSourceRows
         : [];
@@ -35172,14 +35180,23 @@ function syncRecipeIngredientSelectedOptionLineItems(
                 { hide: !preservesExpandedChoice },
             );
         }
-        lineItems.replaceChildren(
-            ...renderedRows.map(sourceRow => (
-                createRecipeIngredientSelectedOptionLineItem(row, sourceRow, {
-                    selectionState,
-                    selectionDetails,
-                })
-            )),
+        const header = lineItems.querySelector(
+            ":scope > [data-ingredient-option-header]",
         );
+        const action = lineItems.querySelector(
+            ":scope > [data-ingredient-option-actions]",
+        );
+        const summaries = renderedRows.map(sourceRow => (
+            createRecipeIngredientSelectedOptionLineItem(row, sourceRow, {
+                selectionState,
+                selectionDetails,
+            })
+        ));
+        renderRecipeIngredientOptionBlock(lineItems, {
+            header,
+            ingredientContent: summaries,
+            actions: [action],
+        });
         lineItems.recipeIngredientOptionSourceRows = renderedRows;
         if (preservesExpandedChoice) {
             const nextSummary = lineItems.querySelector(
@@ -35196,7 +35213,9 @@ function syncRecipeIngredientSelectedOptionLineItems(
             expansionPanel.hidden = false;
         }
     } else {
-        [...lineItems.children].forEach((summary, index) => {
+        [...lineItems.querySelectorAll(
+            ":scope > [data-ingredient-selected-option-line-item]",
+        )].forEach((summary, index) => {
             const sourceRow = renderedRows[index];
             if (!sourceRow) return;
             summary.dataset.ingredientSelectedChoiceState = selectionState;
@@ -35215,25 +35234,24 @@ function syncRecipeIngredientSelectedOptionLineItems(
             );
             syncRecipeIngredientInlineEditor(row, summary);
         });
+        renderRecipeIngredientOptionBlock(lineItems, {
+            header: lineItems.querySelector(
+                ":scope > [data-ingredient-option-header]",
+            ),
+            ingredientContent: [...lineItems.querySelectorAll(
+                ":scope > [data-ingredient-selected-option-line-item]",
+            )],
+            actions: [lineItems.querySelector(
+                ":scope > [data-ingredient-option-actions]",
+            )],
+        });
     }
 
     const hasRenderedRows = renderedRows.length > 0;
-    const expandedAtSelectedLineItem = Boolean(
-        row.recipeIngredientExpansionAnchor
-        && lineItems.contains(row.recipeIngredientExpansionAnchor)
-    );
-    const keepsGroupedSelectedRowsVisible = Boolean(
-        expanded
-        && recipeEditIngredientColumnView.groupByStoreSection
-    );
-    lineItems.hidden = (
-        expanded
-        && !expandedAtSelectedLineItem
-        && !keepsGroupedSelectedRowsVisible
-    ) || !hasRenderedRows;
+    lineItems.hidden = !hasRenderedRows;
     row.classList.toggle(
         "has-selected-option-line-items",
-        renderedRows.length > 0 || expandedAtSelectedLineItem,
+        renderedRows.length > 0,
     );
 }
 
@@ -35928,12 +35946,11 @@ function ensureRecipeIngredientModalOptionsTableHeader(container) {
         column.dataset.ingredientColumn = key;
         header.appendChild(column);
     });
-    const heading = container.querySelector(":scope > .recipe-edit-substitution-heading");
-    if (heading) {
-        heading.after(header);
-    } else {
-        container.prepend(header);
-    }
+    const firstOptionBlock = container.querySelector(
+        ":scope > [data-ingredient-choice-overview], "
+        + ":scope > [data-ingredient-substitution-list]",
+    );
+    container.insertBefore(header, firstOptionBlock || container.firstChild);
     return header;
 }
 
@@ -36068,6 +36085,7 @@ function restoreRecipeIngredientModalOptions(panel) {
     }
     container.hidden = Boolean(wasHidden);
     container.classList.remove("recipe-edit-ingredient-modal-options-panel");
+    syncRecipeIngredientSourceOptionBlockVisibility(container);
     delete panel.recipeIngredientModalOptionsMount;
     return true;
 }
@@ -36139,6 +36157,7 @@ function syncRecipeIngredientModalOptions(row, panel = null) {
     }
     summary.container.hidden = false;
     summary.container.classList.add("recipe-edit-ingredient-modal-options-panel");
+    syncRecipeIngredientSourceOptionBlockVisibility(summary.container);
     ensureRecipeIngredientModalOptionsTableHeader(summary.container);
     syncRecipeIngredientModalDefaultOptionControls(row, panel, summary.container);
     applyRecipeEditIngredientColumnLayout();
@@ -37537,8 +37556,45 @@ function setRecipeIngredientEditMode(row, shouldEdit, options = {}) {
             }
             const returnFocus = recipeEditIngredientModalReturnFocus;
             recipeEditIngredientModalReturnFocus = null;
-            if (options.restoreFocus !== false && returnFocus && returnFocus.isConnected) {
-                returnFocus.focus({ preventScroll: true });
+            const selectedOptionReturnRow = returnFocus?.closest?.(
+                ".recipe-edit-ingredient-row",
+            ) || null;
+            const returnsToSelectedOption = Boolean(
+                returnFocus?.closest?.("[data-ingredient-selected-option-block]"),
+            );
+            const restoreModalFocus = () => {
+                if (options.restoreFocus === false || !returnFocus) return;
+                let focusTarget = returnFocus;
+                if (
+                    returnsToSelectedOption
+                    && (
+                        !focusTarget.isConnected
+                        || focusTarget.closest("[hidden], [inert]")
+                    )
+                ) {
+                    const selectedBlock = selectedOptionReturnRow?.querySelector(
+                        ":scope > [data-ingredient-selected-option-block]",
+                    );
+                    focusTarget = selectedBlock?.querySelector(
+                        ":scope > [data-ingredient-option-header] "
+                        + "> .recipe-edit-alternative-menu-wrap:not([hidden]) "
+                        + "> .recipe-edit-row-menu-btn",
+                    ) || selectedOptionReturnRow?.querySelector(
+                        "[data-ingredient-substitutions-toggle]",
+                    );
+                }
+                if (
+                    focusTarget?.isConnected
+                    && !focusTarget.closest("[hidden], [inert]")
+                ) {
+                    focusTarget.focus({ preventScroll: true });
+                }
+            };
+            restoreModalFocus();
+            // Restoring the options panel can synchronously refresh its block.
+            // Re-apply selected-header focus after that refresh settles.
+            if (returnsToSelectedOption) {
+                window.requestAnimationFrame?.(restoreModalFocus);
             }
         }
     } else {
@@ -49852,17 +49908,6 @@ function addRecipeIngredientRow(item = {}, options = {}) {
                 <span class="recipe-edit-choice-options" data-ingredient-choice-options></span>
             </span>
             <div class="recipe-edit-ingredient-substitutions" data-ingredient-substitutions ${substitutionOptions.length ? "" : "hidden"}>
-                <div class="recipe-edit-substitution-heading">
-                    <span data-ingredient-substitution-title>Alternatives</span>
-                    <span data-ingredient-substitution-count hidden>${escapeHtml(substitutionCountText)}</span>
-                    <button type="button" onclick="return addRecipeIngredientSubstitutionRow(this)">
-                        <span class="recipe-edit-option-add-content"
-                              data-ingredient-grid-column="ingredient">
-                            ${recipeEditSvgIcon("plus")}
-                            <span data-ingredient-substitution-add-label>Add another option</span>
-                        </span>
-                    </button>
-                </div>
                 <div class="recipe-edit-substitution-list" data-ingredient-substitution-list>
                     ${recipeIngredientSubstitutionOptionsHtml(presentationItem)}
                 </div>
@@ -49876,6 +49921,17 @@ function addRecipeIngredientRow(item = {}, options = {}) {
                         onclick="return viewAllRecipeIngredientSubstitutions(this)">
                     View all <span data-ingredient-substitution-view-all-count>${substitutionGroupCount}</span> alternatives
                 </button>
+                <div class="recipe-edit-substitution-heading">
+                    <span data-ingredient-substitution-title>Alternatives</span>
+                    <span data-ingredient-substitution-count hidden>${escapeHtml(substitutionCountText)}</span>
+                    <button type="button" onclick="return addRecipeIngredientSubstitutionRow(this)">
+                        <span class="recipe-edit-option-add-content"
+                              data-ingredient-grid-column="ingredient">
+                            ${recipeEditSvgIcon("plus")}
+                            <span data-ingredient-substitution-add-label>Add another option</span>
+                        </span>
+                    </button>
+                </div>
             </div>
             <span class="recipe-edit-extraction-warning" data-ingredient-warning-message ${extractionWarning ? "" : "hidden"}>
                 ${escapeHtml(extractionWarning)}
@@ -50167,14 +50223,10 @@ function recipeIngredientExpansionSelectedOptionSummary(row, control = null) {
     ) {
         return controlledSummary;
     }
-    if (!recipeEditIngredientColumnView.groupByStoreSection) {
-        return null;
-    }
-    // Store Section grouping projects only real components of a
-    // multi-ingredient option; the normal Table view uses the shared panel.
-    return recipeIngredientSelectedOptionSummaries(row).find(summary => (
-        !summary.classList.contains("is-ingredient-column-grouped-away")
-    )) || null;
+    // The parent disclosure always controls the parent's alternatives region.
+    // Store Section grouping no longer promotes an individual ingredient row
+    // into a second expansion anchor because that would split the option block.
+    return null;
 }
 
 function recipeIngredientExpansionSourceRow(row, control = null) {
@@ -50200,9 +50252,11 @@ function recipeIngredientExpansionAnchorFromControl(row, control = null) {
         selectedOptionSummary
         && selectedOptionSummary.recipeIngredientChoiceParentRow === row
     ) {
+        // A same-section selected option is an atomic block on the parent row.
+        // Only a cross-section projection becomes its own expansion anchor.
         return selectedOptionSummary.closest(
             "[data-recipe-ingredient-column-group-projection]",
-        ) || selectedOptionSummary;
+        ) || row;
     }
     return row;
 }
@@ -51074,6 +51128,177 @@ function recipeIngredientAlternativeExplanation(rows = []) {
     }).filter(Boolean))].join(" ");
 }
 
+function recipeIngredientOptionHeaderMenuHtml(kind = "") {
+    if (kind === "default") {
+        return `
+            <div class="recipe-edit-row-menu-wrap recipe-edit-alternative-menu-wrap"
+                 data-ingredient-grid-column="actions">
+                <button type="button"
+                        class="recipe-edit-row-menu-btn"
+                        aria-label="Option actions"
+                        title="Option actions"
+                        aria-haspopup="true"
+                        aria-expanded="false"
+                        onclick="return toggleRecipeEditRowMenu(this, event)">
+                    <span aria-hidden="true"></span>
+                </button>
+                <div class="recipe-edit-row-menu recipe-edit-alternative-menu" hidden>
+                    <div class="recipe-edit-menu-group">
+                        <div class="recipe-edit-menu-group-label">Ingredient option</div>
+                        <button type="button" onclick="return focusRecipeEditCompactRow(this)">Edit option</button>
+                        <button type="button" onclick="return duplicateRecipeIngredientDefaultOption(this)">Duplicate option</button>
+                        <button type="button" onclick="return moveRecipeIngredientDefaultOption(this, -1)">Move option up</button>
+                        <button type="button" onclick="return moveRecipeIngredientDefaultOption(this, 1)">Move option down</button>
+                        <button type="button"
+                                data-set-alternative-preferred
+                                onclick="return setRecipeIngredientOptionSelected(this)">Use this option</button>
+                    </div>
+                    <div class="recipe-edit-menu-group recipe-edit-menu-group-danger">
+                        <button type="button"
+                                class="delete"
+                                onclick="return removeRecipeIngredientDefaultOption(this)">Remove option</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    if (kind === "selected") {
+        return `
+            <div class="recipe-edit-row-menu-wrap recipe-edit-alternative-menu-wrap"
+                 data-ingredient-grid-column="actions">
+                <button type="button"
+                        class="recipe-edit-row-menu-btn"
+                        aria-label="Selected option actions"
+                        title="Selected option actions"
+                        aria-haspopup="true"
+                        aria-expanded="false"
+                        onclick="return toggleRecipeEditRowMenu(this, event)">
+                    <span aria-hidden="true"></span>
+                </button>
+                <div class="recipe-edit-row-menu recipe-edit-alternative-menu" hidden>
+                    <div class="recipe-edit-menu-group">
+                        <div class="recipe-edit-menu-group-label">Selected ingredient option</div>
+                        <button type="button" onclick="return editRecipeIngredientSelectedOption(this)">Edit option</button>
+                        <button type="button" onclick="return duplicateRecipeIngredientSelectedOption(this)">Duplicate option</button>
+                        <button type="button" onclick="return moveRecipeIngredientSelectedOption(this, -1)">Move option up</button>
+                        <button type="button" onclick="return moveRecipeIngredientSelectedOption(this, 1)">Move option down</button>
+                        <button type="button" disabled>Selected option</button>
+                    </div>
+                    <div class="recipe-edit-menu-group recipe-edit-menu-group-danger">
+                        <button type="button"
+                                class="delete"
+                                onclick="return removeRecipeIngredientSelectedOption(this)">Remove option</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    if (kind !== "alternative") {
+        return "";
+    }
+    return `
+        <div class="recipe-edit-row-menu-wrap recipe-edit-alternative-menu-wrap"
+             data-ingredient-grid-column="actions">
+            <button type="button"
+                    class="recipe-edit-row-menu-btn"
+                    aria-label="Option actions"
+                    title="Option actions"
+                    aria-haspopup="true"
+                    aria-expanded="false"
+                    onclick="return toggleRecipeEditRowMenu(this, event)">
+                <span aria-hidden="true"></span>
+            </button>
+            <div class="recipe-edit-row-menu recipe-edit-alternative-menu" hidden>
+                <div class="recipe-edit-menu-group">
+                    <div class="recipe-edit-menu-group-label">Ingredient option</div>
+                    <button type="button" onclick="return setRecipeIngredientAlternativeEditMode(this, true)">Edit option</button>
+                    <button type="button" onclick="return duplicateRecipeIngredientAlternative(this)">Duplicate option</button>
+                    <button type="button" onclick="return moveRecipeIngredientAlternative(this, -1)">Move option up</button>
+                    <button type="button" onclick="return moveRecipeIngredientAlternative(this, 1)">Move option down</button>
+                    <button type="button" data-set-alternative-preferred onclick="return setRecipeIngredientAlternativePreferred(this)">Use this option</button>
+                </div>
+                <div class="recipe-edit-menu-group recipe-edit-menu-group-danger">
+                    <button type="button" class="delete" onclick="return removeRecipeIngredientAlternative(this)">Remove option</button>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function createRecipeIngredientOptionHeader(options = {}) {
+    const labelText = String(options.label || "ALTERNATIVE OPTION").trim();
+    const selected = Boolean(options.selected);
+    const header = document.createElement("div");
+    header.className = "recipe-edit-ingredient-option-divider";
+    header.dataset.ingredientOptionHeader = "";
+
+    const label = document.createElement("span");
+    label.dataset.ingredientOptionDividerLabel = "";
+    label.dataset.ingredientOptionLabel = "";
+    label.dataset.ingredientGridColumn = "ingredient";
+    label.setAttribute("role", "heading");
+    label.setAttribute("aria-level", "4");
+    label.textContent = labelText;
+    header.appendChild(label);
+
+    if (selected) {
+        const status = document.createElement("span");
+        status.className = "recipe-edit-option-selection is-selected";
+        status.dataset.ingredientOptionSelectedStatus = "";
+        status.setAttribute("role", "status");
+        status.setAttribute("aria-label", "Selected ingredient option");
+        status.innerHTML = `
+            <span class="recipe-edit-option-selection-icon" aria-hidden="true">
+                ${recipeEditSvgIcon("check")}
+            </span>
+            <span>Selected</span>
+        `;
+        header.appendChild(status);
+    } else {
+        const control = document.createElement("button");
+        control.type = "button";
+        control.className = "recipe-edit-option-selection";
+        control.dataset.ingredientOptionSelect = "";
+        control.setAttribute("aria-label", "Use this ingredient option");
+        control.setAttribute("aria-pressed", "false");
+        control.title = "Use this ingredient option";
+        control.setAttribute("onclick", "return setRecipeIngredientOptionSelected(this)");
+        control.innerHTML = `
+            <span class="recipe-edit-option-selection-icon" aria-hidden="true">
+                ${recipeEditSvgIcon("check")}
+            </span>
+            <span data-ingredient-option-select-label>Use this option</span>
+        `;
+        header.appendChild(control);
+    }
+
+    const menuHtml = recipeIngredientOptionHeaderMenuHtml(options.menuKind);
+    if (menuHtml) header.insertAdjacentHTML("beforeend", menuHtml);
+    return header;
+}
+
+function renderRecipeIngredientOptionBlock(block, options = {}) {
+    if (!block) return null;
+    const ingredientContent = Array.isArray(options.ingredientContent)
+        ? options.ingredientContent.filter(Boolean)
+        : [];
+    const actions = Array.isArray(options.actions)
+        ? options.actions.filter(Boolean)
+        : [];
+    const trailing = Array.isArray(options.trailing)
+        ? options.trailing.filter(Boolean)
+        : [];
+    const children = [
+        options.header,
+        ...ingredientContent,
+        ...actions,
+        ...trailing,
+    ].filter(Boolean);
+    block.replaceChildren(...children);
+    if (block.dataset) block.dataset.ingredientOptionBlock = "";
+    return block;
+}
+
 function updateRecipeIngredientOptionSelectionState(option, selected) {
     if (!option) return;
     const isSelected = Boolean(selected);
@@ -51220,55 +51445,16 @@ function createRecipeIngredientAlternativeCard(group, groupIndex) {
     const card = document.createElement("section");
     card.className = "recipe-edit-alternative-card";
     card.dataset.alternativeCard = "";
+    card.dataset.ingredientOptionBlock = "";
     card.dataset.alternativeId = group.alternativeId || "";
     card.innerHTML = `
-        <div class="recipe-edit-ingredient-option-divider">
-            <span data-ingredient-option-divider-label
-                  role="heading"
-                  aria-level="4"
-                  data-ingredient-grid-column="ingredient">ALTERNATIVE OPTION</span>
-            <button type="button"
-                    class="recipe-edit-option-selection"
-                    data-ingredient-option-select
-                    aria-label="Use this ingredient option"
-                    aria-pressed="false"
-                    title="Use this ingredient option"
-                    onclick="return setRecipeIngredientOptionSelected(this)">
-                <span class="recipe-edit-option-selection-icon" aria-hidden="true">
-                    ${recipeEditSvgIcon("check")}
-                </span>
-                <span data-ingredient-option-select-label>Use this option</span>
-            </button>
-            <div class="recipe-edit-row-menu-wrap recipe-edit-alternative-menu-wrap"
-                 data-ingredient-grid-column="actions">
-                <button type="button"
-                        class="recipe-edit-row-menu-btn"
-                        aria-label="Option actions"
-                        title="Option actions"
-                        aria-haspopup="true"
-                        aria-expanded="false"
-                        onclick="return toggleRecipeEditRowMenu(this, event)">
-                    <span aria-hidden="true"></span>
-                </button>
-                <div class="recipe-edit-row-menu recipe-edit-alternative-menu" hidden>
-                    <div class="recipe-edit-menu-group">
-                        <div class="recipe-edit-menu-group-label">Ingredient option</div>
-                        <button type="button" onclick="return setRecipeIngredientAlternativeEditMode(this, true)">Edit option</button>
-                        <button type="button" onclick="return duplicateRecipeIngredientAlternative(this)">Duplicate option</button>
-                        <button type="button" onclick="return moveRecipeIngredientAlternative(this, -1)">Move option up</button>
-                        <button type="button" onclick="return moveRecipeIngredientAlternative(this, 1)">Move option down</button>
-                        <button type="button" data-set-alternative-preferred onclick="return setRecipeIngredientAlternativePreferred(this)">Use this option</button>
-                    </div>
-                    <div class="recipe-edit-menu-group recipe-edit-menu-group-danger">
-                        <button type="button" class="delete" onclick="return removeRecipeIngredientAlternative(this)">Remove option</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <section class="recipe-edit-alternative-editor" aria-label="Ingredients in this option">
+        <section class="recipe-edit-alternative-editor"
+                 data-ingredient-option-ingredients
+                 aria-label="Ingredients in this option">
             <div class="recipe-edit-alternative-components"></div>
             <button type="button"
                     class="recipe-edit-alternative-add-component"
+                    data-ingredient-option-actions
                     onclick="return addRecipeIngredientAlternativeComponent(this)">
                 <span class="recipe-edit-option-add-content"
                       data-ingredient-grid-column="ingredient">
@@ -51281,7 +51467,18 @@ function createRecipeIngredientAlternativeCard(group, groupIndex) {
             <button type="button" class="recipe-edit-alternative-cancel" onclick="return cancelRecipeIngredientAlternativeEdit(this)">Cancel</button>
         </div>
     `;
-    const components = card.querySelector(".recipe-edit-alternative-components");
+    const header = createRecipeIngredientOptionHeader({
+        label: "ALTERNATIVE OPTION",
+        menuKind: "alternative",
+    });
+    const editor = card.querySelector(".recipe-edit-alternative-editor");
+    const footer = card.querySelector(".recipe-edit-alternative-edit-footer");
+    renderRecipeIngredientOptionBlock(card, {
+        header,
+        ingredientContent: [editor],
+        trailing: [footer],
+    });
+    const components = editor.querySelector(".recipe-edit-alternative-components");
     group.rows.forEach(optionRow => components.appendChild(optionRow));
     updateRecipeIngredientAlternativeCard(card, groupIndex);
     return card;
@@ -51550,6 +51747,13 @@ function setRecipeIngredientOptionSelected(button) {
     const focusedRecordHadChanges = modalIsActive
         ? recipeIngredientModalHasChanges(ingredientRow)
         : false;
+    const selectionTriggerHadFocus = Boolean(
+        typeof document !== "undefined"
+        && (
+            button === document.activeElement
+            || option.contains(document.activeElement)
+        ),
+    );
     const selectedOptionRow = card
         ? card.querySelector("[data-substitution-option-row]")
         : null;
@@ -51580,6 +51784,29 @@ function setRecipeIngredientOptionSelected(button) {
         openRecipeIngredientDefaultOptionModalWithOptions(button, {
             skipUnsavedCheck: !focusedRecordHadChanges,
         });
+    }
+    if (!modalIsActive && selectionTriggerHadFocus) {
+        // Selecting an option hides and inerts its source card immediately.
+        // Move focus to the equivalent visible selected-option control instead
+        // of leaving keyboard focus inside the newly hidden alternative.
+        const selectedBlock = ingredientRow.querySelector(
+            ":scope > [data-ingredient-selected-option-block]",
+        );
+        const selectedMenuButton = selectedBlock?.querySelector(
+            ":scope > [data-ingredient-option-header] "
+            + "> .recipe-edit-alternative-menu-wrap:not([hidden]) "
+            + "> .recipe-edit-row-menu-btn",
+        );
+        const disclosure = ingredientRow.querySelector(
+            "[data-ingredient-substitutions-toggle]",
+        );
+        const focusTarget = selectedMenuButton || disclosure;
+        if (
+            focusTarget?.isConnected
+            && !focusTarget.closest("[hidden], [inert]")
+        ) {
+            focusTarget.focus({ preventScroll: true });
+        }
     }
     setRecipeEditStatus("Ingredient option selected. Save Recipe to keep it.");
     return false;
@@ -52140,66 +52367,26 @@ function ensureRecipeIngredientChoiceOverview(container, row, alternativeGroups,
             overview = document.createElement("section");
             overview.className = "recipe-edit-ingredient-choice-overview recipe-edit-ingredient-option-group is-default-option";
             overview.dataset.ingredientChoiceOverview = "";
+            overview.dataset.ingredientOptionBlock = "";
             const list = container.querySelector(":scope > [data-ingredient-substitution-list]");
             list?.insertAdjacentElement("beforebegin", overview);
         }
+        overview.dataset.ingredientOptionBlock = "";
         let summary = overview.querySelector(".recipe-edit-default-option-summary");
         if (!summary) {
-            const divider = document.createElement("div");
-            divider.className = "recipe-edit-ingredient-option-divider";
-            divider.innerHTML = `
-                <span role="heading"
-                      aria-level="4"
-                      data-ingredient-grid-column="ingredient">DEFAULT OPTION</span>
-                <button type="button"
-                        class="recipe-edit-option-selection"
-                        data-ingredient-option-select
-                        aria-label="Use this ingredient option"
-                        aria-pressed="false"
-                        title="Use this ingredient option"
-                        onclick="return setRecipeIngredientOptionSelected(this)">
-                    <span class="recipe-edit-option-selection-icon" aria-hidden="true">
-                        ${recipeEditSvgIcon("check")}
-                    </span>
-                    <span data-ingredient-option-select-label>Use this option</span>
-                </button>
-                <div class="recipe-edit-row-menu-wrap recipe-edit-alternative-menu-wrap"
-                     data-ingredient-grid-column="actions">
-                    <button type="button"
-                            class="recipe-edit-row-menu-btn"
-                            aria-label="Option actions"
-                            title="Option actions"
-                            aria-haspopup="true"
-                            aria-expanded="false"
-                            onclick="return toggleRecipeEditRowMenu(this, event)">
-                        <span aria-hidden="true"></span>
-                    </button>
-                    <div class="recipe-edit-row-menu recipe-edit-alternative-menu" hidden>
-                        <div class="recipe-edit-menu-group">
-                            <div class="recipe-edit-menu-group-label">Ingredient option</div>
-                            <button type="button" onclick="return focusRecipeEditCompactRow(this)">Edit option</button>
-                            <button type="button" onclick="return duplicateRecipeIngredientDefaultOption(this)">Duplicate option</button>
-                            <button type="button" onclick="return moveRecipeIngredientDefaultOption(this, -1)">Move option up</button>
-                            <button type="button" onclick="return moveRecipeIngredientDefaultOption(this, 1)">Move option down</button>
-                            <button type="button"
-                                    data-set-alternative-preferred
-                                    onclick="return setRecipeIngredientOptionSelected(this)">Use this option</button>
-                        </div>
-                        <div class="recipe-edit-menu-group recipe-edit-menu-group-danger">
-                            <button type="button"
-                                    class="delete"
-                                    onclick="return removeRecipeIngredientDefaultOption(this)">Remove option</button>
-                        </div>
-                    </div>
-                </div>
-            `;
+            const divider = createRecipeIngredientOptionHeader({
+                label: "DEFAULT OPTION",
+                menuKind: "default",
+            });
             const optionBody = document.createElement("div");
             optionBody.className = "recipe-edit-ingredient-default-option-body";
+            optionBody.dataset.ingredientOptionIngredients = "";
             summary = createRecipeIngredientDefaultOptionSummary(row, parentValues);
             optionBody.appendChild(summary);
             const addIngredient = document.createElement("button");
             addIngredient.type = "button";
             addIngredient.className = "recipe-edit-alternative-add-component recipe-edit-default-option-add-component";
+            addIngredient.dataset.ingredientOptionActions = "";
             addIngredient.innerHTML = `
                 <span class="recipe-edit-option-add-content"
                       data-ingredient-grid-column="ingredient">
@@ -52208,7 +52395,10 @@ function ensureRecipeIngredientChoiceOverview(container, row, alternativeGroups,
             `;
             addIngredient.addEventListener("click", () => addRecipeIngredientDefaultComponent(addIngredient));
             optionBody.appendChild(addIngredient);
-            overview.replaceChildren(divider, optionBody);
+            renderRecipeIngredientOptionBlock(overview, {
+                header: divider,
+                ingredientContent: [optionBody],
+            });
         } else {
             updateRecipeIngredientOptionRowSummary(summary, row, parentValues, {
                 accessiblePrefix: "Edit ingredient",
@@ -52246,6 +52436,45 @@ function ensureRecipeIngredientChoiceOverview(container, row, alternativeGroups,
         }
     });
     return overview;
+}
+
+function syncRecipeIngredientSourceOptionBlockVisibility(container) {
+    if (!container) return;
+    const showsSourceSelectedOption = container.classList.contains(
+        "recipe-edit-ingredient-modal-options-panel",
+    );
+    const sourceBlocks = [
+        container.querySelector(":scope > [data-ingredient-choice-overview]"),
+        ...container.querySelectorAll(
+            ":scope > [data-ingredient-substitution-list] > .recipe-edit-alternative-card",
+        ),
+    ].filter(Boolean);
+    sourceBlocks.forEach(block => {
+        const hidesSelectedSource = Boolean(
+            !showsSourceSelectedOption
+            && block.classList.contains("is-selected-option"),
+        );
+        block.classList.toggle("is-selected-option-source", hidesSelectedSource);
+        block.hidden = hidesSelectedSource;
+        block.toggleAttribute("inert", hidesSelectedSource);
+        const header = block.querySelector(":scope > .recipe-edit-ingredient-option-divider");
+        const label = header?.querySelector("[data-ingredient-option-label]");
+        if (hidesSelectedSource) {
+            block.dataset.ingredientOptionSourceCarrier = "";
+            delete block.dataset.ingredientOptionBlock;
+            if (header) delete header.dataset.ingredientOptionHeader;
+            label?.removeAttribute("role");
+            label?.removeAttribute("aria-level");
+            block.setAttribute("aria-hidden", "true");
+        } else {
+            delete block.dataset.ingredientOptionSourceCarrier;
+            block.dataset.ingredientOptionBlock = "";
+            if (header) header.dataset.ingredientOptionHeader = "";
+            label?.setAttribute("role", "heading");
+            label?.setAttribute("aria-level", "4");
+            block.removeAttribute("aria-hidden");
+        }
+    });
 }
 
 function materializeRecipeIngredientDefaultOption(control) {
@@ -52453,17 +52682,7 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
     ).trim();
     const choiceTitle = originalRecipeText || ingredientName;
     const hasSelectedChoice = Boolean(selectedChoice?.values?.length);
-    const projectedSelectedChoiceRows = recipeIngredientSelectedOptionProjectionRows(
-        selectedChoice,
-    );
-    const hidesSelectedChoiceHeaderInStoreSectionView = Boolean(
-        recipeEditIngredientColumnView.groupByStoreSection
-        && projectedSelectedChoiceRows.length > 0
-    );
-    const showsSelectedChoiceGroup = Boolean(
-        presentation.hasGroup
-        && !hidesSelectedChoiceHeaderInStoreSectionView,
-    );
+    const showsSelectedChoiceGroup = Boolean(presentation.hasGroup);
     const selectedChoiceGroupHeader = showsSelectedChoiceGroup
         ? ensureRecipeIngredientSelectedChoiceGroupHeader(row)
         : row.querySelector("[data-ingredient-selected-choice-group-header]");
@@ -52594,6 +52813,13 @@ function updateRecipeIngredientSubstitutionState(row, control = null) {
         });
     });
     ensureRecipeIngredientChoiceOverview(container, row, alternativeGroups, cards);
+    syncRecipeIngredientSourceOptionBlockVisibility(container);
+    const addAnother = container?.querySelector(
+        ":scope > .recipe-edit-substitution-heading",
+    );
+    if (addAnother && container.lastElementChild !== addAnother) {
+        container.appendChild(addAnother);
+    }
 
     if (table) {
         table.hidden = optionRows.length === 0;
