@@ -1114,9 +1114,18 @@ def test_corn_spoon_bread_backfill_is_idempotent_and_preserves_grouping(
         "cumin",
         "onion",
     ]
+    assert [item["store_section"] for item in corn["options"][0]["items"]] == [
+        "PRODUCE",
+        "SPICES & SEASONINGS",
+        "PRODUCE",
+    ]
     assert [item["ingredient"] for item in corn["options"][1]["items"]] == [
         "corn",
         "onion",
+    ]
+    assert [item["store_section"] for item in corn["options"][1]["items"]] == [
+        "FROZEN",
+        "PRODUCE",
     ]
 
     butter = requirement_by_id(requirements, "requirement-e919369467e87fe1")

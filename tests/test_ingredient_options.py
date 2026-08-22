@@ -283,6 +283,7 @@ def test_camel_case_legacy_choices_survive_the_real_editor_load_boundary(monkeyp
                     "name": "Water",
                     "alternativeComponentOrder": 1,
                     "purchasableItem": "Filtered water",
+                    "storeSection": "Beverages",
                 },
                 {
                     "name": "Coconut milk",
@@ -334,6 +335,7 @@ def test_camel_case_legacy_choices_survive_the_real_editor_load_boundary(monkeyp
     assert substitutions[0]["optional"] is False
     assert substitutions[0]["inferred"] is False
     assert substitutions[1]["purchasable_item"] == "Filtered water"
+    assert substitutions[1]["store_section"] == "Beverages"
     assert flat_option_id["default_option_id"] == "legacy-soy"
     assert flat_option_id["substitutions"][0]["alternative_id"] == "legacy-soy"
     assert optional_choice["selection_required"] is False
@@ -1648,7 +1650,7 @@ def test_selected_group_summary_uses_preparation_when_it_distinguishes_options()
     assert "recipeIngredientChoiceItemSummary(" in selected_choice
 
 
-def test_group_parent_uses_one_persistent_selected_option_block_in_every_table_view():
+def test_group_parent_uses_one_persistent_selected_option_source_block():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
 
     selected_choice = script[
@@ -2117,9 +2119,27 @@ def test_corn_fixture_collapsed_view_keeps_all_selected_components(monkeypatch):
 
     assert corn["selection_required"] is True
     assert [row["ingredient"] for row in selected] == ["corn", "cumin", "onion"]
+    assert [row["store_section"] for row in selected] == [
+        "PRODUCE",
+        "SPICES & SEASONINGS",
+        "PRODUCE",
+    ]
     assert [row["ingredient"] for row in alternatives] == ["corn", "onion"]
     assert normalized["default_option_id"] == default_id
     assert len(normalized["substitutions"]) == 5
+    normalized_selected = [
+        row
+        for row in normalized["substitutions"]
+        if row["alternative_id"] == default_id
+    ]
+    assert [
+        (row["alternative_id"], row["alternative_component_order"], row["store_section"])
+        for row in normalized_selected
+    ] == [
+        (default_id, 0, "PRODUCE"),
+        (default_id, 1, "SPICES & SEASONINGS"),
+        (default_id, 2, "PRODUCE"),
+    ]
 
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     selected_choice = script[

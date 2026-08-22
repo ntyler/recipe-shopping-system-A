@@ -79042,3 +79042,96 @@ body.recipe-edit-standalone-page #recipeEditIngredients
         grid-row: 5 !important;
     }
 }
+
+/* Ingredient editor v113: Store Section grouping owns real ingredient rows. */
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-store-section-option-fragment {
+    display: flex !important;
+    flex-direction: column;
+    box-sizing: border-box;
+    grid-column: auto !important;
+    grid-row: auto !important;
+    align-items: stretch;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-bottom: 1px solid color-mix(
+        in srgb,
+        var(--recipe-editor-border-soft) 22%,
+        transparent
+    );
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-store-section-option-fragment.is-ingredient-column-filtered,
+body.recipe-edit-standalone-page #recipeEditIngredients
+    .recipe-edit-selected-option-line-item.is-ingredient-column-filtered {
+    display: none !important;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-store-section-option-fragment
+    > .recipe-edit-ingredient-store-section-option-context {
+    width: 100%;
+    min-width: 0;
+    border-block: 0;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-store-section-option-fragment
+    > .recipe-edit-selected-option-line-item {
+    grid-row: auto !important;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+}
+
+@media (max-width: 767px) {
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        > .recipe-edit-ingredient-store-section-option-fragment
+        > .recipe-edit-ingredient-store-section-option-context {
+        display: flex !important;
+        box-sizing: border-box;
+        min-height: 44px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px;
+        padding: 4px 12px !important;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        > .recipe-edit-ingredient-store-section-option-fragment
+        > .recipe-edit-ingredient-store-section-option-context
+        > [data-ingredient-grid-column="ingredient"] {
+        flex: 1 1 auto;
+        grid-column: auto !important;
+        min-width: 0;
+        padding-left: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        > .recipe-edit-ingredient-store-section-option-fragment
+        > .recipe-edit-ingredient-store-section-option-context
+        > .recipe-edit-option-selection {
+        position: static !important;
+        inset: auto !important;
+        flex: 0 0 auto;
+        transform: none !important;
+    }
+}
+
+@media (forced-colors: active) {
+    body.recipe-edit-standalone-page #recipeEditIngredients
+        > .recipe-edit-ingredient-store-section-option-fragment {
+        border-bottom-color: CanvasText;
+    }
+}

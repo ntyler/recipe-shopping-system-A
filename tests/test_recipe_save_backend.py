@@ -1244,6 +1244,7 @@ def test_grouped_choice_selection_and_component_metadata_survive_two_saves(
                 "quantity": "2",
                 "unit": "cup",
                 "purchasable_item": "Low-sodium chicken broth",
+                "store_section": "CANNED",
             },
             {
                 "id": "option-item-garlic",
@@ -1259,6 +1260,7 @@ def test_grouped_choice_selection_and_component_metadata_survive_two_saves(
                 "quantity": "1",
                 "unit": "clove",
                 "purchasable_item": "Garlic",
+                "store_section": "PRODUCE",
             },
             {
                 "id": "option-item-vegetable-broth",
@@ -1274,6 +1276,7 @@ def test_grouped_choice_selection_and_component_metadata_survive_two_saves(
                 "quantity": "2",
                 "unit": "cup",
                 "purchasable_item": "Vegetable broth",
+                "store_section": "CANNED",
             },
         ],
     }
@@ -1315,6 +1318,7 @@ def test_grouped_choice_selection_and_component_metadata_survive_two_saves(
         "quantity",
         "unit",
         "purchasable_item",
+        "store_section",
     )
     first_components = [
         {field: component.get(field) for field in preserved_fields}
@@ -1339,6 +1343,11 @@ def test_grouped_choice_selection_and_component_metadata_survive_two_saves(
         0,
         1,
         0,
+    ]
+    assert [component["store_section"] for component in second_components] == [
+        "CANNED",
+        "PRODUCE",
+        "CANNED",
     ]
 
 

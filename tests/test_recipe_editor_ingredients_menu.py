@@ -17,6 +17,61 @@ from PushShoppingList.services import user_account_service
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def javascript_function_source(script, function_name):
+    """Extract one top-level JavaScript function for a focused Node harness."""
+    marker = f"function {function_name}("
+    start = script.index(marker)
+    body_start = script.index("{", start)
+    depth = 0
+    quote = None
+    escaped = False
+    line_comment = False
+    block_comment = False
+    index = body_start
+    while index < len(script):
+        character = script[index]
+        following = script[index + 1] if index + 1 < len(script) else ""
+        if line_comment:
+            if character in "\r\n":
+                line_comment = False
+            index += 1
+            continue
+        if block_comment:
+            if character == "*" and following == "/":
+                block_comment = False
+                index += 2
+                continue
+            index += 1
+            continue
+        if quote:
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == quote:
+                quote = None
+            index += 1
+            continue
+        if character == "/" and following == "/":
+            line_comment = True
+            index += 2
+            continue
+        if character == "/" and following == "*":
+            block_comment = True
+            index += 2
+            continue
+        if character in "'\"`":
+            quote = character
+        elif character == "{":
+            depth += 1
+        elif character == "}":
+            depth -= 1
+            if depth == 0:
+                return script[start:index + 1]
+        index += 1
+    raise AssertionError(f"Could not extract JavaScript function {function_name}")
+
+
 def test_ingredients_header_has_image_overflow_menu():
     template = (ROOT / "PushShoppingList/templates/sections/current_recipe_url_log.html").read_text(
         encoding="utf-8",
@@ -742,14 +797,16 @@ def test_recipe_editor_requested_headers_filter_and_sort_as_combined_view_only_m
     view_start = script.index("function recipeIngredientColumnViewDefinition")
     view_end = script.index("function clearRecipeEditIngredientColumnDropTargets", view_start)
     view = script[view_start:view_end]
+    apply_view = javascript_function_source(script, "applyRecipeIngredientColumnView")
     assert '["manual", "store", "az", "za"]' in view
     assert "function recipeIngredientColumnViewOptions(columnKey)" in view
     assert "function applyRecipeIngredientColumnView(options = {})" in view
     assert "recipeEditIngredientColumnView.filterKeys.entries()" in view
-    assert 'entry.row.style.order = String(order);' in view
-    assert 'entry.row.style.removeProperty("order");' in view
+    assert ".style.order" not in apply_view
+    assert 'removeProperty("order")' not in apply_view
+    assert "syncRecipeIngredientColumnViewSectionFragments" in view
+    assert "clearRecipeIngredientColumnViewSectionFragments" in view
     assert '"is-ingredient-column-filtered"' in view
-    assert "list.appendChild" not in view
     assert 'function clearRecipeIngredientColumnView(columnKey = "", options = {})' in view
     assert "filterKeys: new Map()" in script
     assert "sorts: []" in script
@@ -839,21 +896,38 @@ def test_ingredient_column_menu_can_hide_buy_as_matching_ingredient_name():
     assert "recipeEditIngredientColumnView.hideMatchingBuyAs = false;" in view
 
 
-def test_recipe_editor_store_section_menu_can_group_rows_without_reordering_row_nodes():
+def test_recipe_editor_store_section_menu_reconciles_direct_children_without_css_order():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
     view_start = script.index("function recipeIngredientColumnViewDefinition")
     view_end = script.index("function clearRecipeEditIngredientColumnDropTargets", view_start)
     view = script[view_start:view_end]
+    group_headers = javascript_function_source(
+        script,
+        "renderRecipeIngredientColumnViewGroupHeaders",
+    )
+    apply_view = javascript_function_source(script, "applyRecipeIngredientColumnView")
+    fragments = javascript_function_source(
+        script,
+        "syncRecipeIngredientColumnViewSectionFragments",
+    )
+    reconcile = javascript_function_source(
+        script,
+        "reconcileRecipeIngredientColumnViewOrder",
+    )
 
     assert "function clearRecipeIngredientColumnViewGroupHeaders(list)" in view
     assert "function renderRecipeIngredientColumnViewGroupHeaders(list, sortedRows)" in view
-    assert 'recipeIngredientColumnViewEntry(left.row, "store")' in view
+    assert "recipeIngredientColumnViewIngredientEntries" in view
     assert "return left.index - right.index;" in view
     assert 'header.dataset.recipeIngredientColumnGroupHeader = section.key || "__unassigned__";' in view
-    assert 'list.insertAdjacentElement("beforeend", header);' in view
-    assert "list.appendChild(entry.row)" not in view
+    assert "reconcileRecipeIngredientColumnViewOrder(list, orderedNodes);" in group_headers
+    assert "list.insertBefore(node, cursor);" in reconcile
+    assert ".style.order" not in group_headers
+    assert ".style.order" not in apply_view
+    assert ".style.order" not in fragments
+    assert "cloneNode" not in fragments
     assert "Group rows by Store Section" in view
     assert "Sort other columns to order ingredients within each section." in view
     assert "[data-recipe-ingredient-column-view-group-store]" in view
@@ -1012,40 +1086,25 @@ process.stdout.write(JSON.stringify({
     assert result["sorts"] == [{"columnKey": "ingredient", "mode": "az"}]
 
 
-def test_store_section_grouping_clears_legacy_projections_and_keeps_atomic_selected_rows():
+def test_store_section_grouping_uses_leaf_entries_and_moves_existing_rows_without_clones():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
 
     view_start = script.index("function recipeIngredientColumnViewSourceRow")
-    view_end = script.index("function recipeIngredientColumnViewEntry", view_start)
+    view_end = script.index("function recipeIngredientColumnViewEntry(row", view_start)
     grouped_view = script[view_start:view_end]
 
-    # Legacy projections are still recognized so an already-rendered view can be
-    # cleaned up, but Store Section grouping never creates a replacement tree.
-    assert "function recipeIngredientColumnViewDisplayRows" in grouped_view
-    assert 'row.hasAttribute?.("data-recipe-ingredient-column-group-projection")' in grouped_view
-    assert "function clearRecipeIngredientColumnViewGroupProjections" in grouped_view
-    assert '":scope > [data-recipe-ingredient-column-group-projection]"' in grouped_view
-    assert "projection.remove();" in grouped_view
-    assert "function clearRecipeIngredientColumnViewGroupedAwayLineItems" in grouped_view
-    assert 'lineItem.classList.remove("is-ingredient-column-grouped-away");' in grouped_view
-    assert 'row.classList.remove("is-ingredient-store-section-grouped-choice");' in grouped_view
-    assert "Grouping changes where the complete parent group is placed" in grouped_view
-    assert "clearRecipeIngredientColumnViewGroupProjections(list);" in grouped_view
-    assert "rows.forEach(syncRecipeIngredientSelectedOptionToggles);" in grouped_view
+    assert "function recipeIngredientColumnViewIngredientEntries" in grouped_view
+    assert "recipeIngredientColumnViewSelectedOptionLineItems" in grouped_view
+    assert "sourceRow" in grouped_view
+    assert "parentRow" in grouped_view
+    assert "optionId" in grouped_view
+    assert "manualIndex" in grouped_view
+    assert "function syncRecipeIngredientColumnViewSectionFragments" in grouped_view
+    assert "function clearRecipeIngredientColumnViewSectionFragments" in grouped_view
+    assert "cloneNode" not in grouped_view
+    assert ".style.order" not in grouped_view
     assert "function createRecipeIngredientColumnViewGroupProjection" not in script
     assert "function syncRecipeIngredientColumnViewGroupProjection" not in script
-
-    sync_start = script.index("function syncRecipeIngredientSelectedOptionLineItems")
-    sync_end = script.index("function organizeRecipeEditSubstitutionOptionRow", sync_start)
-    sync_line_items = script[sync_start:sync_end]
-    assert '":scope > [data-ingredient-selected-option-block]"' in sync_line_items
-    assert "ensureRecipeIngredientSelectedOptionBlock(" in sync_line_items
-    assert "const renderedRows = activeRows;" in sync_line_items
-    assert "recipeEditIngredientColumnView.groupByStoreSection" not in sync_line_items
-    assert "lineItems.hidden = !hasRenderedRows;" in sync_line_items
-    assert 'row.classList.toggle(\n        "has-selected-option-line-items",' in sync_line_items
-    assert "renderRecipeIngredientOptionBlock(lineItems, {" in sync_line_items
-    assert "ingredientContent: summaries," in sync_line_items
 
 
 def test_store_section_counts_use_visible_active_leaf_ingredients():
@@ -1054,75 +1113,196 @@ def test_store_section_counts_use_visible_active_leaf_ingredients():
         pytest.skip("Node.js is required for Store Section count coverage")
 
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
-    count_helpers = script[
-        script.index("function recipeIngredientColumnViewSelectedOptionLineItems"):
-        script.index("function prepareRecipeIngredientColumnViewDisplayRows")
-    ]
-    options = script[
-        script.index("function recipeIngredientColumnViewOptions"):
-        script.index("function recipeIngredientColumnViewIsActive")
-    ]
-    group_headers = script[
-        script.index("function renderRecipeIngredientColumnViewGroupHeaders"):
-        script.index("function applyRecipeIngredientColumnView")
-    ]
-    harness = count_helpers + r"""
+    assert "function recipeIngredientColumnViewIngredientEntries" in script
+    entries_function = javascript_function_source(
+        script,
+        "recipeIngredientColumnViewIngredientEntries",
+    )
+    stable_function = ""
+    if "function recipeIngredientColumnViewEntryStableId" in script:
+        stable_function = javascript_function_source(
+            script,
+            "recipeIngredientColumnViewEntryStableId",
+        )
+    harness = r"""
 function classes(...names) {
     const values = new Set(names);
-    return { contains(name) { return values.has(name); } };
-}
-function ingredientRow(id, { choice = false, lineItems = [] } = {}) {
     return {
-        id,
-        classList: classes(...(choice ? ["has-ingredient-choice"] : [])),
-        hasAttribute() { return false; },
-        querySelectorAll() { return lineItems; },
+        contains(name) { return values.has(name); },
+        toggle(name, enabled) {
+            if (enabled) values.add(name);
+            else values.delete(name);
+        },
     };
 }
-function lineItem(id) {
+function sourceRow(id, ingredient, storeSection, values = {}) {
     return {
         id,
+        ingredient,
+        store_section: storeSection,
+        ...values,
+        dataset: {},
+        querySelector() { return null; },
+    };
+}
+function selectedLineItem(source, optionId) {
+    return {
+        id: `display-${source.id}`,
+        recipeIngredientOptionSourceRow: source,
+        dataset: {
+            ingredientOptionId: optionId,
+            ingredientSelectedOptionId: optionId,
+        },
         classList: classes(),
+        querySelector() { return null; },
+        closest() { return null; },
     };
 }
+function ingredientRow(id, ingredient, storeSection, options = {}) {
+    const row = sourceRow(id, ingredient, storeSection, options.values || {});
+    row.classList = classes(...(options.choice ? ["has-ingredient-choice"] : []));
+    row.dataset = {
+        ingredientSelectedOptionId: options.optionId || "",
+        ingredientOptionId: options.optionId || "",
+    };
+    row.lineItems = options.lineItems || [];
+    row.alternativeRows = options.alternativeRows || [];
+    row.expanded = false;
+    row.hasAttribute = () => false;
+    row.querySelectorAll = selector => selector.includes("ingredient-selected-option-line-item")
+        ? row.lineItems
+        : [];
+    row.querySelector = selector => {
+        if (selector === '[data-field="default_option_id"]') {
+            return {value: options.optionId || ""};
+        }
+        if (selector === "[data-original-option-id]") {
+            return {value: options.originalOptionId || ""};
+        }
+        return null;
+    };
+    return row;
+}
+function fieldValuesFromRow(row) { return row || {}; }
+function recipeIngredientColumnViewSourceRow(row) {
+    return row && (row.recipeIngredientOptionSourceRow || row);
+}
+function recipeIngredientColumnViewSelectedOptionLineItems(row) {
+    return row && Array.isArray(row.lineItems) ? row.lineItems : [];
+}
+function recipeIngredientStoreSectionKey(value) {
+    return String(value || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-");
+}
+function recipeStoreSectionDisplayLabel(value) { return String(value || ""); }
+function recipeIngredientColumnViewEntry(row, columnKey) {
+    const source = recipeIngredientColumnViewSourceRow(row);
+    const value = columnKey === "store"
+        ? String(source && (source.store_section || source.storeSection) || "").trim()
+        : String(source && source.ingredient || "").trim();
+    return {
+        key: columnKey === "store" ? recipeIngredientStoreSectionKey(value) : value.toLowerCase(),
+        label: value || "Unassigned",
+        value,
+    };
+}
+function recipeIngredientColumnViewEntryStableId(source, parent, optionId, manualIndex) {
+    return String(
+        source && (source.id || source.recipe_ingredient_id || source.substitution_id)
+        || `${parent && parent.id || "ingredient"}:${optionId || "standard"}:${manualIndex}`
+    );
+}
+function recipeIngredientStablePresentationId(value, prefix = "ingredient") {
+    return String(value && (value.id || value.recipe_ingredient_id) || `${prefix}-legacy`);
+}
+""" + stable_function + "\n" + entries_function + r"""
 
-const egg = ingredientRow("egg");
-const sourCream = ingredientRow("sour-cream");
-const optionalStandard = ingredientRow("optional-standard");
-const butter = ingredientRow("butter-group", {
-    choice: true,
-    lineItems: [lineItem("butter")],
+const cannedCorn = ingredientRow("ingredient-canned-corn", "Canned cream-style corn", "CANNED");
+const egg = ingredientRow("ingredient-egg", "Egg", "DAIRY & EGGS");
+const sourCream = ingredientRow("ingredient-sour-cream", "Sour cream", "DAIRY & EGGS");
+
+const cornSource = sourceRow("component-corn", "Corn", "PRODUCE", {
+    alternative_id: "option-corn-default",
+    alternative_component_order: 0,
 });
-const unresolved = ingredientRow("required-unresolved", { choice: true });
-const sameSectionChoice = ingredientRow("same-section-group", {
-    choice: true,
-    lineItems: [lineItem("first"), lineItem("second"), lineItem("third")],
+const cuminSource = sourceRow("component-cumin", "Cumin", "SPICES & SEASONINGS", {
+    alternative_id: "option-corn-default",
+    alternative_component_order: 1,
 });
-const corn = ingredientRow("corn-group", {
+const onionSource = sourceRow("component-onion", "Onion", "PRODUCE", {
+    alternative_id: "option-corn-default",
+    alternative_component_order: 2,
+});
+const corn = ingredientRow("requirement-corn", "Corn choice", "PRODUCE", {
     choice: true,
+    optionId: "option-corn-default",
     lineItems: [
-        lineItem("corn"),
-        lineItem("cumin"),
-        lineItem("onion"),
+        selectedLineItem(cornSource, "option-corn-default"),
+        selectedLineItem(cuminSource, "option-corn-default"),
+        selectedLineItem(onionSource, "option-corn-default"),
     ],
+    alternativeRows: [sourceRow("component-frozen-corn", "Frozen corn", "FROZEN")],
 });
-const hiddenExpandedAlternative = ingredientRow("unsalted-butter-alternative");
+// Reproduce the regression trigger: the parent points at its first selected row.
+corn.recipeIngredientInlineSummarySourceRow = cornSource;
 
-const dairyRows = [egg, sourCream, butter];
-const cornRows = [corn];
+const butter = ingredientRow("requirement-butter", "Butter", "DAIRY & EGGS", {
+    choice: true,
+    optionId: "original:requirement-butter",
+    originalOptionId: "original:requirement-butter",
+    alternativeRows: [sourceRow("component-unsalted", "Unsalted butter", "DAIRY & EGGS")],
+});
+butter.lineItems = [selectedLineItem(butter, "original:requirement-butter")];
+
+const unresolved = ingredientRow(
+    "requirement-unresolved",
+    "Selection required",
+    "PRODUCE",
+    {choice: true},
+);
+const rows = [cannedCorn, egg, sourCream, corn, butter, unresolved];
+let recipeEditIngredientColumnView = {groupByStoreSection: false};
+function snapshot({grouped, expanded}) {
+    recipeEditIngredientColumnView.groupByStoreSection = grouped;
+    corn.expanded = expanded;
+    butter.expanded = expanded;
+    corn.classList.toggle("recipe-edit-substitutions-open", expanded);
+    butter.classList.toggle("recipe-edit-substitutions-open", expanded);
+    const entries = recipeIngredientColumnViewIngredientEntries(rows);
+    const activeEntries = entries.filter(entry => entry.counted !== false);
+    const counts = {};
+    activeEntries.forEach(entry => {
+        counts[entry.store.value] = (counts[entry.store.value] || 0) + 1;
+    });
+    const cumin = entries.find(entry => entry.sourceRow.id === "component-cumin");
+    const unresolvedEntry = entries.find(entry => (
+        entry.parentRow.id === "requirement-unresolved"
+    ));
+    return {
+        sourceIds: activeEntries.map(entry => entry.sourceRow.id),
+        keys: activeEntries.map(entry => entry.key),
+        counts,
+        cuminSection: cumin && cumin.store.value,
+        cuminParent: cumin && cumin.parentRow.id,
+        cornOptionIds: entries
+            .filter(entry => entry.parentRow.id === "requirement-corn")
+            .map(entry => entry.optionId),
+        unresolvedCounted: unresolvedEntry && unresolvedEntry.counted,
+        duplicateSourceCount: activeEntries.length - new Set(
+            activeEntries.map(entry => entry.sourceRow.id),
+        ).size,
+    };
+}
+const collapsedUngrouped = snapshot({grouped: false, expanded: false});
+const collapsedGrouped = snapshot({grouped: true, expanded: false});
+const expandedGrouped = snapshot({grouped: true, expanded: true});
+const repeatedGrouped = snapshot({grouped: true, expanded: false});
+const restoredUngrouped = snapshot({grouped: false, expanded: false});
 process.stdout.write(JSON.stringify({
-    standard: recipeIngredientColumnViewIngredientCount(egg),
-    optionalStandard: recipeIngredientColumnViewIngredientCount(optionalStandard),
-    implicitDefault: recipeIngredientColumnViewIngredientCount(butter),
-    unresolved: recipeIngredientColumnViewIngredientCount(unresolved),
-    sameSectionChoice: recipeIngredientColumnViewIngredientCount(sameSectionChoice),
-    intactCornOption: recipeIngredientColumnViewIngredientCount(corn),
-    dairyTotal: recipeIngredientColumnViewIngredientTotal(dairyRows),
-    cornTotal: recipeIngredientColumnViewIngredientTotal(cornRows),
-    repeatedTotal: recipeIngredientColumnViewIngredientTotal(cornRows),
-    collapsedTotalWithoutAlternative: recipeIngredientColumnViewIngredientTotal(dairyRows),
-    expandedTotalWithoutAlternative: recipeIngredientColumnViewIngredientTotal(dairyRows),
-    excludedAlternative: hiddenExpandedAlternative.id,
+    collapsedUngrouped,
+    collapsedGrouped,
+    expandedGrouped,
+    repeatedGrouped,
+    restoredUngrouped,
 }));
 """
     completed = subprocess.run(
@@ -1136,27 +1316,297 @@ process.stdout.write(JSON.stringify({
     )
 
     assert completed.returncode == 0, completed.stderr
-    assert json.loads(completed.stdout) == {
-        "standard": 1,
-        "optionalStandard": 1,
-        "implicitDefault": 1,
-        "unresolved": 0,
-        "sameSectionChoice": 3,
-        "intactCornOption": 3,
-        "dairyTotal": 3,
-        "cornTotal": 3,
-        "repeatedTotal": 3,
-        "collapsedTotalWithoutAlternative": 3,
-        "expandedTotalWithoutAlternative": 3,
-        "excludedAlternative": "unsalted-butter-alternative",
+    result = json.loads(completed.stdout)
+    expected_source_ids = [
+        "ingredient-canned-corn",
+        "ingredient-egg",
+        "ingredient-sour-cream",
+        "component-corn",
+        "component-cumin",
+        "component-onion",
+        "requirement-butter",
+    ]
+    expected_counts = {
+        "CANNED": 1,
+        "DAIRY & EGGS": 3,
+        "PRODUCE": 2,
+        "SPICES & SEASONINGS": 1,
     }
-    assert (
-        'recipeEditIngredientColumnView.groupByStoreSection\n'
-        '            && columnKey === "store"'
-        in options
+    baseline = result["collapsedUngrouped"]
+    assert baseline["sourceIds"] == expected_source_ids
+    assert baseline["counts"] == expected_counts
+    assert baseline["cuminSection"] == "SPICES & SEASONINGS"
+    assert baseline["cuminParent"] == "requirement-corn"
+    assert baseline["cornOptionIds"] == ["option-corn-default"] * 3
+    assert baseline["unresolvedCounted"] is False
+    assert baseline["duplicateSourceCount"] == 0
+    for state in (
+        "collapsedGrouped",
+        "expandedGrouped",
+        "repeatedGrouped",
+        "restoredUngrouped",
+    ):
+        assert result[state] == baseline
+
+
+def test_cross_section_option_fragments_move_and_restore_the_same_line_item_nodes():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for Store Section fragment coverage")
+
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    sync_fragments = javascript_function_source(
+        script,
+        "syncRecipeIngredientColumnViewSectionFragments",
     )
-    assert "recipeIngredientColumnViewIngredientCount(entry.row)" in group_headers
-    assert "recipeIngredientColumnViewIngredientTotal" in script
+    clear_fragments = javascript_function_source(
+        script,
+        "clearRecipeIngredientColumnViewSectionFragments",
+    )
+    harness = r"""
+function classes(...initial) {
+    const values = new Set(initial);
+    return {
+        add(...names) { names.forEach(name => values.add(name)); },
+        remove(...names) { names.forEach(name => values.delete(name)); },
+        contains(name) { return values.has(name); },
+        toggle(name, enabled) {
+            if (enabled) values.add(name);
+            else values.delete(name);
+        },
+    };
+}
+class FakeNode {
+    constructor(id = "") {
+        this.id = id;
+        this.children = [];
+        this.dataset = {};
+        this.classList = classes();
+        this.attributes = {};
+        this.parentNode = null;
+        this.textContent = "";
+    }
+    append(...nodes) {
+        nodes.filter(Boolean).forEach(node => {
+            node.remove();
+            node.parentNode = this;
+            this.children.push(node);
+        });
+    }
+    appendChild(node) {
+        this.append(node);
+        return node;
+    }
+    remove() {
+        if (!this.parentNode) return;
+        const index = this.parentNode.children.indexOf(this);
+        if (index >= 0) this.parentNode.children.splice(index, 1);
+        this.parentNode = null;
+    }
+    setAttribute(name, value) { this.attributes[name] = String(value); }
+    querySelector(selector) {
+        if (selector.includes("ingredient-selected-option-block")) {
+            return this.selectedBlock || null;
+        }
+        if (selector.includes("ingredient-option-header")) {
+            return this.children.find(child => (
+                Object.hasOwn(child.dataset, "ingredientOptionHeader")
+            )) || null;
+        }
+        if (selector.includes("ingredient-option-actions")) {
+            return this.children.find(child => (
+                Object.hasOwn(child.dataset, "ingredientOptionActions")
+            )) || null;
+        }
+        if (selector.includes("ingredient-option-label")) {
+            return this.optionLabel || null;
+        }
+        return null;
+    }
+    querySelectorAll(selector) {
+        if (selector.includes("ingredient-column-section-fragment")) {
+            return this.children.filter(child => (
+                Object.hasOwn(child.dataset, "recipeIngredientColumnSectionFragment")
+            ));
+        }
+        if (selector.includes("ingredient-selected-option-line-item")) {
+            return this.children.filter(child => (
+                Object.hasOwn(child.dataset, "ingredientSelectedOptionLineItem")
+            ));
+        }
+        return [];
+    }
+}
+const document = {createElement() { return new FakeNode("fragment"); }};
+function createRecipeIngredientOptionHeader({label}) {
+    const header = new FakeNode("context-header");
+    header.dataset.ingredientOptionHeader = "";
+    header.optionLabel = {textContent: label};
+    return header;
+}
+function renderRecipeIngredientOptionBlock(block, {header, ingredientContent, actions}) {
+    [...block.children].forEach(child => child.remove());
+    block.append(header, ...(ingredientContent || []), ...(actions || []).filter(Boolean));
+}
+function recipeIngredientColumnViewEntryStableId(source, parent) {
+    return String(source && source.id || parent && parent.id || "ingredient");
+}
+""" + sync_fragments + "\n" + clear_fragments + r"""
+
+function lineItem(id) {
+    const row = new FakeNode(id);
+    row.dataset.ingredientSelectedOptionLineItem = "";
+    row.recipeIngredientOptionSourceRow = {id: `source-${id}`};
+    return row;
+}
+function selectedBlock(id, rows) {
+    const block = new FakeNode(id);
+    block.dataset.ingredientSelectedOptionBlock = "";
+    block.recipeIngredientOptionSourceRows = rows.map(row => row.recipeIngredientOptionSourceRow);
+    const header = new FakeNode("selected-header");
+    header.dataset.ingredientOptionHeader = "";
+    header.optionLabel = {textContent: "DEFAULT OPTION"};
+    const action = new FakeNode("selected-action");
+    action.dataset.ingredientOptionActions = "";
+    block.append(header, ...rows, action);
+    return {block, header, action};
+}
+function entry(row, parentRow, store, manualIndex, optionId) {
+    return {
+        key: row.id,
+        row,
+        sourceRow: row.recipeIngredientOptionSourceRow,
+        parentRow,
+        optionId,
+        store: {key: store.toLowerCase(), label: store, value: store},
+        manualIndex,
+        filtered: false,
+    };
+}
+function ids(node) { return node.children.map(child => child.id); }
+
+const corn = lineItem("corn");
+const cumin = lineItem("cumin");
+const onion = lineItem("onion");
+const parent = new FakeNode("requirement-corn");
+parent.classList.add("has-ingredient-choice");
+const selected = selectedBlock("selected-corn", [corn, cumin, onion]);
+parent.selectedBlock = selected.block;
+parent.append(selected.block);
+const butter = lineItem("butter");
+const butterParent = new FakeNode("requirement-butter");
+butterParent.classList.add("has-ingredient-choice");
+const selectedButter = selectedBlock("selected-butter", [butter]);
+butterParent.selectedBlock = selectedButter.block;
+butterParent.append(selectedButter.block);
+const list = new FakeNode("ingredient-list");
+list.append(parent, butterParent);
+const entries = [
+    entry(corn, parent, "PRODUCE", 0, "option-corn-default"),
+    entry(cumin, parent, "SPICES & SEASONINGS", 1, "option-corn-default"),
+    entry(onion, parent, "PRODUCE", 2, "option-corn-default"),
+    entry(butter, butterParent, "DAIRY & EGGS", 3, "original:requirement-butter"),
+];
+
+syncRecipeIngredientColumnViewSectionFragments(list, [parent, butterParent], entries);
+const fragment = list.querySelectorAll(
+    ":scope > [data-recipe-ingredient-column-section-fragment]"
+)[0];
+const grouped = {
+    selected: ids(selected.block),
+    fragment: ids(fragment),
+    fragmentSection: fragment.dataset.recipeIngredientColumnSectionKey,
+    uniqueRows: new Set([
+        ...selected.block.querySelectorAll("[data-ingredient-selected-option-line-item]"),
+        ...fragment.querySelectorAll("[data-ingredient-selected-option-line-item]"),
+    ]).size,
+    cuminIsOriginalNode: fragment.children.includes(cumin),
+};
+const sameSection = {
+    selected: ids(selectedButter.block),
+    fragmentCount: list.querySelectorAll(
+        ":scope > [data-recipe-ingredient-column-section-fragment]"
+    ).filter(candidate => (
+        candidate.recipeIngredientColumnViewParentRow === butterParent
+    )).length,
+    butterIsOriginalNode: selectedButter.block.children.includes(butter),
+};
+
+clearRecipeIngredientColumnViewSectionFragments(list);
+const restored = {
+    selected: ids(selected.block),
+    fragmentCount: list.querySelectorAll(
+        ":scope > [data-recipe-ingredient-column-section-fragment]"
+    ).length,
+    uniqueRows: new Set(
+        selected.block.querySelectorAll("[data-ingredient-selected-option-line-item]")
+    ).size,
+    canonicalIdentity: selected.block.children[1] === corn
+        && selected.block.children[2] === cumin
+        && selected.block.children[3] === onion,
+};
+
+syncRecipeIngredientColumnViewSectionFragments(list, [parent, butterParent], entries);
+clearRecipeIngredientColumnViewSectionFragments(list);
+const repeated = {
+    selected: ids(selected.block),
+    fragmentCount: list.querySelectorAll(
+        ":scope > [data-recipe-ingredient-column-section-fragment]"
+    ).length,
+    uniqueRows: new Set(
+        selected.block.querySelectorAll("[data-ingredient-selected-option-line-item]")
+    ).size,
+};
+
+process.stdout.write(JSON.stringify({grouped, sameSection, restored, repeated}));
+"""
+    completed = subprocess.run(
+        [node, "-e", harness],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout) == {
+        "grouped": {
+            "selected": ["selected-header", "corn", "onion", "selected-action"],
+            "fragment": ["context-header", "cumin"],
+            "fragmentSection": "spices & seasonings",
+            "uniqueRows": 3,
+            "cuminIsOriginalNode": True,
+        },
+        "sameSection": {
+            "selected": ["selected-header", "butter", "selected-action"],
+            "fragmentCount": 0,
+            "butterIsOriginalNode": True,
+        },
+        "restored": {
+            "selected": [
+                "selected-header",
+                "corn",
+                "cumin",
+                "onion",
+                "selected-action",
+            ],
+            "fragmentCount": 0,
+            "uniqueRows": 3,
+            "canonicalIdentity": True,
+        },
+        "repeated": {
+            "selected": [
+                "selected-header",
+                "corn",
+                "cumin",
+                "onion",
+                "selected-action",
+            ],
+            "fragmentCount": 0,
+            "uniqueRows": 3,
+        },
+    }
 
 
 def test_store_section_grouping_toggle_preserves_choice_expansion_state():
@@ -1400,9 +1850,11 @@ def test_projected_replacement_move_uses_visible_store_section_siblings_and_drag
     ]
 
     assert "function recipeIngredientColumnViewManualRowsInSection" in helpers
+    assert "style.order" not in helpers
+    assert "Number.parseFloat" not in helpers
     assert 'recipeIngredientColumnViewEntry(displayRow, "store").key' in helpers
-    assert 'recipeIngredientColumnViewEntry(entry.row, "store").key === sectionKey' in helpers
-    assert 'entry.row.classList.contains("is-ingredient-column-filtered")' in helpers
+    assert 'recipeIngredientColumnViewEntry(row, "store").key === sectionKey' in helpers
+    assert 'row.classList.contains("is-ingredient-column-filtered")' in helpers
     assert "visibleRows[currentIndex + offset]" in helpers
     assert "recipeIngredientTopLevelSourceRow(displayRow)" in helpers
     assert "recipeIngredientTopLevelSourceRow(targetDisplayRow)" in helpers
@@ -1416,23 +1868,128 @@ def test_projected_replacement_move_uses_visible_store_section_siblings_and_drag
 
 def test_store_section_grouping_preserves_serialized_top_level_order_without_projections():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
-    grouped_view = script[
-        script.index("function prepareRecipeIngredientColumnViewDisplayRows"):
-        script.index("function recipeIngredientColumnViewEntry", script.index("function prepareRecipeIngredientColumnViewDisplayRows"))
-    ]
+    grouped_view = javascript_function_source(
+        script,
+        "prepareRecipeIngredientColumnViewDisplayRows",
+    )
     collection = script[
         script.index("function collectRecipeIngredientRows"):
         script.index("function collectRecipeNutritionRows")
     ]
 
-    assert "clearRecipeIngredientColumnViewGroupProjections(list);" in grouped_view
-    assert "return recipeIngredientColumnViewDisplayRows(list);" in grouped_view
+    assert "clearRecipeIngredientColumnViewSectionFragments" in grouped_view
+    assert "syncRecipeIngredientColumnViewSectionFragments" in grouped_view
     assert "projectionAnchor" not in grouped_view
     assert 'insertAdjacentElement("afterend", projection)' not in grouped_view
+    assert "cloneNode" not in grouped_view
+    assert ".style.order" not in grouped_view
     assert "function createRecipeIngredientColumnViewGroupProjection" not in script
     assert "return recipeEditIngredientRows()" in collection
     assert ".map(row => {" in collection
     assert "const item = fieldValuesFromRow(row);" in collection
+    assert "data-recipe-ingredient-column-section-fragment" not in collection
+
+
+def test_physical_grouping_order_does_not_change_serialized_canonical_ingredient_order():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for canonical ingredient-order coverage")
+
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    functions = "\n".join([
+        javascript_function_source(script, "recipeIngredientColumnViewCanonicalOrder"),
+        javascript_function_source(script, "ensureRecipeIngredientColumnViewCanonicalOrder"),
+        javascript_function_source(script, "reconcileRecipeIngredientColumnViewOrder"),
+        javascript_function_source(script, "restoreRecipeIngredientColumnViewCanonicalOrder"),
+        javascript_function_source(script, "recipeEditIngredientRows"),
+        javascript_function_source(script, "collectRecipeIngredientRows"),
+    ])
+    harness = r"""
+function classes(...names) {
+    const values = new Set(names);
+    return {contains(name) { return values.has(name); }};
+}
+function row(id, order) {
+    return {
+        id,
+        ingredient: id,
+        recipeIngredientColumnViewCanonicalOrder: order,
+        classList: classes("recipe-edit-ingredient-row"),
+        dataset: {},
+        style: {removeProperty() {}},
+    };
+}
+const first = row("first", 0);
+const second = row("second", 1);
+const third = row("third", 2);
+const list = {
+    children: [third, first, second],
+    get firstChild() { return this.children[0] || null; },
+    appendChild(item) {
+        const index = this.children.indexOf(item);
+        if (index >= 0) this.children.splice(index, 1);
+        this.children.push(item);
+    },
+    insertBefore(item, cursor) {
+        const currentIndex = this.children.indexOf(item);
+        if (currentIndex >= 0) this.children.splice(currentIndex, 1);
+        const cursorIndex = this.children.indexOf(cursor);
+        if (cursorIndex >= 0) this.children.splice(cursorIndex, 0, item);
+        else this.children.push(item);
+    },
+};
+[first, second, third].forEach(item => Object.defineProperty(item, "nextSibling", {
+    get() {
+        const index = list.children.indexOf(item);
+        return index >= 0 ? (list.children[index + 1] || null) : null;
+    },
+}));
+const document = {
+    activeElement: null,
+    getElementById(id) { return id === "recipeEditIngredients" ? list : null; },
+};
+function fieldValuesFromRow(item) { return {ingredient: item.ingredient}; }
+function recipeIngredientTypeValue() { return "main"; }
+function recipeIngredientIsOptional() { return false; }
+function recipeIngredientMatchItemFromRow() { return null; }
+function recipeIngredientMatchSnapshot() { return {}; }
+function recipeIngredientFoodReviewPayload() { return null; }
+function collectRecipeIngredientSubstitutionRows() { return []; }
+function canonicalRecipeIngredientAmountForSave(item) { return item; }
+""" + functions + r"""
+
+const groupedRows = recipeEditIngredientRows().map(item => item.id);
+const groupedPayload = JSON.stringify(collectRecipeIngredientRows());
+restoreRecipeIngredientColumnViewCanonicalOrder(list, [...list.children]);
+const restoredRows = recipeEditIngredientRows().map(item => item.id);
+const restoredPayload = JSON.stringify(collectRecipeIngredientRows());
+process.stdout.write(JSON.stringify({
+    groupedRows,
+    restoredRows,
+    groupedPayload,
+    restoredPayload,
+    physicalOrder: list.children.map(item => item.id),
+    canonicalMarkersCleared: list.children.every(item => (
+        item.recipeIngredientColumnViewCanonicalOrder === undefined
+    )),
+}));
+"""
+    completed = subprocess.run(
+        [node, "-e", harness],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    result = json.loads(completed.stdout)
+    assert result["groupedRows"] == ["first", "second", "third"]
+    assert result["restoredRows"] == ["first", "second", "third"]
+    assert result["physicalOrder"] == ["first", "second", "third"]
+    assert result["groupedPayload"] == result["restoredPayload"]
+    assert result["canonicalMarkersCleared"] is True
 
 
 def test_replacement_move_actions_disable_at_visible_and_component_boundaries():
@@ -1494,66 +2051,58 @@ def test_selected_choice_header_uses_a_compact_flat_options_control():
     assert "white-space: nowrap;" in header_controls
 
 
-def test_store_section_grouping_keeps_selected_option_atomic_on_parent_row():
+def test_store_section_grouping_repeats_option_context_without_parent_section_inheritance():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    entries = javascript_function_source(script, "recipeIngredientColumnViewIngredientEntries")
+    fragments = javascript_function_source(
+        script,
+        "syncRecipeIngredientColumnViewSectionFragments",
+    )
+    restore = javascript_function_source(
+        script,
+        "clearRecipeIngredientColumnViewSectionFragments",
+    )
+    prepare = javascript_function_source(
+        script,
+        "prepareRecipeIngredientColumnViewDisplayRows",
+    )
 
-    view_start = script.index("function prepareRecipeIngredientColumnViewDisplayRows")
-    view_end = script.index("function recipeIngredientColumnViewEntry", view_start)
-    grouped_view = script[view_start:view_end]
-    toggles_start = script.index("function recipeIngredientSelectedOptionSummaries")
-    toggles_end = script.index("function createRecipeIngredientSelectedOptionLineItem", toggles_start)
-    toggles = script[toggles_start:toggles_end]
-    assert 'row.classList.remove("is-ingredient-store-section-grouped-choice");' in grouped_view
-    assert "Grouping changes where the complete parent group is placed" in grouped_view
-    assert "updateRecipeIngredientSubstitutionState(row);" in grouped_view
-    assert "clearRecipeIngredientColumnViewGroupProjections(list);" in grouped_view
-    assert "rows.forEach(syncRecipeIngredientSelectedOptionToggles);" in grouped_view
-    assert "componentSection" not in grouped_view
-    assert "projectionAnchor" not in grouped_view
-    assert "function createRecipeIngredientColumnViewGroupProjection" not in script
-    assert "function syncRecipeIngredientColumnViewGroupProjection" not in script
+    assert "recipeIngredientColumnViewSelectedOptionLineItems" in entries
+    assert "sourceRow" in entries
+    assert "parentRow" in entries
+    assert "optionId" in entries
+    assert "store" in entries
+    assert "manualIndex" in entries
+    assert "recipeIngredientColumnViewEntry" in entries
+    assert "parentRow.recipeIngredientInlineSummarySourceRow" not in entries
+    assert "cloneNode" not in fragments
+    assert ".style.order" not in fragments
+    assert "replaceChildren" not in fragments
+    assert any(operation in fragments for operation in ("appendChild", "append(", "insertBefore"))
+    assert "data-recipe-ingredient-column-group-projection" not in fragments
+    assert "ingredientEntries" in fragments
+    assert '"recipe-edit-selected-option-line-items"' in fragments
+    assert "recipeIngredientColumnViewIngredientEntries" in prepare
+    assert "syncRecipeIngredientColumnViewSectionFragments" in prepare
+    assert "recipeIngredientOptionSourceRows" in restore
 
-    # Per-component toggles are a legacy compatibility path and remain hidden
-    # after grouping normalizes the parent row; the parent disclosure owns state.
-    assert "function ensureRecipeIngredientSelectedOptionToggle" in toggles
-    assert '!summary.closest("[data-recipe-ingredient-edit-panel]")' in toggles
-    assert 'button.dataset.ingredientSelectedOptionToggle = "";' in toggles
-    assert "toggleRecipeIngredientSubstitutions(button, event)" in toggles
-    assert "function syncRecipeIngredientSelectedOptionToggles" in toggles
-    assert 'sourceLabel?.textContent || "Options"' in toggles
-    assert "recipeIngredientExpansionIsOpen(row, button)" in toggles
-    assert 'button.setAttribute("aria-expanded", String(isExpanded));' in toggles
-    assert "recipeIngredientDisclosureActionText" in toggles
-
-    expansion = script[
-        script.index("function recipeIngredientExpansionSelectedOptionSummary"):
-        script.index("function recipeIngredientExpansionViewportAnchor")
-    ]
-    assert "The parent disclosure always controls the parent's alternatives region." in expansion
-    assert "return null;" in expansion
-    assert "recipeEditIngredientColumnView.groupByStoreSection" not in expansion
-    assert "A same-section selected option is an atomic block on the parent row." in expansion
-    assert '"[data-recipe-ingredient-column-group-projection]"' in expansion
-    assert ") || row;" in expansion
-    assert ") || selectedOptionSummary;" not in expansion
-
-    atomic_css = css[css.index(
-        "/* Ingredient editor v112: every selected ingredient option renders as one atomic block. */"
+    fragment_css = css[css.index(
+        "/* Ingredient editor v113: Store Section grouping owns real ingredient rows. */"
     ):]
-    assert "> .recipe-edit-ingredient-row.has-selected-choice-group-header" in atomic_css
-    assert "> .recipe-edit-selected-option-line-items" in atomic_css
-    assert "> .recipe-edit-ingredient-options-panel" in atomic_css
-    assert "grid-row: 2 !important;" in atomic_css
-    assert "grid-row: 3 !important;" in atomic_css
+    assert "display: flex !important;" in fragment_css
+    assert "flex-direction: column;" in fragment_css
+    assert "grid-row: auto !important;" in fragment_css
+    assert ".recipe-edit-ingredient-store-section-option-context" in fragment_css
+    assert "position: static !important;" in fragment_css
 
 
 def test_store_section_grouping_keeps_same_section_selected_option_header():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
-    grouped_view = script[
-        script.index("function prepareRecipeIngredientColumnViewDisplayRows"):
-        script.index("function recipeIngredientColumnViewEntry")
-    ]
+    grouped_view = javascript_function_source(
+        script,
+        "syncRecipeIngredientColumnViewSectionFragments",
+    )
     selected_block = script[
         script.index("function ensureRecipeIngredientSelectedOptionBlock"):
         script.index("function syncRecipeIngredientSelectedOptionLineItems")
@@ -1563,12 +2112,14 @@ def test_store_section_grouping_keeps_same_section_selected_option_header():
         script.index("function addRecipeIngredientSubstitutionRow")
     ]
 
-    assert 'row.classList.remove("is-ingredient-store-section-grouped-choice");' in grouped_view
-    assert 'row.classList.contains("has-ingredient-choice")' in grouped_view
-    assert 'row.classList.contains("has-selected-implicit-default-choice")' not in grouped_view
-    assert "Grouping changes where the complete parent group is placed" in grouped_view
-    assert "clearRecipeIngredientColumnViewGroupProjections(list);" in grouped_view
-    assert "updateRecipeIngredientSubstitutionState(row);" in grouped_view
+    assert "ingredientEntries" in grouped_view
+    assert "entriesBySection" in grouped_view
+    assert "hostEntries" in grouped_view
+    assert "optionId" in grouped_view
+    assert "store" in grouped_view
+    assert "parentRow" in grouped_view
+    assert "cloneNode" not in grouped_view
+    assert "data-recipe-ingredient-column-group-projection" not in grouped_view
     assert "selectedChoiceUsesParentIngredientRow" not in substitution_state
     assert '"has-selected-implicit-default-choice"' not in substitution_state
     assert "hidesSelectedChoiceHeaderInStoreSectionView" not in substitution_state
@@ -1612,13 +2163,12 @@ def test_ingredient_choice_panel_mounts_on_parent_row_after_the_home_marker():
     assert "return null;" in expansion
     assert "recipeIngredientExpansionSelectedOptionSummary(" in expansion
     assert "recipeIngredientExpansionAnchorFromControl" in expansion
-    assert "selectedOptionSummary.closest(" in expansion
-    assert '"[data-recipe-ingredient-column-group-projection]"' in expansion
-    assert "A same-section selected option is an atomic block on the parent row." in expansion
-    assert ") || row;" in expansion
-    assert ") || selectedOptionSummary;" not in expansion
+    assert "function recipeIngredientExpansionAnchorFromControl(row, control = null)" in expansion
+    assert "return row;" in expansion
+    assert '"[data-recipe-ingredient-column-group-projection]"' not in expansion
+    assert '"[data-recipe-ingredient-column-section-fragment]"' not in expansion
     assert 'anchor.insertAdjacentElement("afterend", container);' in expansion
-    assert "anchor.appendChild(container);" in expansion
+    assert "row.appendChild(container);" in expansion
     assert "if (anchor === row)" in expansion
     assert "home.after(container);" in expansion
     assert "container.dataset.ingredientExpansionFor = expansionId;" in expansion
@@ -7327,82 +7877,42 @@ def test_mobile_selected_option_block_keeps_header_and_rows_visible_when_collaps
         assert f"grid-row: {grid_row} !important;" in atomic_css
 
 
-def test_every_table_grouping_mode_uses_one_atomic_selected_option_block():
+def test_grouping_toggle_restores_one_canonical_selected_option_block_without_duplicates():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
-    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    selected_block = javascript_function_source(
+        script,
+        "ensureRecipeIngredientSelectedOptionBlock",
+    )
+    fragments = javascript_function_source(
+        script,
+        "syncRecipeIngredientColumnViewSectionFragments",
+    )
+    restore = javascript_function_source(
+        script,
+        "clearRecipeIngredientColumnViewSectionFragments",
+    )
+    handler_start = script.index(
+        'menu.querySelector("[data-recipe-ingredient-column-view-group-store]")'
+    )
+    handler_end = script.index(
+        'menu.querySelectorAll("[data-recipe-ingredient-column-view-filter]")',
+        handler_start,
+    )
+    handler = script[handler_start:handler_end]
 
-    sync_line_items = script[
-        script.index("function recipeIngredientSelectedOptionProjectionRows"):
-        script.index("function organizeRecipeEditSubstitutionOptionRow")
-    ]
-    substitution_state = script[
-        script.index("function updateRecipeIngredientSubstitutionState"):
-        script.index("function addRecipeIngredientSubstitutionRow")
-    ]
-    grouped_view = script[
-        script.index("function prepareRecipeIngredientColumnViewDisplayRows"):
-        script.index("function recipeIngredientColumnViewEntry")
-    ]
-
-    assert "return rows.length > 1 ? rows : [];" in sync_line_items
-    assert "function recipeIngredientSelectedOptionActiveRows" in sync_line_items
-    assert "return selectedChoice && values.length === 1 && row ? [row] : [];" in sync_line_items
-    assert "const renderedRows = activeRows;" in sync_line_items
-    assert "groupByStoreSection\n        ? projectedRows" not in sync_line_items
-    assert "if (!renderedRows.length)" in sync_line_items
-    assert "const relocatesExpandedChoice = Boolean(" in sync_line_items
-    assert "parentDisclosure || row" in sync_line_items
-    assert "lineItems?.remove();" in sync_line_items
-    assert 'row.classList.remove("has-selected-option-line-items");' in sync_line_items
-    assert '"has-mobile-implicit-default-line-item"' not in sync_line_items
-    assert "function ensureRecipeIngredientSelectedOptionBlock" in sync_line_items
-    assert 'block.dataset.ingredientSelectedOptionBlock = "";' in sync_line_items
-    assert 'block.dataset.ingredientOptionBlock = "";' in sync_line_items
-    assert "const home = row.recipeIngredientSubstitutionHome;" in sync_line_items
-    assert "const reference = homeIsInRow" in sync_line_items
-    assert "row.insertBefore(block, reference);" in sync_line_items
-    assert "else if (homeIsInRow && block.nextSibling !== home)" in sync_line_items
-    assert "row.insertBefore(block, home);" in sync_line_items
-    assert 'block.querySelector(":scope > [data-ingredient-option-header]")' in sync_line_items
-    assert 'block.querySelector(":scope > [data-ingredient-option-actions]")' in sync_line_items
-    assert "renderRecipeIngredientOptionBlock(lineItems, {" in sync_line_items
-    assert "ingredientContent: summaries," in sync_line_items
-    assert "actions: [action]," in sync_line_items
-    assert "lineItems.hidden = !hasRenderedRows;" in sync_line_items
-    assert "expandedAtSelectedLineItem" not in sync_line_items
-    assert "keepsGroupedSelectedRowsVisible" not in sync_line_items
-    assert "const preservesExpandedChoice = Boolean(" in sync_line_items
-    assert "mountRecipeIngredientExpansion(" in sync_line_items
-    assert "nextToggle || nextSummary" in sync_line_items
-    assert "selectedChoiceUsesParentIngredientRow" not in substitution_state
-    assert "hidesSelectedChoiceHeaderInStoreSectionView" not in substitution_state
-    assert "syncRecipeIngredientSourceOptionBlockVisibility(container);" in substitution_state
-    assert "clearRecipeIngredientColumnViewGroupProjections(list);" in grouped_view
-    assert "rows.forEach(syncRecipeIngredientSelectedOptionToggles);" in grouped_view
+    assert 'block.dataset.ingredientSelectedOptionBlock = "";' in selected_block
+    assert 'block.dataset.ingredientOptionBlock = "";' in selected_block
+    assert 'block.querySelector(":scope > [data-ingredient-option-header]")' in selected_block
+    assert "row.insertBefore(block" in selected_block
+    assert "ingredientEntries" in fragments
+    assert "cloneNode" not in fragments
+    assert "replaceChildren" not in fragments
+    assert "recipeIngredientOptionSourceRows" in restore
+    assert "captureRecipeIngredientChoiceExpansionState()" in handler
+    assert "applyRecipeIngredientColumnView({ announce: true });" in handler
+    assert "restoreRecipeIngredientChoiceExpansionState(" in handler
     assert "function createRecipeIngredientColumnViewGroupProjection" not in script
     assert "function syncRecipeIngredientColumnViewGroupProjection" not in script
-    assert ".has-mobile-implicit-default-line-item" not in css
-    assert ".has-section-placed-selected-option" not in css
-
-    expansion = script[
-        script.index("function recipeIngredientExpansionSelectedOptionSummary"):
-        script.index("function recipeIngredientExpansionViewportAnchor")
-    ]
-    assert "controlledSummary.recipeIngredientChoiceParentRow === row" in expansion
-    assert "controlledSummary.recipeIngredientOptionSourceRow !== row" not in expansion
-    assert "summary.recipeIngredientOptionSourceRow !== row" not in expansion
-    assert "The parent disclosure always controls the parent's alternatives region." in expansion
-    assert "recipeEditIngredientColumnView.groupByStoreSection" not in expansion
-    assert '"[data-recipe-ingredient-column-group-projection]"' in expansion
-    assert ") || row;" in expansion
-
-    atomic_css = css[css.index(
-        "/* Ingredient editor v112: every selected ingredient option renders as one atomic block. */"
-    ):]
-    assert "> .recipe-edit-selected-option-line-items" in atomic_css
-    assert "> .recipe-edit-ingredient-options-panel" in atomic_css
-    assert "grid-row: 2 !important;" in atomic_css
-    assert "grid-row: 3 !important;" in atomic_css
 
 
 def test_ingredient_modal_selected_option_header_stays_above_shared_summary_rows():
