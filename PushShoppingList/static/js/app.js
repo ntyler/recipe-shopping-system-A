@@ -29708,6 +29708,30 @@ function clearRecipeIngredientColumnViewSectionFragments(list) {
                 }
                 delete action.recipeIngredientColumnViewOriginalOnclick;
             });
+            const originalPlacement = control
+                .recipeIngredientColumnViewOriginalPlacement;
+            if (originalPlacement && control.style) {
+                Object.entries(originalPlacement).forEach(([
+                    property,
+                    { value, priority },
+                ]) => {
+                    if (value) {
+                        control.style.setProperty(property, value, priority);
+                    } else {
+                        control.style.removeProperty(property);
+                    }
+                });
+            }
+            const originalGridColumnAttribute = control
+                .recipeIngredientColumnViewOriginalGridColumnAttribute;
+            if (originalGridColumnAttribute === null) {
+                control.removeAttribute("data-ingredient-grid-column");
+            } else if (originalGridColumnAttribute !== undefined) {
+                control.setAttribute(
+                    "data-ingredient-grid-column",
+                    originalGridColumnAttribute,
+                );
+            }
             const home = control.recipeIngredientColumnViewHome;
             if (home?.parentNode) {
                 home.replaceWith(control);
@@ -29715,6 +29739,8 @@ function clearRecipeIngredientColumnViewSectionFragments(list) {
                 control.remove();
             }
             delete control.recipeIngredientColumnViewHome;
+            delete control.recipeIngredientColumnViewOriginalPlacement;
+            delete control.recipeIngredientColumnViewOriginalGridColumnAttribute;
             delete control.recipeIngredientChoiceParentRow;
             delete control.recipeIngredientOptionSourceRow;
         });
@@ -29863,6 +29889,12 @@ function selectRecipeIngredientColumnViewOption(control, event = null) {
     window.requestAnimationFrame(() => {
         const disclosure = parentRow.recipeIngredientGroupedChoiceAnchorSummary
             ?.querySelector("[data-ingredient-selected-option-toggle]");
+        ensureRecipeIngredientGroupHeaderVisible(
+            disclosure?.closest?.("[data-recipe-ingredient-column-option-row]")
+                || parentRow.recipeIngredientGroupedChoiceAnchorSummary
+                || parentRow,
+            recipeIngredientVerticalScrollContainer(parentRow),
+        );
         if (
             disclosure?.isConnected
             && !disclosure.closest("[hidden], [inert]")
@@ -29934,6 +29966,40 @@ function setRecipeIngredientColumnViewSourceCarrier(parentRow) {
 function recipeIngredientColumnViewMoveControl(row, control, target) {
     if (!row || !control || !target) return false;
     if (!moveRecipeIngredientColumnViewNode(control, target)) return false;
+    if (control.style) {
+        if (
+            control.recipeIngredientColumnViewOriginalGridColumnAttribute
+            === undefined
+        ) {
+            control.recipeIngredientColumnViewOriginalGridColumnAttribute = (
+                control.hasAttribute("data-ingredient-grid-column")
+                    ? control.getAttribute("data-ingredient-grid-column")
+                    : null
+            );
+        }
+        control.removeAttribute("data-ingredient-grid-column");
+        if (!control.recipeIngredientColumnViewOriginalPlacement) {
+            control.recipeIngredientColumnViewOriginalPlacement = Object.fromEntries(
+                ["grid-area", "grid-column", "grid-row"].map(property => [
+                    property,
+                    {
+                        value: control.style.getPropertyValue(property),
+                        priority: control.style.getPropertyPriority(property),
+                    },
+                ]),
+            );
+        }
+        const groupedColumn = control.classList?.contains(
+            "recipe-edit-alternative-menu-wrap",
+        ) ? "2" : "1";
+        control.style.setProperty(
+            "grid-area",
+            `1 / ${groupedColumn}`,
+            "important",
+        );
+        control.style.setProperty("grid-column", groupedColumn, "important");
+        control.style.setProperty("grid-row", "1", "important");
+    }
     const controls = Array.isArray(row.recipeIngredientColumnViewMovedControls)
         ? row.recipeIngredientColumnViewMovedControls
         : [];
@@ -35466,6 +35532,8 @@ function syncRecipeIngredientSelectedOptionToggles(row) {
         );
         cell.setAttribute("aria-hidden", String(!showOnSummary));
         if (!showOnSummary) {
+            button.setAttribute("aria-expanded", "false");
+            button.removeAttribute("aria-controls");
             return;
         }
         const sourceLabel = sourceButton.querySelector(
@@ -35502,10 +35570,24 @@ function syncRecipeIngredientSelectedOptionToggles(row) {
             sourceButton.title,
             isExpanded,
         );
-        const groupedControls = recipeIngredientColumnViewAlternativeSummaryIds(
-            row,
+        const groupedView = row.classList.contains(
+            "is-ingredient-store-section-grouped-choice",
         );
-        const controls = groupedControls.length
+        const parentId = ensureRecipeIngredientExpansionId(row);
+        const groupedControls = groupedView
+            ? [...new Set(isExpanded
+                ? [...document.querySelectorAll(
+                    "#recipeEditIngredients > "
+                    + "[data-recipe-ingredient-column-option-row]",
+                )].filter(optionRow => (
+                    optionRow.dataset.recipeIngredientChoiceParentId === parentId
+                    && !optionRow.classList.contains(
+                        "is-recipe-ingredient-column-selected-option",
+                    )
+                )).map(optionRow => optionRow.id).filter(Boolean)
+                : recipeIngredientColumnViewAlternativeSummaryIds(row))]
+            : [];
+        const controls = groupedView
             ? groupedControls.join(" ")
             : sourceButton.getAttribute("aria-controls");
         if (controls) {
@@ -51604,6 +51686,67 @@ function restoreRecipeIngredientExpansionAnchor(anchor, previousTop, scrollConta
     }
 }
 
+function ensureRecipeIngredientGroupHeaderVisible(anchor, scrollContainer = null) {
+    if (!anchor?.isConnected) {
+        return;
+    }
+
+    const ingredientList = anchor.closest?.("#recipeEditIngredients");
+    const tableHead = document.querySelector(
+        ".recipe-edit-ingredient-table-head-viewport",
+    );
+    if (!ingredientList || !tableHead) {
+        return;
+    }
+
+    let listItem = anchor;
+    while (listItem && listItem.parentElement !== ingredientList) {
+        listItem = listItem.parentElement;
+    }
+    let groupHeader = listItem?.previousElementSibling || null;
+    while (
+        groupHeader
+        && !groupHeader.classList.contains(
+            "recipe-edit-ingredient-column-group-header",
+        )
+    ) {
+        groupHeader = groupHeader.previousElementSibling;
+    }
+    if (!groupHeader) {
+        return;
+    }
+
+    const headerRect = groupHeader.getBoundingClientRect();
+    const tableHeadRect = tableHead.getBoundingClientRect();
+    const isObscured = (
+        headerRect.bottom > tableHeadRect.top
+        && headerRect.top < tableHeadRect.bottom
+    );
+    if (!isObscured) {
+        return;
+    }
+
+    const overlap = Math.ceil(tableHeadRect.bottom - headerRect.top + 1);
+    if (!Number.isFinite(overlap) || overlap <= 0) {
+        return;
+    }
+
+    const verticalScroller = scrollContainer?.isConnected
+        ? scrollContainer
+        : recipeIngredientVerticalScrollContainer(anchor);
+    if (verticalScroller?.isConnected) {
+        const state = recipeEditIngredientScrollReserveStates.get(verticalScroller);
+        if (state) state.adjusting = true;
+        verticalScroller.scrollTop = Math.max(
+            0,
+            verticalScroller.scrollTop - overlap,
+        );
+        if (state) state.adjusting = false;
+    } else {
+        window.scrollBy({ top: -overlap, behavior: "instant" });
+    }
+}
+
 function toggleRecipeIngredientExpansionWithAnchor(row, control, toggleExpansion) {
     if (!row || typeof toggleExpansion !== "function") {
         return false;
@@ -51661,6 +51804,10 @@ function toggleRecipeIngredientExpansionWithAnchor(row, control, toggleExpansion
             ) {
                 scrollContainer.classList.remove("recipe-edit-ingredient-scroll-stabilizing");
             }
+            ensureRecipeIngredientGroupHeaderVisible(
+                row.recipeIngredientGroupedChoiceAnchorSummary || anchor || row,
+                scrollContainer,
+            );
         });
     });
     return result;
