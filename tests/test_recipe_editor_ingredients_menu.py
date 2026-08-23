@@ -1148,6 +1148,14 @@ def test_store_section_counts_use_visible_active_leaf_ingredients():
         script,
         "recipeIngredientColumnViewChoiceEntries",
     )
+    context_anchors_function = javascript_function_source(
+        script,
+        "assignRecipeIngredientColumnViewSectionContextAnchors",
+    )
+    option_context_key_function = javascript_function_source(
+        script,
+        "recipeIngredientColumnViewOptionContextKey",
+    )
     stable_function = ""
     if "function recipeIngredientColumnViewEntryStableId" in script:
         stable_function = javascript_function_source(
@@ -1275,7 +1283,7 @@ function recipeIngredientColumnViewOptionHeader() { return null; }
 function recipeIngredientOptionTypeLabel(isDefault) {
     return isDefault ? "DEFAULT OPTION" : "ALTERNATIVE OPTION";
 }
-""" + stable_function + "\n" + choice_entries_function + "\n" + entries_function + r"""
+""" + stable_function + "\n" + context_anchors_function + "\n" + option_context_key_function + "\n" + choice_entries_function + "\n" + entries_function + r"""
 
 const cannedCorn = ingredientRow("ingredient-canned-corn", "Canned cream-style corn", "CANNED");
 const egg = ingredientRow("ingredient-egg", "Egg", "DAIRY & EGGS");
@@ -1455,6 +1463,19 @@ function snapshot({grouped, expanded}) {
                 && !entry.row.store_section
                 && !entry.row.storeSection
             )),
+        optionContexts: entries
+            .filter(entry => entry.parentRow.classList.contains(
+                "has-ingredient-choice",
+            ))
+            .map(entry => ({
+                sourceId: entry.sourceRow.id,
+                optionId: entry.optionId,
+                store: entry.store.value,
+                selected: entry.selected,
+                anchor: entry.anchor,
+                sectionContextAnchor: entry.sectionContextAnchor,
+                optionLabel: entry.optionLabel,
+            })),
         unresolvedCounted: unresolvedEntries.map(entry => entry.counted),
         duplicateSourceCount: entries.length - new Set(
             entries.map(entry => entry.sourceRow.id),
@@ -1535,6 +1556,53 @@ process.stdout.write(JSON.stringify({
     }
     assert collapsed_grouped["alternativeSummariesOmitStore"] is True
     assert collapsed_grouped["cornOptionIds"] == ["option-corn-default"] * 3
+    assert collapsed_grouped["optionContexts"] == [
+        {
+            "sourceId": "component-corn",
+            "optionId": "option-corn-default",
+            "store": "PRODUCE",
+            "selected": True,
+            "anchor": True,
+            "sectionContextAnchor": True,
+            "optionLabel": "DEFAULT OPTION",
+        },
+        {
+            "sourceId": "component-cumin",
+            "optionId": "option-corn-default",
+            "store": "SPICES & SEASONINGS",
+            "selected": True,
+            "anchor": False,
+            "sectionContextAnchor": True,
+            "optionLabel": "DEFAULT OPTION",
+        },
+        {
+            "sourceId": "component-onion",
+            "optionId": "option-corn-default",
+            "store": "PRODUCE",
+            "selected": True,
+            "anchor": False,
+            "sectionContextAnchor": False,
+            "optionLabel": "DEFAULT OPTION",
+        },
+        {
+            "sourceId": "requirement-butter",
+            "optionId": "original:requirement-butter",
+            "store": "DAIRY & EGGS",
+            "selected": True,
+            "anchor": True,
+            "sectionContextAnchor": True,
+            "optionLabel": "DEFAULT OPTION",
+        },
+        {
+            "sourceId": "component-required-choice",
+            "optionId": "option-required",
+            "store": "PRODUCE",
+            "selected": False,
+            "anchor": True,
+            "sectionContextAnchor": True,
+            "optionLabel": "ALTERNATIVE OPTION",
+        },
+    ]
     assert result["repeatedGrouped"] == collapsed_grouped
 
     expanded_grouped = result["expandedGrouped"]
@@ -1572,6 +1640,30 @@ process.stdout.write(JSON.stringify({
         "component-required-choice": "PRODUCE",
     }
     assert expanded_grouped["alternativeSummariesOmitStore"] is True
+    assert [
+        context
+        for context in expanded_grouped["optionContexts"]
+        if context["optionId"] == "option-corn-frozen"
+    ] == [
+        {
+            "sourceId": "component-frozen-corn",
+            "optionId": "option-corn-frozen",
+            "store": "FROZEN",
+            "selected": False,
+            "anchor": True,
+            "sectionContextAnchor": True,
+            "optionLabel": "ALTERNATIVE OPTION",
+        },
+        {
+            "sourceId": "component-alternative-onion",
+            "optionId": "option-corn-frozen",
+            "store": "PRODUCE",
+            "selected": False,
+            "anchor": False,
+            "sectionContextAnchor": True,
+            "optionLabel": "ALTERNATIVE OPTION",
+        },
+    ]
     assert result["restoredUngrouped"] == baseline
 
 
@@ -1744,6 +1836,18 @@ def test_grouped_option_rows_move_without_parent_summaries_and_restore_exact_nod
         script,
         "syncRecipeIngredientColumnViewOptionMetadata",
     )
+    shows_option_context = javascript_function_source(
+        script,
+        "recipeIngredientColumnViewEntryShowsOptionContext",
+    )
+    sync_option_accessibility = javascript_function_source(
+        script,
+        "syncRecipeIngredientColumnViewOptionAccessibility",
+    )
+    sync_option_context = javascript_function_source(
+        script,
+        "syncRecipeIngredientColumnViewOptionContext",
+    )
     harness = r"""
 function classes(...initial) {
     const values = new Set(initial);
@@ -1828,6 +1932,7 @@ class FakeNode {
             "data-recipe-ingredient-option-member-id": "recipeIngredientOptionMemberId",
             "data-recipe-ingredient-option-id": "recipeIngredientOptionId",
             "data-recipe-ingredient-option-anchor": "recipeIngredientOptionAnchor",
+            "data-recipe-ingredient-option-section-context": "recipeIngredientOptionSectionContext",
         };
         if (datasetKeys[name]) delete this.dataset[datasetKeys[name]];
     }
@@ -1969,7 +2074,7 @@ function recipeIngredientExpansionIsOpen() { return false; }
 function ensureRecipeIngredientExpansionId(row) { return `expansion-${row.id}`; }
 const recipeEditExpandedIngredientIds = new Set();
 const recipeEditIngredientColumnView = {groupByStoreSection: false};
-""" + display_rows + "\n" + ensure_option_row_id + "\n" + move_node + "\n" + bind_option_selection + "\n" + source_carrier + "\n" + move_control + "\n" + sync_option_metadata + "\n" + sync_fragments + "\n" + clear_fragments + r"""
+""" + display_rows + "\n" + ensure_option_row_id + "\n" + move_node + "\n" + bind_option_selection + "\n" + source_carrier + "\n" + move_control + "\n" + shows_option_context + "\n" + sync_option_accessibility + "\n" + sync_option_context + "\n" + sync_option_metadata + "\n" + sync_fragments + "\n" + clear_fragments + r"""
 
 function lineItem(id) {
     const row = new FakeNode(id);
@@ -1999,7 +2104,12 @@ function entry(
     store,
     manualIndex,
     optionId,
-    {selected = true, counted = true, anchor = false} = {},
+    {
+        selected = true,
+        counted = true,
+        anchor = false,
+        sectionContextAnchor = false,
+    } = {},
 ) {
     return {
         key: row.id,
@@ -2013,6 +2123,7 @@ function entry(
         active: selected,
         counted,
         anchor,
+        sectionContextAnchor,
         stableId: sourceRow.id || row.id,
         componentOrder: manualIndex,
         optionLabel: selected ? "DEFAULT OPTION" : "ALTERNATIVE OPTION",
@@ -2083,9 +2194,17 @@ const selectedEntries = [
         "PRODUCE",
         0,
         "option-corn-default",
-        {anchor: true},
+        {anchor: true, sectionContextAnchor: true},
     ),
-    entry(cumin, cumin.recipeIngredientOptionSourceRow, parent, "SPICES & SEASONINGS", 1, "option-corn-default"),
+    entry(
+        cumin,
+        cumin.recipeIngredientOptionSourceRow,
+        parent,
+        "SPICES & SEASONINGS",
+        1,
+        "option-corn-default",
+        {sectionContextAnchor: true},
+    ),
     entry(onion, onion.recipeIngredientOptionSourceRow, parent, "PRODUCE", 2, "option-corn-default"),
     entry(
         butter,
@@ -2094,7 +2213,7 @@ const selectedEntries = [
         "DAIRY & EGGS",
         3,
         "original:requirement-butter",
-        {anchor: true},
+        {anchor: true, sectionContextAnchor: true},
     ),
 ];
 const alternativeEntries = [
@@ -2105,7 +2224,12 @@ const alternativeEntries = [
         "FROZEN",
         4,
         "option-frozen-corn",
-        {selected: false, counted: false, anchor: true},
+        {
+            selected: false,
+            counted: false,
+            anchor: true,
+            sectionContextAnchor: true,
+        },
     ),
     entry(
         alternativeOnion.summary,
@@ -2114,7 +2238,7 @@ const alternativeEntries = [
         "PRODUCE",
         5,
         "option-frozen-corn",
-        {selected: false, counted: false},
+        {selected: false, counted: false, sectionContextAnchor: true},
     ),
     entry(
         unsaltedButter.summary,
@@ -2123,7 +2247,12 @@ const alternativeEntries = [
         "DAIRY & EGGS",
         6,
         "option-unsalted-butter",
-        {selected: false, counted: false, anchor: true},
+        {
+            selected: false,
+            counted: false,
+            anchor: true,
+            sectionContextAnchor: true,
+        },
     ),
 ];
 
@@ -2171,7 +2300,13 @@ const collapsed = {
         === row.recipeIngredientColumnViewEntry?.optionId
         && row.dataset.recipeIngredientOptionAnchor
         === String(row.recipeIngredientColumnViewEntry?.anchor)
+        && row.dataset.recipeIngredientOptionSectionContext
+        === String(row.recipeIngredientColumnViewEntry?.sectionContextAnchor)
     )),
+    contextLabels: Object.fromEntries(optionSummarySyncs.map(sync => [
+        sync.row,
+        sync.options.selectionState,
+    ])),
 };
 
 clearRecipeIngredientColumnViewSectionFragments(list);
@@ -2220,6 +2355,10 @@ const expanded = {
         row.recipeIngredientColumnViewEntry?.counted !== false
     )).length,
     metadataSyncCount: optionSummarySyncs.length,
+    contextLabels: Object.fromEntries(optionSummarySyncs.map(sync => [
+        sync.row,
+        sync.options.selectionState,
+    ])),
     frozenOptionControls: ids(frozenCorn.summary.optionCell),
     frozenOptionCellHasMenu: frozenCorn.summary.optionCell.classList.contains(
         "has-recipe-ingredient-grouped-option-menu",
@@ -2297,6 +2436,7 @@ process.stdout.write(JSON.stringify({
         key: result["expanded"].pop(key)
         for key in (
             "metadataSyncCount",
+            "contextLabels",
             "frozenOptionControls",
             "frozenOptionCellHasMenu",
             "frozenMenuPlacementIsSafe",
@@ -2315,6 +2455,15 @@ process.stdout.write(JSON.stringify({
     }
     assert expanded_metadata == {
         "metadataSyncCount": 11,
+        "contextLabels": {
+            "corn": "DEFAULT OPTION",
+            "cumin": "DEFAULT OPTION",
+            "onion": "",
+            "butter": "DEFAULT OPTION",
+            "frozen-corn": "ALTERNATIVE OPTION",
+            "alternative-onion": "ALTERNATIVE OPTION",
+            "unsalted-butter": "ALTERNATIVE OPTION",
+        },
         "frozenOptionControls": [
             "frozen-corn-use-option",
             "frozen-corn-option-menu",
@@ -2355,6 +2504,12 @@ process.stdout.write(JSON.stringify({
             ],
             "stableKeysAreUnique": True,
             "stableDatasets": True,
+            "contextLabels": {
+                "corn": "DEFAULT OPTION",
+                "cumin": "DEFAULT OPTION",
+                "onion": "",
+                "butter": "DEFAULT OPTION",
+            },
         },
         "restoredCollapsed": {
             "parents": ["requirement-corn", "requirement-butter"],
@@ -3528,7 +3683,7 @@ def test_selected_choice_header_uses_a_compact_flat_options_control():
     assert "white-space: nowrap;" in header_controls
 
 
-def test_store_section_grouping_promotes_actual_option_rows_without_context_headers():
+def test_store_section_grouping_promotes_actual_rows_with_compact_section_context():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     entries = javascript_function_source(script, "recipeIngredientColumnViewIngredientEntries")
     choice_entries = javascript_function_source(
@@ -3551,6 +3706,30 @@ def test_store_section_grouping_promotes_actual_option_rows_without_context_head
         script,
         "prepareRecipeIngredientColumnViewDisplayRows",
     )
+    metadata = javascript_function_source(
+        script,
+        "syncRecipeIngredientColumnViewOptionMetadata",
+    )
+    context_anchors = javascript_function_source(
+        script,
+        "assignRecipeIngredientColumnViewSectionContextAnchors",
+    )
+    context_key = javascript_function_source(
+        script,
+        "recipeIngredientColumnViewOptionContextKey",
+    )
+    context_sync = javascript_function_source(
+        script,
+        "syncRecipeIngredientColumnViewOptionContext",
+    )
+    visible_contexts = javascript_function_source(
+        script,
+        "syncRecipeIngredientColumnViewVisibleSectionContexts",
+    )
+    apply_view = javascript_function_source(
+        script,
+        "applyRecipeIngredientColumnView",
+    )
 
     assert "recipeIngredientColumnViewChoiceEntries" in entries
     assert "options.includeAlternatives" in choice_entries
@@ -3562,12 +3741,22 @@ def test_store_section_grouping_promotes_actual_option_rows_without_context_head
         "sourceRow",
         "parentRow",
         "optionId",
+        "optionContextKey",
         "componentOrder",
         "store",
         "manualIndex",
         "anchor",
+        "sectionContextAnchor",
     ):
         assert field in choice_entries
+    assert "assignRecipeIngredientColumnViewSectionContextAnchors" in choice_entries
+    assert "recipeIngredientColumnViewOptionContextKey" in choice_entries
+    assert "const entriesBySection = new Map();" in context_anchors
+    assert "options.visibleOnly" in context_anchors
+    assert "sectionContextAnchors.has(entry)" in context_anchors
+    assert 'if (optionId) return `id:${optionId}`;' in context_key
+    assert "optionEntries.map(entry => entry.stableId).sort" in context_key
+    assert '"recipeIngredientColumnOptionContext"' in context_key
     assert 'row.hasAttribute?.("data-recipe-ingredient-column-option-row")' in display_rows
     assert '"is-recipe-ingredient-column-source-carrier"' in display_rows
     assert "cloneNode" not in fragments
@@ -3581,6 +3770,11 @@ def test_store_section_grouping_promotes_actual_option_rows_without_context_head
     assert "row.dataset.recipeIngredientOptionMemberId = entry.stableId;" in fragments
     assert "row.dataset.recipeIngredientOptionId = entry.optionId;" in fragments
     assert "row.dataset.recipeIngredientOptionAnchor = String(entry.anchor);" in fragments
+    assert "row.dataset.recipeIngredientOptionSectionContext" in context_sync
+    assert '"is-recipe-ingredient-column-option-section-context"' in context_sync
+    assert 'selectionState: showsOptionContext ? entry.optionLabel : ""' in (
+        context_sync
+    )
     assert "row.recipeIngredientColumnViewEntry = entry;" in fragments
     assert "setRecipeIngredientColumnViewSourceCarrier(parentRow);" in fragments
     assert "recipeIngredientColumnViewIngredientEntries" in prepare
@@ -3591,6 +3785,256 @@ def test_store_section_grouping_promotes_actual_option_rows_without_context_head
     assert 'row.removeAttribute("data-recipe-ingredient-option-member-id");' in restore
     assert 'row.removeAttribute("data-recipe-ingredient-option-id");' in restore
     assert 'row.removeAttribute("data-recipe-ingredient-option-anchor");' in restore
+    assert (
+        'row.removeAttribute("data-recipe-ingredient-option-section-context");'
+        in restore
+    )
+    assert "recipeIngredientColumnViewEntryShowsOptionContext" in context_sync
+    assert "syncRecipeIngredientColumnViewOptionContext(entry);" in metadata
+    assert "if (!entry.anchor) return;" in metadata
+    assert "assignRecipeIngredientColumnViewSectionContextAnchors" in visible_contexts
+    assert "entry.optionContextKey" in visible_contexts
+    assert "{ visibleOnly: true }" in visible_contexts
+    assert "optionEntries.forEach(syncRecipeIngredientColumnViewOptionContext);" in (
+        visible_contexts
+    )
+    assert "syncRecipeIngredientColumnViewVisibleSectionContexts" in apply_view
+
+
+def test_grouped_option_context_survives_selected_and_alternative_row_refreshes():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    selected_refresh = javascript_function_source(
+        script,
+        "syncRecipeIngredientSelectedOptionLineItems",
+    )
+    alternative_refresh = javascript_function_source(
+        script,
+        "updateRecipeIngredientAlternativeComponentSummary",
+    )
+    accessibility = javascript_function_source(
+        script,
+        "syncRecipeIngredientColumnViewOptionAccessibility",
+    )
+
+    for refresh in (selected_refresh, alternative_refresh):
+        assert "recipeIngredientColumnViewEntryShowsOptionContext" in refresh
+        assert "syncRecipeIngredientColumnViewOptionAccessibility" in refresh
+    assert "groupedEntry" in selected_refresh
+    assert "groupedEntry" in alternative_refresh
+    assert "entry.anchor ? entry.optionLabel" not in selected_refresh
+    assert "groupedEntry?.anchor" not in alternative_refresh
+    assert 'row.setAttribute(\n        "aria-label"' in accessibility
+    assert 'entry.selected ? "selected " : ""' in accessibility
+
+
+def test_grouped_option_context_moves_to_a_visible_member_when_filtered():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for filtered option-context coverage")
+
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    assign_context = javascript_function_source(
+        script,
+        "assignRecipeIngredientColumnViewSectionContextAnchors",
+    )
+    harness = r"""
+function recipeIngredientColumnViewOptionAnchor(_parentRow, entries) {
+    return entries.find(entry => entry.anchor) || entries[0] || null;
+}
+""" + assign_context + r"""
+
+const parent = {id: "requirement-corn"};
+const corn = {
+    id: "corn",
+    anchor: true,
+    filtered: true,
+    store: {key: "produce"},
+};
+const onion = {
+    id: "onion",
+    anchor: false,
+    filtered: false,
+    store: {key: "produce"},
+};
+const cumin = {
+    id: "cumin",
+    anchor: false,
+    filtered: false,
+    store: {key: "spices"},
+};
+const entries = [corn, onion, cumin];
+function state() {
+    return Object.fromEntries(entries.map(entry => [
+        entry.id,
+        entry.sectionContextAnchor,
+    ]));
+}
+
+assignRecipeIngredientColumnViewSectionContextAnchors(
+    parent,
+    entries,
+    {visibleOnly: true},
+);
+const anchorFiltered = state();
+corn.filtered = false;
+assignRecipeIngredientColumnViewSectionContextAnchors(
+    parent,
+    entries,
+    {visibleOnly: true},
+);
+const filterCleared = state();
+corn.filtered = true;
+onion.filtered = true;
+assignRecipeIngredientColumnViewSectionContextAnchors(
+    parent,
+    entries,
+    {visibleOnly: true},
+);
+const produceHidden = state();
+process.stdout.write(JSON.stringify({
+    anchorFiltered,
+    filterCleared,
+    produceHidden,
+}));
+"""
+    completed = subprocess.run(
+        [node],
+        input=harness,
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout) == {
+        "anchorFiltered": {"corn": False, "onion": True, "cumin": True},
+        "filterCleared": {"corn": True, "onion": False, "cumin": True},
+        "produceHidden": {"corn": False, "onion": False, "cumin": True},
+    }
+
+
+def test_filtered_context_keeps_distinct_idless_legacy_options_isolated():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for legacy option-context coverage")
+
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    stable_presentation_id = javascript_function_source(
+        script,
+        "recipeIngredientStablePresentationId",
+    )
+    context_key = javascript_function_source(
+        script,
+        "recipeIngredientColumnViewOptionContextKey",
+    )
+    assign_context = javascript_function_source(
+        script,
+        "assignRecipeIngredientColumnViewSectionContextAnchors",
+    )
+    sync_visible_context = javascript_function_source(
+        script,
+        "syncRecipeIngredientColumnViewVisibleSectionContexts",
+    )
+    harness = r"""
+function recipeIngredientColumnViewEntryStableId(row) {
+    return row.id;
+}
+function recipeIngredientColumnViewOptionAnchor(_parentRow, entries) {
+    return entries.find(entry => entry.anchor) || entries[0] || null;
+}
+const contextSyncs = [];
+function syncRecipeIngredientColumnViewOptionContext(entry) {
+    contextSyncs.push(entry.stableId);
+}
+""" + stable_presentation_id + "\n" + context_key + "\n" + assign_context + "\n" + sync_visible_context + r"""
+
+const parent = {
+    id: "requirement-legacy",
+    classList: {contains(name) { return name === "has-ingredient-choice"; }},
+};
+function entry(stableId, section, {anchor = false, filtered = false} = {}) {
+    return {
+        stableId,
+        parentRow: parent,
+        optionId: "",
+        store: {key: section},
+        anchor,
+        filtered,
+    };
+}
+const firstOption = [
+    entry("first-corn", "produce", {anchor: true, filtered: true}),
+    entry("first-onion", "produce"),
+    entry("first-cumin", "spices"),
+];
+const secondOption = [
+    entry("second-corn", "produce", {anchor: true}),
+    entry("second-onion", "produce"),
+    entry("second-pepper", "spices"),
+];
+const firstKey = recipeIngredientColumnViewOptionContextKey(
+    parent,
+    {id: "", selected: false},
+    firstOption,
+);
+const secondKey = recipeIngredientColumnViewOptionContextKey(
+    parent,
+    {id: "", selected: false},
+    secondOption,
+);
+firstOption.forEach(item => { item.optionContextKey = firstKey; });
+secondOption.forEach(item => { item.optionContextKey = secondKey; });
+syncRecipeIngredientColumnViewVisibleSectionContexts([
+    ...firstOption,
+    ...secondOption,
+]);
+function state(entries) {
+    return Object.fromEntries(entries.map(item => [
+        item.stableId,
+        item.sectionContextAnchor,
+    ]));
+}
+process.stdout.write(JSON.stringify({
+    distinctKeys: firstKey !== secondKey,
+    first: state(firstOption),
+    second: state(secondOption),
+    contextSyncs,
+}));
+"""
+    completed = subprocess.run(
+        [node],
+        input=harness,
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout) == {
+        "distinctKeys": True,
+        "first": {
+            "first-corn": False,
+            "first-onion": True,
+            "first-cumin": True,
+        },
+        "second": {
+            "second-corn": True,
+            "second-onion": False,
+            "second-pepper": True,
+        },
+        "contextSyncs": [
+            "first-corn",
+            "first-onion",
+            "first-cumin",
+            "second-corn",
+            "second-onion",
+            "second-pepper",
+        ],
+    }
 
 
 def test_ungrouped_selected_option_block_remains_the_canonical_source_after_grouping():

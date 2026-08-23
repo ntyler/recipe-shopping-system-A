@@ -29399,6 +29399,60 @@ function recipeIngredientColumnViewOptionAnchor(parentRow, optionEntries = []) {
     ))[0];
 }
 
+function assignRecipeIngredientColumnViewSectionContextAnchors(
+    parentRow,
+    optionEntries = [],
+    options = {},
+) {
+    const eligibleEntries = options.visibleOnly
+        ? optionEntries.filter(entry => !entry.filtered)
+        : optionEntries;
+    const entriesBySection = new Map();
+    eligibleEntries.forEach(entry => {
+        const sectionKey = String(entry.store?.key || "__unassigned__");
+        const sectionEntries = entriesBySection.get(sectionKey) || [];
+        sectionEntries.push(entry);
+        entriesBySection.set(sectionKey, sectionEntries);
+    });
+    const sectionContextAnchors = new Set(
+        [...entriesBySection.values()]
+            .map(sectionEntries => recipeIngredientColumnViewOptionAnchor(
+                parentRow,
+                sectionEntries,
+            ))
+            .filter(Boolean),
+    );
+    optionEntries.forEach(entry => {
+        entry.sectionContextAnchor = sectionContextAnchors.has(entry);
+    });
+    return optionEntries;
+}
+
+function recipeIngredientColumnViewOptionContextKey(
+    parentRow,
+    option = {},
+    optionEntries = [],
+) {
+    const optionId = String(option.id || "").trim();
+    if (optionId) return `id:${optionId}`;
+    return recipeIngredientStablePresentationId(
+        "recipeIngredientColumnOptionContext",
+        recipeIngredientColumnViewEntryStableId(
+            parentRow,
+            parentRow,
+            "parent",
+            0,
+        ),
+        option.selected ? "selected" : "alternative",
+        optionEntries.map(entry => entry.stableId).sort((left, right) => (
+            left.localeCompare(right, undefined, {
+                numeric: true,
+                sensitivity: "base",
+            })
+        )),
+    );
+}
+
 function recipeIngredientColumnViewOptionHeader(parentRow, option = {}) {
     if (option.selected) {
         return parentRow?.querySelector?.(
@@ -29574,6 +29628,7 @@ function recipeIngredientColumnViewChoiceEntries(
                 sourceRow,
                 parentRow,
                 optionId,
+                optionContextKey: "",
                 optionHeader: null,
                 optionLabel: String(
                     option.selectionLabel
@@ -29593,6 +29648,7 @@ function recipeIngredientColumnViewChoiceEntries(
                 manualIndex,
                 filtered: false,
                 anchor: false,
+                sectionContextAnchor: false,
             };
             row.recipeIngredientColumnViewManualIndex = manualIndex;
             manualIndex += 1;
@@ -29602,8 +29658,22 @@ function recipeIngredientColumnViewChoiceEntries(
             parentRow,
             optionEntries,
         );
+        const optionContextKey = recipeIngredientColumnViewOptionContextKey(
+            parentRow,
+            option,
+            optionEntries,
+        );
+        assignRecipeIngredientColumnViewSectionContextAnchors(
+            parentRow,
+            optionEntries,
+        );
         optionEntries.forEach(entry => {
             entry.anchor = entry === anchor;
+            entry.optionContextKey = optionContextKey;
+            // Store Section grouping can split one option across several aisles.
+            // Keep one compact context label in every resulting section while
+            // reserving disclosure and management controls for the canonical
+            // option anchor.
             entry.optionHeader = recipeIngredientColumnViewOptionHeader(
                 parentRow,
                 { ...option, sourceRow: entry.sourceRow },
@@ -29663,6 +29733,7 @@ function recipeIngredientColumnViewIngredientEntries(rows = [], options = {}) {
                 active: true,
                 selected: false,
                 anchor: false,
+                sectionContextAnchor: false,
                 filtered: false,
             };
             row.recipeIngredientColumnViewManualIndex = manualIndex;
@@ -29765,12 +29836,14 @@ function clearRecipeIngredientColumnViewSectionFragments(list) {
         row.classList.remove(
             "is-ingredient-column-filtered",
             "is-recipe-ingredient-column-option-anchor",
+            "is-recipe-ingredient-column-option-section-context",
             "is-recipe-ingredient-column-selected-option",
         );
         row.removeAttribute("data-recipe-ingredient-column-option-row");
         row.removeAttribute("data-recipe-ingredient-option-member-id");
         row.removeAttribute("data-recipe-ingredient-option-id");
         row.removeAttribute("data-recipe-ingredient-option-anchor");
+        row.removeAttribute("data-recipe-ingredient-option-section-context");
         row.removeAttribute("data-recipe-ingredient-choice-parent-id");
         row.querySelector(
             ".recipe-edit-alternative-component-option-spacer",
@@ -30039,16 +30112,37 @@ function recipeIngredientColumnViewMoveControl(row, control, target) {
     return true;
 }
 
-function syncRecipeIngredientColumnViewOptionMetadata(entry) {
+function recipeIngredientColumnViewEntryShowsOptionContext(entry) {
+    return Boolean(entry?.anchor || entry?.sectionContextAnchor);
+}
+
+function syncRecipeIngredientColumnViewOptionAccessibility(row, entry, values = {}) {
+    if (!row || !recipeIngredientColumnViewEntryShowsOptionContext(entry)) {
+        return;
+    }
+    const name = String(values.ingredient || "").trim() || "Unnamed ingredient";
+    const optionLabel = String(entry.optionLabel || "Ingredient option")
+        .trim()
+        .toLowerCase();
+    row.setAttribute(
+        "aria-label",
+        `Edit ingredient ${name}; ${entry.selected ? "selected " : ""}${optionLabel}`,
+    );
+}
+
+function syncRecipeIngredientColumnViewOptionContext(entry) {
     const row = entry?.row;
     if (!row) return;
     const values = fieldValuesFromRow(entry.sourceRow);
+    const showsOptionContext = recipeIngredientColumnViewEntryShowsOptionContext(
+        entry,
+    );
     updateRecipeIngredientOptionRowSummary(row, entry.sourceRow, values, {
         accessiblePrefix: "Edit ingredient",
         fallbackName: "Unnamed ingredient",
         showMetadata: false,
-        selectionState: entry.anchor ? entry.optionLabel : "",
-        selectionDetails: entry.anchor
+        selectionState: showsOptionContext ? entry.optionLabel : "",
+        selectionDetails: showsOptionContext
             ? String(
                 fieldValuesFromRow(entry.parentRow).source_text
                 || fieldValuesFromRow(entry.parentRow).original_text
@@ -30056,6 +30150,20 @@ function syncRecipeIngredientColumnViewOptionMetadata(entry) {
             ).trim()
             : "",
     });
+    syncRecipeIngredientColumnViewOptionAccessibility(row, entry, values);
+    row.dataset.recipeIngredientOptionSectionContext = String(
+        entry.sectionContextAnchor,
+    );
+    row.classList.toggle(
+        "is-recipe-ingredient-column-option-section-context",
+        entry.sectionContextAnchor,
+    );
+}
+
+function syncRecipeIngredientColumnViewOptionMetadata(entry) {
+    const row = entry?.row;
+    if (!row) return;
+    syncRecipeIngredientColumnViewOptionContext(entry);
     if (!entry.anchor) return;
 
     const sourceText = row.querySelector("[data-ingredient-source-text]");
@@ -30093,6 +30201,36 @@ function syncRecipeIngredientColumnViewOptionMetadata(entry) {
             movedMenu,
         );
     }
+}
+
+function syncRecipeIngredientColumnViewVisibleSectionContexts(
+    ingredientEntries = [],
+) {
+    const optionEntries = ingredientEntries.filter(entry => (
+        entry.parentRow?.classList?.contains("has-ingredient-choice")
+    ));
+    const entriesByParent = new Map();
+    optionEntries.forEach(entry => {
+        const entriesByOption = entriesByParent.get(entry.parentRow) || new Map();
+        const optionKey = String(
+            entry.optionContextKey
+            || (entry.optionId ? `id:${entry.optionId}` : "__option__"),
+        );
+        const groupedEntries = entriesByOption.get(optionKey) || [];
+        groupedEntries.push(entry);
+        entriesByOption.set(optionKey, groupedEntries);
+        entriesByParent.set(entry.parentRow, entriesByOption);
+    });
+    entriesByParent.forEach((entriesByOption, parentRow) => {
+        entriesByOption.forEach(optionGroupEntries => {
+            assignRecipeIngredientColumnViewSectionContextAnchors(
+                parentRow,
+                optionGroupEntries,
+                { visibleOnly: true },
+            );
+        });
+    });
+    optionEntries.forEach(syncRecipeIngredientColumnViewOptionContext);
 }
 
 function syncRecipeIngredientColumnViewSectionFragments(
@@ -30790,6 +30928,9 @@ function applyRecipeIngredientColumnView(options = {}) {
             entry.filtered,
         );
     });
+    if (recipeEditIngredientColumnView.groupByStoreSection) {
+        syncRecipeIngredientColumnViewVisibleSectionContexts(ingredientEntries);
+    }
     const sortedRows = displayRows
         .map((row, index) => {
             const rowEntries = Array.isArray(row.recipeIngredientColumnViewEntries)
@@ -35427,12 +35568,15 @@ function updateRecipeIngredientAlternativeComponentSummary(optionRow) {
     }
     const values = fieldValuesFromRow(optionRow);
     const groupedEntry = summary.recipeIngredientColumnViewEntry || null;
+    const showsOptionContext = recipeIngredientColumnViewEntryShowsOptionContext(
+        groupedEntry,
+    );
     updateRecipeIngredientOptionRowSummary(summary, optionRow, values, {
         role: recipeIngredientAlternativeRoleLabel(optionRow, values),
-        selectionState: groupedEntry?.anchor
+        selectionState: showsOptionContext
             ? groupedEntry.optionLabel
             : "",
-        selectionDetails: groupedEntry?.anchor
+        selectionDetails: showsOptionContext
             ? String(
                 fieldValuesFromRow(groupedEntry.parentRow).source_text
                 || fieldValuesFromRow(groupedEntry.parentRow).original_text
@@ -35440,6 +35584,11 @@ function updateRecipeIngredientAlternativeComponentSummary(optionRow) {
             ).trim()
             : "",
     });
+    syncRecipeIngredientColumnViewOptionAccessibility(
+        summary,
+        groupedEntry,
+        values,
+    );
 }
 
 function recipeIngredientAlternativeRoleLabel(optionRow, values = {}) {
@@ -36199,6 +36348,7 @@ function syncRecipeIngredientSelectedOptionLineItems(
         promotedRows.forEach(summary => {
             const sourceRow = summary.recipeIngredientOptionSourceRow;
             if (!sourceRow || !activeRows.includes(sourceRow)) return;
+            const groupedEntry = summary.recipeIngredientColumnViewEntry || null;
             summary.dataset.ingredientSelectedChoiceState = selectionState;
             summary.dataset.ingredientSelectedChoiceDetails = selectionDetails;
             updateRecipeIngredientOptionRowSummary(
@@ -36209,12 +36359,18 @@ function syncRecipeIngredientSelectedOptionLineItems(
                     accessiblePrefix: "Edit ingredient",
                     fallbackName: "Unnamed ingredient",
                     showMetadata: false,
-                    selectionState: summary.dataset
-                        .recipeIngredientOptionAnchor === "true"
+                    selectionState: recipeIngredientColumnViewEntryShowsOptionContext(
+                        groupedEntry,
+                    )
                         ? selectionState
                         : "",
                     selectionDetails,
                 },
+            );
+            syncRecipeIngredientColumnViewOptionAccessibility(
+                summary,
+                groupedEntry,
+                fieldValuesFromRow(sourceRow),
             );
             syncRecipeIngredientInlineEditor(row, summary);
         });
