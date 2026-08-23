@@ -3547,6 +3547,49 @@ def test_grouped_store_section_forward_port_keeps_real_controls_and_actions():
     assert "width: 32px;" in grouped_css
     assert "min-width: 32px;" in grouped_css
 
+    selection_selector = (
+        ".recipe-edit-alternative-component-option-spacer\n"
+        "    > .recipe-edit-option-selection {"
+    )
+    selection_start = grouped_css.index(selection_selector)
+    selection_rule = grouped_css[selection_start:grouped_css.index("}", selection_start)]
+    assert "appearance: none;" in selection_rule
+    assert "display: inline-flex !important;" in selection_rule
+    assert "height: 32px;" in selection_rule
+    assert "align-items: center;" in selection_rule
+    assert "justify-content: center;" in selection_rule
+    assert "margin: 0 !important;" in selection_rule
+    assert "padding: 3px 2px;" in selection_rule
+    assert "border: 1px solid color-mix(" in selection_rule
+    assert "border-radius: 999px;" in selection_rule
+    assert "background: var(--app-surface);" in selection_rule
+    assert "font-size: 10px !important;" in selection_rule
+    assert "font-weight: 700 !important;" in selection_rule
+    assert "white-space: nowrap;" in selection_rule
+
+    menu_selector = (
+        ".recipe-edit-alternative-component-option-spacer.has-recipe-ingredient-grouped-option-menu\n"
+        "    > .recipe-edit-alternative-menu-wrap\n"
+        "    > .recipe-edit-row-menu-btn {"
+    )
+    menu_start = grouped_css.index(menu_selector)
+    menu_rule = grouped_css[menu_start:grouped_css.index("}", menu_start)]
+    assert "width: 32px;" in menu_rule
+    assert "height: 32px;" in menu_rule
+    assert "min-height: 32px;" in menu_rule
+    assert "align-items: center;" in menu_rule
+    assert "justify-content: center;" in menu_rule
+    assert "margin: 0 !important;" in menu_rule
+    assert "padding: 0 !important;" in menu_rule
+
+    menu_dot_selector = f"{menu_selector[:-2]}::before {{"
+    menu_dot_start = grouped_css.index(menu_dot_selector)
+    menu_dot_rule = grouped_css[
+        menu_dot_start:grouped_css.index("}", menu_dot_start)
+    ]
+    assert "top: 50%;" in menu_dot_rule
+    assert "transform: translate(-50%, -50%);" in menu_dot_rule
+
     assert "> [data-recipe-ingredient-column-option-row]" in desktop_css
     assert "min-height: 80px;" in desktop_css
     assert "align-items: center;" in desktop_css
@@ -3558,6 +3601,8 @@ def test_grouped_store_section_forward_port_keeps_real_controls_and_actions():
     assert "grid-template-columns: minmax(0, 1fr) 40px;" in mobile_css
     assert "width: 40px;" in mobile_css
     assert "min-width: 40px;" in mobile_css
+    assert "height: 40px;" in mobile_css
+    assert "min-height: 40px;" in mobile_css
     assert "> [data-recipe-ingredient-column-management-row]" in mobile_css
     assert "width: 100% !important;" in mobile_css
     assert "@media (forced-colors: active)" in grouped_css
