@@ -29701,9 +29701,9 @@ function recipeIngredientColumnViewChoiceEntries(
             entry.anchor = entry === anchor;
             entry.optionContextKey = optionContextKey;
             // Store Section grouping can split one option across several aisles.
-            // Keep one compact context label in every resulting section while
-            // reserving disclosure and management controls for the canonical
-            // option anchor.
+            // Keep one compact context label in every resulting section. The
+            // canonical anchor remains the stable data owner; visible option
+            // controls are rehomed later to the first rendered section context.
             entry.optionHeader = recipeIngredientColumnViewOptionHeader(
                 parentRow,
                 { ...option, sourceRow: entry.sourceRow },
@@ -30466,11 +30466,23 @@ function recipeIngredientColumnViewOptionInteractionAnchor(
 ) {
     const canonicalAnchor = optionEntries.find(entry => entry.anchor)
         || recipeIngredientColumnViewOptionAnchor(parentRow, optionEntries);
-    if (canonicalAnchor && !canonicalAnchor.filtered) return canonicalAnchor;
-    return recipeIngredientColumnViewOptionAnchor(
-        parentRow,
-        optionEntries.filter(entry => !entry.filtered),
-    );
+    const visibleEntries = optionEntries.filter(entry => !entry.filtered);
+    if (!visibleEntries.length) return null;
+
+    // Selected-option disclosure and group actions keep their canonical data
+    // anchor whenever it remains visible. An unselected option instead exposes
+    // its one "Use this option" action on the first rendered section context so
+    // a cross-aisle option is selectable where the user first encounters it.
+    if (
+        visibleEntries.some(entry => entry.selected)
+        && canonicalAnchor
+        && !canonicalAnchor.filtered
+    ) {
+        return canonicalAnchor;
+    }
+    return visibleEntries.find(entry => entry.sectionContextAnchor)
+        || visibleEntries[0]
+        || canonicalAnchor;
 }
 
 function recipeIngredientColumnViewOptionControl(optionEntries = [], selector = "") {
@@ -30665,6 +30677,7 @@ function syncRecipeIngredientColumnViewVisibleOptionControls(
 
 function syncRecipeIngredientColumnViewVisibleSectionContexts(
     ingredientEntries = [],
+    orderedRows = [],
 ) {
     const optionEntries = ingredientEntries.filter(entry => (
         entry.parentRow?.classList?.contains("has-ingredient-choice")
@@ -30681,15 +30694,32 @@ function syncRecipeIngredientColumnViewVisibleSectionContexts(
         entriesByOption.set(optionKey, groupedEntries);
         entriesByParent.set(entry.parentRow, entriesByOption);
     });
+    const rowOrder = new Map(orderedRows.map((item, index) => [
+        item?.row || item,
+        index,
+    ]));
     const optionGroups = [];
     entriesByParent.forEach((entriesByOption, parentRow) => {
         entriesByOption.forEach(optionGroupEntries => {
+            const orderedOptionEntries = [...optionGroupEntries].sort((left, right) => {
+                const leftOrder = rowOrder.has(left.row)
+                    ? rowOrder.get(left.row)
+                    : Number.MAX_SAFE_INTEGER;
+                const rightOrder = rowOrder.has(right.row)
+                    ? rowOrder.get(right.row)
+                    : Number.MAX_SAFE_INTEGER;
+                return leftOrder - rightOrder
+                    || Number(left.manualIndex || 0) - Number(right.manualIndex || 0);
+            });
             assignRecipeIngredientColumnViewSectionContextAnchors(
                 parentRow,
-                optionGroupEntries,
+                orderedOptionEntries,
                 { visibleOnly: true },
             );
-            optionGroups.push({ parentRow, optionEntries: optionGroupEntries });
+            optionGroups.push({
+                parentRow,
+                optionEntries: orderedOptionEntries,
+            });
         });
     });
     optionEntries.forEach(syncRecipeIngredientColumnViewOptionContext);
@@ -31499,9 +31529,6 @@ function applyRecipeIngredientColumnView(options = {}) {
             entry.filtered,
         );
     });
-    if (recipeEditIngredientColumnView.groupByStoreSection) {
-        syncRecipeIngredientColumnViewVisibleSectionContexts(ingredientEntries);
-    }
     const sortedRows = displayRows
         .map((row, index) => {
             const rowEntries = Array.isArray(row.recipeIngredientColumnViewEntries)
@@ -31531,6 +31558,10 @@ function applyRecipeIngredientColumnView(options = {}) {
         entry.row.classList.toggle("is-ingredient-column-filtered", entry.filtered);
     });
     if (recipeEditIngredientColumnView.groupByStoreSection) {
+        syncRecipeIngredientColumnViewVisibleSectionContexts(
+            ingredientEntries,
+            sortedRows.map(entry => entry.row),
+        );
         renderRecipeIngredientColumnViewGroupHeaders(list, sortedRows);
     } else {
         reconcileRecipeIngredientColumnViewOrder(

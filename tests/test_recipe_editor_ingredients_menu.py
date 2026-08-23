@@ -4818,10 +4818,20 @@ def test_store_section_grouping_promotes_actual_rows_with_compact_section_contex
     assert "assignRecipeIngredientColumnViewSectionContextAnchors" in visible_contexts
     assert "entry.optionContextKey" in visible_contexts
     assert "{ visibleOnly: true }" in visible_contexts
+    assert "orderedRows = []" in visible_contexts
+    assert "const rowOrder = new Map(" in visible_contexts
+    assert "const orderedOptionEntries = [...optionGroupEntries].sort" in visible_contexts
     assert "optionEntries.forEach(syncRecipeIngredientColumnViewOptionContext);" in (
         visible_contexts
     )
     assert "syncRecipeIngredientColumnViewVisibleSectionContexts" in apply_view
+    assert (
+        "syncRecipeIngredientColumnViewVisibleSectionContexts(\n"
+        "            ingredientEntries,\n"
+        "            sortedRows.map(entry => entry.row),\n"
+        "        );"
+        in apply_view
+    )
 
 
 def test_grouped_option_context_survives_selected_and_alternative_row_refreshes():
@@ -5106,26 +5116,44 @@ const frozen = fakeRow("frozen-corn");
 const alternativeOnion = fakeRow("alternative-onion");
 const useThisOption = control("select", "use-option");
 const alternativeMenu = control("menu", "alternative-menu");
+useThisOption.setAttribute(
+    "onclick",
+    "return selectRecipeIngredientColumnViewOption(this, event)",
+);
 frozen.cell.appendChild(useThisOption);
 frozen.cell.appendChild(alternativeMenu);
 const alternativeEntries = [
-    {
-        row: frozen,
-        parentRow: alternativeParent,
-        sourceRow: {id: "source-frozen"},
-        anchor: true,
-        selected: false,
-        filtered: true,
-    },
     {
         row: alternativeOnion,
         parentRow: alternativeParent,
         sourceRow: {id: "source-onion"},
         anchor: false,
+        sectionContextAnchor: true,
+        selected: false,
+        filtered: false,
+    },
+    {
+        row: frozen,
+        parentRow: alternativeParent,
+        sourceRow: {id: "source-frozen"},
+        anchor: true,
+        sectionContextAnchor: true,
         selected: false,
         filtered: false,
     },
 ];
+syncRecipeIngredientColumnViewVisibleOptionControls(
+    alternativeParent,
+    alternativeEntries,
+);
+const visibleAlternative = {
+    interaction: alternativeEntries.filter(entry => entry.interactionAnchor)
+        .map(entry => entry.row.id),
+    selectionOwner: useThisOption.ownerRow.id,
+    menuOwner: alternativeMenu.ownerRow.id,
+    selectionHandler: useThisOption.getAttribute("onclick"),
+};
+alternativeEntries[0].filtered = true;
 syncRecipeIngredientColumnViewVisibleOptionControls(
     alternativeParent,
     alternativeEntries,
@@ -5136,7 +5164,7 @@ const filteredAlternative = {
     selectionOwner: useThisOption.ownerRow.id,
     menuOwner: alternativeMenu.ownerRow.id,
 };
-    alternativeEntries[0].filtered = false;
+alternativeEntries[0].filtered = false;
 syncRecipeIngredientColumnViewVisibleOptionControls(
     alternativeParent,
     alternativeEntries,
@@ -5146,6 +5174,12 @@ const restoredAlternative = {
         .map(entry => entry.row.id),
     selectionOwner: useThisOption.ownerRow.id,
     menuOwner: alternativeMenu.ownerRow.id,
+    selectionCount: [alternativeOnion, frozen].filter(row => (
+        row.cell.controls.includes(useThisOption)
+    )).length,
+    menuCount: [alternativeOnion, frozen].filter(row => (
+        row.cell.controls.includes(alternativeMenu)
+    )).length,
 };
 
 const selectedParentHandleCell = fakeCell("selected-parent-handle-cell");
@@ -5210,6 +5244,7 @@ const filteredSelected = {
 selectedEntries[0].filtered = false;
 syncRecipeIngredientColumnViewVisibleOptionControls(selectedParent, selectedEntries);
 process.stdout.write(JSON.stringify({
+    visibleAlternative,
     filteredAlternative,
     restoredAlternative,
     selected: {
@@ -5246,15 +5281,25 @@ process.stdout.write(JSON.stringify({
 
     assert completed.returncode == 0, completed.stderr
     assert json.loads(completed.stdout) == {
-        "filteredAlternative": {
+        "visibleAlternative": {
             "interaction": ["alternative-onion"],
             "selectionOwner": "alternative-onion",
             "menuOwner": "alternative-onion",
+            "selectionHandler": (
+                "return selectRecipeIngredientColumnViewOption(this, event)"
+            ),
         },
-        "restoredAlternative": {
+        "filteredAlternative": {
             "interaction": ["frozen-corn"],
             "selectionOwner": "frozen-corn",
             "menuOwner": "frozen-corn",
+        },
+        "restoredAlternative": {
+            "interaction": ["alternative-onion"],
+            "selectionOwner": "alternative-onion",
+            "menuOwner": "alternative-onion",
+            "selectionCount": 1,
+            "menuCount": 1,
         },
         "selected": {
             "interaction": ["selected-corn"],
@@ -5284,6 +5329,8 @@ process.stdout.write(JSON.stringify({
             "alternative-menu:alternative-onion",
             "use-option:frozen-corn",
             "alternative-menu:frozen-corn",
+            "use-option:alternative-onion",
+            "alternative-menu:alternative-onion",
             "selected-group-handle:selected-cumin",
             "selected-group-menu:selected-cumin",
             "selected-menu:selected-cumin",
