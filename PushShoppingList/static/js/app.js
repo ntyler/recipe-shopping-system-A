@@ -26608,9 +26608,15 @@ function recipeEditCuisineRegistryAliasMap(payload) {
         const canonical = normalizeRecipeEditTagText(item.name || item.label || item.value);
         const canonicalKey = recipeEditTagKey(canonical);
         if (!canonical || !canonicalKey) return;
+        // A canonical registry label may differ from an assigned value only by
+        // its presentation icon (for example, "Chinese" versus
+        // "🇨🇳 Chinese"). Keep the canonical key in this map so an open
+        // editor adopts that presentation without treating it as a user edit.
+        // Canonical labels take precedence over a legacy alias collision.
+        aliases.set(canonicalKey, canonical);
         (Array.isArray(item.aliases) ? item.aliases : []).forEach(rawAlias => {
             const aliasKey = recipeEditTagKey(normalizeRecipeEditTagText(rawAlias));
-            if (aliasKey && aliasKey !== canonicalKey && !aliases.has(aliasKey)) {
+            if (aliasKey && !aliases.has(aliasKey)) {
                 aliases.set(aliasKey, canonical);
             }
         });

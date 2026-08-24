@@ -339,6 +339,178 @@ process.stdout.write(JSON.stringify({
     }
 
 
+def test_recipe_editor_cuisine_registry_refresh_adopts_flagged_presentation_without_dirty_state():
+    node = shutil.which("node")
+    if not node:
+        return
+
+    script = read_text("PushShoppingList/static/js/app.js")
+    normalizers = script[
+        script.index("function normalizeRecipeEditTagText"):
+        script.index("function recipeEditMultiselectField")
+    ]
+    registry_logic = script[
+        script.index("function recipeEditCuisineRegistryCategoryRows"):
+        script.index("function canonicalRecipeEditMultiselectValue")
+    ]
+    dirty_logic = script[
+        script.index("function recipeEditorCurrentSaveSnapshot"):
+        script.index("function clearRecipeEditorValidation")
+    ]
+    harness = r'''
+const rendered = [];
+let currentDescription = "Saved description";
+let recipeEditOriginalSnapshot = {
+    description: "Saved description",
+    cuisine: "United Kingdom",
+    cuisine_tags: ["United Kingdom", "Chinese"],
+};
+const recipeEditSavedFormSnapshots = new WeakMap();
+const selectedInput = { value: "United Kingdom, Chinese" };
+const primaryInput = { value: "United Kingdom" };
+const canonicalOptions = ["🇬🇧 United Kingdom", "🇨🇳 Chinese"];
+const source = {
+    dataset: { recipeEditCuisineRegistrySignature: canonicalOptions.join("\u001f") },
+    children: canonicalOptions.map(value => ({
+        dataset: { recipeEditMultiselectOption: value },
+    })),
+    replaceCount: 0,
+    replaceChildren(...children) {
+        this.children = children;
+        this.replaceCount += 1;
+    },
+};
+const field = {
+    querySelector(selector) {
+        return selector === "[data-recipe-edit-multiselect-options]" ? source : null;
+    },
+};
+const form = {
+    dataset: {
+        originalCategoryValues: JSON.stringify({
+            cuisine: "United Kingdom",
+            meal_type: "Dinner",
+        }),
+    },
+    querySelectorAll() { return []; },
+};
+const document = {
+    body: { dataset: { recipeEditPage: "true" } },
+    createElement() { return { dataset: {} }; },
+    getElementById(id) {
+        if (id === "recipeEditCuisineTags") return selectedInput;
+        if (id === "recipeEditCategoryCuisine") return primaryInput;
+        if (id === "recipeEditForm") return form;
+        return null;
+    },
+};
+const window = { addEventListener() {} };
+function recipeEditMultiselectField(kind) { return kind === "cuisine" ? field : null; }
+function renderRecipeEditMultiselect(kind) { rendered.push(kind); }
+function setRecipeEditCuisineCategories(values) {
+    selectedInput.value = values.join(", ");
+    primaryInput.value = values[0] || "";
+    renderRecipeEditMultiselect("cuisine");
+}
+function collectRecipeEditorPayload() {
+    return {
+        recipe: {
+            description: currentDescription,
+            cuisine: primaryInput.value,
+            cuisine_tags: selectedInput.value
+                .split(/[,;\n]+/)
+                .map(value => value.trim())
+                .filter(Boolean),
+        },
+    };
+}
+function collectRecipeEditorCategoryValues() {
+    return { cuisine: primaryInput.value, meal_type: "Dinner" };
+}
+function collectRecipeEditorCategorySources() {
+    return { cuisine: "user_selected", meal_type: "user_selected" };
+}
+function masterDataViewerUrl(value) { return value; }
+function fetch() { return Promise.resolve({ ok: false }); }
+const console = { warn() {} };
+''' + normalizers + registry_logic + dirty_logic + r'''
+
+recipeEditSavedFormSnapshots.set(form, recipeEditorCurrentSaveSnapshot(form));
+const payload = {
+    categories: [
+        {
+            name: "🇬🇧 United Kingdom",
+            active: true,
+            aliases: ["United Kingdom"],
+        },
+        {
+            name: "🇨🇳 Chinese",
+            active: true,
+            aliases: ["Chinese"],
+        },
+    ],
+};
+const aliases = recipeEditCuisineRegistryAliasMap(payload);
+const changed = updateRecipeEditCuisineRegistryOptions(
+    recipeEditActiveCuisineRegistryLabels(payload),
+    aliases,
+);
+const dirty = recipeEditorHasUnsavedChanges(form);
+const savedSnapshot = JSON.parse(recipeEditSavedFormSnapshots.get(form));
+const originalCategoryValues = JSON.parse(form.dataset.originalCategoryValues);
+
+process.stdout.write(JSON.stringify({
+    changed,
+    dirty,
+    selected: selectedInput.value,
+    primary: primaryInput.value,
+    choices: source.children.map(item => item.dataset.recipeEditMultiselectOption),
+    replaceCount: source.replaceCount,
+    rendered,
+    ukAlias: aliases.get(recipeEditTagKey("United Kingdom")),
+    chineseAlias: aliases.get(recipeEditTagKey("Chinese")),
+    savedCuisine: savedSnapshot.payload.recipe.cuisine,
+    savedCuisineTags: savedSnapshot.payload.recipe.cuisine_tags,
+    savedCategoryCuisine: savedSnapshot.category_values.cuisine,
+    originalCategoryCuisine: originalCategoryValues.cuisine,
+    originalSnapshotCuisine: recipeEditOriginalSnapshot.cuisine,
+    originalSnapshotCuisineTags: recipeEditOriginalSnapshot.cuisine_tags,
+}));
+'''
+    completed = subprocess.run(
+        [node],
+        input=harness,
+        text=True,
+        encoding="utf-8",
+        capture_output=True,
+        check=False,
+        timeout=10,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    result = json.loads(completed.stdout)
+    assert result == {
+        "changed": True,
+        "dirty": False,
+        "selected": "🇬🇧 United Kingdom, 🇨🇳 Chinese",
+        "primary": "🇬🇧 United Kingdom",
+        "choices": ["🇬🇧 United Kingdom", "🇨🇳 Chinese"],
+        "replaceCount": 0,
+        "rendered": ["cuisine"],
+        "ukAlias": "🇬🇧 United Kingdom",
+        "chineseAlias": "🇨🇳 Chinese",
+        "savedCuisine": "🇬🇧 United Kingdom",
+        "savedCuisineTags": ["🇬🇧 United Kingdom", "🇨🇳 Chinese"],
+        "savedCategoryCuisine": "🇬🇧 United Kingdom",
+        "originalCategoryCuisine": "🇬🇧 United Kingdom",
+        "originalSnapshotCuisine": "🇬🇧 United Kingdom",
+        "originalSnapshotCuisineTags": [
+            "🇬🇧 United Kingdom",
+            "🇨🇳 Chinese",
+        ],
+    }
+
+
 def test_recipe_editor_cuisine_alias_refresh_rebases_only_alias_baselines():
     node = shutil.which("node")
     if not node:

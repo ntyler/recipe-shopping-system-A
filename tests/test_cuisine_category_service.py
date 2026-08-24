@@ -128,6 +128,166 @@ def test_seed_and_custom_categories_are_idempotent_and_workspace_isolated(
     assert seeded_rows == 10
 
 
+def test_recognized_national_cuisines_receive_flags_without_guessing_regions(
+    cuisine_workspace,
+):
+    assert cuisines.decorate_recognized_cuisine_name("United Kingdom") == (
+        "🇬🇧 United Kingdom"
+    )
+    assert cuisines.decorate_recognized_cuisine_name("British") == "🇬🇧 British"
+    assert cuisines.decorate_recognized_cuisine_name("Korean") == "🇰🇷 Korean"
+    assert cuisines.decorate_recognized_cuisine_name("Mediterranean") == (
+        "Mediterranean"
+    )
+    assert cuisines.decorate_recognized_cuisine_name("Cajun") == "Cajun"
+    assert cuisines.decorate_recognized_cuisine_name("🍜 United Kingdom") == (
+        "🍜 United Kingdom"
+    )
+    assert cuisines.decorate_recognized_cuisine_name("🇬🇧 United Kingdom") == (
+        "🇬🇧 United Kingdom"
+    )
+
+    created = cuisines.save_workspace_cuisine_category(
+        {"name": "  United   Kingdom  ", "active": True},
+        user_id="user-a",
+    )
+    assert created["ok"] is True
+    assert created["name"] == "🇬🇧 United Kingdom"
+    assert category_named(
+        cuisines.cuisine_category_registry_payload("user-a"),
+        "🇬🇧 United Kingdom",
+    )["id"] == created["category_id"]
+
+    duplicate = cuisines.save_workspace_cuisine_category(
+        {"name": "🇬🇧 United Kingdom", "active": True},
+        user_id="user-a",
+    )
+    assert duplicate["status"] == 422
+    assert duplicate["errors"]["name"] == (
+        "A cuisine category with that name already exists."
+    )
+
+    regional = cuisines.save_workspace_cuisine_category(
+        {"name": "Levantine", "active": True},
+        user_id="user-a",
+    )
+    explicit_icon = cuisines.save_workspace_cuisine_category(
+        {"name": "🍜 Korean", "active": True},
+        user_id="user-a",
+    )
+    assert regional["name"] == "Levantine"
+    assert explicit_icon["name"] == "🍜 Korean"
+
+
+def test_import_deduplicates_plain_and_flagged_national_cuisine_names(
+    cuisine_workspace,
+):
+    result = cuisines.import_workspace_cuisine_category_names(
+        ["United Kingdom", "🇬🇧 United Kingdom", "Mediterranean"],
+        user_id="user-a",
+    )
+
+    assert result["imported"] == ["🇬🇧 United Kingdom", "Mediterranean"]
+    assert result["skipped"] == ["🇬🇧 United Kingdom"]
+    names = [
+        item["name"]
+        for item in cuisines.cuisine_category_registry_payload("user-a")[
+            "categories"
+        ]
+    ]
+    assert names.count("🇬🇧 United Kingdom") == 1
+    assert "United Kingdom" not in names
+
+
+def test_legacy_plain_national_cuisine_displays_and_migrates_to_flagged_name(
+    cuisine_workspace,
+):
+    category_id = "custom_legacy_united_kingdom"
+    with master_data.recipe_master_connection(user_id="user-a") as connection:
+        cuisines._seed_registry(connection, "user-a")
+        timestamp = master_data.utc_now_iso()
+        connection.execute(
+            """
+            INSERT INTO workspace_cuisine_categories (
+                user_id, id, name, normalized_name, aliases_json, is_seeded,
+                is_active, sort_order, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, '[]', 0, 1, 10, ?, ?)
+            """,
+            (
+                "user-a",
+                category_id,
+                "United Kingdom",
+                "united kingdom",
+                timestamp,
+                timestamp,
+            ),
+        )
+
+    public_before_save = category_named(
+        cuisines.cuisine_category_registry_payload("user-a"),
+        "🇬🇧 United Kingdom",
+    )
+    assert public_before_save["id"] == category_id
+    assert public_before_save["aliases"] == ["United Kingdom"]
+
+    recipe_path = write_recipe_output(
+        "user-a",
+        "https://example.test/united-kingdom",
+        {
+            "recipe_title": "British plate",
+            "cuisine": "United Kingdom",
+            "cuisine_tags": [
+                "United Kingdom",
+                "🇬🇧 United Kingdom",
+                "Italian",
+            ],
+        },
+    )
+    cookbook_path = write_cookbooks(
+        "user-a",
+        {
+            "cookbooks": [{
+                "id": "british",
+                "name": "British recipes",
+                "recipes": [{
+                    "url": "https://example.test/united-kingdom",
+                    "name": "British plate",
+                    "cuisine": "United Kingdom",
+                }],
+            }],
+        },
+    )
+
+    saved = cuisines.save_workspace_cuisine_category(
+        {"name": "United Kingdom", "active": True},
+        category_id=category_id,
+        user_id="user-a",
+    )
+    assert saved["ok"] is True
+    assert saved["name"] == "🇬🇧 United Kingdom"
+    assert saved["migration"] == {"recipe_records": 1, "cookbook_records": 1}
+
+    recipe_payload = json.loads(recipe_path.read_text(encoding="utf-8"))
+    assert recipe_payload["cuisine"] == "🇬🇧 United Kingdom"
+    assert recipe_payload["cuisine_tags"] == [
+        "🇬🇧 United Kingdom",
+        "Italian",
+    ]
+    cookbook_payload = json.loads(cookbook_path.read_text(encoding="utf-8"))
+    assert cookbook_payload["cookbooks"][0]["recipes"][0]["cuisine"] == (
+        "🇬🇧 United Kingdom"
+    )
+
+    registry = cuisines.cuisine_category_registry_payload(
+        "user-a",
+        include_usage=True,
+    )
+    category = category_named(registry, "🇬🇧 United Kingdom")
+    assert category["aliases"] == ["United Kingdom"]
+    assert category["recipe_count"] == 1
+    assert sum(item["id"] == category_id for item in registry["categories"]) == 1
+
+
 def test_usage_and_references_dedupe_primary_tags_and_cookbook_metadata(
     cuisine_workspace,
 ):

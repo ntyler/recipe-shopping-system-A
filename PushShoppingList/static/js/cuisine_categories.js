@@ -245,7 +245,7 @@
             nameInput.disabled = Boolean(item?.seeded);
             nameHelp.textContent = item?.seeded
                 ? "Built-in names stay tied to stable cuisine labels. You can change availability."
-                : "Custom cuisine names can be changed without losing recipe assignments.";
+                : "Recognized national cuisine names automatically receive a matching flag. Renaming preserves recipe assignments.";
             activeInput.checked = item ? Boolean(item.active) : true;
             activeInput.disabled = false;
             editorTitle.textContent = item ? `Edit ${item.name}` : "Add Cuisine Category";

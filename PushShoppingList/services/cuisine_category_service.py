@@ -48,6 +48,157 @@ def cuisine_category_key(value):
     return re.sub(r"\s+", " ", value).strip()
 
 
+# Cuisine labels are intentionally matched exactly. National labels get a
+# helpful flag, while regional or stylistic labels (for example Mediterranean,
+# Cajun, or Fusion) remain untouched rather than receiving a guessed identity.
+NATIONAL_CUISINE_COUNTRY_CODES = {
+    "american": "US",
+    "united states": "US",
+    "canada": "CA",
+    "canadian": "CA",
+    "mexican": "MX",
+    "mexico": "MX",
+    "peru": "PE",
+    "peruvian": "PE",
+    "argentina": "AR",
+    "argentine": "AR",
+    "argentinian": "AR",
+    "brazil": "BR",
+    "brazilian": "BR",
+    "chile": "CL",
+    "chilean": "CL",
+    "colombia": "CO",
+    "colombian": "CO",
+    "venezuela": "VE",
+    "venezuelan": "VE",
+    "cuba": "CU",
+    "cuban": "CU",
+    "jamaica": "JM",
+    "jamaican": "JM",
+    "united kingdom": "GB",
+    "british": "GB",
+    "english": "GB",
+    "scottish": "GB",
+    "welsh": "GB",
+    "northern irish": "GB",
+    "ireland": "IE",
+    "irish": "IE",
+    "france": "FR",
+    "french": "FR",
+    "italy": "IT",
+    "italian": "IT",
+    "spain": "ES",
+    "spanish": "ES",
+    "portugal": "PT",
+    "portuguese": "PT",
+    "germany": "DE",
+    "german": "DE",
+    "austria": "AT",
+    "austrian": "AT",
+    "switzerland": "CH",
+    "swiss": "CH",
+    "belgium": "BE",
+    "belgian": "BE",
+    "netherlands": "NL",
+    "dutch": "NL",
+    "denmark": "DK",
+    "danish": "DK",
+    "sweden": "SE",
+    "swedish": "SE",
+    "norway": "NO",
+    "norwegian": "NO",
+    "finland": "FI",
+    "finnish": "FI",
+    "poland": "PL",
+    "polish": "PL",
+    "greece": "GR",
+    "greek": "GR",
+    "czechia": "CZ",
+    "czech": "CZ",
+    "hungary": "HU",
+    "hungarian": "HU",
+    "ukraine": "UA",
+    "ukrainian": "UA",
+    "russia": "RU",
+    "russian": "RU",
+    "turkey": "TR",
+    "turkish": "TR",
+    "lebanon": "LB",
+    "lebanese": "LB",
+    "israel": "IL",
+    "israeli": "IL",
+    "iran": "IR",
+    "iranian": "IR",
+    "egypt": "EG",
+    "egyptian": "EG",
+    "morocco": "MA",
+    "moroccan": "MA",
+    "ethiopia": "ET",
+    "ethiopian": "ET",
+    "nigeria": "NG",
+    "nigerian": "NG",
+    "south africa": "ZA",
+    "south african": "ZA",
+    "india": "IN",
+    "indian": "IN",
+    "pakistan": "PK",
+    "pakistani": "PK",
+    "bangladesh": "BD",
+    "bangladeshi": "BD",
+    "sri lanka": "LK",
+    "sri lankan": "LK",
+    "nepal": "NP",
+    "nepalese": "NP",
+    "china": "CN",
+    "chinese": "CN",
+    "hong kong": "HK",
+    "taiwan": "TW",
+    "taiwanese": "TW",
+    "japan": "JP",
+    "japanese": "JP",
+    "south korea": "KR",
+    "south korean": "KR",
+    "korea": "KR",
+    "korean": "KR",
+    "vietnam": "VN",
+    "vietnamese": "VN",
+    "thailand": "TH",
+    "thai": "TH",
+    "indonesia": "ID",
+    "indonesian": "ID",
+    "malaysia": "MY",
+    "malaysian": "MY",
+    "philippines": "PH",
+    "filipino": "PH",
+    "singapore": "SG",
+    "singaporean": "SG",
+    "australia": "AU",
+    "australian": "AU",
+    "new zealand": "NZ",
+}
+
+
+def country_flag_emoji(country_code):
+    """Build a Unicode flag from a validated ISO alpha-2 country code."""
+    country_code = str(country_code or "").strip().upper()
+    if not re.fullmatch(r"[A-Z]{2}", country_code):
+        return ""
+    return "".join(
+        chr(0x1F1E6 + ord(character) - ord("A"))
+        for character in country_code
+    )
+
+
+def decorate_recognized_cuisine_name(value):
+    """Add a flag to exact national cuisine labels without guessing regions."""
+    name = clean_cuisine_category_name(value)
+    if not name or not name[0].isalnum():
+        return name
+    country_code = NATIONAL_CUISINE_COUNTRY_CODES.get(cuisine_category_key(name))
+    flag = country_flag_emoji(country_code)
+    return f"{flag} {name}" if flag else name
+
+
 def _json_text_list(value):
     try:
         decoded = json.loads(str(value or "[]"))
@@ -133,9 +284,14 @@ def _public_category(item, recipe_count=None):
     }
     aliases = []
     seen_aliases = set()
-    current_name = clean_cuisine_category_name(item.get("name"))
+    stored_name = clean_cuisine_category_name(item.get("name"))
+    current_name = decorate_recognized_cuisine_name(stored_name)
+    category["name"] = current_name
     category_id = str(item.get("id") or "")
-    for raw_alias in item.get("_aliases", []):
+    raw_aliases = list(item.get("_aliases", []))
+    if stored_name and stored_name != current_name:
+        raw_aliases.insert(0, stored_name)
+    for raw_alias in raw_aliases:
         alias = clean_cuisine_category_name(raw_alias)
         alias_key = alias.casefold()
         if (
@@ -790,6 +946,17 @@ def _replace_category_value(value, previous_keys, replacement):
             )
             updated.append(replacement_item)
             changed = changed or item_changed
+        if changed:
+            deduplicated = []
+            seen = set()
+            for item in updated:
+                key = cuisine_category_key(item) if isinstance(item, str) else ""
+                if key and key in seen:
+                    continue
+                if key:
+                    seen.add(key)
+                deduplicated.append(item)
+            updated = deduplicated
         return updated, changed
     if not isinstance(value, str):
         return value, False
@@ -805,6 +972,16 @@ def _replace_category_value(value, previous_keys, replacement):
         replacement if cuisine_category_key(part) in previous_keys else part
         for part in parts
     ]
+    deduplicated_parts = []
+    seen = set()
+    for part in updated_parts:
+        key = cuisine_category_key(part)
+        if key and key in seen:
+            continue
+        if key:
+            seen.add(key)
+        deduplicated_parts.append(part)
+    updated_parts = deduplicated_parts
     updated = ", ".join(updated_parts)
     return updated, updated != value
 
@@ -937,7 +1114,7 @@ def save_workspace_cuisine_category(values, category_id="", user_id=None):
     values = values if isinstance(values, dict) else {}
     raw_name = values.get("name") or values.get("canonical_name")
     normalized_raw_name = unicodedata.normalize("NFKC", str(raw_name or ""))
-    name = clean_cuisine_category_name(normalized_raw_name)
+    name = decorate_recognized_cuisine_name(normalized_raw_name)
     active = bool(values.get("active", True))
     errors = {}
     if not name:
@@ -1061,6 +1238,7 @@ def save_workspace_cuisine_category(values, category_id="", user_id=None):
         "ok": True,
         "created": not bool(existing),
         "category_id": category_id,
+        "name": name,
         "message": f'{name} {"added" if not existing else "updated"}.',
         "migration": migration,
         "registry": _public_registry(registry),
@@ -1132,7 +1310,7 @@ def import_workspace_cuisine_category_names(values, user_id=None):
             user_id=user_id,
         )
         if result.get("ok") and result.get("created"):
-            imported.append(name)
+            imported.append(str(result.get("name") or name))
         else:
             skipped.append(name)
     return {
