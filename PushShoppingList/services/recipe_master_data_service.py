@@ -49,6 +49,8 @@ RECIPE_MASTER_READ_SCHEMA_TABLES = frozenset({
     "workspace_unit_registry_seeds",
     "workspace_ingredient_types",
     "workspace_ingredient_type_registry_seeds",
+    "workspace_cuisine_categories",
+    "workspace_cuisine_category_registry_seeds",
     "ingredients",
     "ingredient_aliases",
     "ingredient_duplicate_reviews",
@@ -1098,6 +1100,33 @@ def ensure_recipe_master_schema(connection=None):
     )
     connection.execute(
         """
+        CREATE TABLE IF NOT EXISTS workspace_cuisine_categories (
+            user_id TEXT NOT NULL,
+            id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            normalized_name TEXT NOT NULL,
+            aliases_json TEXT NOT NULL DEFAULT '[]',
+            is_seeded INTEGER NOT NULL DEFAULT 0,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            PRIMARY KEY(user_id, id),
+            UNIQUE(user_id, normalized_name)
+        )
+        """
+    )
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS workspace_cuisine_category_registry_seeds (
+            user_id TEXT PRIMARY KEY,
+            seed_version TEXT NOT NULL,
+            seeded_at TEXT NOT NULL
+        )
+        """
+    )
+    connection.execute(
+        """
         CREATE TABLE IF NOT EXISTS ingredients (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id TEXT NOT NULL,
@@ -1505,6 +1534,15 @@ def ensure_recipe_master_schema(connection=None):
             "ALTER TABLE recipe_ingredient_option_items "
             "ADD COLUMN ingredient_type TEXT NOT NULL DEFAULT 'main'"
         )
+    cuisine_category_columns = recipe_master_column_names(
+        connection,
+        "workspace_cuisine_categories",
+    )
+    if "aliases_json" not in cuisine_category_columns:
+        connection.execute(
+            "ALTER TABLE workspace_cuisine_categories "
+            "ADD COLUMN aliases_json TEXT NOT NULL DEFAULT '[]'"
+        )
     duplicate_review_columns = recipe_master_column_names(
         connection,
         "ingredient_duplicate_reviews",
@@ -1544,6 +1582,8 @@ def ensure_recipe_master_schema(connection=None):
     connection.execute("CREATE INDEX IF NOT EXISTS idx_workspace_unit_aliases_unit ON workspace_unit_aliases(user_id, canonical_unit_id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_workspace_ingredient_types_user_order ON workspace_ingredient_types(user_id, sort_order, id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_workspace_ingredient_types_user_active ON workspace_ingredient_types(user_id, is_active, sort_order)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_workspace_cuisine_categories_user_order ON workspace_cuisine_categories(user_id, sort_order, id)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_workspace_cuisine_categories_user_active ON workspace_cuisine_categories(user_id, is_active, sort_order)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredient_requirements_user_recipe_order ON recipe_ingredient_requirements(user_id, recipe_id, sort_order, id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredient_options_requirement_order ON recipe_ingredient_options(requirement_id, sort_order, id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredient_option_items_option_order ON recipe_ingredient_option_items(option_id, sort_order, id)")

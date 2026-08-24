@@ -1,0 +1,255 @@
+{% extends "layouts/app_layout.html" %}
+{% set app_page_title = master_data.title %}
+{% set app_shell_mode = "route" %}
+{% set app_active_nav_item = "settings" %}
+{% set app_search_id = "cuisineCategoriesGlobalSearch" %}
+{% set app_content_class = "master-data-app-content" %}
+
+{% block app_body_attributes %}
+data-user-id="{{ master_data.viewer_user_id }}"
+data-viewer-user-id="{{ master_data.viewer_user_id }}"
+{% endblock %}
+
+{% block app_content %}
+    <script id="cuisineCategoryConfig" type="application/json">{{ master_data.registry | tojson }}</script>
+    <section class="master-data-page unit-master-page type-master-page cuisine-category-master-page"
+             aria-labelledby="cuisineCategoriesTitle"
+             data-cuisine-category-master-page
+             data-create-url="{{ master_data.create_url }}"
+             data-update-url-template="{{ master_data.update_url_template }}"
+             data-usage-url-template="{{ master_data.usage_url_template }}"
+             data-import-url="{{ master_data.import_url }}">
+        <header class="master-data-header">
+            <div>
+                <a class="master-data-home-link" href="{{ url_for('main_bp.index') }}#userAccountSection">Account</a>
+                <h1 id="cuisineCategoriesTitle">Cuisine Categories</h1>
+                <p>Manage the cuisine categories available across this workspace.</p>
+            </div>
+            <nav class="master-data-tabs" aria-label="Master data">
+                <a href="{{ master_data.ingredient_url }}">Ingredients</a>
+                <a href="{{ master_data.equipment_url }}">Equipment</a>
+                <a href="{{ master_data.units_url }}">Units</a>
+                <a href="{{ master_data.types_url }}">Types</a>
+                <a href="{{ master_data.cuisine_category_url }}" class="active" aria-current="page">Cuisine Categories</a>
+                <a href="{{ master_data.store_section_url }}">Store Sections</a>
+            </nav>
+        </header>
+
+        <div class="unit-master-stats" aria-label="Cuisine category summary">
+            <article>
+                <span>System-seeded</span>
+                <strong data-cuisine-category-master-seeded-count>{{ master_data.seeded_count }}</strong>
+            </article>
+            <article>
+                <span>User-created</span>
+                <strong data-cuisine-category-master-custom-count>{{ master_data.custom_count }}</strong>
+            </article>
+            <article>
+                <span>Active</span>
+                <strong data-cuisine-category-master-active-count>{{ master_data.active_count }}</strong>
+            </article>
+            <article>
+                <span>In use</span>
+                <strong data-cuisine-category-master-used-count>{{ master_data.used_count }}</strong>
+            </article>
+        </div>
+
+        <section class="unit-master-import" data-cuisine-category-master-import hidden>
+            <div>
+                <strong>Import browser cuisine categories?</strong>
+                <p>Custom cuisines saved by the previous browser-only editor can be copied into this workspace.</p>
+            </div>
+            <div class="unit-master-import-actions">
+                <button type="button" data-cuisine-category-master-import-button>Import cuisines</button>
+                <button type="button" class="secondary" data-cuisine-category-master-import-dismiss>Not now</button>
+            </div>
+        </section>
+
+        <div class="unit-master-status"
+             role="status"
+             aria-live="polite"
+             data-cuisine-category-master-status
+             hidden></div>
+
+        <section class="unit-master-panel unit-master-catalog" aria-labelledby="cuisineCategoryRegistryTitle">
+            <header>
+                <div>
+                    <span>Workspace registry</span>
+                    <h2 id="cuisineCategoryRegistryTitle">Cuisine Category Registry</h2>
+                    <p>Built-in cuisines keep consistent labels; custom cuisines can be renamed, deactivated, or safely deleted.</p>
+                </div>
+                <div class="unit-master-toolbar">
+                    <label class="unit-master-search">
+                        <span>Search cuisine categories</span>
+                        <input type="search"
+                               placeholder="Cuisine name"
+                               autocomplete="off"
+                               data-cuisine-category-master-search>
+                    </label>
+                    <button type="button" data-cuisine-category-master-add-button>Add Cuisine Category</button>
+                </div>
+            </header>
+
+            <section class="unit-master-category type-master-category"
+                     data-cuisine-category-master-category
+                     aria-labelledby="allCuisineCategoriesTitle">
+                <header>
+                    <h3 id="allCuisineCategoriesTitle">Cuisine categories</h3>
+                    <span data-cuisine-category-master-count-label>{{ master_data.categories | length }} categories</span>
+                </header>
+                <div class="unit-master-table type-master-table" role="table" aria-label="Cuisine categories">
+                    <div class="unit-master-table-head" role="row">
+                        <span role="columnheader">Cuisine category</span>
+                        <span role="columnheader">Used in</span>
+                        <span role="columnheader">Source</span>
+                        <span role="columnheader">Status</span>
+                        <span role="columnheader">Action</span>
+                    </div>
+                    <div data-cuisine-category-master-rows>
+                        {% for category in master_data.categories %}
+                            <div class="unit-master-row"
+                                 role="row"
+                                 data-cuisine-category-master-row
+                                 data-category-id="{{ category.id }}"
+                                 data-cuisine-category-master-search-value="{{ category.name }}">
+                                <strong role="cell">{{ category.name }}</strong>
+                                <div class="unit-master-usage" role="cell">
+                                    {% if category.recipe_count %}
+                                        <button type="button"
+                                                class="unit-master-usage-button"
+                                                data-cuisine-category-master-usage-button
+                                                data-category-id="{{ category.id }}"
+                                                aria-haspopup="dialog"
+                                                aria-controls="cuisineCategoryMasterUsageDialog"
+                                                aria-label="Show {{ category.recipe_count }} recipe{% if category.recipe_count != 1 %}s{% endif %} using {{ category.name }}">
+                                            <strong>{{ category.recipe_count }}</strong>
+                                            <span>{{ "recipe" if category.recipe_count == 1 else "recipes" }}</span>
+                                        </button>
+                                    {% else %}
+                                        <span class="unit-master-usage-empty" aria-label="No recipes use {{ category.name }}">0</span>
+                                    {% endif %}
+                                </div>
+                                <span class="unit-master-source-badge{% if category.custom %} user-created{% endif %}" role="cell">
+                                    {{ "User-created" if category.custom else "System-seeded" }}
+                                </span>
+                                <span class="type-master-status-badge{% if not category.active %} is-inactive{% endif %}" role="cell">
+                                    {{ "Active" if category.active else "Inactive" }}
+                                </span>
+                                <span class="unit-master-action-cell" role="cell">
+                                    <button type="button"
+                                            class="unit-master-edit-button"
+                                            data-cuisine-category-master-edit-button
+                                            data-category-id="{{ category.id }}"
+                                            aria-label="Edit {{ category.name }}">Edit</button>
+                                </span>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </section>
+            <div class="unit-master-empty" data-cuisine-category-master-search-empty hidden>
+                No cuisine categories match that search.
+            </div>
+        </section>
+
+        <dialog class="unit-master-dialog"
+                data-cuisine-category-master-dialog
+                aria-labelledby="cuisineCategoryEditorTitle">
+            <form method="dialog"
+                  class="unit-master-editor type-master-editor"
+                  data-cuisine-category-master-form
+                  novalidate>
+                <header>
+                    <div>
+                        <span data-cuisine-category-master-editor-kicker>Workspace cuisine</span>
+                        <h2 id="cuisineCategoryEditorTitle" data-cuisine-category-master-editor-title>Add Cuisine Category</h2>
+                        <p>Cuisine names are matched case-insensitively throughout the recipe editor.</p>
+                    </div>
+                    <button type="button"
+                            class="unit-master-dialog-close"
+                            data-cuisine-category-master-close
+                            aria-label="Close cuisine category editor">&times;</button>
+                </header>
+
+                <div class="type-master-editor-fields">
+                    <label class="unit-master-field">
+                        <span>Cuisine category name</span>
+                        <input type="text"
+                               maxlength="60"
+                               autocomplete="off"
+                               data-cuisine-category-master-name
+                               aria-describedby="cuisineCategoryNameHelp cuisineCategoryNameError">
+                        <small class="unit-master-field-help"
+                               id="cuisineCategoryNameHelp"
+                               data-cuisine-category-master-name-help>
+                            Custom cuisine categories can be renamed. Built-in names remain stable.
+                        </small>
+                        <small class="unit-master-field-error"
+                               id="cuisineCategoryNameError"
+                               data-cuisine-category-master-name-error
+                               hidden></small>
+                    </label>
+
+                    <label class="type-master-availability">
+                        <input type="checkbox" data-cuisine-category-master-active checked>
+                        <span>
+                            <strong>Available in recipe editor</strong>
+                            <small>Inactive categories remain on existing recipes but are hidden from new selections.</small>
+                        </span>
+                    </label>
+                    <small class="unit-master-field-error" data-cuisine-category-master-active-error hidden></small>
+                </div>
+
+                <div class="unit-master-editor-feedback"
+                     role="alert"
+                     data-cuisine-category-master-editor-feedback
+                     hidden></div>
+                <footer>
+                    <button type="button"
+                            class="danger type-master-delete"
+                            data-cuisine-category-master-delete
+                            style="display: none;"
+                            hidden>Delete Cuisine Category</button>
+                    <span class="type-master-footer-spacer"></span>
+                    <button type="button" class="secondary" data-cuisine-category-master-cancel>Cancel</button>
+                    <button type="submit" data-cuisine-category-master-save>Add Cuisine Category</button>
+                </footer>
+            </form>
+        </dialog>
+
+        <dialog id="cuisineCategoryMasterUsageDialog"
+                class="unit-master-usage-dialog"
+                data-cuisine-category-master-usage-dialog
+                aria-labelledby="cuisineCategoryMasterUsageTitle"
+                aria-describedby="cuisineCategoryMasterUsageContext">
+            <div class="unit-master-usage-dialog-shell">
+                <header>
+                    <div>
+                        <span>Recipe usage</span>
+                        <h2 id="cuisineCategoryMasterUsageTitle" data-cuisine-category-master-usage-title>Recipes using this cuisine</h2>
+                        <p id="cuisineCategoryMasterUsageContext" data-cuisine-category-master-usage-context>
+                            Review every recipe assigned to this cuisine category.
+                        </p>
+                    </div>
+                    <button type="button"
+                            class="unit-master-usage-dialog-close"
+                            data-cuisine-category-master-usage-close
+                            aria-label="Close recipe usage">&times;</button>
+                </header>
+                <div class="unit-master-usage-dialog-summary" data-cuisine-category-master-usage-summary></div>
+                <div class="unit-master-usage-results"
+                     data-cuisine-category-master-usage-results
+                     role="region"
+                     aria-live="polite"></div>
+                <footer>
+                    <span>Recipe links open in a new tab.</span>
+                    <button type="button" data-cuisine-category-master-usage-close>Close</button>
+                </footer>
+            </div>
+        </dialog>
+    </section>
+{% endblock %}
+
+{% block app_scripts %}
+<script src="{{ url_for('static', filename='js/cuisine_categories.js', v=cuisine_categories_js_version) }}" defer></script>
+{% endblock %}

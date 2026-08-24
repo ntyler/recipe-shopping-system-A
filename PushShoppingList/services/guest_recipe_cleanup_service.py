@@ -59,6 +59,8 @@ OWNER_SCOPED_TABLES = (
     "recipe_ingredients",
     "workspace_ingredient_type_registry_seeds",
     "workspace_ingredient_types",
+    "workspace_cuisine_category_registry_seeds",
+    "workspace_cuisine_categories",
     "workspace_unit_aliases",
     "workspace_unit_registry_seeds",
     "workspace_units",
@@ -114,6 +116,8 @@ DELETE_ORDER = (
     "workspace_units",
     "workspace_ingredient_type_registry_seeds",
     "workspace_ingredient_types",
+    "workspace_cuisine_category_registry_seeds",
+    "workspace_cuisine_categories",
 )
 
 

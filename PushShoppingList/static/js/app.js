@@ -26568,6 +26568,245 @@ function recipeEditMultiselectOptions(kind) {
         .filter(Boolean);
 }
 
+function recipeEditCuisineRegistryCategoryRows(payload) {
+    const registry = payload?.registry && typeof payload.registry === "object"
+        ? payload.registry
+        : payload;
+    if (!registry || typeof registry !== "object") return null;
+    for (const key of ["categories", "items", "entries"]) {
+        if (Array.isArray(registry[key])) return registry[key];
+    }
+    return null;
+}
+
+function recipeEditActiveCuisineRegistryLabels(payload) {
+    const rows = recipeEditCuisineRegistryCategoryRows(payload);
+    if (!Array.isArray(rows)) return null;
+    const labels = [];
+    const seen = new Set();
+    rows.forEach(item => {
+        const record = item && typeof item === "object" ? item : null;
+        if (record && record.active === false) return;
+        const value = normalizeRecipeEditTagText(
+            record ? (record.name || record.label || record.value) : item,
+        );
+        const key = recipeEditTagKey(value);
+        if (value && key && !seen.has(key)) {
+            labels.push(value);
+            seen.add(key);
+        }
+    });
+    return labels;
+}
+
+function recipeEditCuisineRegistryAliasMap(payload) {
+    const rows = recipeEditCuisineRegistryCategoryRows(payload);
+    if (!Array.isArray(rows)) return null;
+    const aliases = new Map();
+    rows.forEach(item => {
+        if (!item || typeof item !== "object") return;
+        const canonical = normalizeRecipeEditTagText(item.name || item.label || item.value);
+        const canonicalKey = recipeEditTagKey(canonical);
+        if (!canonical || !canonicalKey) return;
+        (Array.isArray(item.aliases) ? item.aliases : []).forEach(rawAlias => {
+            const aliasKey = recipeEditTagKey(normalizeRecipeEditTagText(rawAlias));
+            if (aliasKey && aliasKey !== canonicalKey && !aliases.has(aliasKey)) {
+                aliases.set(aliasKey, canonical);
+            }
+        });
+    });
+    return aliases;
+}
+
+function recipeEditCanonicalCuisineAliasValue(value, aliases) {
+    const normalized = normalizeRecipeEditTagText(value);
+    const key = recipeEditTagKey(normalized);
+    return (key && aliases instanceof Map ? aliases.get(key) : "") || normalized;
+}
+
+function recipeEditCanonicalCuisineAliasValues(values, aliases) {
+    const items = Array.isArray(values)
+        ? values
+        : String(values || "").split(/[,;\n]+/);
+    const canonical = [];
+    const seen = new Set();
+    items.forEach(value => {
+        const label = recipeEditCanonicalCuisineAliasValue(value, aliases);
+        const key = recipeEditTagKey(label);
+        if (label && key && !seen.has(key)) {
+            canonical.push(label);
+            seen.add(key);
+        }
+    });
+    return canonical;
+}
+
+function rebaseRecipeEditCuisineAliasBaselines(aliases) {
+    if (!(aliases instanceof Map) || !aliases.size) return false;
+
+    const form = document.getElementById("recipeEditForm");
+    let changed = false;
+    if (form?.dataset.originalCategoryValues) {
+        try {
+            const values = JSON.parse(form.dataset.originalCategoryValues) || {};
+            const cuisine = recipeEditCanonicalCuisineAliasValue(values.cuisine, aliases);
+            if (cuisine !== String(values.cuisine || "")) {
+                values.cuisine = cuisine;
+                form.dataset.originalCategoryValues = JSON.stringify(values);
+                changed = true;
+            }
+        } catch (error) {
+            // A later successful recipe load can restore a malformed category baseline.
+        }
+    }
+
+    if (form && recipeEditSavedFormSnapshots.has(form)) {
+        try {
+            const savedSnapshot = JSON.parse(recipeEditSavedFormSnapshots.get(form));
+            const categoryValues = savedSnapshot.category_values;
+            if (categoryValues && typeof categoryValues === "object") {
+                const cuisine = recipeEditCanonicalCuisineAliasValue(categoryValues.cuisine, aliases);
+                if (cuisine !== String(categoryValues.cuisine || "")) {
+                    categoryValues.cuisine = cuisine;
+                    changed = true;
+                }
+            }
+            const savedRecipe = savedSnapshot.payload?.recipe;
+            if (savedRecipe && typeof savedRecipe === "object") {
+                const cuisine = recipeEditCanonicalCuisineAliasValue(savedRecipe.cuisine, aliases);
+                if (savedRecipe.cuisine !== undefined && cuisine !== String(savedRecipe.cuisine || "")) {
+                    savedRecipe.cuisine = cuisine;
+                    changed = true;
+                }
+                const cuisineTags = recipeEditCanonicalCuisineAliasValues(savedRecipe.cuisine_tags, aliases);
+                const serializedTags = JSON.stringify(cuisineTags);
+                if (serializedTags !== JSON.stringify(savedRecipe.cuisine_tags || [])) {
+                    savedRecipe.cuisine_tags = cuisineTags;
+                    changed = true;
+                }
+            }
+            if (changed) {
+                recipeEditSavedFormSnapshots.set(form, JSON.stringify(savedSnapshot));
+            }
+        } catch (error) {
+            // Keep the existing saved snapshot if it cannot be safely rebased.
+        }
+    }
+
+    if (recipeEditOriginalSnapshot && typeof recipeEditOriginalSnapshot === "object") {
+        const cuisine = recipeEditCanonicalCuisineAliasValue(recipeEditOriginalSnapshot.cuisine, aliases);
+        if (
+            recipeEditOriginalSnapshot.cuisine !== undefined
+            && cuisine !== String(recipeEditOriginalSnapshot.cuisine || "")
+        ) {
+            recipeEditOriginalSnapshot.cuisine = cuisine;
+            changed = true;
+        }
+        const cuisineTags = recipeEditCanonicalCuisineAliasValues(
+            recipeEditOriginalSnapshot.cuisine_tags,
+            aliases,
+        );
+        if (JSON.stringify(cuisineTags) !== JSON.stringify(recipeEditOriginalSnapshot.cuisine_tags || [])) {
+            recipeEditOriginalSnapshot.cuisine_tags = cuisineTags;
+            changed = true;
+        }
+    }
+    return changed;
+}
+
+function updateRecipeEditCuisineRegistryOptions(values, aliases = new Map()) {
+    const field = recipeEditMultiselectField("cuisine");
+    const source = field?.querySelector("[data-recipe-edit-multiselect-options]");
+    if (!source || !Array.isArray(values) || !(aliases instanceof Map)) return false;
+
+    const active = [];
+    const seen = new Set();
+    (Array.isArray(values) ? values : []).forEach(rawValue => {
+        const value = normalizeRecipeEditTagText(rawValue);
+        const key = recipeEditTagKey(value);
+        if (value && key && !seen.has(key)) {
+            active.push(value);
+            seen.add(key);
+        }
+    });
+    // Assigned inactive and legacy values stay selectable and visible, but do
+    // not bring back other inactive registry entries.
+    const selected = String(document.getElementById("recipeEditCuisineTags")?.value || "")
+        .split(/[,;\n]+/)
+        .map(normalizeRecipeEditTagText)
+        .filter(Boolean);
+    const canonicalSelected = recipeEditCanonicalCuisineAliasValues(selected, aliases);
+    const selectionChanged = canonicalSelected.length !== selected.length
+        || canonicalSelected.some((value, index) => value !== selected[index]);
+    const choices = [...active];
+    canonicalSelected.forEach(value => {
+        const key = recipeEditTagKey(value);
+        if (key && !seen.has(key)) {
+            choices.push(value);
+            seen.add(key);
+        }
+    });
+    const signature = choices.join("\u001f");
+    const optionsChanged = source.dataset.recipeEditCuisineRegistrySignature !== signature;
+    rebaseRecipeEditCuisineAliasBaselines(aliases);
+    if (!optionsChanged && !selectionChanged) return false;
+
+    if (optionsChanged) {
+        const options = choices.map(value => {
+            const option = document.createElement("span");
+            option.dataset.recipeEditMultiselectOption = value;
+            return option;
+        });
+        source.replaceChildren(...options);
+        source.dataset.recipeEditCuisineRegistrySignature = signature;
+    }
+    if (selectionChanged) {
+        setRecipeEditCuisineCategories(canonicalSelected, { notify: false });
+    } else {
+        renderRecipeEditMultiselect("cuisine");
+    }
+    return true;
+}
+
+let recipeEditCuisineRegistryRefreshPromise = null;
+
+function refreshRecipeEditCuisineCategoryRegistry() {
+    if (
+        !recipeEditMultiselectField("cuisine")
+        || recipeEditCuisineRegistryRefreshPromise
+    ) {
+        return recipeEditCuisineRegistryRefreshPromise || Promise.resolve(false);
+    }
+    recipeEditCuisineRegistryRefreshPromise = fetch(
+        masterDataViewerUrl("/api/master-data/cuisine-categories"),
+        {
+            headers: {
+                Accept: "application/json",
+                "X-Requested-With": "fetch",
+            },
+        },
+    )
+        .then(response => response.ok ? response.json() : null)
+        .then(payload => updateRecipeEditCuisineRegistryOptions(
+            recipeEditActiveCuisineRegistryLabels(payload),
+            recipeEditCuisineRegistryAliasMap(payload),
+        ))
+        .catch(error => {
+            console.warn("Unable to refresh the cuisine category registry.", error);
+            return false;
+        })
+        .finally(() => {
+            recipeEditCuisineRegistryRefreshPromise = null;
+        });
+    return recipeEditCuisineRegistryRefreshPromise;
+}
+
+window.addEventListener("focus", () => {
+    if (document.body?.dataset.recipeEditPage === "true") {
+        refreshRecipeEditCuisineCategoryRegistry();
+    }
+});
+
 function canonicalRecipeEditMultiselectValue(kind, value) {
     const text = normalizeRecipeEditTagText(value);
     const key = recipeEditTagKey(text);
@@ -27178,6 +27417,24 @@ function initializeRecipeEditMultiselectField(field, kind) {
     done.dataset.recipeEditMultiselectDone = "";
     done.textContent = "Done";
     footer.appendChild(done);
+    const manageUrl = String(field.dataset.recipeEditMultiselectManageUrl || "").trim();
+    let manageFooter = null;
+    if (manageUrl) {
+        manageFooter = document.createElement("div");
+        manageFooter.className = "recipe-edit-multiselect-footer recipe-edit-multiselect-manage-footer";
+        const manage = document.createElement("a");
+        manage.className = "recipe-edit-multiselect-done recipe-edit-multiselect-manage";
+        manage.dataset.recipeEditMultiselectManage = "";
+        manage.href = masterDataViewerUrl(manageUrl);
+        manage.target = "_blank";
+        manage.rel = "noopener";
+        manage.textContent = field.dataset.recipeEditMultiselectManageLabel || "Manage categories...";
+        manage.setAttribute(
+            "aria-label",
+            field.dataset.recipeEditMultiselectManageAriaLabel || "Manage categories in a new tab",
+        );
+        manageFooter.appendChild(manage);
+    }
     const status = document.createElement("div");
     status.className = "recipe-edit-multiselect-status";
     status.dataset.recipeEditMultiselectStatus = "";
@@ -27186,6 +27443,7 @@ function initializeRecipeEditMultiselectField(field, kind) {
     status.setAttribute("aria-atomic", "true");
     searchWrap.appendChild(search);
     popover.append(searchWrap, listbox, footer);
+    if (manageFooter) popover.appendChild(manageFooter);
     control.append(chips, trigger, popover, status);
     field.appendChild(control);
 

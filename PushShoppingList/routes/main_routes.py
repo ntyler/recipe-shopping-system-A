@@ -34,6 +34,7 @@ from PushShoppingList.services import master_data_url_service
 from PushShoppingList.services import ingredient_store_section_review_service as ingredient_store_section_reviews
 from PushShoppingList.services import ingredient_duplicate_review_service as ingredient_duplicate_reviews
 from PushShoppingList.services import ingredient_type_service as ingredient_types
+from PushShoppingList.services import cuisine_category_service as cuisine_categories
 from PushShoppingList.services import unit_suggestion_service as unit_suggestions
 from PushShoppingList.services.food_rules_service import load_food_rules
 from PushShoppingList.services.food_rules_service import shopping_item_food_rule_status
@@ -1062,6 +1063,7 @@ MASTER_DATA_PAGE_ENDPOINTS = {
     "equipment": "main_bp.master_data_equipment_route",
     "units": "main_bp.master_data_units_route",
     "types": "main_bp.master_data_types_route",
+    "cuisine_categories": "main_bp.master_data_cuisine_categories_route",
     "store_sections": "main_bp.master_data_store_sections_route",
 }
 
@@ -1191,7 +1193,12 @@ def canonicalize_master_data_redirect_url(
         scope_info = validate_master_data_target_scope(
             is_admin_user(current_public_user()),
             parameters,
-            allow_admin_scope=page not in {"store_sections", "units", "types"},
+            allow_admin_scope=page not in {
+                "store_sections",
+                "units",
+                "types",
+                "cuisine_categories",
+            },
         )
     else:
         page = default_page
@@ -1445,6 +1452,14 @@ def master_data_context(record_type, scope_info=None):
             "viewer_user_id": scope_info.get("viewer_user_id") or active_user_id(),
         },
     )
+    cuisine_category_url = build_canonical_master_data_url(
+        "cuisine_categories",
+        scope_info={
+            "scope": "mine",
+            "user_id": scope_info["current_scope_user_id"],
+            "viewer_user_id": scope_info.get("viewer_user_id") or active_user_id(),
+        },
+    )
 
     row_groups = []
     if record_type == "ingredients" and rows and not store_section:
@@ -1571,6 +1586,7 @@ def master_data_context(record_type, scope_info=None):
         "equipment_url": equipment_url,
         "units_url": units_url,
         "types_url": types_url,
+        "cuisine_category_url": cuisine_category_url,
         "store_section_url": store_section_url,
         "backfill_status_url": url_for("main_bp.recipe_master_data_backfill_status_route"),
         "image_generation_url": url_for("main_bp.recipe_master_data_generate_missing_images_route"),
@@ -1737,6 +1753,10 @@ def unit_master_data_context(scope_info):
         ),
         "types_url": build_canonical_master_data_url(
             "types",
+            scope_info=workspace_scope,
+        ),
+        "cuisine_category_url": build_canonical_master_data_url(
+            "cuisine_categories",
             scope_info=workspace_scope,
         ),
         "store_section_url": build_canonical_master_data_url(
@@ -1928,6 +1948,10 @@ def ingredient_type_master_data_context(scope_info):
             "types",
             scope_info=workspace_scope,
         ),
+        "cuisine_category_url": build_canonical_master_data_url(
+            "cuisine_categories",
+            scope_info=workspace_scope,
+        ),
         "store_section_url": build_canonical_master_data_url(
             "store_sections",
             scope_info=workspace_scope,
@@ -2067,6 +2091,204 @@ def master_data_types_import_api_route():
     return jsonify(result)
 
 
+def cuisine_category_master_data_context(scope_info):
+    workspace_scope = {
+        "scope": "mine",
+        "user_id": scope_info["current_scope_user_id"],
+        "viewer_user_id": scope_info.get("viewer_user_id") or active_user_id(),
+    }
+    registry = cuisine_categories.cuisine_category_registry_payload(
+        workspace_scope["user_id"],
+        include_usage=True,
+    )
+    category_rows = registry.get("categories", [])
+    return {
+        "title": "Cuisine Categories",
+        "record_type": "cuisine_categories",
+        "viewer_user_id": workspace_scope["viewer_user_id"],
+        "scope_user_id": workspace_scope["user_id"],
+        "registry": {**registry, "categories": category_rows},
+        "categories": category_rows,
+        "seeded_count": sum(1 for item in category_rows if item.get("seeded")),
+        "custom_count": sum(1 for item in category_rows if item.get("custom")),
+        "active_count": sum(1 for item in category_rows if item.get("active")),
+        "used_count": sum(1 for item in category_rows if item.get("recipe_count")),
+        "create_url": url_for("main_bp.master_data_cuisine_categories_api_route"),
+        "update_url_template": url_for(
+            "main_bp.master_data_cuisine_category_api_route",
+            category_id="__CATEGORY_ID__",
+        ),
+        "usage_url_template": url_for(
+            "main_bp.master_data_cuisine_category_references_route",
+            category_id="__CATEGORY_ID__",
+        ),
+        "import_url": url_for(
+            "main_bp.master_data_cuisine_categories_import_api_route"
+        ),
+        "ingredient_url": build_canonical_master_data_url(
+            "ingredients",
+            scope_info=workspace_scope,
+        ),
+        "equipment_url": build_canonical_master_data_url(
+            "equipment",
+            scope_info=workspace_scope,
+        ),
+        "units_url": build_canonical_master_data_url(
+            "units",
+            scope_info=workspace_scope,
+        ),
+        "types_url": build_canonical_master_data_url(
+            "types",
+            scope_info=workspace_scope,
+        ),
+        "cuisine_category_url": build_canonical_master_data_url(
+            "cuisine_categories",
+            scope_info=workspace_scope,
+        ),
+        "store_section_url": build_canonical_master_data_url(
+            "store_sections",
+            scope_info=workspace_scope,
+        ),
+    }
+
+
+@main_bp.route("/admin/master-data/cuisine-categories")
+def master_data_cuisine_categories_route():
+    scope_info, canonical_redirect = validate_canonical_master_data_page_request(
+        "cuisine_categories",
+        allow_admin_scope=False,
+    )
+    if canonical_redirect:
+        return canonical_redirect
+    return render_template(
+        "cuisine_categories.html",
+        master_data=cuisine_category_master_data_context(scope_info),
+        current_user=current_public_user(),
+        is_guest_demo=is_guest_session(),
+        app_css_version=static_asset_version("css/app.css"),
+        app_js_version=static_asset_version("js/app.js"),
+        cuisine_categories_js_version=static_asset_version(
+            "js/cuisine_categories.js"
+        ),
+    )
+
+
+@main_bp.route("/api/master-data/cuisine-categories", methods=["GET", "POST"])
+def master_data_cuisine_categories_api_route():
+    workspace_user_id = recipe_master_data.scoped_recipe_user_id()
+    if request.method == "GET":
+        return jsonify({
+            "ok": True,
+            "registry": cuisine_categories.cuisine_category_registry_payload(
+                workspace_user_id,
+                include_usage=True,
+            ),
+        })
+
+    result = cuisine_categories.save_workspace_cuisine_category(
+        request.get_json(silent=True) or {},
+        user_id=workspace_user_id,
+    )
+    if result.get("ok"):
+        result["registry"] = cuisine_categories.cuisine_category_registry_payload(
+            workspace_user_id,
+            include_usage=True,
+        )
+    status = int(result.pop("status", 201 if result.get("created") else 200))
+    return jsonify(result), status
+
+
+@main_bp.route(
+    "/api/master-data/cuisine-categories/<category_id>",
+    methods=["PUT", "PATCH", "DELETE"],
+)
+def master_data_cuisine_category_api_route(category_id):
+    workspace_user_id = recipe_master_data.scoped_recipe_user_id()
+    if request.method == "DELETE":
+        result = cuisine_categories.delete_workspace_cuisine_category(
+            category_id,
+            user_id=workspace_user_id,
+        )
+    else:
+        result = cuisine_categories.save_workspace_cuisine_category(
+            request.get_json(silent=True) or {},
+            category_id=category_id,
+            user_id=workspace_user_id,
+        )
+    if result.get("ok"):
+        result["registry"] = cuisine_categories.cuisine_category_registry_payload(
+            workspace_user_id,
+            include_usage=True,
+        )
+    status = int(result.pop("status", 200))
+    return jsonify(result), status
+
+
+@main_bp.route("/api/master-data/cuisine-categories/<category_id>/references")
+def master_data_cuisine_category_references_route(category_id):
+    workspace_user_id = recipe_master_data.scoped_recipe_user_id()
+    result = cuisine_categories.workspace_cuisine_category_recipe_references(
+        category_id,
+        user_id=workspace_user_id,
+        limit=int_query_arg("limit", 100, minimum=1, maximum=500),
+    )
+    if not (result.get("category") or result.get("cuisine_category")):
+        return jsonify({
+            "ok": False,
+            "success": False,
+            "error": "Cuisine category not found for this workspace.",
+        }), 404
+
+    for reference in result.get("references", []):
+        recipe_url = recipe_master_data.clean_text(reference.get("recipe_url"))
+        reference["edit_url"] = recipe_edit_page_url(recipe_url) if recipe_url else ""
+        cover_image = (
+            reference.get("cover_image")
+            if isinstance(reference.get("cover_image"), dict)
+            else {}
+        )
+        rendered_cover_image = recipe_cover_image_for_view(
+            recipe_url,
+            {
+                "recipe_title": reference.get("recipe_title"),
+                "cover_image": cover_image,
+            },
+            {"cover_image": cover_image},
+            variants=("thumb", "detail"),
+        )
+        reference["recipe_image_url"] = (
+            rendered_cover_image.get("thumb_url")
+            or rendered_cover_image.get("display_url")
+            or rendered_cover_image.get("src")
+            or ""
+        )
+        reference["recipe_image_srcset"] = rendered_cover_image.get("srcset") or ""
+        reference["recipe_image_alt"] = (
+            rendered_cover_image.get("alt")
+            or f"{reference.get('recipe_title') or 'Recipe'} image"
+        )
+
+    return jsonify({"ok": True, "success": True, **result})
+
+
+@main_bp.route(
+    "/api/master-data/cuisine-categories/import-local",
+    methods=["POST"],
+)
+def master_data_cuisine_categories_import_api_route():
+    payload = request.get_json(silent=True) or {}
+    workspace_user_id = recipe_master_data.scoped_recipe_user_id()
+    result = cuisine_categories.import_workspace_cuisine_category_names(
+        payload.get("categories"),
+        user_id=workspace_user_id,
+    )
+    result["registry"] = cuisine_categories.cuisine_category_registry_payload(
+        workspace_user_id,
+        include_usage=True,
+    )
+    return jsonify(result)
+
+
 def store_section_master_data_context():
     user_id = recipe_master_data.scoped_recipe_user_id()
     viewer_user_id = active_user_id()
@@ -2097,6 +2319,9 @@ def store_section_master_data_context():
         "equipment_url": build_canonical_master_data_url("equipment"),
         "units_url": build_canonical_master_data_url("units"),
         "types_url": build_canonical_master_data_url("types"),
+        "cuisine_category_url": build_canonical_master_data_url(
+            "cuisine_categories"
+        ),
         "store_section_url": build_canonical_master_data_url("store_sections"),
         "create_url": build_canonical_master_data_url("store_sections"),
     }

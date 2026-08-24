@@ -19,6 +19,7 @@ MASTER_DATA_PAGES = (
     "/admin/master-data/equipment",
     "/admin/master-data/units",
     "/admin/master-data/types",
+    "/admin/master-data/cuisine-categories",
     "/admin/master-data/store-sections",
 )
 
@@ -214,6 +215,95 @@ def test_units_page_renders_the_persistent_registry_and_unit_editor(
     assert "const saveUnit = async event =>" in units_script
     assert "updateRegistry(result.registry)" in units_script
     assert "data-unit-master-search" in response.get_data(as_text=True)
+
+
+def test_cuisine_categories_page_renders_registry_management_ui(master_data_app):
+    with master_data_app.test_client() as client:
+        sign_in(client, "user-a")
+        response = client.get("/admin/master-data/cuisine-categories")
+
+    assert response.status_code == 200
+    assert_private_no_store(response)
+    html = response.get_data(as_text=True)
+    soup = BeautifulSoup(html, "html.parser")
+    assert soup.title.get_text(strip=True) == "Cuisine Categories"
+    root = soup.select_one("[data-cuisine-category-master-page]")
+    assert root is not None
+    assert root["data-create-url"] == "/api/master-data/cuisine-categories"
+    assert "__CATEGORY_ID__" in root["data-update-url-template"]
+    assert root["data-import-url"] == "/api/master-data/cuisine-categories/import-local"
+    assert soup.select_one("h1#cuisineCategoriesTitle").get_text(strip=True) == (
+        "Cuisine Categories"
+    )
+    assert soup.select_one("[data-cuisine-category-master-add-button]") is not None
+    assert soup.select_one("[data-cuisine-category-master-dialog]") is not None
+    assert soup.select_one("[data-cuisine-category-master-usage-dialog]") is not None
+    assert soup.select_one("[data-cuisine-category-master-search]") is not None
+    assert soup.select("[data-cuisine-category-master-row]")
+    active_tab = soup.select_one("nav.master-data-tabs a.active")
+    assert active_tab.get_text(strip=True) == "Cuisine Categories"
+    assert urlsplit(active_tab["href"]).path == (
+        "/admin/master-data/cuisine-categories"
+    )
+    assert soup.select_one(
+        'script[src*="/static/js/cuisine_categories.js"]'
+    ) is not None
+
+    script = Path(
+        "PushShoppingList/static/js/cuisine_categories.js"
+    ).read_text(encoding="utf-8")
+    assert "const saveCategory = async event =>" in script
+    assert "const deleteCategory = async () =>" in script
+    assert "const openUsage = async (item, trigger) =>" in script
+    assert 'body: JSON.stringify({ categories: importableNames })' in script
+    assert '"__CATEGORY_ID__"' in script
+
+
+def test_cuisine_category_routes_support_workspace_crud_and_references(
+    master_data_app,
+):
+    with master_data_app.test_client() as client:
+        sign_in(client, "user-a")
+        created = client.post(
+            "/api/master-data/cuisine-categories",
+            json={"name": "Great Lakes Fusion", "active": True},
+        )
+        assert created.status_code == 201
+        created_payload = created.get_json()
+        category_id = created_payload["category_id"]
+        assert any(
+            item["id"] == category_id and item["name"] == "Great Lakes Fusion"
+            for item in created_payload["registry"]["categories"]
+        )
+
+        updated = client.patch(
+            f"/api/master-data/cuisine-categories/{category_id}",
+            json={"name": "Midwest Fusion", "active": False},
+        )
+        references = client.get(
+            f"/api/master-data/cuisine-categories/{category_id}/references",
+        )
+        deleted = client.delete(
+            f"/api/master-data/cuisine-categories/{category_id}",
+        )
+
+    assert updated.status_code == 200
+    assert any(
+        item["id"] == category_id
+        and item["name"] == "Midwest Fusion"
+        and item["active"] is False
+        for item in updated.get_json()["registry"]["categories"]
+    )
+    assert references.status_code == 200
+    assert references.get_json()["category"]["id"] == category_id
+    assert references.get_json()["references"] == []
+    assert deleted.status_code == 200
+    assert all(
+        item["id"] != category_id
+        for item in deleted.get_json()["registry"]["categories"]
+    )
+    for response in (created, updated, references, deleted):
+        assert_private_no_store(response)
 
 
 @pytest.mark.parametrize("supplied_viewer", ("user-b", "USER-A"))
@@ -587,6 +677,7 @@ def test_page_tabs_keep_canonical_admin_target_scope(master_data_app):
             "/admin/master-data/store-sections",
             "/admin/master-data/units",
             "/admin/master-data/types",
+            "/admin/master-data/cuisine-categories",
         }:
             # These definitions belong to one session/browser workspace and do
             # not have a coherent aggregate/all-users view.

@@ -1276,11 +1276,44 @@ def cookbook_menu_sort_options():
     ]
 
 
-def cookbook_category_choices():
-    return {
+def active_cuisine_category_choices(user_id=None):
+    fallback = list(COOKBOOK_CATEGORY_CHOICES.get("cuisine", ()))
+    try:
+        # Imported lazily so the category registry may reuse cookbook helpers
+        # without creating a module-import cycle.
+        from PushShoppingList.services import cuisine_category_service
+
+        values = cuisine_category_service.active_workspace_cuisine_category_labels(
+            user_id=user_id,
+        )
+    except Exception:
+        # The recipe editor must remain usable while a workspace registry is
+        # unavailable or before its storage has been initialized.
+        return fallback
+
+    if not isinstance(values, (list, tuple)):
+        return fallback
+
+    choices = []
+    seen = set()
+    for raw_value in values:
+        value = clean_text(raw_value)
+        key = normalized_label_key(value)
+        if value and key and key not in seen:
+            choices.append(value)
+            seen.add(key)
+    # An empty list is meaningful: the workspace may intentionally deactivate
+    # every category. Only a missing/malformed registry should use the fallback.
+    return choices
+
+
+def cookbook_category_choices(user_id=None):
+    choices = {
         field: list(choices)
         for field, choices in COOKBOOK_CATEGORY_CHOICES.items()
     }
+    choices["cuisine"] = active_cuisine_category_choices(user_id=user_id)
+    return choices
 
 
 def cookbook_custom_tag_choices(view):

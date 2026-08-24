@@ -43,6 +43,430 @@ def test_custom_tag_choices_are_reusable_and_case_insensitive():
     assert choices == ["Family Favorites", "Freezer Meals", "Weeknight Dinners"]
 
 
+def test_cookbook_category_choices_use_workspace_cuisine_registry(monkeypatch):
+    from PushShoppingList.services import cuisine_category_service
+
+    monkeypatch.setattr(
+        cuisine_category_service,
+        "active_workspace_cuisine_category_labels",
+        lambda user_id=None: ["Italian", "  Caribbean  ", "italian", ""],
+    )
+
+    choices = cookbook_service.cookbook_category_choices(user_id="cuisine-user")
+
+    assert choices["cuisine"] == ["Italian", "Caribbean"]
+    assert choices["meal_type"] == list(cookbook_service.COOKBOOK_CATEGORY_CHOICES["meal_type"])
+
+
+def test_cookbook_category_choices_keep_safe_cuisine_fallback(monkeypatch):
+    from PushShoppingList.services import cuisine_category_service
+
+    def unavailable_registry(user_id=None):
+        raise RuntimeError("registry unavailable")
+
+    monkeypatch.setattr(
+        cuisine_category_service,
+        "active_workspace_cuisine_category_labels",
+        unavailable_registry,
+    )
+
+    assert cookbook_service.cookbook_category_choices()["cuisine"] == list(
+        cookbook_service.COOKBOOK_CATEGORY_CHOICES["cuisine"]
+    )
+
+
+def test_cookbook_category_choices_honor_intentionally_empty_registry(monkeypatch):
+    from PushShoppingList.services import cuisine_category_service
+
+    monkeypatch.setattr(
+        cuisine_category_service,
+        "active_workspace_cuisine_category_labels",
+        lambda user_id=None: [],
+    )
+
+    assert cookbook_service.cookbook_category_choices()["cuisine"] == []
+
+
+def test_recipe_editor_cuisine_registry_management_and_refresh_contract():
+    template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    script = read_text("PushShoppingList/static/js/app.js")
+    css = read_text("PushShoppingList/static/css/app.css")
+
+    assert 'data-recipe-edit-multiselect-manage-url="/admin/master-data/cuisine-categories"' in template
+    assert 'data-recipe-edit-multiselect-manage-label="Manage Cuisine Categories' in template
+    assert (
+        'data-recipe-edit-multiselect-manage-aria-label="Manage Cuisine Categories in a new tab"'
+        in template
+    )
+    assert 'manage.target = "_blank";' in script
+    assert 'manage.rel = "noopener";' in script
+    assert 'manage.dataset.recipeEditMultiselectManage = "";' in script
+    assert 'masterDataViewerUrl("/api/master-data/cuisine-categories")' in script
+    assert 'window.addEventListener("focus", () => {' in script
+    assert "refreshRecipeEditCuisineCategoryRegistry();" in script
+    assert ".recipe-edit-multiselect-manage" in css
+    assert "text-decoration: none;" in css[
+        css.index(".recipe-edit-multiselect-manage"):
+        css.index("}", css.index(".recipe-edit-multiselect-manage"))
+    ]
+
+
+def test_recipe_editor_cuisine_registry_refresh_preserves_selected_legacy_values():
+    node = shutil.which("node")
+    if not node:
+        return
+
+    script = read_text("PushShoppingList/static/js/app.js")
+    normalizers = script[
+        script.index("function normalizeRecipeEditTagText"):
+        script.index("function recipeEditMultiselectField")
+    ]
+    registry_logic = script[
+        script.index("function recipeEditCuisineRegistryCategoryRows"):
+        script.index("function canonicalRecipeEditMultiselectValue")
+    ]
+    harness = r'''
+const listeners = {};
+const rendered = [];
+let recipeEditOriginalSnapshot = null;
+const selectedInput = { value: "Legacy Cuisine, Unregistered Cuisine, Italian" };
+const primaryInput = { value: "Legacy Cuisine" };
+const source = {
+    dataset: {},
+    children: [],
+    replaceChildren(...children) { this.children = children; },
+};
+const field = {
+    querySelector(selector) {
+        return selector === "[data-recipe-edit-multiselect-options]" ? source : null;
+    },
+};
+const document = {
+    body: { dataset: { recipeEditPage: "true" } },
+    createElement() { return { dataset: {} }; },
+    getElementById(id) {
+        if (id === "recipeEditCuisineTags") return selectedInput;
+        if (id === "recipeEditCategoryCuisine") return primaryInput;
+        return null;
+    },
+};
+const window = {
+    addEventListener(name, callback) { listeners[name] = callback; },
+};
+function recipeEditMultiselectField(kind) { return kind === "cuisine" ? field : null; }
+function renderRecipeEditMultiselect(kind) { rendered.push(kind); }
+function setRecipeEditCuisineCategories(values) {
+    selectedInput.value = values.join(", ");
+    primaryInput.value = values[0] || "";
+    renderRecipeEditMultiselect("cuisine");
+}
+function masterDataViewerUrl(value) { return value; }
+let requestedUrl = "";
+let nextPayload = null;
+function fetch(url) {
+    requestedUrl = url;
+    return Promise.resolve({ ok: true, json: () => Promise.resolve(nextPayload) });
+}
+const console = { warn() {} };
+''' + normalizers + registry_logic + r'''
+
+const parsed = recipeEditActiveCuisineRegistryLabels({
+    categories: [
+        { name: "Italian", active: true },
+        { name: "Mexican", active: true },
+        { name: "Retired Cuisine", active: false },
+        { name: "italian", active: true },
+    ],
+});
+const firstChanged = updateRecipeEditCuisineRegistryOptions(parsed);
+const firstChoices = source.children.map(item => item.dataset.recipeEditMultiselectOption);
+
+nextPayload = {
+    registry: {
+        items: [
+            { label: "Japanese", active: true, aliases: ["Legacy Cuisine"] },
+            { label: "Korean", active: true },
+            { label: "Italian", active: false },
+        ],
+    },
+};
+refreshRecipeEditCuisineCategoryRegistry().then(secondChanged => {
+    const secondChoices = source.children.map(item => item.dataset.recipeEditMultiselectOption);
+    nextPayload = { categories: [] };
+    return refreshRecipeEditCuisineCategoryRegistry().then(emptyChanged => ({
+        secondChanged,
+        secondChoices,
+        emptyChanged,
+    }));
+}).then(({ secondChanged, secondChoices, emptyChanged }) => {
+    process.stdout.write(JSON.stringify({
+        parsed,
+        firstChanged,
+        firstChoices,
+        secondChanged,
+        secondChoices,
+        emptyChanged,
+        emptyChoices: source.children.map(item => item.dataset.recipeEditMultiselectOption),
+        selected: selectedInput.value,
+        primary: primaryInput.value,
+        requestedUrl,
+        rendered,
+        focusBound: typeof listeners.focus === "function",
+    }));
+});
+'''
+    completed = subprocess.run(
+        [node],
+        input=harness,
+        text=True,
+        encoding="utf-8",
+        capture_output=True,
+        check=False,
+        timeout=10,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    result = json.loads(completed.stdout)
+    assert result["parsed"] == ["Italian", "Mexican"]
+    assert result["firstChanged"] is True
+    assert result["firstChoices"] == [
+        "Italian",
+        "Mexican",
+        "Legacy Cuisine",
+        "Unregistered Cuisine",
+    ]
+    assert result["secondChanged"] is True
+    assert result["secondChoices"] == [
+        "Japanese",
+        "Korean",
+        "Unregistered Cuisine",
+        "Italian",
+    ]
+    assert result["emptyChanged"] is True
+    assert result["emptyChoices"] == ["Japanese", "Unregistered Cuisine", "Italian"]
+    assert result["selected"] == "Japanese, Unregistered Cuisine, Italian"
+    assert result["primary"] == "Japanese"
+    assert result["requestedUrl"] == "/api/master-data/cuisine-categories"
+    assert result["rendered"] == ["cuisine", "cuisine", "cuisine"]
+    assert result["focusBound"] is True
+
+
+def test_recipe_editor_cuisine_registry_refresh_canonicalizes_late_alias_with_same_signature():
+    node = shutil.which("node")
+    if not node:
+        return
+
+    script = read_text("PushShoppingList/static/js/app.js")
+    normalizers = script[
+        script.index("function normalizeRecipeEditTagText"):
+        script.index("function recipeEditMultiselectField")
+    ]
+    registry_logic = script[
+        script.index("function recipeEditCuisineRegistryCategoryRows"):
+        script.index("function canonicalRecipeEditMultiselectValue")
+    ]
+    harness = r'''
+const rendered = [];
+let recipeEditOriginalSnapshot = null;
+const recipeEditSavedFormSnapshots = new WeakMap();
+const selectedInput = { value: "Legacy Cuisine" };
+const primaryInput = { value: "Legacy Cuisine" };
+const source = {
+    dataset: { recipeEditCuisineRegistrySignature: "Japanese" },
+    children: [{ dataset: { recipeEditMultiselectOption: "Japanese" } }],
+    replaceCount: 0,
+    replaceChildren(...children) {
+        this.children = children;
+        this.replaceCount += 1;
+    },
+};
+const field = {
+    querySelector(selector) {
+        return selector === "[data-recipe-edit-multiselect-options]" ? source : null;
+    },
+};
+const document = {
+    createElement() { return { dataset: {} }; },
+    getElementById(id) {
+        if (id === "recipeEditCuisineTags") return selectedInput;
+        if (id === "recipeEditCategoryCuisine") return primaryInput;
+        return null;
+    },
+};
+const window = { addEventListener() {} };
+function recipeEditMultiselectField(kind) { return kind === "cuisine" ? field : null; }
+function renderRecipeEditMultiselect(kind) { rendered.push(kind); }
+function setRecipeEditCuisineCategories(values) {
+    selectedInput.value = values.join(", ");
+    primaryInput.value = values[0] || "";
+    renderRecipeEditMultiselect("cuisine");
+}
+function masterDataViewerUrl(value) { return value; }
+function fetch() { return Promise.resolve({ ok: false }); }
+const console = { warn() {} };
+''' + normalizers + registry_logic + r'''
+
+const changed = updateRecipeEditCuisineRegistryOptions(
+    ["Japanese"],
+    new Map([["legacy cuisine", "Japanese"]]),
+);
+process.stdout.write(JSON.stringify({
+    changed,
+    selected: selectedInput.value,
+    primary: primaryInput.value,
+    replaceCount: source.replaceCount,
+    rendered,
+}));
+'''
+    completed = subprocess.run(
+        [node],
+        input=harness,
+        text=True,
+        encoding="utf-8",
+        capture_output=True,
+        check=False,
+        timeout=10,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    result = json.loads(completed.stdout)
+    assert result == {
+        "changed": True,
+        "selected": "Japanese",
+        "primary": "Japanese",
+        "replaceCount": 0,
+        "rendered": ["cuisine"],
+    }
+
+
+def test_recipe_editor_cuisine_alias_refresh_rebases_only_alias_baselines():
+    node = shutil.which("node")
+    if not node:
+        return
+
+    script = read_text("PushShoppingList/static/js/app.js")
+    normalizers = script[
+        script.index("function normalizeRecipeEditTagText"):
+        script.index("function recipeEditMultiselectField")
+    ]
+    registry_logic = script[
+        script.index("function recipeEditCuisineRegistryCategoryRows"):
+        script.index("function canonicalRecipeEditMultiselectValue")
+    ]
+    dirty_logic = script[
+        script.index("function recipeEditorCurrentSaveSnapshot"):
+        script.index("function clearRecipeEditorValidation")
+    ]
+    harness = r'''
+let currentDescription = "Saved description";
+let recipeEditOriginalSnapshot = {
+    description: "Saved description",
+    cuisine_tags: ["Legacy Cuisine"],
+};
+const recipeEditSavedFormSnapshots = new WeakMap();
+const selectedInput = { value: "Legacy Cuisine" };
+const primaryInput = { value: "Legacy Cuisine" };
+const form = {
+    dataset: {
+        originalCategoryValues: JSON.stringify({
+            cuisine: "Legacy Cuisine",
+            meal_type: "Dinner",
+        }),
+    },
+    querySelectorAll() { return []; },
+};
+const source = {
+    dataset: { recipeEditCuisineRegistrySignature: "Japanese" },
+    children: [{ dataset: { recipeEditMultiselectOption: "Japanese" } }],
+    replaceChildren(...children) { this.children = children; },
+};
+const field = {
+    querySelector(selector) {
+        return selector === "[data-recipe-edit-multiselect-options]" ? source : null;
+    },
+};
+const document = {
+    createElement() { return { dataset: {} }; },
+    getElementById(id) {
+        if (id === "recipeEditCuisineTags") return selectedInput;
+        if (id === "recipeEditCategoryCuisine") return primaryInput;
+        if (id === "recipeEditForm") return form;
+        return null;
+    },
+};
+const window = { addEventListener() {} };
+function recipeEditMultiselectField(kind) { return kind === "cuisine" ? field : null; }
+function renderRecipeEditMultiselect() {}
+function setRecipeEditCuisineCategories(values) {
+    selectedInput.value = values.join(", ");
+    primaryInput.value = values[0] || "";
+}
+function collectRecipeEditorPayload() {
+    return {
+        recipe: {
+            description: currentDescription,
+            cuisine_tags: selectedInput.value.split(/[,;\n]+/).map(value => value.trim()).filter(Boolean),
+        },
+    };
+}
+function collectRecipeEditorCategoryValues() {
+    return { cuisine: primaryInput.value, meal_type: "Dinner" };
+}
+function collectRecipeEditorCategorySources() {
+    return { cuisine: "user_selected", meal_type: "user_selected" };
+}
+function masterDataViewerUrl(value) { return value; }
+function fetch() { return Promise.resolve({ ok: false }); }
+const console = { warn() {} };
+''' + normalizers + registry_logic + dirty_logic + r'''
+
+recipeEditSavedFormSnapshots.set(form, recipeEditorCurrentSaveSnapshot(form));
+currentDescription = "Unsaved description";
+updateRecipeEditCuisineRegistryOptions(
+    ["Japanese"],
+    new Map([["legacy cuisine", "Japanese"]]),
+);
+const dirtyWithOtherEdit = recipeEditorHasUnsavedChanges(form);
+const savedSnapshot = JSON.parse(recipeEditSavedFormSnapshots.get(form));
+const originalCategoryValues = JSON.parse(form.dataset.originalCategoryValues);
+currentDescription = "Saved description";
+const dirtyAfterRevertingOtherEdit = recipeEditorHasUnsavedChanges(form);
+
+process.stdout.write(JSON.stringify({
+    selected: selectedInput.value,
+    primary: primaryInput.value,
+    dirtyWithOtherEdit,
+    dirtyAfterRevertingOtherEdit,
+    savedDescription: savedSnapshot.payload.recipe.description,
+    savedCuisineTags: savedSnapshot.payload.recipe.cuisine_tags,
+    savedCategoryCuisine: savedSnapshot.category_values.cuisine,
+    originalCategoryCuisine: originalCategoryValues.cuisine,
+    originalSnapshotCuisineTags: recipeEditOriginalSnapshot.cuisine_tags,
+}));
+'''
+    completed = subprocess.run(
+        [node],
+        input=harness,
+        text=True,
+        encoding="utf-8",
+        capture_output=True,
+        check=False,
+        timeout=10,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    result = json.loads(completed.stdout)
+    assert result["selected"] == "Japanese"
+    assert result["primary"] == "Japanese"
+    assert result["dirtyWithOtherEdit"] is True
+    assert result["dirtyAfterRevertingOtherEdit"] is False
+    assert result["savedDescription"] == "Saved description"
+    assert result["savedCuisineTags"] == ["Japanese"]
+    assert result["savedCategoryCuisine"] == "Japanese"
+    assert result["originalCategoryCuisine"] == "Japanese"
+    assert result["originalSnapshotCuisineTags"] == ["Japanese"]
+
+
 def test_recipe_editor_renders_compact_classification_token_controls():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     script = read_text("PushShoppingList/static/js/app.js")
