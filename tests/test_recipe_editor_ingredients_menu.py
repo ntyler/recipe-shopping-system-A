@@ -5475,7 +5475,7 @@ process.stdout.write(JSON.stringify({
     }
 
 
-def test_store_section_grouping_attaches_inactive_options_to_the_active_choice():
+def test_store_section_grouping_expands_complete_choice_beneath_canonical_anchor():
     node = shutil.which("node")
     if not node:
         pytest.skip("Node.js is required for attached option grouping coverage")
@@ -5503,13 +5503,19 @@ def test_store_section_grouping_attaches_inactive_options_to_the_active_choice()
     )
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
     assert "if (entry.attachedAlternative) return;" in group_headers
-    assert "if (!entry.attachedAlternative)" in group_headers
     assert 'columnKey === "store" && ingredientEntry.counted === false' in filter_options
     assert "option.alternativeCount += 1;" in filter_options
     assert "Selection required" in group_headers
     assert "Current option hidden by filter" in attached_rows
+    assert "item.expandedChoiceHost = false;" in attached_rows
+    assert "item.expandedChoiceContinuation = false;" in attached_rows
+    assert "entry.expandedChoiceBlock = false;" in attached_rows
+    assert "const consumedSelectedRows = new Set();" in attached_rows
+    assert "if (consumedSelectedRows.has(item)) return;" in attached_rows
     assert "is-filtered-alternative" in group_headers
     assert "recipeIngredientColumnChoiceBoundary" in group_headers
+    assert "&& !entry.expandedChoiceContinuation" in group_headers
+    assert "entry.expandedChoiceStore" in group_headers
     assert ".recipe-edit-selected-option-toggle[hidden]" in css
     harness = r"""
 function choiceParent(id, requiredUnresolved = false) {
@@ -5533,6 +5539,8 @@ function displayItem({
     manualIndex = 0,
     componentOrder = 0,
     filtered = false,
+    anchor = false,
+    expanded = false,
 }) {
     const entry = {
         parentRow,
@@ -5544,6 +5552,8 @@ function displayItem({
         manualIndex,
         componentOrder,
         filtered,
+        anchor,
+        expanded,
     };
     const row = {id, recipeIngredientColumnViewEntries: [entry]};
     entry.row = row;
@@ -5554,8 +5564,13 @@ function visible(items) {
 }
 function activeSections(items) {
     return [...new Set(visible(items)
-        .filter(item => !item.attachedAlternative)
-        .map(item => item.row.recipeIngredientColumnViewEntries[0].store.key))];
+        .filter(item => (
+            !item.attachedAlternative && !item.expandedChoiceContinuation
+        ))
+        .map(item => (
+            item.expandedChoiceStore
+            || item.row.recipeIngredientColumnViewEntries[0].store
+        ).key))];
 }
 """ + presentation_entries + "\n" + inactive_row + "\n" + attached_rows + r"""
 
@@ -5563,7 +5578,7 @@ const cornChoice = choiceParent("corn-choice");
 const before = displayItem({id: "before", store: "misc", manualIndex: 0});
 const corn = displayItem({
     id: "fresh-corn", parentRow: cornChoice, counted: true,
-    optionId: "fresh", store: "produce", manualIndex: 1,
+    optionId: "fresh", store: "produce", manualIndex: 1, anchor: true,
 });
 const cumin = displayItem({
     id: "cumin", parentRow: cornChoice, counted: true,
@@ -5585,8 +5600,19 @@ const alternativeOnion = displayItem({
     componentOrder: 1,
 });
 
-// This is the order produced by Store Section sorting before inactive options
-// are reattached. The two inactive members are intentionally split by aisle.
+// Collapsed Store Section grouping receives active rows only and preserves its
+// aisle-sorted order. Expanding the canonical fresh-corn anchor then presents
+// the complete selected option followed by its alternative as one block.
+const collapsed = recipeIngredientColumnViewAttachedPresentationRows([
+    before,
+    cumin,
+    after,
+    corn,
+    onion,
+]);
+const collapsedOrder = collapsed.map(item => item.row.id);
+const collapsedSections = activeSections(collapsed);
+corn.row.recipeIngredientColumnViewEntries[0].expanded = true;
 const expanded = recipeIngredientColumnViewAttachedPresentationRows([
     before,
     cumin,
@@ -5597,7 +5623,7 @@ const expanded = recipeIngredientColumnViewAttachedPresentationRows([
     frozenCorn,
 ]);
 const expandedIds = expanded.map(item => item.row.id);
-const hostIndex = expandedIds.indexOf("onion");
+const hostIndex = expandedIds.indexOf("fresh-corn");
 
 const partialFilterParent = choiceParent("partial-filter-choice");
 const partialSelected = displayItem({
@@ -5652,6 +5678,7 @@ const switchedParent = choiceParent("switched-choice");
 const selectedFrozen = displayItem({
     id: "selected-frozen", parentRow: switchedParent, counted: true,
     optionId: "frozen", store: "frozen", manualIndex: 0,
+    anchor: true, expanded: true,
 });
 const selectedOnion = displayItem({
     id: "selected-onion", parentRow: switchedParent, counted: true,
@@ -5674,11 +5701,21 @@ const switched = recipeIngredientColumnViewAttachedPresentationRows([
 const repeated = recipeIngredientColumnViewAttachedPresentationRows(switched);
 
 process.stdout.write(JSON.stringify({
+    collapsed: {
+        order: collapsedOrder,
+        activeSections: collapsedSections,
+    },
     expanded: {
         order: expandedIds,
-        attachedAfterSelected: expandedIds.slice(hostIndex + 1, hostIndex + 3),
+        contiguousChoiceBlock: expandedIds.slice(hostIndex, hostIndex + 5),
         attachedRows: visible(expanded)
             .filter(item => item.attachedAlternative)
+            .map(item => item.row.id),
+        hosts: visible(expanded)
+            .filter(item => item.expandedChoiceHost)
+            .map(item => item.row.id),
+        continuations: visible(expanded)
+            .filter(item => item.expandedChoiceContinuation)
             .map(item => item.row.id),
         activeSections: activeSections(expanded),
         uniqueRows: new Set(expandedIds).size === expandedIds.length,
@@ -5709,11 +5746,18 @@ process.stdout.write(JSON.stringify({
             ?.requiredChoiceParent?.id || null,
     },
     switched: {
+        order: switched.map(item => item.row.id),
         activeSections: activeSections(switched),
         attachedRows: visible(switched)
             .filter(item => item.attachedAlternative)
             .map(item => item.row.id),
+        hosts: visible(switched)
+            .filter(item => item.expandedChoiceHost)
+            .map(item => item.row.id),
         repeatedOrder: repeated.map(item => item.row.id),
+        repeatedHosts: visible(repeated)
+            .filter(item => item.expandedChoiceHost)
+            .map(item => item.row.id),
         uniqueRows: new Set(repeated.map(item => item.row.id)).size === repeated.length,
     },
 }));
@@ -5730,19 +5774,36 @@ process.stdout.write(JSON.stringify({
 
     assert completed.returncode == 0, completed.stderr
     result = json.loads(completed.stdout)
+    assert result["collapsed"] == {
+        "order": ["before", "cumin", "after", "fresh-corn", "onion"],
+        "activeSections": ["misc", "spices", "dairy", "produce"],
+    }
     assert result["expanded"] == {
         "order": [
             "before",
-            "cumin",
             "after",
             "fresh-corn",
+            "cumin",
             "onion",
             "frozen-corn",
             "alternative-onion",
         ],
-        "attachedAfterSelected": ["frozen-corn", "alternative-onion"],
+        "contiguousChoiceBlock": [
+            "fresh-corn",
+            "cumin",
+            "onion",
+            "frozen-corn",
+            "alternative-onion",
+        ],
         "attachedRows": ["frozen-corn", "alternative-onion"],
-        "activeSections": ["misc", "spices", "dairy", "produce"],
+        "hosts": ["fresh-corn"],
+        "continuations": [
+            "cumin",
+            "onion",
+            "frozen-corn",
+            "alternative-onion",
+        ],
+        "activeSections": ["misc", "dairy", "produce"],
         "uniqueRows": True,
     }
     assert result["partialFilter"] == {
@@ -5763,14 +5824,22 @@ process.stdout.write(JSON.stringify({
         "parent": "required-choice",
     }
     assert result["switched"] == {
-        "activeSections": ["frozen", "produce"],
+        "order": [
+            "selected-frozen",
+            "selected-onion",
+            "previous-corn",
+            "previous-cumin",
+        ],
+        "activeSections": ["frozen"],
         "attachedRows": ["previous-corn", "previous-cumin"],
+        "hosts": ["selected-frozen"],
         "repeatedOrder": [
             "selected-frozen",
             "selected-onion",
             "previous-corn",
             "previous-cumin",
         ],
+        "repeatedHosts": ["selected-frozen"],
         "uniqueRows": True,
     }
 

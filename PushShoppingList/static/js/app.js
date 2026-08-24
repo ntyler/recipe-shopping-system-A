@@ -30342,7 +30342,7 @@ function recipeIngredientColumnViewEntryShowsOptionContext(entry) {
     // Store Section grouping is active. Its canonical data anchor can be a
     // different member from the first rendered member, so only the block's
     // presentation anchor should repeat the option label.
-    if (entry?.attachedAlternative) {
+    if (entry?.attachedAlternative || entry?.expandedChoiceBlock) {
         return Boolean(entry.sectionContextAnchor);
     }
     return Boolean(entry?.anchor || entry?.sectionContextAnchor);
@@ -30743,8 +30743,15 @@ function syncRecipeIngredientColumnViewVisibleSectionContexts(
             const attachedAlternative = orderedOptionEntries.every(entry => (
                 entry.counted === false
             ));
-            if (attachedAlternative) {
+            const expandedChoiceBlock = orderedOptionEntries.some(entry => (
+                entry.expandedChoiceBlock
+            ));
+            if (attachedAlternative || expandedChoiceBlock) {
                 const contextAnchor = orderedOptionEntries.find(entry => (
+                    entry.expandedChoiceHost
+                    && !entry.filtered
+                    && !entry.presentationHidden
+                )) || orderedOptionEntries.find(entry => (
                     !entry.filtered && !entry.presentationHidden
                 )) || null;
                 orderedOptionEntries.forEach(entry => {
@@ -31343,6 +31350,9 @@ function recipeIngredientColumnViewAttachedPresentationRows(sortedRows = []) {
         item.detachedAlternativeParent = null;
         item.detachedAlternativeLabel = "";
         item.detachedAlternativeHelper = "";
+        item.expandedChoiceHost = false;
+        item.expandedChoiceContinuation = false;
+        item.expandedChoiceStore = null;
         item.attachedAlternative = recipeIngredientColumnViewIsInactivePresentationRow(
             item,
         );
@@ -31350,6 +31360,8 @@ function recipeIngredientColumnViewAttachedPresentationRows(sortedRows = []) {
         entries.forEach(entry => {
             entry.presentationHidden = false;
             entry.attachedAlternative = item.attachedAlternative;
+            entry.expandedChoiceBlock = false;
+            entry.expandedChoiceHost = false;
         });
         if (!item.attachedAlternative) {
             activeRows.push(item);
@@ -31402,6 +31414,7 @@ function recipeIngredientColumnViewAttachedPresentationRows(sortedRows = []) {
     const unresolvedBlocks = [];
     const detachedAlternativeBlocks = [];
     const hiddenAlternativeRows = [];
+    const consumedSelectedRows = new Set();
     groupsByParent.forEach((optionsByKey, parentRow) => {
         const groups = [...optionsByKey.values()].sort((left, right) => (
             groupManualOrder(left) - groupManualOrder(right)
@@ -31412,19 +31425,78 @@ function recipeIngredientColumnViewAttachedPresentationRows(sortedRows = []) {
                 entry.parentRow === parentRow && entry.counted !== false
             ))
         ));
-        const visibleSelectedRows = activeRows.filter(item => (
+        const orderedSelectedRows = [...selectedRows].sort(compareGroupRows);
+        const visibleSelectedRows = orderedSelectedRows.filter(item => (
             !item.filtered
             && recipeIngredientColumnViewPresentationEntries(item).some(entry => (
                 entry.parentRow === parentRow && entry.counted !== false
             ))
         ));
-        const host = visibleSelectedRows[visibleSelectedRows.length - 1] || null;
+        const expandedChoice = [
+            ...orderedSelectedRows,
+            ...groups.flatMap(group => group.rows),
+        ].some(item => (
+            recipeIngredientColumnViewPresentationEntries(item).some(entry => (
+                entry.parentRow === parentRow && entry.expanded
+            ))
+        ));
+        const canonicalHost = visibleSelectedRows.find(item => (
+            recipeIngredientColumnViewPresentationEntries(item).some(entry => (
+                entry.parentRow === parentRow
+                && entry.counted !== false
+                && entry.anchor
+            ))
+        )) || null;
+        const host = expandedChoice
+            ? (canonicalHost || visibleSelectedRows[0] || null)
+            : (visibleSelectedRows[visibleSelectedRows.length - 1] || null);
         const requiredUnresolved = Boolean(
             parentRow?.classList?.contains("has-ingredient-choice")
             && recipeIngredientColumnViewChoiceOptions(parentRow).requiredUnresolved,
         );
         const matchingDetachedRows = groups.flatMap(group => group.rows)
             .filter(item => !item.filtered);
+
+        if (expandedChoice && host && !requiredUnresolved) {
+            // Expansion is a choice-comparison view, so temporarily reunite the
+            // selected option and its alternatives beneath the disclosure row.
+            // Collapsing rebuilds activeRows without alternatives and restores
+            // each selected member to its own Store Section bucket.
+            const selectedContinuations = orderedSelectedRows.filter(item => (
+                item !== host
+            ));
+            const alternativeRows = groups.flatMap(group => group.rows);
+            const hostEntry = recipeIngredientColumnViewPresentationEntries(host)
+                .find(entry => (
+                    entry.parentRow === parentRow && entry.counted !== false
+                ));
+            const hostStore = hostEntry?.store
+                || recipeIngredientColumnViewEntry(host.row, "store");
+            const choiceBlock = [
+                host,
+                ...selectedContinuations,
+                ...alternativeRows,
+            ];
+
+            choiceBlock.forEach(item => {
+                item.expandedChoiceHost = item === host;
+                item.expandedChoiceContinuation = item !== host;
+                item.expandedChoiceStore = hostStore;
+                item.presentationHidden = false;
+                recipeIngredientColumnViewPresentationEntries(item)
+                    .forEach(entry => {
+                        entry.expandedChoiceBlock = true;
+                        entry.expandedChoiceHost = item === host;
+                        entry.presentationHidden = false;
+                    });
+            });
+            selectedContinuations.forEach(item => consumedSelectedRows.add(item));
+            attachedAfter.set(host, [
+                ...selectedContinuations,
+                ...alternativeRows,
+            ]);
+            return;
+        }
 
         if (!host && !requiredUnresolved && matchingDetachedRows.length) {
             const firstDetachedRow = matchingDetachedRows[0];
@@ -31508,6 +31580,7 @@ function recipeIngredientColumnViewAttachedPresentationRows(sortedRows = []) {
     ));
     const presentationRows = [];
     activeRows.forEach(item => {
+        if (consumedSelectedRows.has(item)) return;
         presentationRows.push(item);
         presentationRows.push(...(attachedAfter.get(item) || []));
     });
@@ -31600,7 +31673,8 @@ function renderRecipeIngredientColumnViewGroupHeaders(list, sortedRows) {
     const counts = new Map();
     visibleRows.forEach(entry => {
         if (entry.attachedAlternative) return;
-        const section = recipeIngredientColumnViewEntry(entry.row, "store");
+        const section = entry.expandedChoiceStore
+            || recipeIngredientColumnViewEntry(entry.row, "store");
         const count = counts.get(section.key) || { active: 0 };
         count.active += recipeIngredientColumnViewIngredientCount(entry.row);
         counts.set(section.key, count);
@@ -31666,8 +31740,9 @@ function renderRecipeIngredientColumnViewGroupHeaders(list, sortedRows) {
             orderedNodes.push(boundary);
             currentKey = null;
         }
-        if (!entry.attachedAlternative) {
-            const section = recipeIngredientColumnViewEntry(entry.row, "store");
+        if (!entry.attachedAlternative && !entry.expandedChoiceContinuation) {
+            const section = entry.expandedChoiceStore
+                || recipeIngredientColumnViewEntry(entry.row, "store");
             if (section.key !== currentKey) {
                 currentKey = section.key;
                 const count = counts.get(section.key) || { active: 0 };
