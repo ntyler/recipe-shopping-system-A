@@ -46,7 +46,9 @@
 <script src="{{ url_for('static', filename='js/store-sections/StoreSectionDisplay.js', v=app_js_version) }}"></script>
 <script src="{{ url_for('static', filename='js/store-sections/StoreSectionEditor.js', v=app_js_version) }}"></script>
 <script src="{{ url_for('static', filename='js/currency-data.js', v=app_js_version) }}"></script>
-<script src="{{ url_for('static', filename='js/cuisine-icon-visuals.js', v=app_js_version) }}"></script>
+<script src="{{ url_for('static', filename='js/country-territory-catalog.js', v=app_js_version) }}"></script>
+<script src="{{ url_for('static', filename='js/cuisine-icon-visuals.js', v=app_js_version) }}"
+        data-cuisine-flag-sprite-url="{{ url_for('static', filename='vendor/flag-icons/flags-4x3.svg', v=app_js_version) }}"></script>
 <script src="{{ url_for('static', filename='js/app.js', v=app_js_version) }}"></script>
 {% endif %}
 {% block app_scripts %}{% endblock %}

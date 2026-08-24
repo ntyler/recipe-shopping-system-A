@@ -4,38 +4,6 @@
 {% set app_active_nav_item = "settings" %}
 {% set app_search_id = "cuisineCategoriesGlobalSearch" %}
 {% set app_content_class = "master-data-app-content" %}
-{% set cuisine_flag_options = [
-    ("us", "United States"),
-    ("ca", "Canada"),
-    ("mx", "Mexico"),
-    ("pe", "Peru"),
-    ("br", "Brazil"),
-    ("ar", "Argentina"),
-    ("cl", "Chile"),
-    ("co", "Colombia"),
-    ("cu", "Cuba"),
-    ("gb", "United Kingdom"),
-    ("ie", "Ireland"),
-    ("fr", "France"),
-    ("es", "Spain"),
-    ("pt", "Portugal"),
-    ("it", "Italy"),
-    ("de", "Germany"),
-    ("gr", "Greece"),
-    ("tr", "Turkey"),
-    ("in", "India"),
-    ("cn", "China"),
-    ("jp", "Japan"),
-    ("kr", "South Korea"),
-    ("th", "Thailand"),
-    ("vn", "Vietnam"),
-    ("id", "Indonesia"),
-    ("my", "Malaysia"),
-    ("ph", "Philippines"),
-    ("au", "Australia"),
-    ("nz", "New Zealand"),
-    ("pk", "Pakistan")
-] %}
 {% set cuisine_symbol_options = [
     ("globe", "Global / Fusion"),
     ("bowl", "Bowl"),
@@ -249,13 +217,8 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                         aria-describedby="cuisineCategoryIconHelp cuisineCategoryIconError"
                                         data-cuisine-category-master-icon>
                                     <option value="">None</option>
-                                    <optgroup label="Flags">
-                                        {% for code, label in cuisine_flag_options %}
-                                            <option value="flag:{{ code }}"
-                                                    data-icon-kind="flag"
-                                                    data-country-code="{{ code }}">{{ label }} flag ({{ code|upper }})</option>
-                                        {% endfor %}
-                                    </optgroup>
+                                    <optgroup label="Flags"
+                                              data-cuisine-category-master-flag-options></optgroup>
                                     <optgroup label="Cuisine symbols">
                                         {% for symbol, label in cuisine_symbol_options %}
                                             <option value="symbol:{{ symbol }}"

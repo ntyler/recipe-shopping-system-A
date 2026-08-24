@@ -34,6 +34,36 @@ CUISINE_CATEGORY_FLAG_ICON_TOKEN_PATTERN = re.compile(
     r"^flag\s*:\s*([a-z]{2})$",
     flags=re.IGNORECASE,
 )
+# Complete ISO 3166-1 alpha-2 assignment set, including territories and
+# special geographic areas. User-assigned codes (for example XK) are not ISO
+# assignments and remain available only as untouched legacy/custom values.
+ISO_ALPHA2_COUNTRY_CODES = frozenset("""
+    AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ
+    BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ
+    CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ
+    DE DJ DK DM DO DZ
+    EC EE EG EH ER ES ET
+    FI FJ FK FM FO FR
+    GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW GY
+    HK HM HN HR HT HU
+    ID IE IL IM IN IO IQ IR IS IT
+    JE JM JO JP
+    KE KG KH KI KM KN KP KR KW KY KZ
+    LA LB LC LI LK LR LS LT LU LV LY
+    MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ
+    NA NC NE NF NG NI NL NO NP NR NU NZ
+    OM
+    PA PE PF PG PH PK PL PM PN PR PS PT PW PY
+    QA
+    RE RO RS RU RW
+    SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ
+    TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW TZ
+    UA UG UM US UY UZ
+    VA VC VE VG VI VN VU
+    WF WS
+    YE YT
+    ZA ZM ZW
+""".split())
 CUISINE_CATEGORY_SYMBOL_ICONS = {
     "globe": "🌍",
     "bowl": "🍲",
@@ -200,7 +230,7 @@ NATIONAL_CUISINE_COUNTRY_CODES = {
 def country_flag_emoji(country_code):
     """Build a Unicode flag from a validated ISO alpha-2 country code."""
     country_code = str(country_code or "").strip().upper()
-    if not re.fullmatch(r"[A-Z]{2}", country_code):
+    if country_code not in ISO_ALPHA2_COUNTRY_CODES:
         return ""
     return "".join(
         chr(0x1F1E6 + ord(character) - ord("A"))
@@ -209,11 +239,24 @@ def country_flag_emoji(country_code):
 
 
 def cuisine_category_flag_icon_token(country_code):
-    """Return the stable storage token for an ISO-style alpha-2 flag."""
-    country_code = str(country_code or "").strip().lower()
-    if not re.fullmatch(r"[a-z]{2}", country_code):
+    """Return the stable storage token for an assigned ISO alpha-2 flag."""
+    country_code = str(country_code or "").strip().upper()
+    if country_code not in ISO_ALPHA2_COUNTRY_CODES:
         return ""
-    return f"flag:{country_code}"
+    return f"flag:{country_code.lower()}"
+
+
+def cuisine_category_flag_icon_options():
+    """Return every assigned ISO flag token in deterministic code order."""
+    return [
+        {
+            "code": country_code,
+            "token": cuisine_category_flag_icon_token(country_code),
+            "value": cuisine_category_flag_icon_token(country_code),
+            "glyph": country_flag_emoji(country_code),
+        }
+        for country_code in sorted(ISO_ALPHA2_COUNTRY_CODES)
+    ]
 
 
 def cuisine_category_symbol_icon_token(symbol_name):
@@ -229,16 +272,18 @@ def country_code_from_flag(value):
     icon = clean_cuisine_category_name(value)
     token_match = CUISINE_CATEGORY_FLAG_ICON_TOKEN_PATTERN.fullmatch(icon)
     if token_match:
-        return token_match.group(1).upper()
+        country_code = token_match.group(1).upper()
+        return country_code if country_code in ISO_ALPHA2_COUNTRY_CODES else ""
     if len(icon) != 2:
         return ""
     codepoints = [ord(character) for character in icon]
     if not all(0x1F1E6 <= codepoint <= 0x1F1FF for codepoint in codepoints):
         return ""
-    return "".join(
+    country_code = "".join(
         chr(ord("A") + codepoint - 0x1F1E6)
         for codepoint in codepoints
     )
+    return country_code if country_code in ISO_ALPHA2_COUNTRY_CODES else ""
 
 
 def decorate_recognized_cuisine_name(value):
@@ -262,6 +307,12 @@ def clean_cuisine_category_icon(value):
         if token:
             return token
     return icon
+
+
+def cuisine_category_icon_preservation_key(value):
+    """Normalize harmless token casing/spacing for legacy preservation."""
+    icon = clean_cuisine_category_name(value).casefold()
+    return re.sub(r"\s*:\s*", ":", icon)
 
 
 def clean_cuisine_category_abbreviation(value):
@@ -1503,15 +1554,39 @@ def save_workspace_cuisine_category(values, category_id="", user_id=None):
             errors["name"] = (
                 "Enter a cuisine category name containing letters or numbers."
             )
-        invalid_flag_token = (
+        existing_stored_icon = (
+            existing["icon"]
+            if existing is not None and "icon" in set(existing.keys())
+            else None
+        )
+        unchanged_stored_icon = (
+            existing is not None
+            and raw_icon_input is not None
+            and cuisine_category_icon_preservation_key(raw_icon_input)
+            == cuisine_category_icon_preservation_key(existing_stored_icon)
+        )
+        flag_token_match = CUISINE_CATEGORY_FLAG_ICON_TOKEN_PATTERN.fullmatch(
+            str(raw_icon_input or "")
+        )
+        has_flag_token_prefix = (
             raw_icon_input is not None
             and re.match(
                 r"^flag\s*:",
                 str(raw_icon_input or ""),
                 flags=re.IGNORECASE,
             )
-            and not CUISINE_CATEGORY_FLAG_ICON_TOKEN_PATTERN.fullmatch(
-                str(raw_icon_input or "")
+        )
+        invalid_flag_token_format = (
+            has_flag_token_prefix
+            and not unchanged_stored_icon
+            and not flag_token_match
+        )
+        invalid_flag_country_code = (
+            has_flag_token_prefix
+            and not unchanged_stored_icon
+            and flag_token_match
+            and not cuisine_category_flag_icon_token(
+                flag_token_match.group(1)
             )
         )
         symbol_token_match = CUISINE_CATEGORY_SYMBOL_ICON_TOKEN_PATTERN.fullmatch(
@@ -1519,6 +1594,7 @@ def save_workspace_cuisine_category(values, category_id="", user_id=None):
         )
         invalid_symbol_token = (
             raw_icon_input is not None
+            and not unchanged_stored_icon
             and re.match(
                 r"^symbol\s*:",
                 str(raw_icon_input or ""),
@@ -1531,8 +1607,10 @@ def save_workspace_cuisine_category(values, category_id="", user_id=None):
                 )
             )
         )
-        if invalid_flag_token:
+        if invalid_flag_token_format:
             errors["icon"] = "Use a flag token in the format flag:us."
+        elif invalid_flag_country_code:
+            errors["icon"] = "Choose a valid ISO country or territory flag."
         elif invalid_symbol_token:
             errors["icon"] = "Choose a supported cuisine symbol."
         elif len(icon) > CUISINE_CATEGORY_ICON_LIMIT:

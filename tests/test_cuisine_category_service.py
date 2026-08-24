@@ -164,6 +164,7 @@ def test_default_registry_is_read_only_and_has_stable_seed_ids(cuisine_workspace
         ("FLAG : GB", "flag:gb", "GB", "🇬🇧"),
         ("🇬🇧", "flag:gb", "GB", "🇬🇧"),
         ("flag:us", "flag:us", "US", "🇺🇸"),
+        ("🇽🇰", "🇽🇰", "", "🇽🇰"),
         (" SYMBOL : NOODLES ", "symbol:noodles", "", "🍜"),
         ("🍜", "🍜", "", "🍜"),
         ("", "", "", ""),
@@ -178,6 +179,47 @@ def test_flag_icon_tokens_normalize_and_keep_legacy_presentations(
     assert cuisines.clean_cuisine_category_icon(raw_icon) == token
     assert cuisines.country_code_from_flag(raw_icon) == country_code
     assert cuisines.cuisine_category_icon_display(raw_icon) == display
+
+
+def test_flag_icon_catalog_covers_every_assigned_iso_country_and_territory():
+    options = cuisines.cuisine_category_flag_icon_options()
+    codes = [option["code"] for option in options]
+
+    assert len(codes) == 249
+    assert codes == sorted(set(codes))
+    assert {
+        "AQ",  # Antarctica
+        "AX",  # Aland Islands
+        "BQ",  # Caribbean Netherlands
+        "BV",  # Bouvet Island
+        "CC",  # Cocos (Keeling) Islands
+        "CX",  # Christmas Island
+        "EH",  # Western Sahara
+        "GS",  # South Georgia and the South Sandwich Islands
+        "HM",  # Heard Island and McDonald Islands
+        "PN",  # Pitcairn
+        "TF",  # French Southern Territories
+        "UM",  # United States Minor Outlying Islands
+    }.issubset(codes)
+    assert {"AA", "XK", "ZZ"}.isdisjoint(codes)
+
+    for option in options:
+        code = option["code"]
+        token = f"flag:{code.lower()}"
+        assert option == {
+            "code": code,
+            "token": token,
+            "value": token,
+            "glyph": cuisines.country_flag_emoji(code),
+        }
+        assert cuisines.cuisine_category_flag_icon_token(code) == token
+        assert cuisines.clean_cuisine_category_icon(
+            f" FLAG : {code.lower()} "
+        ) == token
+        assert cuisines.country_code_from_flag(token) == code
+        assert cuisines.country_code_from_flag(option["glyph"]) == code
+        assert cuisines.clean_cuisine_category_icon(option["glyph"]) == token
+        assert cuisines.cuisine_category_icon_display(token) == option["glyph"]
 
 
 def test_flag_icon_token_create_normalizes_storage_and_legacy_display(
@@ -256,6 +298,97 @@ def test_invalid_flag_icon_tokens_are_rejected(cuisine_workspace, icon):
     assert result["status"] == 422
     assert result["errors"]["icon"] == (
         "Use a flag token in the format flag:us."
+    )
+
+
+@pytest.mark.parametrize("icon", ("flag:aa", "flag:xk", "flag:zz"))
+def test_unassigned_alpha2_flag_tokens_are_rejected(cuisine_workspace, icon):
+    result = cuisines.save_workspace_cuisine_category(
+        {
+            "icon": icon,
+            "abbreviation": "TEST",
+            "category_name": f"Unassigned token {icon}",
+        },
+        user_id="user-a",
+    )
+
+    assert result["status"] == 422
+    assert result["errors"]["icon"] == (
+        "Choose a valid ISO country or territory flag."
+    )
+    assert cuisines.cuisine_category_flag_icon_token(icon.removeprefix("flag:")) == ""
+    assert cuisines.country_code_from_flag(icon) == ""
+
+
+@pytest.mark.parametrize("legacy_icon", ("flag:xk", "flag:zz"))
+def test_ui_patch_preserves_unchanged_existing_unassigned_flag_token(
+    cuisine_workspace,
+    legacy_icon,
+):
+    category_id = "custom_legacy_unassigned_flag"
+    with master_data.recipe_master_connection(user_id="user-a") as connection:
+        cuisines._seed_registry(connection, "user-a")
+        timestamp = master_data.utc_now_iso()
+        connection.execute(
+            """
+            INSERT INTO workspace_cuisine_categories (
+                user_id, id, icon, abbreviation, name, normalized_name,
+                aliases_json, is_seeded, is_active, sort_order, created_at,
+                updated_at
+            ) VALUES (?, ?, ?, 'LEG', 'Legacy Cuisine', 'legacy cuisine',
+                      '[]', 0, 1, 10, ?, ?)
+            """,
+            ("user-a", category_id, legacy_icon, timestamp, timestamp),
+        )
+
+    updated = cuisines.save_workspace_cuisine_category(
+        {
+            # The manager PATCH payload always round-trips every form field,
+            # including an unchanged icon value from a legacy row.
+            "icon": legacy_icon,
+            "abbreviation": "LEG",
+            "category_name": "Legacy Cuisine",
+            "active": False,
+        },
+        category_id=category_id,
+        user_id="user-a",
+    )
+
+    assert updated["ok"] is True
+    category = next(
+        item
+        for item in updated["registry"]["categories"]
+        if item["id"] == category_id
+    )
+    assert updated["migration"] == {"recipe_records": 0, "cookbook_records": 0}
+    assert category["icon"] == legacy_icon
+    assert category["category_name"] == "Legacy Cuisine"
+    assert category["active"] is False
+    with master_data.recipe_master_connection(user_id="user-a") as connection:
+        stored_icon = connection.execute(
+            """
+            SELECT icon
+              FROM workspace_cuisine_categories
+             WHERE user_id = ? AND id = ?
+            """,
+            ("user-a", category_id),
+        ).fetchone()["icon"]
+    assert stored_icon == legacy_icon
+
+    changed_icon = "flag:zz" if legacy_icon == "flag:xk" else "flag:xk"
+    rejected = cuisines.save_workspace_cuisine_category(
+        {
+            "icon": changed_icon,
+            "abbreviation": "LEG",
+            "category_name": "Legacy Cuisine",
+            "active": True,
+        },
+        category_id=category_id,
+        user_id="user-a",
+    )
+    assert rejected["status"] == 422
+    assert rejected["errors"]["icon"] == (
+        "Choose a valid ISO country or territory flag."
     )
 
 

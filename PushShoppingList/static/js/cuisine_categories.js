@@ -112,6 +112,7 @@
 
         const categoryDisplayLabel = item => categoryName(item) || "Cuisine category";
 
+        const countryCatalog = window.CountryTerritoryCatalog;
         const iconVisuals = window.CuisineIconVisuals;
         const iconDescriptor = value => (
             iconVisuals?.descriptor(value)
@@ -308,6 +309,47 @@
             renderRegistry();
         };
 
+        const populateFlagOptions = () => {
+            const marker = iconInput.querySelector("[data-cuisine-category-master-flag-options]");
+            const entries = Array.from(countryCatalog?.entries || []);
+            if (!marker || !entries.length) return;
+
+            const regionOrder = [
+                "Africa",
+                "Asia",
+                "Europe",
+                "North America",
+                "South America",
+                "Oceania",
+                "Antarctica",
+                "Other",
+            ];
+            const entriesByRegion = new Map(regionOrder.map(region => [region, []]));
+            entries.forEach(entry => {
+                const region = entriesByRegion.has(entry.region) ? entry.region : "Other";
+                entriesByRegion.get(region).push(entry);
+            });
+
+            const groups = regionOrder.flatMap(region => {
+                const regionEntries = entriesByRegion.get(region);
+                if (!regionEntries.length) return [];
+                const group = document.createElement("optgroup");
+                group.label = `Flags \u2014 ${region}`;
+                group.dataset.cuisineCategoryMasterFlagRegion = region;
+                regionEntries.forEach(entry => {
+                    const option = document.createElement("option");
+                    option.value = `flag:${entry.code}`;
+                    option.textContent = `${entry.name} flag (${entry.code.toUpperCase()})`;
+                    option.dataset.iconKind = "flag";
+                    option.dataset.countryCode = entry.code;
+                    option.dataset.searchAliases = Array.from(entry.aliases || []).join(" ");
+                    group.appendChild(option);
+                });
+                return [group];
+            });
+            marker.replaceWith(...groups);
+        };
+
         const iconOptionRecords = () => Array.from(iconInput.options).map(option => {
             const token = iconVisuals?.normalizeToken(option.value) || cleanText(option.value);
             const item = iconDescriptor(token);
@@ -318,7 +360,14 @@
                 token,
                 label: cleanText(option.textContent) || item.label,
                 group: cleanText(option.dataset.iconGroup) || parentLabel,
-                search: [option.textContent, item.label, item.code, token].filter(Boolean).join(" "),
+                search: [
+                    option.textContent,
+                    option.dataset.searchAliases,
+                    option.parentElement?.label,
+                    item.label,
+                    item.code,
+                    token,
+                ].filter(Boolean).join(" "),
                 item,
             };
         });
@@ -372,7 +421,9 @@
             const state = document.createElement("span");
             state.className = "cuisine-category-master-icon-option-state";
             state.setAttribute("aria-hidden", "true");
-            state.textContent = record.token === suggestedIconToken && !iconChoiceExplicit
+            state.textContent = suggestedIconToken
+                && record.token === suggestedIconToken
+                && !iconChoiceExplicit
                 ? "Suggested"
                 : record.token === iconInput.value
                     ? "✓"
@@ -959,6 +1010,7 @@
             },
         );
 
+        populateFlagOptions();
         enhanceIconPicker();
         renderRegistry();
     }
