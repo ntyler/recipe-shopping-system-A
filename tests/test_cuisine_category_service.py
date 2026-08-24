@@ -71,6 +71,87 @@ def test_default_registry_is_read_only_and_has_stable_seed_ids(cuisine_workspace
     assert registry["categories"][0]["name"] == "🇺🇸 American"
     assert registry["categories"][-1]["name"] == "🌍 Other / Fusion"
     assert all(item["seeded"] and item["active"] for item in registry["categories"])
+    assert [
+        {
+            "id": item["id"],
+            "icon": item["icon"],
+            "abbreviation": item["abbreviation"],
+            "category_name": item["category_name"],
+            "display_label": item["display_label"],
+        }
+        for item in registry["categories"]
+    ] == [
+        {
+            "id": "american",
+            "icon": "🇺🇸",
+            "abbreviation": "US",
+            "category_name": "American",
+            "display_label": "🇺🇸 American",
+        },
+        {
+            "id": "mexican",
+            "icon": "🇲🇽",
+            "abbreviation": "MX",
+            "category_name": "Mexican",
+            "display_label": "🇲🇽 Mexican",
+        },
+        {
+            "id": "peruvian",
+            "icon": "🇵🇪",
+            "abbreviation": "PE",
+            "category_name": "Peruvian",
+            "display_label": "🇵🇪 Peruvian",
+        },
+        {
+            "id": "italian",
+            "icon": "🇮🇹",
+            "abbreviation": "IT",
+            "category_name": "Italian",
+            "display_label": "🇮🇹 Italian",
+        },
+        {
+            "id": "japanese",
+            "icon": "🇯🇵",
+            "abbreviation": "JP",
+            "category_name": "Japanese",
+            "display_label": "🇯🇵 Japanese",
+        },
+        {
+            "id": "thai",
+            "icon": "🇹🇭",
+            "abbreviation": "TH",
+            "category_name": "Thai",
+            "display_label": "🇹🇭 Thai",
+        },
+        {
+            "id": "chinese",
+            "icon": "🇨🇳",
+            "abbreviation": "CN",
+            "category_name": "Chinese",
+            "display_label": "🇨🇳 Chinese",
+        },
+        {
+            "id": "indian",
+            "icon": "🇮🇳",
+            "abbreviation": "IN",
+            "category_name": "Indian",
+            "display_label": "🇮🇳 Indian",
+        },
+        {
+            "id": "french",
+            "icon": "🇫🇷",
+            "abbreviation": "FR",
+            "category_name": "French",
+            "display_label": "🇫🇷 French",
+        },
+        {
+            "id": "other_fusion",
+            "icon": "🌍",
+            "abbreviation": "FUS",
+            "category_name": "Other / Fusion",
+            "display_label": "🌍 Other / Fusion",
+        },
+    ]
     assert cuisines.active_workspace_cuisine_category_labels("user-a") == [
         item["name"] for item in registry["categories"]
     ]
@@ -126,6 +207,437 @@ def test_seed_and_custom_categories_are_idempotent_and_workspace_isolated(
         ).fetchone()[0]
     assert seed_markers == 1
     assert seeded_rows == 10
+
+
+def test_custom_category_create_and_edit_persist_structured_display_fields(
+    cuisine_workspace,
+):
+    created = cuisines.save_workspace_cuisine_category(
+        {
+            "icon": "🍲",
+            "abbreviation": "lev",
+            "category_name": "Levantine",
+            "active": True,
+        },
+        user_id="user-a",
+    )
+
+    assert created["ok"] is True
+    assert created["icon"] == "🍲"
+    assert created["abbreviation"] == "LEV"
+    assert created["category_name"] == "Levantine"
+    assert created["display_label"] == "🍲 Levantine"
+    category_id = created["category_id"]
+    with master_data.recipe_master_connection(user_id="user-a") as connection:
+        stored = connection.execute(
+            """
+            SELECT icon, abbreviation, name, normalized_name
+              FROM workspace_cuisine_categories
+             WHERE user_id = ? AND id = ?
+            """,
+            ("user-a", category_id),
+        ).fetchone()
+    assert dict(stored) == {
+        "icon": "🍲",
+        "abbreviation": "LEV",
+        "name": "Levantine",
+        "normalized_name": "levantine",
+    }
+
+    updated = cuisines.save_workspace_cuisine_category(
+        {
+            "icon": "🌊",
+            "abbreviation": "med",
+            "category_name": "Mediterranean",
+            "active": True,
+        },
+        category_id=category_id,
+        user_id="user-a",
+    )
+
+    assert updated["ok"] is True
+    public = next(
+        item
+        for item in updated["registry"]["categories"]
+        if item["id"] == category_id
+    )
+    assert {
+        "icon": public["icon"],
+        "abbreviation": public["abbreviation"],
+        "category_name": public["category_name"],
+        "name": public["name"],
+        "display_label": public["display_label"],
+    } == {
+        "icon": "🌊",
+        "abbreviation": "MED",
+        "category_name": "Mediterranean",
+        "name": "🌊 Mediterranean",
+        "display_label": "🌊 Mediterranean",
+    }
+    with master_data.recipe_master_connection(user_id="user-a") as connection:
+        stored = connection.execute(
+            """
+            SELECT icon, abbreviation, name, normalized_name
+              FROM workspace_cuisine_categories
+             WHERE user_id = ? AND id = ?
+            """,
+            ("user-a", category_id),
+        ).fetchone()
+    assert dict(stored) == {
+        "icon": "🌊",
+        "abbreviation": "MED",
+        "name": "Mediterranean",
+        "normalized_name": "mediterranean",
+    }
+
+
+def test_explicit_blank_icon_and_abbreviation_persist_without_inference(
+    cuisine_workspace,
+):
+    created = cuisines.save_workspace_cuisine_category(
+        {
+            "icon": "",
+            "abbreviation": "",
+            "category_name": "Korean",
+            "active": True,
+        },
+        user_id="user-a",
+    )
+
+    assert created["ok"] is True
+    assert created["icon"] == ""
+    assert created["abbreviation"] == ""
+    assert created["display_label"] == "Korean"
+    category = next(
+        item
+        for item in cuisines.cuisine_category_registry_payload("user-a")[
+            "categories"
+        ]
+        if item["id"] == created["category_id"]
+    )
+    assert category["icon"] == ""
+    assert category["abbreviation"] == ""
+    assert category["category_name"] == "Korean"
+    assert category["name"] == "Korean"
+    with master_data.recipe_master_connection(user_id="user-a") as connection:
+        stored = connection.execute(
+            """
+            SELECT icon, abbreviation, name
+              FROM workspace_cuisine_categories
+             WHERE user_id = ? AND id = ?
+            """,
+            ("user-a", created["category_id"]),
+        ).fetchone()
+    assert dict(stored) == {
+        "icon": "",
+        "abbreviation": "",
+        "name": "Korean",
+    }
+
+
+def test_partial_structured_edit_preserves_active_state_and_prefers_category_name(
+    cuisine_workspace,
+):
+    created = cuisines.save_workspace_cuisine_category(
+        {
+            "icon": "🍲",
+            "abbreviation": "LEV",
+            "category_name": "Levantine",
+            "active": False,
+        },
+        user_id="user-a",
+    )
+
+    updated = cuisines.save_workspace_cuisine_category(
+        {
+            # A client may round-trip the legacy display field while editing
+            # the new structured category name.
+            "name": created["display_label"],
+            "category_name": "Eastern Mediterranean",
+            "icon": "🫓",
+        },
+        category_id=created["category_id"],
+        user_id="user-a",
+    )
+
+    assert updated["ok"] is True
+    category = next(
+        item
+        for item in updated["registry"]["categories"]
+        if item["id"] == created["category_id"]
+    )
+    assert category["category_name"] == "Eastern Mediterranean"
+    assert category["icon"] == "🫓"
+    assert category["active"] is False
+
+
+def test_builtin_name_is_immutable_while_icon_and_abbreviation_are_editable(
+    cuisine_workspace,
+):
+    updated = cuisines.save_workspace_cuisine_category(
+        {
+            "icon": "🍝",
+            "abbreviation": "ita",
+            "category_name": "Italian",
+            "active": True,
+        },
+        category_id="italian",
+        user_id="user-a",
+    )
+
+    assert updated["ok"] is True
+    assert updated["category_name"] == "Italian"
+    assert updated["icon"] == "🍝"
+    assert updated["abbreviation"] == "ITA"
+    assert updated["display_label"] == "🍝 Italian"
+    with master_data.recipe_master_connection(user_id="user-a") as connection:
+        stored = connection.execute(
+            """
+            SELECT icon, abbreviation, name
+              FROM workspace_cuisine_categories
+             WHERE user_id = ? AND id = ?
+            """,
+            ("user-a", "italian"),
+        ).fetchone()
+    assert dict(stored) == {
+        "icon": "🍝",
+        "abbreviation": "ITA",
+        "name": "Italian",
+    }
+
+    rejected = cuisines.save_workspace_cuisine_category(
+        {
+            "icon": "🍝",
+            "abbreviation": "ITA",
+            "category_name": "Tuscan",
+            "active": True,
+        },
+        category_id="italian",
+        user_id="user-a",
+    )
+    assert rejected["status"] == 422
+    assert rejected["errors"]["name"] == (
+        "Built-in cuisine category names cannot be changed."
+    )
+
+
+def test_legacy_combined_and_plain_rows_resolve_structured_fields_safely(
+    cuisine_workspace,
+):
+    legacy_rows = (
+        (
+            "user-combined",
+            "custom_united_kingdom",
+            "🇬🇧 United Kingdom",
+            "united kingdom",
+        ),
+        (
+            "user-plain",
+            "custom_united_kingdom",
+            "United Kingdom",
+            "united kingdom",
+        ),
+    )
+    for user_id, category_id, name, normalized_name in legacy_rows:
+        with master_data.recipe_master_connection(user_id=user_id) as connection:
+            cuisines._seed_registry(connection, user_id)
+            timestamp = master_data.utc_now_iso()
+            connection.execute(
+                """
+                INSERT INTO workspace_cuisine_categories (
+                    user_id, id, name, normalized_name, aliases_json,
+                    is_seeded, is_active, sort_order, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, '[]', 0, 1, 10, ?, ?)
+                """,
+                (
+                    user_id,
+                    category_id,
+                    name,
+                    normalized_name,
+                    timestamp,
+                    timestamp,
+                ),
+            )
+
+        category = next(
+            item
+            for item in cuisines.cuisine_category_registry_payload(user_id)[
+                "categories"
+            ]
+            if item["id"] == category_id
+        )
+        assert category["icon"] == "🇬🇧"
+        assert category["abbreviation"] == "GB"
+        assert category["category_name"] == "United Kingdom"
+        assert category["display_label"] == "🇬🇧 United Kingdom"
+        assert category["aliases"] == ["United Kingdom"]
+
+
+def test_duplicate_and_invalid_cuisine_abbreviations_are_rejected(
+    cuisine_workspace,
+):
+    created = cuisines.save_workspace_cuisine_category(
+        {
+            "icon": "🍲",
+            "abbreviation": "LEV",
+            "category_name": "Levantine",
+        },
+        user_id="user-a",
+    )
+    assert created["ok"] is True
+
+    duplicate = cuisines.save_workspace_cuisine_category(
+        {
+            "icon": "🫓",
+            "abbreviation": "lev",
+            "category_name": "Eastern Mediterranean",
+        },
+        user_id="user-a",
+    )
+    assert duplicate["status"] == 422
+    assert duplicate["errors"]["abbreviation"] == (
+        "A cuisine category with that abbreviation already exists."
+    )
+
+    invalid_values = {
+        "A": "Use at least 2 characters.",
+        "TOO-LONG9": "Use 8 characters or fewer.",
+        "M E": "Use letters and numbers only.",
+    }
+    for abbreviation, message in invalid_values.items():
+        result = cuisines.save_workspace_cuisine_category(
+            {
+                "icon": "",
+                "abbreviation": abbreviation,
+                "category_name": f"Test {abbreviation}",
+            },
+            user_id="user-a",
+        )
+        assert result["status"] == 422
+        assert result["errors"]["abbreviation"] == message
+
+
+def test_abbreviation_does_not_steal_a_legacy_category_name_or_block_edits(
+    cuisine_workspace,
+):
+    category_id = "custom_legacy_us"
+    with master_data.recipe_master_connection(user_id="user-a") as connection:
+        cuisines._seed_registry(connection, "user-a")
+        timestamp = master_data.utc_now_iso()
+        connection.execute(
+            """
+            INSERT INTO workspace_cuisine_categories (
+                user_id, id, name, normalized_name, aliases_json, is_seeded,
+                is_active, sort_order, created_at, updated_at
+            ) VALUES (?, ?, 'US', 'us', '[]', 0, 1, 10, ?, ?)
+            """,
+            ("user-a", category_id, timestamp, timestamp),
+        )
+    write_recipe_output(
+        "user-a",
+        "https://example.test/legacy-us",
+        {"cuisine": "US", "cuisine_tags": ["US"]},
+    )
+
+    registry = cuisines.cuisine_category_registry_payload(
+        "user-a",
+        include_usage=True,
+    )
+    legacy = category_named(registry, "US")
+    assert legacy["id"] == category_id
+    assert legacy["recipe_count"] == 1
+    assert category_named(registry, "🇺🇸 American")["recipe_count"] == 0
+
+    updated = cuisines.save_workspace_cuisine_category(
+        {"icon": "🗺️", "active": False},
+        category_id=category_id,
+        user_id="user-a",
+    )
+    assert updated["ok"] is True
+    updated_category = next(
+        item
+        for item in updated["registry"]["categories"]
+        if item["id"] == category_id
+    )
+    assert updated_category["active"] is False
+    assert updated_category["category_name"] == "US"
+
+
+def test_display_label_collision_is_rejected_on_the_icon_field(
+    cuisine_workspace,
+):
+    first = cuisines.save_workspace_cuisine_category(
+        {
+            "icon": "",
+            "abbreviation": "AC",
+            "category_name": "Alpha Cuisine",
+        },
+        user_id="user-a",
+    )
+    assert first["ok"] is True
+
+    collision = cuisines.save_workspace_cuisine_category(
+        {
+            "icon": "Alpha",
+            "abbreviation": "CU",
+            "category_name": "Cuisine",
+        },
+        user_id="user-a",
+    )
+
+    assert collision["status"] == 422
+    assert collision["errors"]["icon"] == (
+        "That icon and category name match another cuisine category."
+    )
+
+
+def test_unchanged_duplicate_legacy_abbreviation_does_not_block_other_edits(
+    cuisine_workspace,
+):
+    timestamp = master_data.utc_now_iso()
+    with master_data.recipe_master_connection(user_id="user-a") as connection:
+        cuisines._seed_registry(connection, "user-a")
+        for category_id, name in (
+            ("custom_legacy_british", "British"),
+            ("custom_legacy_united_kingdom", "United Kingdom"),
+        ):
+            connection.execute(
+                """
+                INSERT INTO workspace_cuisine_categories (
+                    user_id, id, name, normalized_name, aliases_json,
+                    is_seeded, is_active, sort_order, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, '[]', 0, 1, 10, ?, ?)
+                """,
+                (
+                    "user-a",
+                    category_id,
+                    name,
+                    cuisines.cuisine_category_key(name),
+                    timestamp,
+                    timestamp,
+                ),
+            )
+
+    updated = cuisines.save_workspace_cuisine_category(
+        {
+            "icon": "🏰",
+            "abbreviation": "GB",
+            "category_name": "United Kingdom",
+            "active": False,
+        },
+        category_id="custom_legacy_united_kingdom",
+        user_id="user-a",
+    )
+
+    assert updated["ok"] is True
+    assert updated["display_label"] == "🏰 United Kingdom"
+    assert updated["abbreviation"] == "GB"
+    updated_category = next(
+        item
+        for item in updated["registry"]["categories"]
+        if item["id"] == "custom_legacy_united_kingdom"
+    )
+    assert updated_category["active"] is False
 
 
 def test_recognized_national_cuisines_receive_flags_without_guessing_regions(
@@ -199,7 +711,7 @@ def test_import_deduplicates_plain_and_flagged_national_cuisine_names(
     assert "United Kingdom" not in names
 
 
-def test_legacy_plain_national_cuisine_displays_and_migrates_to_flagged_name(
+def test_legacy_plain_national_cuisine_adds_presentation_without_rewriting_data(
     cuisine_workspace,
 ):
     category_id = "custom_legacy_united_kingdom"
@@ -265,17 +777,19 @@ def test_legacy_plain_national_cuisine_displays_and_migrates_to_flagged_name(
     )
     assert saved["ok"] is True
     assert saved["name"] == "🇬🇧 United Kingdom"
-    assert saved["migration"] == {"recipe_records": 1, "cookbook_records": 1}
+    assert saved["category_name"] == "United Kingdom"
+    assert saved["migration"] == {"recipe_records": 0, "cookbook_records": 0}
 
     recipe_payload = json.loads(recipe_path.read_text(encoding="utf-8"))
-    assert recipe_payload["cuisine"] == "🇬🇧 United Kingdom"
+    assert recipe_payload["cuisine"] == "United Kingdom"
     assert recipe_payload["cuisine_tags"] == [
+        "United Kingdom",
         "🇬🇧 United Kingdom",
         "Italian",
     ]
     cookbook_payload = json.loads(cookbook_path.read_text(encoding="utf-8"))
     assert cookbook_payload["cookbooks"][0]["recipes"][0]["cuisine"] == (
-        "🇬🇧 United Kingdom"
+        "United Kingdom"
     )
 
     registry = cuisines.cuisine_category_registry_payload(
@@ -286,6 +800,48 @@ def test_legacy_plain_national_cuisine_displays_and_migrates_to_flagged_name(
     assert category["aliases"] == ["United Kingdom"]
     assert category["recipe_count"] == 1
     assert sum(item["id"] == category_id for item in registry["categories"]) == 1
+
+
+def test_icon_only_edit_updates_display_without_rewriting_recipe_values(
+    cuisine_workspace,
+):
+    created = cuisines.save_workspace_cuisine_category(
+        {"name": "United Kingdom", "active": True},
+        user_id="user-a",
+    )
+    category_id = created["category_id"]
+    recipe_path = write_recipe_output(
+        "user-a",
+        "https://example.test/icon-only-cuisine-edit",
+        {
+            "recipe_title": "British plate",
+            "cuisine": "United Kingdom",
+            "cuisine_tags": ["United Kingdom", "Italian"],
+        },
+    )
+
+    updated = cuisines.save_workspace_cuisine_category(
+        {"icon": "🏰"},
+        category_id=category_id,
+        user_id="user-a",
+    )
+
+    assert updated["ok"] is True
+    assert updated["category_name"] == "United Kingdom"
+    assert updated["display_label"] == "🏰 United Kingdom"
+    assert updated["migration"] == {"recipe_records": 0, "cookbook_records": 0}
+    recipe_payload = json.loads(recipe_path.read_text(encoding="utf-8"))
+    assert recipe_payload["cuisine"] == "United Kingdom"
+    assert recipe_payload["cuisine_tags"] == ["United Kingdom", "Italian"]
+
+    registry = cuisines.cuisine_category_registry_payload(
+        "user-a",
+        include_usage=True,
+    )
+    category = category_named(registry, "🏰 United Kingdom")
+    assert category["category_name"] == "United Kingdom"
+    assert "🇬🇧 United Kingdom" in category["aliases"]
+    assert category["recipe_count"] == 1
 
 
 def test_usage_and_references_dedupe_primary_tags_and_cookbook_metadata(
@@ -484,6 +1040,61 @@ def test_rename_migrates_recipe_and_cookbook_values_and_keeps_an_alias(
     )
     assert blocked["status"] == 409
     assert "Deactivate it instead" in blocked["error"]
+
+
+def test_rename_leaves_ambiguous_legacy_alias_assignments_unchanged(
+    cuisine_workspace,
+):
+    timestamp = master_data.utc_now_iso()
+    with master_data.recipe_master_connection(user_id="user-a") as connection:
+        cuisines._seed_registry(connection, "user-a")
+        for category_id, name in (
+            ("custom_first", "First Cuisine"),
+            ("custom_second", "Second Cuisine"),
+        ):
+            connection.execute(
+                """
+                INSERT INTO workspace_cuisine_categories (
+                    user_id, id, name, normalized_name, aliases_json,
+                    is_seeded, is_active, sort_order, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, 0, 1, 10, ?, ?)
+                """,
+                (
+                    "user-a",
+                    category_id,
+                    name,
+                    cuisines.cuisine_category_key(name),
+                    json.dumps(["Shared Legacy"]),
+                    timestamp,
+                    timestamp,
+                ),
+            )
+
+    ambiguous_path = write_recipe_output(
+        "user-a",
+        "https://example.test/ambiguous-cuisine-alias",
+        {"cuisine": "Shared Legacy", "cuisine_tags": ["Shared Legacy"]},
+    )
+    direct_path = write_recipe_output(
+        "user-a",
+        "https://example.test/direct-cuisine-name",
+        {"cuisine": "First Cuisine", "cuisine_tags": ["First Cuisine"]},
+    )
+
+    renamed = cuisines.save_workspace_cuisine_category(
+        {"category_name": "Renamed Cuisine"},
+        category_id="custom_first",
+        user_id="user-a",
+    )
+
+    assert renamed["ok"] is True
+    assert renamed["migration"] == {"recipe_records": 1, "cookbook_records": 0}
+    ambiguous = json.loads(ambiguous_path.read_text(encoding="utf-8"))
+    direct = json.loads(direct_path.read_text(encoding="utf-8"))
+    assert ambiguous["cuisine"] == "Shared Legacy"
+    assert ambiguous["cuisine_tags"] == ["Shared Legacy"]
+    assert direct["cuisine"] == "Renamed Cuisine"
+    assert direct["cuisine_tags"] == ["Renamed Cuisine"]
 
 
 def test_deactivation_import_and_safe_delete_rules(cuisine_workspace):

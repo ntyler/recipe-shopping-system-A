@@ -82,7 +82,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                     <label class="unit-master-search">
                         <span>Search cuisine categories</span>
                         <input type="search"
-                               placeholder="Cuisine name"
+                               placeholder="Icon, abbreviation, or name"
                                autocomplete="off"
                                data-cuisine-category-master-search>
                     </label>
@@ -97,9 +97,11 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                     <h3 id="allCuisineCategoriesTitle">Cuisine categories</h3>
                     <span data-cuisine-category-master-count-label>{{ master_data.categories | length }} categories</span>
                 </header>
-                <div class="unit-master-table type-master-table" role="table" aria-label="Cuisine categories">
+                <div class="unit-master-table type-master-table cuisine-category-master-table" role="table" aria-label="Cuisine categories">
                     <div class="unit-master-table-head" role="row">
-                        <span role="columnheader">Cuisine category</span>
+                        <span role="columnheader">Icon</span>
+                        <span role="columnheader">Abbreviation</span>
+                        <span role="columnheader">Cuisine Category Name</span>
                         <span role="columnheader">Used in</span>
                         <span role="columnheader">Source</span>
                         <span role="columnheader">Status</span>
@@ -111,8 +113,16 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                  role="row"
                                  data-cuisine-category-master-row
                                  data-category-id="{{ category.id }}"
-                                 data-cuisine-category-master-search-value="{{ category.name }}">
-                                <strong role="cell">{{ category.name }}</strong>
+                                 data-cuisine-category-master-search-value="{{ category.icon }} {{ category.abbreviation }} {{ category.category_name or category.canonical_name or category.name }}">
+                                <span class="cuisine-category-master-icon" role="cell">
+                                    {{ category.icon or "—" }}
+                                </span>
+                                <strong class="cuisine-category-master-abbreviation" role="cell">
+                                    {{ category.abbreviation or "—" }}
+                                </strong>
+                                <strong class="cuisine-category-master-name" role="cell">
+                                    {{ category.category_name or category.canonical_name or category.name }}
+                                </strong>
                                 <div class="unit-master-usage" role="cell">
                                     {% if category.recipe_count %}
                                         <button type="button"
@@ -172,24 +182,66 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                 </header>
 
                 <div class="type-master-editor-fields">
-                    <label class="unit-master-field">
-                        <span>Cuisine category name</span>
-                        <input type="text"
-                               maxlength="60"
-                               autocomplete="off"
-                               data-cuisine-category-master-name
-                               aria-describedby="cuisineCategoryNameHelp cuisineCategoryNameError">
-                        <small class="unit-master-field-help"
-                               id="cuisineCategoryNameHelp"
-                               data-cuisine-category-master-name-help>
-                            Recognized national cuisine names automatically receive a matching flag.
-                            Built-in names remain stable.
-                        </small>
-                        <small class="unit-master-field-error"
-                               id="cuisineCategoryNameError"
-                               data-cuisine-category-master-name-error
-                               hidden></small>
-                    </label>
+                    <div class="cuisine-category-master-identity-fields">
+                        <label class="unit-master-field">
+                            <span>Icon</span>
+                            <input type="text"
+                                   maxlength="16"
+                                   placeholder="e.g. 🇬🇧"
+                                   autocomplete="off"
+                                   spellcheck="false"
+                                   data-cuisine-category-master-icon
+                                   aria-describedby="cuisineCategoryIconHelp cuisineCategoryIconError">
+                            <small class="unit-master-field-help"
+                                   id="cuisineCategoryIconHelp">
+                                Optional. Enter a flag, emoji, or short symbol.
+                            </small>
+                            <small class="unit-master-field-error"
+                                   id="cuisineCategoryIconError"
+                                   data-cuisine-category-master-icon-error
+                                   hidden></small>
+                        </label>
+
+                        <label class="unit-master-field">
+                            <span>Cuisine category abbreviation</span>
+                            <input type="text"
+                                   maxlength="8"
+                                   placeholder="e.g. GB"
+                                   autocomplete="off"
+                                   spellcheck="false"
+                                   data-cuisine-category-master-abbreviation
+                                   aria-describedby="cuisineCategoryAbbreviationHelp cuisineCategoryAbbreviationError">
+                            <small class="unit-master-field-help"
+                                   id="cuisineCategoryAbbreviationHelp">
+                                Optional. Use 2–8 letters or numbers, such as GB.
+                            </small>
+                            <small class="unit-master-field-error"
+                                   id="cuisineCategoryAbbreviationError"
+                                   data-cuisine-category-master-abbreviation-error
+                                   hidden></small>
+                        </label>
+
+                        <label class="unit-master-field cuisine-category-master-name-field">
+                            <span>Cuisine category name</span>
+                            <input type="text"
+                                   maxlength="60"
+                                   placeholder="e.g. United Kingdom"
+                                   autocomplete="off"
+                                   required
+                                   data-cuisine-category-master-name
+                                   aria-describedby="cuisineCategoryNameHelp cuisineCategoryNameError">
+                            <small class="unit-master-field-help"
+                                   id="cuisineCategoryNameHelp"
+                                   data-cuisine-category-master-name-help>
+                                Enter the full category name shown in the recipe editor.
+                                Built-in names remain stable.
+                            </small>
+                            <small class="unit-master-field-error"
+                                   id="cuisineCategoryNameError"
+                                   data-cuisine-category-master-name-error
+                                   hidden></small>
+                        </label>
+                    </div>
 
                     <label class="type-master-availability">
                         <input type="checkbox" data-cuisine-category-master-active checked>

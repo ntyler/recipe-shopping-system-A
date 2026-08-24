@@ -1506,6 +1506,7 @@
             </section>
 
             {% set editor_category_choices = cookbook_view.category_choices if cookbook_view and cookbook_view.category_choices else {} %}
+            {% set editor_cuisine_options = cookbook_view.cuisine_category_options if cookbook_view and cookbook_view.cuisine_category_options is defined else none %}
             <section id="recipeEditCategoriesSection"
                      class="recipe-edit-inline-categories"
                      aria-label="Recipe categories"
@@ -1595,9 +1596,17 @@
                         <input type="hidden" id="recipeEditCategoryCuisine" name="cuisine">
                         <input type="hidden" id="recipeEditCuisineTags" name="cuisine_tags" autocomplete="off">
                         <div data-recipe-edit-multiselect-options hidden>
-                            {% for choice in editor_category_choices.cuisine or [] %}
-                                <span data-recipe-edit-multiselect-option="{{ choice }}"></span>
-                            {% endfor %}
+                            {% if editor_cuisine_options is not none %}
+                                {% for option in editor_cuisine_options %}
+                                    <span data-recipe-edit-multiselect-option="{{ option.value }}"
+                                          data-recipe-edit-multiselect-label="{{ option.label or option.value }}"></span>
+                                {% endfor %}
+                            {% else %}
+                                {% for choice in editor_category_choices.cuisine or [] %}
+                                    <span data-recipe-edit-multiselect-option="{{ choice }}"
+                                          data-recipe-edit-multiselect-label="{{ choice }}"></span>
+                                {% endfor %}
+                            {% endif %}
                         </div>
                     </div>
                     <input id="recipeEditCategoryPrepTimeGroup"

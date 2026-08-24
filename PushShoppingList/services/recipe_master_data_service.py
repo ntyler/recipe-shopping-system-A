@@ -1103,6 +1103,8 @@ def ensure_recipe_master_schema(connection=None):
         CREATE TABLE IF NOT EXISTS workspace_cuisine_categories (
             user_id TEXT NOT NULL,
             id TEXT NOT NULL,
+            icon TEXT DEFAULT NULL,
+            abbreviation TEXT DEFAULT NULL,
             name TEXT NOT NULL,
             normalized_name TEXT NOT NULL,
             aliases_json TEXT NOT NULL DEFAULT '[]',
@@ -1538,11 +1540,17 @@ def ensure_recipe_master_schema(connection=None):
         connection,
         "workspace_cuisine_categories",
     )
-    if "aliases_json" not in cuisine_category_columns:
-        connection.execute(
-            "ALTER TABLE workspace_cuisine_categories "
-            "ADD COLUMN aliases_json TEXT NOT NULL DEFAULT '[]'"
-        )
+    cuisine_category_column_definitions = {
+        "aliases_json": "TEXT NOT NULL DEFAULT '[]'",
+        "icon": "TEXT DEFAULT NULL",
+        "abbreviation": "TEXT DEFAULT NULL",
+    }
+    for column_name, column_definition in cuisine_category_column_definitions.items():
+        if column_name not in cuisine_category_columns:
+            connection.execute(
+                "ALTER TABLE workspace_cuisine_categories "
+                f"ADD COLUMN {column_name} {column_definition}"
+            )
     duplicate_review_columns = recipe_master_column_names(
         connection,
         "ingredient_duplicate_reviews",

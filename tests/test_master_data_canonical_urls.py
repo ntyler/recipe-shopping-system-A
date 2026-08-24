@@ -239,7 +239,23 @@ def test_cuisine_categories_page_renders_registry_management_ui(master_data_app)
     assert soup.select_one("[data-cuisine-category-master-dialog]") is not None
     assert soup.select_one("[data-cuisine-category-master-usage-dialog]") is not None
     assert soup.select_one("[data-cuisine-category-master-search]") is not None
+    column_headers = [
+        cell.get_text(" ", strip=True)
+        for cell in soup.select(
+            ".cuisine-category-master-table [role='columnheader']"
+        )
+    ]
+    assert column_headers[:3] == [
+        "Icon",
+        "Abbreviation",
+        "Cuisine Category Name",
+    ]
     assert soup.select("[data-cuisine-category-master-row]")
+    assert soup.select_one("[data-cuisine-category-master-icon]") is not None
+    assert soup.select_one(
+        "[data-cuisine-category-master-abbreviation]"
+    ) is not None
+    assert soup.select_one("[data-cuisine-category-master-name]") is not None
     active_tab = soup.select_one("nav.master-data-tabs a.active")
     assert active_tab.get_text(strip=True) == "Cuisine Categories"
     assert urlsplit(active_tab["href"]).path == (
@@ -266,19 +282,33 @@ def test_cuisine_category_routes_support_workspace_crud_and_references(
         sign_in(client, "user-a")
         created = client.post(
             "/api/master-data/cuisine-categories",
-            json={"name": "Great Lakes Fusion", "active": True},
+            json={
+                "icon": "🌊",
+                "abbreviation": "GLF",
+                "name": "Great Lakes Fusion",
+                "active": True,
+            },
         )
         assert created.status_code == 201
         created_payload = created.get_json()
         category_id = created_payload["category_id"]
         assert any(
-            item["id"] == category_id and item["name"] == "Great Lakes Fusion"
+            item["id"] == category_id
+            and item["icon"] == "🌊"
+            and item["abbreviation"] == "GLF"
+            and item["category_name"] == "Great Lakes Fusion"
+            and item["name"] == "🌊 Great Lakes Fusion"
             for item in created_payload["registry"]["categories"]
         )
 
         updated = client.patch(
             f"/api/master-data/cuisine-categories/{category_id}",
-            json={"name": "Midwest Fusion", "active": False},
+            json={
+                "icon": "🌽",
+                "abbreviation": "MWF",
+                "name": "Midwest Fusion",
+                "active": False,
+            },
         )
         references = client.get(
             f"/api/master-data/cuisine-categories/{category_id}/references",
@@ -290,7 +320,10 @@ def test_cuisine_category_routes_support_workspace_crud_and_references(
     assert updated.status_code == 200
     assert any(
         item["id"] == category_id
-        and item["name"] == "Midwest Fusion"
+        and item["icon"] == "🌽"
+        and item["abbreviation"] == "MWF"
+        and item["category_name"] == "Midwest Fusion"
+        and item["name"] == "🌽 Midwest Fusion"
         and item["active"] is False
         for item in updated.get_json()["registry"]["categories"]
     )

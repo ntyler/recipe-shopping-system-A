@@ -68,6 +68,10 @@
         const searchEmpty = root.querySelector("[data-cuisine-category-master-search-empty]");
         const dialog = root.querySelector("[data-cuisine-category-master-dialog]");
         const form = root.querySelector("[data-cuisine-category-master-form]");
+        const iconInput = root.querySelector("[data-cuisine-category-master-icon]");
+        const iconError = root.querySelector("[data-cuisine-category-master-icon-error]");
+        const abbreviationInput = root.querySelector("[data-cuisine-category-master-abbreviation]");
+        const abbreviationError = root.querySelector("[data-cuisine-category-master-abbreviation-error]");
         const nameInput = root.querySelector("[data-cuisine-category-master-name]");
         const nameHelp = root.querySelector("[data-cuisine-category-master-name-help]");
         const nameError = root.querySelector("[data-cuisine-category-master-name-error]");
@@ -88,6 +92,19 @@
 
         const categoryById = categoryId => (
             registry.categories.find(item => String(item.id) === String(categoryId)) || null
+        );
+
+        const categoryName = item => (
+            cleanText(item?.category_name)
+            || cleanText(item?.canonical_name)
+            || cleanText(item?.name)
+        );
+
+        const categoryDisplayLabel = item => (
+            cleanText(item?.display_label)
+            || cleanText(item?.name)
+            || [cleanText(item?.icon), categoryName(item)].filter(Boolean).join(" ")
+            || "Cuisine category"
         );
 
         const setStatus = (message, type = "success") => {
@@ -118,7 +135,7 @@
                 const empty = document.createElement("span");
                 empty.className = "unit-master-usage-empty";
                 empty.textContent = "0";
-                empty.setAttribute("aria-label", `No recipes use ${item.name}`);
+                empty.setAttribute("aria-label", `No recipes use ${categoryDisplayLabel(item)}`);
                 usage.appendChild(empty);
                 return usage;
             }
@@ -132,7 +149,7 @@
             button.setAttribute("aria-controls", "cuisineCategoryMasterUsageDialog");
             button.setAttribute(
                 "aria-label",
-                `Show ${recipeCount} recipe${recipeCount === 1 ? "" : "s"} using ${item.name}`,
+                `Show ${recipeCount} recipe${recipeCount === 1 ? "" : "s"} using ${categoryDisplayLabel(item)}`,
             );
             const count = document.createElement("strong");
             count.textContent = String(recipeCount);
@@ -149,11 +166,27 @@
             row.setAttribute("role", "row");
             row.dataset.cuisineCategoryMasterRow = "";
             row.dataset.categoryId = item.id;
-            row.dataset.cuisineCategoryMasterSearchValue = item.name;
+            row.dataset.cuisineCategoryMasterSearchValue = [
+                item.icon,
+                item.abbreviation,
+                categoryName(item),
+            ].filter(Boolean).join(" ");
+
+            const icon = document.createElement("span");
+            icon.className = "cuisine-category-master-icon";
+            icon.setAttribute("role", "cell");
+            icon.setAttribute("aria-label", item.icon ? `Icon: ${item.icon}` : "No icon");
+            icon.textContent = item.icon || "—";
+
+            const abbreviation = document.createElement("strong");
+            abbreviation.className = "cuisine-category-master-abbreviation";
+            abbreviation.setAttribute("role", "cell");
+            abbreviation.textContent = item.abbreviation || "—";
 
             const name = document.createElement("strong");
+            name.className = "cuisine-category-master-name";
             name.setAttribute("role", "cell");
-            name.textContent = item.name;
+            name.textContent = categoryName(item);
 
             const sourceBadge = document.createElement("span");
             sourceBadge.className = `unit-master-source-badge${item.custom ? " user-created" : ""}`;
@@ -171,14 +204,22 @@
             edit.dataset.cuisineCategoryMasterEditButton = "";
             edit.dataset.categoryId = item.id;
             edit.textContent = "Edit";
-            edit.setAttribute("aria-label", `Edit ${item.name}`);
+            edit.setAttribute("aria-label", `Edit ${categoryDisplayLabel(item)}`);
 
             const actionCell = document.createElement("span");
             actionCell.className = "unit-master-action-cell";
             actionCell.setAttribute("role", "cell");
             actionCell.appendChild(edit);
 
-            row.append(name, createUsageCell(item), sourceBadge, state, actionCell);
+            row.append(
+                icon,
+                abbreviation,
+                name,
+                createUsageCell(item),
+                sourceBadge,
+                state,
+                actionCell,
+            );
             return row;
         };
 
@@ -198,11 +239,21 @@
         };
 
         const applySearch = () => {
-            const query = categoryKey(search.value);
+            const rawQuery = cleanText(search.value).toLocaleLowerCase();
+            const semanticQuery = categoryKey(rawQuery);
             let visible = 0;
             root.querySelectorAll("[data-cuisine-category-master-row]").forEach(row => {
-                const searchValue = row.dataset.cuisineCategoryMasterSearchValue;
-                const matches = !query || categoryKey(searchValue).includes(query);
+                const searchValue = cleanText(
+                    row.dataset.cuisineCategoryMasterSearchValue,
+                );
+                const matches = (
+                    !rawQuery
+                    || searchValue.toLocaleLowerCase().includes(rawQuery)
+                    || (
+                        Boolean(semanticQuery)
+                        && categoryKey(searchValue).includes(semanticQuery)
+                    )
+                );
                 row.hidden = !matches;
                 if (matches) visible += 1;
             });
@@ -228,6 +279,8 @@
         };
 
         const clearEditorErrors = () => {
+            setFieldError(iconInput, iconError, "");
+            setFieldError(abbreviationInput, abbreviationError, "");
             setFieldError(nameInput, nameError, "");
             setFieldError(activeInput, activeError, "");
             setEditorFeedback("");
@@ -241,14 +294,18 @@
             editorCategoryId = String(item?.id || "");
             returnFocus = trigger || document.activeElement;
             clearEditorErrors();
-            nameInput.value = item?.name || "";
+            iconInput.value = item?.icon || "";
+            abbreviationInput.value = item?.abbreviation || "";
+            nameInput.value = categoryName(item);
             nameInput.disabled = Boolean(item?.seeded);
             nameHelp.textContent = item?.seeded
-                ? "Built-in names stay tied to stable cuisine labels. You can change availability."
-                : "Recognized national cuisine names automatically receive a matching flag. Renaming preserves recipe assignments.";
+                ? "Built-in category names stay tied to stable cuisine labels. You can edit the icon and abbreviation."
+                : "Enter the full category name shown in the recipe editor. Renaming preserves recipe assignments.";
             activeInput.checked = item ? Boolean(item.active) : true;
             activeInput.disabled = false;
-            editorTitle.textContent = item ? `Edit ${item.name}` : "Add Cuisine Category";
+            editorTitle.textContent = item
+                ? `Edit ${categoryDisplayLabel(item)}`
+                : "Add Cuisine Category";
             editorKicker.textContent = item?.seeded ? "Built-in cuisine" : "Workspace cuisine";
             saveButton.textContent = item ? "Save Changes" : "Add Cuisine Category";
             deleteButton.hidden = !item?.custom;
@@ -260,7 +317,7 @@
                 deleteButton.removeAttribute("title");
             }
             if (!dialog.open) dialog.showModal();
-            window.requestAnimationFrame(() => (nameInput.disabled ? activeInput : nameInput).focus());
+            window.requestAnimationFrame(() => iconInput.focus());
         };
 
         const requestJson = async (url, options = {}) => {
@@ -281,8 +338,20 @@
             event.preventDefault();
             clearEditorErrors();
             const current = categoryById(editorCategoryId);
+            const icon = cleanText(iconInput.value);
+            const abbreviation = cleanText(abbreviationInput.value);
+            const name = current?.seeded ? categoryName(current) : cleanText(nameInput.value);
+            setFieldError(nameInput, nameError, name ? "" : "Enter a cuisine category name.");
+            const firstInvalidInput = form.querySelector('[aria-invalid="true"]');
+            if (firstInvalidInput) {
+                setEditorFeedback("Complete the required cuisine category fields.");
+                firstInvalidInput.focus();
+                return;
+            }
             const payload = {
-                name: current?.seeded ? current.name : cleanText(nameInput.value),
+                icon,
+                abbreviation,
+                category_name: name,
                 active: activeInput.checked,
             };
             saveButton.disabled = true;
@@ -300,9 +369,16 @@
                 });
                 if (!response.ok || data.ok === false) {
                     const errors = data.errors || {};
+                    setFieldError(iconInput, iconError, errors.icon || "");
+                    setFieldError(
+                        abbreviationInput,
+                        abbreviationError,
+                        errors.abbreviation || "",
+                    );
                     setFieldError(nameInput, nameError, errors.name || "");
                     setFieldError(activeInput, activeError, errors.active || "");
                     setEditorFeedback(data.error || "The cuisine category could not be saved.");
+                    form.querySelector('[aria-invalid="true"]')?.focus();
                     return;
                 }
                 updateRegistry(data.registry);
@@ -457,8 +533,9 @@
 
         const openUsage = async (item, trigger) => {
             usageReturnFocus = trigger || document.activeElement;
-            usageTitle.textContent = `Recipes using ${item.name}`;
-            usageContext.textContent = `Review every recipe assigned to ${item.name}.`;
+            const displayLabel = categoryDisplayLabel(item);
+            usageTitle.textContent = `Recipes using ${displayLabel}`;
+            usageContext.textContent = `Review every recipe assigned to ${displayLabel}.`;
             setUsageState("Loading connected recipes…");
             if (!usageDialog.open) usageDialog.showModal();
             const requestToken = ++usageRequestToken;

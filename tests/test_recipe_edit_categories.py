@@ -43,18 +43,49 @@ def test_custom_tag_choices_are_reusable_and_case_insensitive():
     assert choices == ["Family Favorites", "Freezer Meals", "Weeknight Dinners"]
 
 
-def test_cookbook_category_choices_use_workspace_cuisine_registry(monkeypatch):
+def test_cookbook_cuisine_options_keep_bare_values_and_display_labels(monkeypatch):
     from PushShoppingList.services import cuisine_category_service
 
     monkeypatch.setattr(
         cuisine_category_service,
-        "active_workspace_cuisine_category_labels",
-        lambda user_id=None: ["Italian", "  Caribbean  ", "italian", ""],
+        "cuisine_category_registry_payload",
+        lambda user_id=None: {
+            "categories": [
+                {
+                    "value": "Italian",
+                    "display_label": "🇮🇹 Italian",
+                    "active": True,
+                },
+                {
+                    "category_name": "  Caribbean  ",
+                    "name": "🌴 Caribbean",
+                    "active": True,
+                },
+                {
+                    "value": "italian",
+                    "display_label": "Duplicate Italian",
+                    "active": True,
+                },
+                {
+                    "value": "Inactive",
+                    "display_label": "⛔ Inactive",
+                    "active": False,
+                },
+                {"value": "", "display_label": "", "active": True},
+            ]
+        },
     )
 
+    options = cookbook_service.active_cuisine_category_options(
+        user_id="cuisine-user"
+    )
     choices = cookbook_service.cookbook_category_choices(user_id="cuisine-user")
 
-    assert choices["cuisine"] == ["Italian", "Caribbean"]
+    assert options == [
+        {"value": "Italian", "label": "🇮🇹 Italian"},
+        {"value": "Caribbean", "label": "🌴 Caribbean"},
+    ]
+    assert choices["cuisine"] == ["🇮🇹 Italian", "🌴 Caribbean"]
     assert choices["meal_type"] == list(cookbook_service.COOKBOOK_CATEGORY_CHOICES["meal_type"])
 
 
@@ -66,10 +97,14 @@ def test_cookbook_category_choices_keep_safe_cuisine_fallback(monkeypatch):
 
     monkeypatch.setattr(
         cuisine_category_service,
-        "active_workspace_cuisine_category_labels",
+        "cuisine_category_registry_payload",
         unavailable_registry,
     )
 
+    assert cookbook_service.active_cuisine_category_options() == [
+        {"value": choice, "label": choice}
+        for choice in cookbook_service.COOKBOOK_CATEGORY_CHOICES["cuisine"]
+    ]
     assert cookbook_service.cookbook_category_choices()["cuisine"] == list(
         cookbook_service.COOKBOOK_CATEGORY_CHOICES["cuisine"]
     )
@@ -80,10 +115,11 @@ def test_cookbook_category_choices_honor_intentionally_empty_registry(monkeypatc
 
     monkeypatch.setattr(
         cuisine_category_service,
-        "active_workspace_cuisine_category_labels",
-        lambda user_id=None: [],
+        "cuisine_category_registry_payload",
+        lambda user_id=None: {"categories": []},
     )
 
+    assert cookbook_service.active_cuisine_category_options() == []
     assert cookbook_service.cookbook_category_choices()["cuisine"] == []
 
 
@@ -121,6 +157,10 @@ def test_recipe_editor_cuisine_registry_refresh_preserves_selected_legacy_values
         script.index("function normalizeRecipeEditTagText"):
         script.index("function recipeEditMultiselectField")
     ]
+    option_records = script[
+        script.index("function recipeEditMultiselectOptionRecords"):
+        script.index("function recipeEditCuisineRegistryCategoryRows")
+    ]
     registry_logic = script[
         script.index("function recipeEditCuisineRegistryCategoryRows"):
         script.index("function canonicalRecipeEditMultiselectValue")
@@ -139,6 +179,9 @@ const source = {
 const field = {
     querySelector(selector) {
         return selector === "[data-recipe-edit-multiselect-options]" ? source : null;
+    },
+    querySelectorAll(selector) {
+        return selector === "[data-recipe-edit-multiselect-option]" ? source.children : [];
     },
 };
 const document = {
@@ -168,7 +211,7 @@ function fetch(url) {
     return Promise.resolve({ ok: true, json: () => Promise.resolve(nextPayload) });
 }
 const console = { warn() {} };
-''' + normalizers + registry_logic + r'''
+''' + normalizers + option_records + registry_logic + r'''
 
 const parsed = recipeEditActiveCuisineRegistryLabels({
     categories: [
@@ -261,6 +304,10 @@ def test_recipe_editor_cuisine_registry_refresh_canonicalizes_late_alias_with_sa
         script.index("function normalizeRecipeEditTagText"):
         script.index("function recipeEditMultiselectField")
     ]
+    option_records = script[
+        script.index("function recipeEditMultiselectOptionRecords"):
+        script.index("function recipeEditCuisineRegistryCategoryRows")
+    ]
     registry_logic = script[
         script.index("function recipeEditCuisineRegistryCategoryRows"):
         script.index("function canonicalRecipeEditMultiselectValue")
@@ -272,8 +319,15 @@ const recipeEditSavedFormSnapshots = new WeakMap();
 const selectedInput = { value: "Legacy Cuisine" };
 const primaryInput = { value: "Legacy Cuisine" };
 const source = {
-    dataset: { recipeEditCuisineRegistrySignature: "Japanese" },
-    children: [{ dataset: { recipeEditMultiselectOption: "Japanese" } }],
+    dataset: {
+        recipeEditCuisineRegistrySignature: JSON.stringify([["Japanese", "Japanese"]]),
+    },
+    children: [{
+        dataset: {
+            recipeEditMultiselectOption: "Japanese",
+            recipeEditMultiselectLabel: "Japanese",
+        },
+    }],
     replaceCount: 0,
     replaceChildren(...children) {
         this.children = children;
@@ -283,6 +337,9 @@ const source = {
 const field = {
     querySelector(selector) {
         return selector === "[data-recipe-edit-multiselect-options]" ? source : null;
+    },
+    querySelectorAll(selector) {
+        return selector === "[data-recipe-edit-multiselect-option]" ? source.children : [];
     },
 };
 const document = {
@@ -304,7 +361,7 @@ function setRecipeEditCuisineCategories(values) {
 function masterDataViewerUrl(value) { return value; }
 function fetch() { return Promise.resolve({ ok: false }); }
 const console = { warn() {} };
-''' + normalizers + registry_logic + r'''
+''' + normalizers + option_records + registry_logic + r'''
 
 const changed = updateRecipeEditCuisineRegistryOptions(
     ["Japanese"],
@@ -349,6 +406,10 @@ def test_recipe_editor_cuisine_registry_refresh_adopts_flagged_presentation_with
         script.index("function normalizeRecipeEditTagText"):
         script.index("function recipeEditMultiselectField")
     ]
+    option_records = script[
+        script.index("function recipeEditMultiselectOptionRecords"):
+        script.index("function recipeEditCuisineRegistryCategoryRows")
+    ]
     registry_logic = script[
         script.index("function recipeEditCuisineRegistryCategoryRows"):
         script.index("function canonicalRecipeEditMultiselectValue")
@@ -368,11 +429,18 @@ let recipeEditOriginalSnapshot = {
 const recipeEditSavedFormSnapshots = new WeakMap();
 const selectedInput = { value: "United Kingdom, Chinese" };
 const primaryInput = { value: "United Kingdom" };
-const canonicalOptions = ["🇬🇧 United Kingdom", "🇨🇳 Chinese"];
+const canonicalOptions = ["United Kingdom", "Chinese"];
 const source = {
-    dataset: { recipeEditCuisineRegistrySignature: canonicalOptions.join("\u001f") },
+    dataset: {
+        recipeEditCuisineRegistrySignature: JSON.stringify(
+            canonicalOptions.map(value => [value, value]),
+        ),
+    },
     children: canonicalOptions.map(value => ({
-        dataset: { recipeEditMultiselectOption: value },
+        dataset: {
+            recipeEditMultiselectOption: value,
+            recipeEditMultiselectLabel: value,
+        },
     })),
     replaceCount: 0,
     replaceChildren(...children) {
@@ -383,6 +451,9 @@ const source = {
 const field = {
     querySelector(selector) {
         return selector === "[data-recipe-edit-multiselect-options]" ? source : null;
+    },
+    querySelectorAll(selector) {
+        return selector === "[data-recipe-edit-multiselect-option]" ? source.children : [];
     },
 };
 const form = {
@@ -433,27 +504,37 @@ function collectRecipeEditorCategorySources() {
 function masterDataViewerUrl(value) { return value; }
 function fetch() { return Promise.resolve({ ok: false }); }
 const console = { warn() {} };
-''' + normalizers + registry_logic + dirty_logic + r'''
+''' + normalizers + option_records + registry_logic + dirty_logic + r'''
 
 recipeEditSavedFormSnapshots.set(form, recipeEditorCurrentSaveSnapshot(form));
 const payload = {
     categories: [
         {
+            value: "United Kingdom",
+            category_name: "United Kingdom",
             name: "🇬🇧 United Kingdom",
+            display_label: "🇬🇧 United Kingdom",
+            abbreviation: "GB",
             active: true,
-            aliases: ["United Kingdom"],
+            aliases: ["United Kingdom", "GB"],
         },
         {
+            value: "Chinese",
+            category_name: "Chinese",
             name: "🇨🇳 Chinese",
+            display_label: "🇨🇳 Chinese",
+            abbreviation: "CN",
             active: true,
-            aliases: ["Chinese"],
+            aliases: ["Chinese", "CN"],
         },
     ],
 };
 const aliases = recipeEditCuisineRegistryAliasMap(payload);
+const displayLabels = recipeEditCuisineRegistryDisplayLabelMap(payload);
 const changed = updateRecipeEditCuisineRegistryOptions(
     recipeEditActiveCuisineRegistryLabels(payload),
     aliases,
+    displayLabels,
 );
 const dirty = recipeEditorHasUnsavedChanges(form);
 const savedSnapshot = JSON.parse(recipeEditSavedFormSnapshots.get(form));
@@ -465,10 +546,13 @@ process.stdout.write(JSON.stringify({
     selected: selectedInput.value,
     primary: primaryInput.value,
     choices: source.children.map(item => item.dataset.recipeEditMultiselectOption),
+    choiceLabels: source.children.map(item => item.dataset.recipeEditMultiselectLabel),
     replaceCount: source.replaceCount,
     rendered,
     ukAlias: aliases.get(recipeEditTagKey("United Kingdom")),
     chineseAlias: aliases.get(recipeEditTagKey("Chinese")),
+    gbAlias: aliases.get(recipeEditTagKey("GB")) || null,
+    cnAlias: aliases.get(recipeEditTagKey("CN")) || null,
     savedCuisine: savedSnapshot.payload.recipe.cuisine,
     savedCuisineTags: savedSnapshot.payload.recipe.cuisine_tags,
     savedCategoryCuisine: savedSnapshot.category_values.cuisine,
@@ -492,22 +576,166 @@ process.stdout.write(JSON.stringify({
     assert result == {
         "changed": True,
         "dirty": False,
-        "selected": "🇬🇧 United Kingdom, 🇨🇳 Chinese",
-        "primary": "🇬🇧 United Kingdom",
-        "choices": ["🇬🇧 United Kingdom", "🇨🇳 Chinese"],
-        "replaceCount": 0,
+        "selected": "United Kingdom, Chinese",
+        "primary": "United Kingdom",
+        "choices": ["United Kingdom", "Chinese"],
+        "choiceLabels": ["🇬🇧 United Kingdom", "🇨🇳 Chinese"],
+        "replaceCount": 1,
         "rendered": ["cuisine"],
-        "ukAlias": "🇬🇧 United Kingdom",
-        "chineseAlias": "🇨🇳 Chinese",
-        "savedCuisine": "🇬🇧 United Kingdom",
-        "savedCuisineTags": ["🇬🇧 United Kingdom", "🇨🇳 Chinese"],
-        "savedCategoryCuisine": "🇬🇧 United Kingdom",
-        "originalCategoryCuisine": "🇬🇧 United Kingdom",
-        "originalSnapshotCuisine": "🇬🇧 United Kingdom",
-        "originalSnapshotCuisineTags": [
-            "🇬🇧 United Kingdom",
-            "🇨🇳 Chinese",
+        "ukAlias": "United Kingdom",
+        "chineseAlias": "Chinese",
+        "gbAlias": None,
+        "cnAlias": None,
+        "savedCuisine": "United Kingdom",
+        "savedCuisineTags": ["United Kingdom", "Chinese"],
+        "savedCategoryCuisine": "United Kingdom",
+        "originalCategoryCuisine": "United Kingdom",
+        "originalSnapshotCuisine": "United Kingdom",
+        "originalSnapshotCuisineTags": ["United Kingdom", "Chinese"],
+    }
+
+
+def test_recipe_editor_cuisine_multiselect_renders_and_searches_display_labels():
+    node = shutil.which("node")
+    if not node:
+        return
+
+    script = read_text("PushShoppingList/static/js/app.js")
+    normalizers = script[
+        script.index("function normalizeRecipeEditTagText"):
+        script.index("function recipeEditMultiselectField")
+    ]
+    option_records = script[
+        script.index("function recipeEditMultiselectOptionRecords"):
+        script.index("function recipeEditCuisineRegistryCategoryRows")
+    ]
+    option_rendering = script[
+        script.index("function recipeEditMultiselectOptionButton"):
+        script.index("function selectRecipeEditMultiselectValue")
+    ]
+    chip_rendering = script[
+        script.index("function renderRecipeEditMultiselect(kind)"):
+        script.index("function moveRecipeEditMultiselectOptionFocus")
+    ]
+    harness = r'''
+function makeElement(tagName) {
+    return {
+        tagName,
+        dataset: {},
+        children: [],
+        attributes: {},
+        className: "",
+        classList: {
+            values: new Set(),
+            add(...names) { names.forEach(name => this.values.add(name)); },
+            contains(name) { return this.values.has(name); },
+        },
+        appendChild(child) { this.children.push(child); },
+        setAttribute(name, value) { this.attributes[name] = value; },
+    };
+}
+
+const source = {
+    children: [
+        {
+            dataset: {
+                recipeEditMultiselectOption: "United Kingdom",
+                recipeEditMultiselectLabel: "\uD83C\uDDEC\uD83C\uDDE7 United Kingdom",
+            },
+        },
+        {
+            dataset: {
+                recipeEditMultiselectOption: "Chinese",
+                recipeEditMultiselectLabel: "\uD83C\uDDE8\uD83C\uDDF3 Chinese",
+            },
+        },
+    ],
+};
+const field = {
+    classList: { contains() { return false; } },
+    querySelectorAll(selector) {
+        return selector === "[data-recipe-edit-multiselect-option]" ? source.children : [];
+    },
+};
+const listbox = {
+    children: [],
+    replaceChildren(...children) { this.children = children; },
+};
+const chips = {
+    children: [],
+    replaceChildren(...children) { this.children = children; },
+};
+const parts = {
+    field,
+    search: { value: "" },
+    listbox,
+    chips,
+};
+const document = {
+    createElement: makeElement,
+    querySelector() { return null; },
+};
+const CATEGORY_SOURCE_AI_INFERRED = "ai_inferred";
+function recipeEditMultiselectField(kind) { return kind === "cuisine" ? field : null; }
+function recipeEditMultiselectParts(kind) { return kind === "cuisine" ? parts : null; }
+function recipeEditMultiselectValues(kind) {
+    return kind === "cuisine" ? ["United Kingdom"] : [];
+}
+function recipeEditMultiselectSource() { return "user_selected"; }
+function recipeEditMultiselectCopy() { return { chipLabel: "cuisine category", empty: "None" }; }
+function uniqueRecipeEditMultiselectValues(values) {
+    return Array.from(new Map(values.map(value => [recipeEditTagKey(value), value])).values());
+}
+function recipeEditStructuredCategoryMatch() { return null; }
+function scheduleRecipeEditMultiselectPopoverPosition() {}
+''' + normalizers + option_records + option_rendering + chip_rendering + r'''
+
+parts.search.value = "\uD83C\uDDEC\uD83C\uDDE7";
+renderRecipeEditMultiselectOptions("cuisine");
+const flagSearch = listbox.children.map(button => ({
+    label: button.textContent,
+    value: button.dataset.recipeEditMultiselectValue,
+    selected: button.attributes["aria-selected"],
+}));
+
+parts.search.value = "Chinese";
+renderRecipeEditMultiselectOptions("cuisine");
+const nameSearch = listbox.children.map(button => ({
+    label: button.textContent,
+    value: button.dataset.recipeEditMultiselectValue,
+}));
+
+renderRecipeEditMultiselect("cuisine");
+const chip = chips.children[0];
+process.stdout.write(JSON.stringify({
+    flagSearch,
+    nameSearch,
+    chipLabel: chip.children[0].textContent,
+    removeLabel: chip.children[1].attributes["aria-label"],
+}));
+'''
+    completed = subprocess.run(
+        [node],
+        input=harness,
+        text=True,
+        encoding="utf-8",
+        capture_output=True,
+        check=False,
+        timeout=10,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout) == {
+        "flagSearch": [
+            {
+                "label": "🇬🇧 United Kingdom",
+                "value": "United Kingdom",
+                "selected": "true",
+            }
         ],
+        "nameSearch": [{"label": "🇨🇳 Chinese", "value": "Chinese"}],
+        "chipLabel": "🇬🇧 United Kingdom",
+        "removeLabel": "Remove cuisine category 🇬🇧 United Kingdom",
     }
 
 
@@ -520,6 +748,10 @@ def test_recipe_editor_cuisine_alias_refresh_rebases_only_alias_baselines():
     normalizers = script[
         script.index("function normalizeRecipeEditTagText"):
         script.index("function recipeEditMultiselectField")
+    ]
+    option_records = script[
+        script.index("function recipeEditMultiselectOptionRecords"):
+        script.index("function recipeEditCuisineRegistryCategoryRows")
     ]
     registry_logic = script[
         script.index("function recipeEditCuisineRegistryCategoryRows"):
@@ -556,6 +788,9 @@ const field = {
     querySelector(selector) {
         return selector === "[data-recipe-edit-multiselect-options]" ? source : null;
     },
+    querySelectorAll(selector) {
+        return selector === "[data-recipe-edit-multiselect-option]" ? source.children : [];
+    },
 };
 const document = {
     createElement() { return { dataset: {} }; },
@@ -590,7 +825,7 @@ function collectRecipeEditorCategorySources() {
 function masterDataViewerUrl(value) { return value; }
 function fetch() { return Promise.resolve({ ok: false }); }
 const console = { warn() {} };
-''' + normalizers + registry_logic + dirty_logic + r'''
+''' + normalizers + option_records + registry_logic + dirty_logic + r'''
 
 recipeEditSavedFormSnapshots.set(form, recipeEditorCurrentSaveSnapshot(form));
 currentDescription = "Unsaved description";
@@ -688,6 +923,12 @@ def test_recipe_editor_renders_compact_classification_token_controls():
     assert template.count('id="recipeEditCuisineTags"') == 1
     assert 'name="cuisine_tags"' in category_markup
     assert template.index('id="recipeEditCuisineTags"') > category_start
+    assert "editor_cuisine_options" in category_markup
+    assert 'data-recipe-edit-multiselect-option="{{ option.value }}"' in category_markup
+    assert (
+        'data-recipe-edit-multiselect-label="{{ option.label or option.value }}"'
+        in category_markup
+    )
     assert 'data-recipe-edit-multiselect-option="{{ choice }}"' in category_markup
     assert "cookbook_view.custom_tag_choices" in category_markup
 
@@ -763,7 +1004,9 @@ def test_recipe_editor_renders_compact_classification_token_controls():
     assert "listbox.tabIndex = -1;" in script
     assert 'button.setAttribute("aria-selected", selected ? "true" : "false");' in script
     assert 'button.classList.add("is-selected");' in script
-    assert 'return !queryKey || key.includes(queryKey);' in script
+    assert "const labelKey = recipeEditTagKey(label);" in script
+    assert "(queryKey && (key.includes(queryKey) || labelKey.includes(queryKey)))" in script
+    assert "label.toLocaleLowerCase().includes(queryText)" in script
     assert 'return !selectedKeys.has(key)' not in script
     assert "function addRecipeEditMultiselectSearchValues" not in script
     assert "function updateRecipeEditMultiselectAddButton" not in script
@@ -776,7 +1019,7 @@ def test_recipe_editor_renders_compact_classification_token_controls():
     assert "function setRecipeEditCustomCategories" in script
     assert "function clearRecipeEditCustomCategory" in script
     assert "function renderRecipeEditCustomCategoryChips" in script
-    assert 'remove.setAttribute("aria-label", `Remove ${copy.chipLabel} ${value}`)' in script
+    assert 'remove.setAttribute("aria-label", `Remove ${copy.chipLabel} ${label}`)' in script
     assert "normalizeRecipeEditCustomTag" in script
     assert "uniqueRecipeEditMultiselectValues" in script
     assert "recipeEditStructuredCategoryMatch(query)" in script
@@ -1069,6 +1312,7 @@ const CATEGORY_SOURCE_USER_SELECTED = "user_selected";
 const window = { requestAnimationFrame(callback) { callback(); } };
 
 function recipeEditMultiselectOptions(kind) { return available[kind].slice(); }
+function recipeEditMultiselectDisplayLabel(kind, value) { return value; }
 function recipeEditMultiselectValues(kind) { return state[kind].slice(); }
 function setRecipeEditMultiselectValues(kind, values) {
     state[kind] = uniqueRecipeEditMultiselectValues(values, kind);

@@ -26561,11 +26561,29 @@ function recipeEditMultiselectField(kind) {
     return document.querySelector(`[data-recipe-edit-multiselect-field="${kind}"]`);
 }
 
-function recipeEditMultiselectOptions(kind) {
+function recipeEditMultiselectOptionRecords(kind) {
     const field = recipeEditMultiselectField(kind);
     return Array.from(field?.querySelectorAll("[data-recipe-edit-multiselect-option]") || [])
-        .map(option => normalizeRecipeEditTagText(option.dataset.recipeEditMultiselectOption))
+        .map(option => {
+            const value = normalizeRecipeEditTagText(option.dataset.recipeEditMultiselectOption);
+            const label = normalizeRecipeEditTagText(
+                option.dataset.recipeEditMultiselectLabel,
+            ) || value;
+            return value ? { value, label } : null;
+        })
         .filter(Boolean);
+}
+
+function recipeEditMultiselectOptions(kind) {
+    return recipeEditMultiselectOptionRecords(kind).map(option => option.value);
+}
+
+function recipeEditMultiselectDisplayLabel(kind, value) {
+    const normalized = normalizeRecipeEditTagText(value);
+    const key = recipeEditTagKey(normalized);
+    if (!key) return normalized;
+    return recipeEditMultiselectOptionRecords(kind)
+        .find(option => recipeEditTagKey(option.value) === key)?.label || normalized;
 }
 
 function recipeEditCuisineRegistryCategoryRows(payload) {
@@ -26588,7 +26606,15 @@ function recipeEditActiveCuisineRegistryLabels(payload) {
         const record = item && typeof item === "object" ? item : null;
         if (record && record.active === false) return;
         const value = normalizeRecipeEditTagText(
-            record ? (record.name || record.label || record.value) : item,
+            record
+                ? (
+                    record.value
+                    || record.category_name
+                    || record.canonical_name
+                    || record.name
+                    || record.label
+                )
+                : item,
         );
         const key = recipeEditTagKey(value);
         if (value && key && !seen.has(key)) {
@@ -26599,27 +26625,72 @@ function recipeEditActiveCuisineRegistryLabels(payload) {
     return labels;
 }
 
+function recipeEditCuisineRegistryDisplayLabelMap(payload) {
+    const rows = recipeEditCuisineRegistryCategoryRows(payload);
+    if (!Array.isArray(rows)) return null;
+    const labels = new Map();
+    rows.forEach(item => {
+        if (!item || typeof item !== "object") return;
+        const value = normalizeRecipeEditTagText(
+            item.value
+            || item.category_name
+            || item.canonical_name
+            || item.name
+            || item.label,
+        );
+        const key = recipeEditTagKey(value);
+        if (!value || !key || labels.has(key)) return;
+        const label = normalizeRecipeEditTagText(
+            item.display_label || item.name || item.label || value,
+        ) || value;
+        labels.set(key, label);
+    });
+    return labels;
+}
+
 function recipeEditCuisineRegistryAliasMap(payload) {
     const rows = recipeEditCuisineRegistryCategoryRows(payload);
     if (!Array.isArray(rows)) return null;
-    const aliases = new Map();
+    const owners = new Map();
+    const addOwner = (rawAlias, canonical) => {
+        const aliasKey = recipeEditTagKey(normalizeRecipeEditTagText(rawAlias));
+        if (!aliasKey) return;
+        if (!owners.has(aliasKey)) owners.set(aliasKey, new Set());
+        owners.get(aliasKey).add(canonical);
+    };
     rows.forEach(item => {
         if (!item || typeof item !== "object") return;
-        const canonical = normalizeRecipeEditTagText(item.name || item.label || item.value);
+        const canonical = normalizeRecipeEditTagText(
+            item.value
+            || item.category_name
+            || item.canonical_name
+            || item.name
+            || item.label,
+        );
         const canonicalKey = recipeEditTagKey(canonical);
         if (!canonical || !canonicalKey) return;
-        // A canonical registry label may differ from an assigned value only by
-        // its presentation icon (for example, "Chinese" versus
-        // "🇨🇳 Chinese"). Keep the canonical key in this map so an open
-        // editor adopts that presentation without treating it as a user edit.
-        // Canonical labels take precedence over a legacy alias collision.
-        aliases.set(canonicalKey, canonical);
-        (Array.isArray(item.aliases) ? item.aliases : []).forEach(rawAlias => {
-            const aliasKey = recipeEditTagKey(normalizeRecipeEditTagText(rawAlias));
-            if (aliasKey && !aliases.has(aliasKey)) {
-                aliases.set(aliasKey, canonical);
+        addOwner(canonical, canonical);
+        const abbreviationKey = recipeEditTagKey(item.abbreviation);
+        [
+            item.category_name,
+            item.canonical_name,
+            item.value,
+            item.name,
+            item.label,
+            item.display_label,
+            ...(Array.isArray(item.aliases) ? item.aliases : []),
+        ].forEach(rawAlias => {
+            const aliasKey = recipeEditTagKey(rawAlias);
+            if (aliasKey && aliasKey !== abbreviationKey) {
+                addOwner(rawAlias, canonical);
             }
         });
+    });
+    const aliases = new Map();
+    owners.forEach((canonicalValues, aliasKey) => {
+        if (canonicalValues.size === 1) {
+            aliases.set(aliasKey, canonicalValues.values().next().value);
+        }
     });
     return aliases;
 }
@@ -26720,10 +26791,30 @@ function rebaseRecipeEditCuisineAliasBaselines(aliases) {
     return changed;
 }
 
-function updateRecipeEditCuisineRegistryOptions(values, aliases = new Map()) {
+function updateRecipeEditCuisineRegistryOptions(
+    values,
+    aliases = new Map(),
+    displayLabels = new Map(),
+) {
     const field = recipeEditMultiselectField("cuisine");
     const source = field?.querySelector("[data-recipe-edit-multiselect-options]");
-    if (!source || !Array.isArray(values) || !(aliases instanceof Map)) return false;
+    if (
+        !source
+        || !Array.isArray(values)
+        || !(aliases instanceof Map)
+        || !(displayLabels instanceof Map)
+    ) return false;
+
+    const existingLabels = new Map(
+        recipeEditMultiselectOptionRecords("cuisine").map(option => [
+            recipeEditTagKey(option.value),
+            option.label,
+        ]),
+    );
+    const displayLabelFor = value => {
+        const key = recipeEditTagKey(value);
+        return displayLabels.get(key) || existingLabels.get(key) || value;
+    };
 
     const active = [];
     const seen = new Set();
@@ -26752,7 +26843,9 @@ function updateRecipeEditCuisineRegistryOptions(values, aliases = new Map()) {
             seen.add(key);
         }
     });
-    const signature = choices.join("\u001f");
+    const signature = JSON.stringify(
+        choices.map(value => [value, displayLabelFor(value)]),
+    );
     const optionsChanged = source.dataset.recipeEditCuisineRegistrySignature !== signature;
     rebaseRecipeEditCuisineAliasBaselines(aliases);
     if (!optionsChanged && !selectionChanged) return false;
@@ -26761,6 +26854,7 @@ function updateRecipeEditCuisineRegistryOptions(values, aliases = new Map()) {
         const options = choices.map(value => {
             const option = document.createElement("span");
             option.dataset.recipeEditMultiselectOption = value;
+            option.dataset.recipeEditMultiselectLabel = displayLabelFor(value);
             return option;
         });
         source.replaceChildren(...options);
@@ -26796,6 +26890,7 @@ function refreshRecipeEditCuisineCategoryRegistry() {
         .then(payload => updateRecipeEditCuisineRegistryOptions(
             recipeEditActiveCuisineRegistryLabels(payload),
             recipeEditCuisineRegistryAliasMap(payload),
+            recipeEditCuisineRegistryDisplayLabelMap(payload),
         ))
         .catch(error => {
             console.warn("Unable to refresh the cuisine category registry.", error);
@@ -27147,6 +27242,7 @@ function renderRecipeEditMultiselectOptions(kind) {
     if (!parts) return;
     const query = normalizeRecipeEditTagText(parts.search.value);
     const queryKey = recipeEditTagKey(query);
+    const queryText = query.toLocaleLowerCase();
     const invalidCustomTag = kind === "custom"
         && recipeEditCustomTagHasDelimiter(parts.search.value);
     const selectedKeys = new Set(recipeEditMultiselectValues(kind).map(recipeEditTagKey));
@@ -27155,11 +27251,19 @@ function renderRecipeEditMultiselectOptions(kind) {
         kind,
     ).filter(value => {
         const key = recipeEditTagKey(value);
-        return !queryKey || key.includes(queryKey);
+        const label = recipeEditMultiselectDisplayLabel(kind, value);
+        const labelKey = recipeEditTagKey(label);
+        if (!queryText) return true;
+        return (
+            (queryKey && (key.includes(queryKey) || labelKey.includes(queryKey)))
+            || value.toLocaleLowerCase().includes(queryText)
+            || label.toLocaleLowerCase().includes(queryText)
+        );
     });
     const buttons = choices.map(value => {
+        const label = recipeEditMultiselectDisplayLabel(kind, value);
         const button = recipeEditMultiselectOptionButton(
-            value,
+            label,
             "",
             selectedKeys.has(recipeEditTagKey(value)),
         );
@@ -27225,6 +27329,7 @@ function selectRecipeEditMultiselectValue(kind, value) {
         : canonicalRecipeEditMultiselectValue(kind, value);
     const copy = recipeEditMultiselectCopy(kind);
     const nextKey = recipeEditTagKey(nextValue);
+    const nextLabel = recipeEditMultiselectDisplayLabel(kind, nextValue);
     if (!nextKey) return false;
     if (recipeEditMultiselectValues(kind).some(item => recipeEditTagKey(item) === nextKey)) {
         if (parts) {
@@ -27232,7 +27337,7 @@ function selectRecipeEditMultiselectValue(kind, value) {
             renderRecipeEditMultiselectOptions(kind);
             parts.search.focus({ preventScroll: true });
         }
-        announceRecipeEditMultiselect(kind, `${nextValue} is already selected.`);
+        announceRecipeEditMultiselect(kind, `${nextLabel} is already selected.`);
         return false;
     }
     setRecipeEditMultiselectValues(
@@ -27245,7 +27350,7 @@ function selectRecipeEditMultiselectValue(kind, value) {
         openRecipeEditMultiselect(kind, { focus: false });
         parts.search.focus({ preventScroll: true });
     }
-    announceRecipeEditMultiselect(kind, `Added ${copy.chipLabel} ${nextValue}.`);
+    announceRecipeEditMultiselect(kind, `Added ${copy.chipLabel} ${nextLabel}.`);
     return true;
 }
 
@@ -27281,9 +27386,13 @@ function removeRecipeEditMultiselectValue(kind, index) {
     const numericIndex = Number(index);
     if (!Number.isInteger(numericIndex) || numericIndex < 0 || numericIndex >= values.length) return;
     const [removed] = values.splice(numericIndex, 1);
+    const removedLabel = recipeEditMultiselectDisplayLabel(kind, removed);
     const wasOpen = recipeEditMultiselectParts(kind)?.field.classList.contains("is-open");
     setRecipeEditMultiselectValues(kind, values, { source: CATEGORY_SOURCE_USER_SELECTED });
-    announceRecipeEditMultiselect(kind, `Removed ${recipeEditMultiselectCopy(kind).chipLabel} ${removed}.`);
+    announceRecipeEditMultiselect(
+        kind,
+        `Removed ${recipeEditMultiselectCopy(kind).chipLabel} ${removedLabel}.`,
+    );
     if (wasOpen) {
         recipeEditMultiselectParts(kind)?.search.focus({ preventScroll: true });
         return;
@@ -27306,16 +27415,17 @@ function renderRecipeEditMultiselect(kind) {
     const copy = recipeEditMultiselectCopy(kind);
     const aiInferred = recipeEditMultiselectSource(kind) === CATEGORY_SOURCE_AI_INFERRED;
     const chips = values.map((value, index) => {
+        const label = recipeEditMultiselectDisplayLabel(kind, value);
         const chip = document.createElement("span");
         chip.className = "recipe-edit-tag-chip";
         if (aiInferred) chip.classList.add("is-ai-inferred");
         const text = document.createElement("span");
-        text.textContent = value;
+        text.textContent = label;
         chip.appendChild(text);
         const remove = document.createElement("button");
         remove.type = "button";
         remove.dataset.recipeEditMultiselectRemove = String(index);
-        remove.setAttribute("aria-label", `Remove ${copy.chipLabel} ${value}`);
+        remove.setAttribute("aria-label", `Remove ${copy.chipLabel} ${label}`);
         remove.innerHTML = document.querySelector('[data-recipe-metadata-icon="x"]')?.innerHTML || "&times;";
         chip.appendChild(remove);
         return chip;

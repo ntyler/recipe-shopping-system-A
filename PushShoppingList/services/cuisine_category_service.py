@@ -15,19 +15,21 @@ from PushShoppingList.services.recipe_url_service import normalize_recipe_url_ke
 
 
 CUISINE_CATEGORY_SEEDS = (
-    ("american", "🇺🇸 American"),
-    ("mexican", "🇲🇽 Mexican"),
-    ("peruvian", "🇵🇪 Peruvian"),
-    ("italian", "🇮🇹 Italian"),
-    ("japanese", "🇯🇵 Japanese"),
-    ("thai", "🇹🇭 Thai"),
-    ("chinese", "🇨🇳 Chinese"),
-    ("indian", "🇮🇳 Indian"),
-    ("french", "🇫🇷 French"),
-    ("other_fusion", "🌍 Other / Fusion"),
+    ("american", "🇺🇸", "US", "American"),
+    ("mexican", "🇲🇽", "MX", "Mexican"),
+    ("peruvian", "🇵🇪", "PE", "Peruvian"),
+    ("italian", "🇮🇹", "IT", "Italian"),
+    ("japanese", "🇯🇵", "JP", "Japanese"),
+    ("thai", "🇹🇭", "TH", "Thai"),
+    ("chinese", "🇨🇳", "CN", "Chinese"),
+    ("indian", "🇮🇳", "IN", "Indian"),
+    ("french", "🇫🇷", "FR", "French"),
+    ("other_fusion", "🌍", "FUS", "Other / Fusion"),
 )
-CUISINE_CATEGORY_SEED_VERSION = "cuisine_categories_v1"
+CUISINE_CATEGORY_SEED_VERSION = "cuisine_categories_v2"
 CUISINE_CATEGORY_NAME_LIMIT = 60
+CUISINE_CATEGORY_ICON_LIMIT = 16
+CUISINE_CATEGORY_ABBREVIATION_LIMIT = 8
 _CUISINE_CATEGORY_DATA_LOCK = threading.RLock()
 
 
@@ -199,6 +201,94 @@ def decorate_recognized_cuisine_name(value):
     return f"{flag} {name}" if flag else name
 
 
+def clean_cuisine_category_icon(value):
+    return clean_cuisine_category_name(value)
+
+
+def clean_cuisine_category_abbreviation(value):
+    return clean_cuisine_category_name(value).upper()
+
+
+def split_legacy_cuisine_category_label(value):
+    """Split a legacy icon-bearing label into presentation and plain name."""
+    label = clean_cuisine_category_name(value)
+    match = re.match(r"^([^\w\s]+)\s+(.+)$", label, flags=re.UNICODE)
+    if not match:
+        return "", label
+    icon = clean_cuisine_category_icon(match.group(1))
+    name = clean_cuisine_category_name(match.group(2))
+    return (icon, name) if cuisine_category_key(name) else ("", label)
+
+
+def country_code_from_flag(value):
+    icon = clean_cuisine_category_icon(value)
+    if len(icon) != 2:
+        return ""
+    codepoints = [ord(character) for character in icon]
+    if not all(0x1F1E6 <= codepoint <= 0x1F1FF for codepoint in codepoints):
+        return ""
+    return "".join(chr(ord("A") + codepoint - 0x1F1E6) for codepoint in codepoints)
+
+
+def cuisine_category_display_label(icon, name):
+    icon = clean_cuisine_category_icon(icon)
+    name = clean_cuisine_category_name(name)
+    return f"{icon} {name}" if icon else name
+
+
+def _seed_category_parts(category_id):
+    for seed_id, icon, abbreviation, name in CUISINE_CATEGORY_SEEDS:
+        if seed_id == category_id:
+            return {
+                "icon": icon,
+                "abbreviation": abbreviation,
+                "name": name,
+            }
+    return None
+
+
+def resolve_cuisine_category_parts(
+    raw_name,
+    *,
+    icon=None,
+    abbreviation=None,
+    category_id="",
+):
+    """Resolve structured fields from new values or a legacy combined label."""
+    legacy_icon, name = split_legacy_cuisine_category_label(raw_name)
+    seed = _seed_category_parts(str(category_id or "")) or {}
+    inferred_country_code = NATIONAL_CUISINE_COUNTRY_CODES.get(
+        cuisine_category_key(name),
+        "",
+    )
+    resolved_icon = (
+        clean_cuisine_category_icon(icon)
+        if icon is not None
+        else (
+            legacy_icon
+            or str(seed.get("icon") or "")
+            or country_flag_emoji(inferred_country_code)
+        )
+    )
+    resolved_abbreviation = (
+        clean_cuisine_category_abbreviation(abbreviation)
+        if abbreviation is not None
+        else (
+            str(seed.get("abbreviation") or "")
+            or country_code_from_flag(resolved_icon)
+            or inferred_country_code
+        )
+    )
+    return {
+        "icon": resolved_icon,
+        "abbreviation": clean_cuisine_category_abbreviation(
+            resolved_abbreviation
+        ),
+        "name": clean_cuisine_category_name(name),
+        "display_label": cuisine_category_display_label(resolved_icon, name),
+    }
+
+
 def _json_text_list(value):
     try:
         decoded = json.loads(str(value or "[]"))
@@ -219,22 +309,36 @@ def _json_text_list(value):
 
 
 def _seed_aliases(category_id):
-    for seed_id, seed_name in CUISINE_CATEGORY_SEEDS:
-        if seed_id != category_id:
-            continue
-        plain_name = re.sub(r"^[^\w]+", "", seed_name, flags=re.UNICODE).strip()
-        return [seed_id, seed_name, plain_name]
-    return []
+    parts = _seed_category_parts(category_id)
+    if not parts:
+        return []
+    return [
+        category_id,
+        parts["name"],
+        cuisine_category_display_label(parts["icon"], parts["name"]),
+    ]
 
 
 def _category_item_from_row(row):
     seeded = bool(row["is_seeded"])
     category_id = str(row["id"])
+    row_keys = set(row.keys())
+    raw_icon = row["icon"] if "icon" in row_keys else None
+    raw_abbreviation = row["abbreviation"] if "abbreviation" in row_keys else None
+    parts = resolve_cuisine_category_parts(
+        row["name"],
+        icon=raw_icon,
+        abbreviation=raw_abbreviation,
+        category_id=category_id,
+    )
     aliases = _json_text_list(row["aliases_json"])
+    stored_name = clean_cuisine_category_name(row["name"])
+    if stored_name and stored_name not in aliases:
+        aliases.append(stored_name)
     aliases.extend(_seed_aliases(category_id) if seeded else [])
     return {
         "id": category_id,
-        "name": str(row["name"]),
+        **parts,
         "seeded": seeded,
         "custom": not seeded,
         "active": bool(row["is_active"]),
@@ -245,10 +349,21 @@ def _category_item_from_row(row):
 
 
 def _registry_from_connection(connection, user_id):
+    columns = master_data.recipe_master_column_names(
+        connection,
+        "workspace_cuisine_categories",
+    )
+    icon_expression = "icon" if "icon" in columns else "NULL AS icon"
+    abbreviation_expression = (
+        "abbreviation"
+        if "abbreviation" in columns
+        else "NULL AS abbreviation"
+    )
     rows = connection.execute(
-        """
-        SELECT id, name, normalized_name, aliases_json, is_seeded, is_active,
-               sort_order, created_at, updated_at
+        f"""
+        SELECT id, {icon_expression}, {abbreviation_expression},
+               name, normalized_name, aliases_json,
+               is_seeded, is_active, sort_order, created_at, updated_at
           FROM workspace_cuisine_categories
          WHERE user_id = ?
          ORDER BY sort_order ASC, normalized_name ASC, id ASC
@@ -263,7 +378,10 @@ def _internal_default_registry():
         "categories": [
             {
                 "id": category_id,
+                "icon": icon,
+                "abbreviation": abbreviation,
                 "name": name,
+                "display_label": cuisine_category_display_label(icon, name),
                 "seeded": True,
                 "custom": False,
                 "active": True,
@@ -271,7 +389,12 @@ def _internal_default_registry():
                 "updated_at": "",
                 "_aliases": _seed_aliases(category_id),
             }
-            for sort_order, (category_id, name) in enumerate(CUISINE_CATEGORY_SEEDS)
+            for sort_order, (
+                category_id,
+                icon,
+                abbreviation,
+                name,
+            ) in enumerate(CUISINE_CATEGORY_SEEDS)
         ]
     }
 
@@ -284,20 +407,32 @@ def _public_category(item, recipe_count=None):
     }
     aliases = []
     seen_aliases = set()
-    stored_name = clean_cuisine_category_name(item.get("name"))
-    current_name = decorate_recognized_cuisine_name(stored_name)
-    category["name"] = current_name
+    category_name = clean_cuisine_category_name(item.get("name"))
+    icon = clean_cuisine_category_icon(item.get("icon"))
+    abbreviation = clean_cuisine_category_abbreviation(
+        item.get("abbreviation")
+    )
+    display_label = cuisine_category_display_label(icon, category_name)
+    category.update({
+        # `name` remains the legacy display value for existing consumers.
+        "name": display_label,
+        "category_name": category_name,
+        "canonical_name": category_name,
+        "value": category_name,
+        "icon": icon,
+        "abbreviation": abbreviation,
+        "display_label": display_label,
+    })
     category_id = str(item.get("id") or "")
     raw_aliases = list(item.get("_aliases", []))
-    if stored_name and stored_name != current_name:
-        raw_aliases.insert(0, stored_name)
+    raw_aliases.append(category_name)
     for raw_alias in raw_aliases:
         alias = clean_cuisine_category_name(raw_alias)
         alias_key = alias.casefold()
         if (
             not alias
             or alias == category_id
-            or alias == current_name
+            or alias == display_label
             or alias_key in seen_aliases
         ):
             continue
@@ -340,17 +475,25 @@ def _seed_registry(connection, user_id):
         return False
 
     timestamp = master_data.utc_now_iso()
-    for sort_order, (category_id, name) in enumerate(CUISINE_CATEGORY_SEEDS):
+    for sort_order, (
+        category_id,
+        icon,
+        abbreviation,
+        name,
+    ) in enumerate(CUISINE_CATEGORY_SEEDS):
         connection.execute(
             """
             INSERT OR IGNORE INTO workspace_cuisine_categories (
-                user_id, id, name, normalized_name, aliases_json, is_seeded,
-                is_active, sort_order, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, '[]', 1, 1, ?, ?, ?)
+                user_id, id, icon, abbreviation, name, normalized_name,
+                aliases_json, is_seeded, is_active, sort_order, created_at,
+                updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, '[]', 1, 1, ?, ?, ?)
             """,
             (
                 user_id,
                 category_id,
+                icon,
+                abbreviation,
                 name,
                 cuisine_category_key(name),
                 sort_order,
@@ -373,14 +516,35 @@ def _seed_registry(connection, user_id):
 
 
 def _category_lookup(registry):
-    lookup = {}
+    primary_owners = {}
+    alias_owners = {}
+
+    def add_owner(target, value, category_id):
+        key = cuisine_category_key(value)
+        if not key:
+            return
+        target.setdefault(key, set()).add(category_id)
+
     for item in registry.get("categories", []):
         category_id = str(item.get("id") or "")
-        values = [category_id, item.get("name"), *item.get("_aliases", [])]
-        for value in values:
-            key = cuisine_category_key(value)
-            if key:
-                lookup.setdefault(key, category_id)
+        if not category_id:
+            continue
+        for value in (category_id, item.get("name")):
+            add_owner(primary_owners, value, category_id)
+        for value in (
+            item.get("display_label"),
+            *item.get("_aliases", []),
+        ):
+            add_owner(alias_owners, value, category_id)
+
+    lookup = {
+        key: next(iter(owners))
+        for key, owners in primary_owners.items()
+        if len(owners) == 1
+    }
+    for key, owners in alias_owners.items():
+        if key not in lookup and len(owners) == 1:
+            lookup[key] = next(iter(owners))
     return lookup
 
 
@@ -1102,7 +1266,25 @@ def _category_collision(registry, name, current_id=""):
     for item in registry.get("categories", []):
         if str(item.get("id")) == current_id:
             continue
-        values = [item.get("id"), item.get("name"), *item.get("_aliases", [])]
+        values = [
+            item.get("id"),
+            item.get("name"),
+            item.get("display_label"),
+            *item.get("_aliases", []),
+        ]
+        if target_key in {cuisine_category_key(value) for value in values}:
+            return item
+    return None
+
+
+def _category_abbreviation_collision(registry, abbreviation, current_id=""):
+    target_key = cuisine_category_key(abbreviation)
+    if not target_key:
+        return None
+    for item in registry.get("categories", []):
+        if str(item.get("id")) == current_id:
+            continue
+        values = [item.get("abbreviation")]
         if target_key in {cuisine_category_key(value) for value in values}:
             return item
     return None
@@ -1112,19 +1294,28 @@ def save_workspace_cuisine_category(values, category_id="", user_id=None):
     user_id = str(user_id or master_data.scoped_recipe_user_id()).strip()
     category_id = str(category_id or "").strip()
     values = values if isinstance(values, dict) else {}
-    raw_name = values.get("name") or values.get("canonical_name")
-    normalized_raw_name = unicodedata.normalize("NFKC", str(raw_name or ""))
-    name = decorate_recognized_cuisine_name(normalized_raw_name)
+    if "category_name" in values:
+        raw_name = values.get("category_name")
+    elif "canonical_name" in values:
+        raw_name = values.get("canonical_name")
+    elif "name" in values:
+        raw_name = values.get("name")
+    else:
+        raw_name = None
+    icon_supplied = "icon" in values
+    abbreviation_supplied = "abbreviation" in values
+    supplied_icon = (
+        clean_cuisine_category_icon(values.get("icon"))
+        if icon_supplied
+        else None
+    )
+    supplied_abbreviation = (
+        clean_cuisine_category_abbreviation(values.get("abbreviation"))
+        if abbreviation_supplied
+        else None
+    )
+    active_supplied = "active" in values
     active = bool(values.get("active", True))
-    errors = {}
-    if not name:
-        errors["name"] = "Enter a cuisine category name."
-    elif len(name) > CUISINE_CATEGORY_NAME_LIMIT:
-        errors["name"] = f"Use {CUISINE_CATEGORY_NAME_LIMIT} characters or fewer."
-    elif re.search(r"[,;\r\n]", normalized_raw_name):
-        errors["name"] = "Cuisine category names cannot contain commas, semicolons, or line breaks."
-    elif not cuisine_category_key(name):
-        errors["name"] = "Enter a cuisine category name containing letters or numbers."
 
     migration = {"recipe_records": 0, "cookbook_records": 0}
     migration_keys = set()
@@ -1132,6 +1323,7 @@ def save_workspace_cuisine_category(values, category_id="", user_id=None):
         _seed_registry(connection, user_id)
         registry = _registry_from_connection(connection, user_id)
         existing = None
+        existing_item = None
         if category_id:
             existing = connection.execute(
                 """
@@ -1146,10 +1338,113 @@ def save_workspace_cuisine_category(values, category_id="", user_id=None):
                     "status": 404,
                     "error": "Cuisine category not found.",
                 }
-            if bool(existing["is_seeded"]) and name != str(existing["name"]):
-                errors["name"] = "Built-in cuisine category names cannot be changed."
+            existing_item = _category_item_from_row(existing)
+            if not active_supplied:
+                active = bool(existing_item.get("active"))
+
+        effective_raw_name = raw_name
+        if effective_raw_name is None and existing_item:
+            effective_raw_name = existing_item["name"]
+        normalized_raw_name = unicodedata.normalize(
+            "NFKC",
+            str(effective_raw_name or ""),
+        )
+        legacy_input_icon, _legacy_input_name = split_legacy_cuisine_category_label(
+            normalized_raw_name
+        )
+        if existing_item:
+            resolved_icon = (
+                supplied_icon
+                if icon_supplied
+                else (legacy_input_icon or existing_item.get("icon"))
+            )
+            resolved_abbreviation = (
+                supplied_abbreviation
+                if abbreviation_supplied
+                else existing_item.get("abbreviation")
+            )
+        else:
+            resolved_icon = supplied_icon if icon_supplied else None
+            resolved_abbreviation = (
+                supplied_abbreviation if abbreviation_supplied else None
+            )
+        parts = resolve_cuisine_category_parts(
+            normalized_raw_name,
+            icon=resolved_icon,
+            abbreviation=resolved_abbreviation,
+            category_id=category_id,
+        )
+        icon = parts["icon"]
+        abbreviation = parts["abbreviation"]
+        name = parts["name"]
+        display_label = parts["display_label"]
+
+        errors = {}
+        if not name:
+            errors["name"] = "Enter a cuisine category name."
+        elif len(name) > CUISINE_CATEGORY_NAME_LIMIT:
+            errors["name"] = (
+                f"Use {CUISINE_CATEGORY_NAME_LIMIT} characters or fewer."
+            )
+        elif re.search(r"[,;\r\n]", normalized_raw_name):
+            errors["name"] = (
+                "Cuisine category names cannot contain commas, semicolons, "
+                "or line breaks."
+            )
+        elif not cuisine_category_key(name):
+            errors["name"] = (
+                "Enter a cuisine category name containing letters or numbers."
+            )
+        if len(icon) > CUISINE_CATEGORY_ICON_LIMIT:
+            errors["icon"] = (
+                f"Use {CUISINE_CATEGORY_ICON_LIMIT} characters or fewer."
+            )
+        elif re.search(r"[,;\r\n]", icon):
+            errors["icon"] = (
+                "Cuisine category icons cannot contain commas, semicolons, "
+                "or line breaks."
+            )
+        if abbreviation and len(abbreviation) < 2:
+            errors["abbreviation"] = "Use at least 2 characters."
+        elif len(abbreviation) > CUISINE_CATEGORY_ABBREVIATION_LIMIT:
+            errors["abbreviation"] = (
+                f"Use {CUISINE_CATEGORY_ABBREVIATION_LIMIT} characters or fewer."
+            )
+        elif abbreviation and not re.fullmatch(r"[A-Z0-9]+", abbreviation):
+            errors["abbreviation"] = "Use letters and numbers only."
+
+        if (
+            existing_item
+            and existing_item.get("seeded")
+            and name != existing_item.get("name")
+        ):
+            errors["name"] = "Built-in cuisine category names cannot be changed."
         if name and _category_collision(registry, name, category_id):
             errors["name"] = "A cuisine category with that name already exists."
+        display_key = cuisine_category_key(display_label)
+        name_key = cuisine_category_key(name)
+        if (
+            display_key
+            and display_key != name_key
+            and _category_collision(registry, display_label, category_id)
+        ):
+            errors["icon"] = (
+                "That icon and category name match another cuisine category."
+            )
+        existing_abbreviation = clean_cuisine_category_abbreviation(
+            existing_item.get("abbreviation") if existing_item else ""
+        )
+        abbreviation_changed = (
+            not existing_item or abbreviation != existing_abbreviation
+        )
+        if abbreviation and abbreviation_changed and _category_abbreviation_collision(
+            registry,
+            abbreviation,
+            category_id,
+        ):
+            errors["abbreviation"] = (
+                "A cuisine category with that abbreviation already exists."
+            )
         if errors:
             return {
                 "ok": False,
@@ -1160,31 +1455,51 @@ def save_workspace_cuisine_category(values, category_id="", user_id=None):
 
         timestamp = master_data.utc_now_iso()
         if existing:
-            previous_name = str(existing["name"])
+            previous_name = str(existing_item["name"])
+            previous_display_label = str(existing_item["display_label"])
+            stored_name = clean_cuisine_category_name(existing["name"])
             aliases = _json_text_list(existing["aliases_json"])
             if previous_name != name:
-                migration_keys = {
+                candidate_migration_keys = {
                     cuisine_category_key(value)
                     for value in (
                         category_id,
                         previous_name,
+                        previous_display_label,
+                        stored_name,
                         *aliases,
                         *_seed_aliases(category_id),
                     )
                     if cuisine_category_key(value)
                 }
-                aliases = _json_text_list(json.dumps(
-                    [*aliases, previous_name],
-                    ensure_ascii=False,
-                ))
+                current_lookup = _category_lookup(registry)
+                migration_keys = {
+                    key
+                    for key in candidate_migration_keys
+                    if current_lookup.get(key) == category_id
+                }
+            historical_aliases = [*aliases]
+            if stored_name and stored_name != name:
+                historical_aliases.append(stored_name)
+            if previous_name != name:
+                historical_aliases.append(previous_name)
+            if previous_display_label != display_label:
+                historical_aliases.append(previous_display_label)
+            aliases = _json_text_list(json.dumps(
+                historical_aliases,
+                ensure_ascii=False,
+            ))
             connection.execute(
                 """
                 UPDATE workspace_cuisine_categories
-                   SET name = ?, normalized_name = ?, aliases_json = ?,
-                       is_active = ?, updated_at = ?
+                   SET icon = ?, abbreviation = ?, name = ?,
+                       normalized_name = ?, aliases_json = ?, is_active = ?,
+                       updated_at = ?
                  WHERE user_id = ? AND id = ?
                 """,
                 (
+                    icon,
+                    abbreviation,
                     name,
                     cuisine_category_key(name),
                     json.dumps(aliases, ensure_ascii=False),
@@ -1207,13 +1522,16 @@ def save_workspace_cuisine_category(values, category_id="", user_id=None):
             connection.execute(
                 """
                 INSERT INTO workspace_cuisine_categories (
-                    user_id, id, name, normalized_name, aliases_json, is_seeded,
-                    is_active, sort_order, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, '[]', 0, ?, ?, ?, ?)
+                    user_id, id, icon, abbreviation, name, normalized_name,
+                    aliases_json, is_seeded, is_active, sort_order, created_at,
+                    updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, '[]', 0, ?, ?, ?, ?)
                 """,
                 (
                     user_id,
                     category_id,
+                    icon,
+                    abbreviation,
                     name,
                     cuisine_category_key(name),
                     1 if active else 0,
@@ -1238,8 +1556,15 @@ def save_workspace_cuisine_category(values, category_id="", user_id=None):
         "ok": True,
         "created": not bool(existing),
         "category_id": category_id,
-        "name": name,
-        "message": f'{name} {"added" if not existing else "updated"}.',
+        "name": display_label,
+        "category_name": name,
+        "canonical_name": name,
+        "icon": icon,
+        "abbreviation": abbreviation,
+        "display_label": display_label,
+        "message": (
+            f'{display_label} {"added" if not existing else "updated"}.'
+        ),
         "migration": migration,
         "registry": _public_registry(registry),
     }
@@ -1271,6 +1596,8 @@ def delete_workspace_cuisine_category(category_id, user_id=None):
                     "Built-in cuisine categories can be deactivated but not deleted."
                 ),
             }
+        existing_item = _category_item_from_row(existing)
+        existing_label = str(existing_item["display_label"])
         registry = _registry_from_connection(connection, user_id)
         usage = _usage_counts(user_id, registry).get(category_id, 0)
         if usage:
@@ -1278,7 +1605,7 @@ def delete_workspace_cuisine_category(category_id, user_id=None):
                 "ok": False,
                 "status": 409,
                 "error": (
-                    f'{existing["name"]} is used by {usage} '
+                    f"{existing_label} is used by {usage} "
                     f'recipe{"s" if usage != 1 else ""}. Deactivate it instead.'
                 ),
             }
@@ -1291,7 +1618,7 @@ def delete_workspace_cuisine_category(category_id, user_id=None):
         "ok": True,
         "deleted": True,
         "category_id": category_id,
-        "message": f'{existing["name"]} deleted.',
+        "message": f"{existing_label} deleted.",
         "registry": _public_registry(registry),
     }
 
