@@ -958,7 +958,7 @@ def test_recipe_editor_store_section_menu_reconciles_direct_children_without_css
     assert "Sort other columns to order ingredients within each section." in view
     assert "[data-recipe-ingredient-column-view-group-store]" in view
     assert "recipeEditIngredientColumnView.groupByStoreSection = false;" in view
-    assert "renderRecipeIngredientColumnViewGroupHeaders(list, sortedRows);" in view
+    assert "renderRecipeIngredientColumnViewGroupHeaders(list, presentationRows);" in view
     assert "function recipeIngredientColumnViewDescription()" in view
     assert "function compareRecipeIngredientColumnViewSort(left, right, sort, storeOrder)" in view
     assert "function recipeIngredientColumnViewCompare(left, right, storeOrder, manualStoreOrder)" in view
@@ -1739,6 +1739,10 @@ function recipeIngredientColumnViewIngredientCount(row) {
     return (row.recipeIngredientColumnViewEntries || [{counted: true}])
         .filter(entry => entry.counted !== false).length;
 }
+function recipeIngredientColumnViewChoiceOptions() {
+    return {statusText: "Selection required", helperText: "Choose one option"};
+}
+function ensureRecipeIngredientExpansionId(row) { return row.id; }
 function recipeIngredientStoreSectionIconHtml() { return ""; }
 function escapeHtml(value) { return String(value); }
 """ + reconcile + "\n" + count_label + "\n" + render_headers + r"""
@@ -1756,21 +1760,62 @@ const cannedCorn = ingredient("canned-corn", "canned", "Canned Goods");
 const corn = ingredient("corn", "produce", "Produce");
 const onion = ingredient("onion", "produce", "Produce");
 const cumin = ingredient("cumin", "spices", "Spices");
+const requiredParent = {id: "required-choice"};
+const required = ingredient("required-option", "frozen", "Frozen", false);
+const filteredParent = {id: "filtered-choice"};
+const filteredAlternative = ingredient(
+    "filtered-alternative",
+    "frozen",
+    "Frozen",
+    false,
+);
 const list = new FakeNode("ingredients");
-const rows = [butter, egg, sourCream, cannedCorn, corn, onion, cumin];
+const rows = [
+    butter,
+    egg,
+    sourCream,
+    cannedCorn,
+    corn,
+    onion,
+    cumin,
+    required,
+    filteredAlternative,
+];
 list.append(...rows);
 renderRecipeIngredientColumnViewGroupHeaders(
     list,
-    rows.map((row, index) => ({row, index, filtered: false})),
+    rows.map((row, index) => ({
+        row,
+        index,
+        filtered: false,
+        attachedAlternative: row === required || row === filteredAlternative,
+        requiredChoiceStart: row === required,
+        requiredChoiceParent: row === required ? requiredParent : null,
+        detachedAlternativeStart: row === filteredAlternative,
+        detachedAlternativeParent: row === filteredAlternative
+            ? filteredParent
+            : null,
+        detachedAlternativeLabel: row === filteredAlternative
+            ? "Alternative option"
+            : "",
+        detachedAlternativeHelper: row === filteredAlternative
+            ? "Current option hidden by filter"
+            : "",
+    })),
 );
 process.stdout.write(JSON.stringify({
     sequence: list.children.map(item => (
         item.dataset.recipeIngredientColumnGroupHeader
             ? `header:${item.dataset.recipeIngredientColumnGroupHeader}`
+            : item.dataset.recipeIngredientColumnChoiceBoundary
+                ? `required:${item.dataset.recipeIngredientColumnChoiceBoundary}`
             : item.id
     )),
     labels: list.children
         .filter(item => item.dataset.recipeIngredientColumnGroupHeader)
+        .map(item => item.attributes["aria-label"]),
+    requiredLabels: list.children
+        .filter(item => item.dataset.recipeIngredientColumnChoiceBoundary)
         .map(item => item.attributes["aria-label"]),
 }));
 """
@@ -1797,12 +1842,20 @@ process.stdout.write(JSON.stringify({
             "onion",
             "header:spices",
             "cumin",
+            "required:required-choice",
+            "required-option",
+            "required:filtered-choice-filtered-alternative",
+            "filtered-alternative",
         ],
         "labels": [
             "Dairy & Eggs, 3 ingredients",
             "Canned Goods, 1 ingredient",
             "Produce, 2 ingredients",
             "Spices, 1 ingredient",
+        ],
+        "requiredLabels": [
+            "Selection required. Choose one option.",
+            "Alternative option. Current option hidden by filter.",
         ],
     }
 
@@ -4828,7 +4881,7 @@ def test_store_section_grouping_promotes_actual_rows_with_compact_section_contex
     assert (
         "syncRecipeIngredientColumnViewVisibleSectionContexts(\n"
         "            ingredientEntries,\n"
-        "            sortedRows.map(entry => entry.row),\n"
+        "            presentationRows.map(entry => entry.row),\n"
         "        );"
         in apply_view
     )
@@ -4989,10 +5042,14 @@ function detach(control) {
     control.container = null;
 }
 function fakeCell(id) {
+    const attributes = new Map([["aria-hidden", "true"]]);
     return {
         id,
         controls: [],
         classList: fakeClassList(),
+        getAttribute(name) { return attributes.has(name) ? attributes.get(name) : null; },
+        setAttribute(name, value) { attributes.set(name, String(value)); },
+        removeAttribute(name) { attributes.delete(name); },
         appendChild(control) {
             detach(control);
             this.controls.push(control);
@@ -5152,6 +5209,7 @@ const visibleAlternative = {
     selectionOwner: useThisOption.ownerRow.id,
     menuOwner: alternativeMenu.ownerRow.id,
     selectionHandler: useThisOption.getAttribute("onclick"),
+    actionCellAriaHidden: alternativeOnion.cell.getAttribute("aria-hidden"),
 };
 alternativeEntries[0].filtered = true;
 syncRecipeIngredientColumnViewVisibleOptionControls(
@@ -5163,6 +5221,8 @@ const filteredAlternative = {
         .map(entry => entry.row.id),
     selectionOwner: useThisOption.ownerRow.id,
     menuOwner: alternativeMenu.ownerRow.id,
+    previousCellAriaHidden: alternativeOnion.cell.getAttribute("aria-hidden"),
+    actionCellAriaHidden: frozen.cell.getAttribute("aria-hidden"),
 };
 alternativeEntries[0].filtered = false;
 syncRecipeIngredientColumnViewVisibleOptionControls(
@@ -5180,6 +5240,8 @@ const restoredAlternative = {
     menuCount: [alternativeOnion, frozen].filter(row => (
         row.cell.controls.includes(alternativeMenu)
     )).length,
+    previousCellAriaHidden: frozen.cell.getAttribute("aria-hidden"),
+    actionCellAriaHidden: alternativeOnion.cell.getAttribute("aria-hidden"),
 };
 
 const selectedParentHandleCell = fakeCell("selected-parent-handle-cell");
@@ -5288,11 +5350,14 @@ process.stdout.write(JSON.stringify({
             "selectionHandler": (
                 "return selectRecipeIngredientColumnViewOption(this, event)"
             ),
+            "actionCellAriaHidden": None,
         },
         "filteredAlternative": {
             "interaction": ["frozen-corn"],
             "selectionOwner": "frozen-corn",
             "menuOwner": "frozen-corn",
+            "previousCellAriaHidden": "true",
+            "actionCellAriaHidden": None,
         },
         "restoredAlternative": {
             "interaction": ["alternative-onion"],
@@ -5300,6 +5365,8 @@ process.stdout.write(JSON.stringify({
             "menuOwner": "alternative-onion",
             "selectionCount": 1,
             "menuCount": 1,
+            "previousCellAriaHidden": "true",
+            "actionCellAriaHidden": None,
         },
         "selected": {
             "interaction": ["selected-corn"],
@@ -5357,9 +5424,10 @@ def test_grouped_option_control_rehoming_has_one_restore_owner():
     assert "previousControls.filter(item => item !== control)" in move_control
     assert "control.recipeIngredientColumnViewOwnerRow = row;" in move_control
     assert "delete control.recipeIngredientColumnViewOwnerRow;" in restore
+    assert 'optionSpacer?.setAttribute("aria-hidden", "true");' in restore
 
 
-def test_grouped_store_section_counts_name_visible_alternatives_separately():
+def test_ingredient_view_count_labels_can_describe_visible_alternatives_separately():
     node = shutil.which("node")
     if not node:
         pytest.skip("Node.js is required for alternative count-label coverage")
@@ -5404,6 +5472,306 @@ process.stdout.write(JSON.stringify({
         "alternativeOnly": "1 alternative ingredient",
         "allSectionsSummary": "12 of 12 active + 2 alternative ingredients",
         "alternativeOnlySummary": "0 of 12 active + 1 alternative ingredient",
+    }
+
+
+def test_store_section_grouping_attaches_inactive_options_to_the_active_choice():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for attached option grouping coverage")
+
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    presentation_entries = javascript_function_source(
+        script,
+        "recipeIngredientColumnViewPresentationEntries",
+    )
+    inactive_row = javascript_function_source(
+        script,
+        "recipeIngredientColumnViewIsInactivePresentationRow",
+    )
+    attached_rows = javascript_function_source(
+        script,
+        "recipeIngredientColumnViewAttachedPresentationRows",
+    )
+    group_headers = javascript_function_source(
+        script,
+        "renderRecipeIngredientColumnViewGroupHeaders",
+    )
+    filter_options = javascript_function_source(
+        script,
+        "recipeIngredientColumnViewOptions",
+    )
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    assert "if (entry.attachedAlternative) return;" in group_headers
+    assert "if (!entry.attachedAlternative)" in group_headers
+    assert 'columnKey === "store" && ingredientEntry.counted === false' in filter_options
+    assert "option.alternativeCount += 1;" in filter_options
+    assert "Selection required" in group_headers
+    assert "Current option hidden by filter" in attached_rows
+    assert "is-filtered-alternative" in group_headers
+    assert "recipeIngredientColumnChoiceBoundary" in group_headers
+    assert ".recipe-edit-selected-option-toggle[hidden]" in css
+    harness = r"""
+function choiceParent(id, requiredUnresolved = false) {
+    return {
+        id,
+        requiredUnresolved,
+        classList: {
+            contains(name) { return name === "has-ingredient-choice"; },
+        },
+    };
+}
+function recipeIngredientColumnViewChoiceOptions(parentRow) {
+    return {requiredUnresolved: Boolean(parentRow?.requiredUnresolved)};
+}
+function displayItem({
+    id,
+    parentRow = null,
+    counted = true,
+    optionId = "",
+    store = "unassigned",
+    manualIndex = 0,
+    componentOrder = 0,
+    filtered = false,
+}) {
+    const entry = {
+        parentRow,
+        counted,
+        selected: counted,
+        optionId,
+        optionContextKey: optionId ? `id:${optionId}` : "",
+        store: {key: store},
+        manualIndex,
+        componentOrder,
+        filtered,
+    };
+    const row = {id, recipeIngredientColumnViewEntries: [entry]};
+    entry.row = row;
+    return {row, index: manualIndex, filtered};
+}
+function visible(items) {
+    return items.filter(item => !item.filtered && !item.presentationHidden);
+}
+function activeSections(items) {
+    return [...new Set(visible(items)
+        .filter(item => !item.attachedAlternative)
+        .map(item => item.row.recipeIngredientColumnViewEntries[0].store.key))];
+}
+""" + presentation_entries + "\n" + inactive_row + "\n" + attached_rows + r"""
+
+const cornChoice = choiceParent("corn-choice");
+const before = displayItem({id: "before", store: "misc", manualIndex: 0});
+const corn = displayItem({
+    id: "fresh-corn", parentRow: cornChoice, counted: true,
+    optionId: "fresh", store: "produce", manualIndex: 1,
+});
+const cumin = displayItem({
+    id: "cumin", parentRow: cornChoice, counted: true,
+    optionId: "fresh", store: "spices", manualIndex: 2,
+});
+const onion = displayItem({
+    id: "onion", parentRow: cornChoice, counted: true,
+    optionId: "fresh", store: "produce", manualIndex: 3,
+});
+const after = displayItem({id: "after", store: "dairy", manualIndex: 6});
+const frozenCorn = displayItem({
+    id: "frozen-corn", parentRow: cornChoice, counted: false,
+    optionId: "frozen", store: "frozen", manualIndex: 4,
+    componentOrder: 0,
+});
+const alternativeOnion = displayItem({
+    id: "alternative-onion", parentRow: cornChoice, counted: false,
+    optionId: "frozen", store: "produce", manualIndex: 5,
+    componentOrder: 1,
+});
+
+// This is the order produced by Store Section sorting before inactive options
+// are reattached. The two inactive members are intentionally split by aisle.
+const expanded = recipeIngredientColumnViewAttachedPresentationRows([
+    before,
+    cumin,
+    after,
+    corn,
+    onion,
+    alternativeOnion,
+    frozenCorn,
+]);
+const expandedIds = expanded.map(item => item.row.id);
+const hostIndex = expandedIds.indexOf("onion");
+
+const partialFilterParent = choiceParent("partial-filter-choice");
+const partialSelected = displayItem({
+    id: "partial-selected", parentRow: partialFilterParent, counted: true,
+    optionId: "selected", store: "produce", manualIndex: 0,
+});
+const partialFrozen = displayItem({
+    id: "partial-frozen", parentRow: partialFilterParent, counted: false,
+    optionId: "alternative", store: "frozen", manualIndex: 1,
+    componentOrder: 0, filtered: true,
+});
+const partialOnion = displayItem({
+    id: "partial-onion", parentRow: partialFilterParent, counted: false,
+    optionId: "alternative", store: "produce", manualIndex: 2,
+    componentOrder: 1,
+});
+const partialFilterView = recipeIngredientColumnViewAttachedPresentationRows([
+    partialSelected,
+    partialOnion,
+    partialFrozen,
+]);
+
+const filteredParent = choiceParent("filtered-choice");
+const filteredSelected = displayItem({
+    id: "filtered-selected", parentRow: filteredParent, counted: true,
+    optionId: "selected", store: "produce", manualIndex: 0, filtered: true,
+});
+const orphanAlternative = displayItem({
+    id: "orphan-alternative", parentRow: filteredParent, counted: false,
+    optionId: "alternative", store: "frozen", manualIndex: 1,
+});
+const filteredView = recipeIngredientColumnViewAttachedPresentationRows([
+    filteredSelected,
+    orphanAlternative,
+]);
+
+const unresolvedParent = choiceParent("required-choice", true);
+const unresolvedA = displayItem({
+    id: "required-a", parentRow: unresolvedParent, counted: false,
+    optionId: "a", store: "produce", manualIndex: 0,
+});
+const unresolvedB = displayItem({
+    id: "required-b", parentRow: unresolvedParent, counted: false,
+    optionId: "b", store: "frozen", manualIndex: 1,
+});
+const unresolvedView = recipeIngredientColumnViewAttachedPresentationRows([
+    unresolvedB,
+    unresolvedA,
+]);
+
+const switchedParent = choiceParent("switched-choice");
+const selectedFrozen = displayItem({
+    id: "selected-frozen", parentRow: switchedParent, counted: true,
+    optionId: "frozen", store: "frozen", manualIndex: 0,
+});
+const selectedOnion = displayItem({
+    id: "selected-onion", parentRow: switchedParent, counted: true,
+    optionId: "frozen", store: "produce", manualIndex: 1,
+});
+const previousCorn = displayItem({
+    id: "previous-corn", parentRow: switchedParent, counted: false,
+    optionId: "fresh", store: "produce", manualIndex: 2, componentOrder: 0,
+});
+const previousCumin = displayItem({
+    id: "previous-cumin", parentRow: switchedParent, counted: false,
+    optionId: "fresh", store: "spices", manualIndex: 3, componentOrder: 1,
+});
+const switched = recipeIngredientColumnViewAttachedPresentationRows([
+    selectedFrozen,
+    selectedOnion,
+    previousCumin,
+    previousCorn,
+]);
+const repeated = recipeIngredientColumnViewAttachedPresentationRows(switched);
+
+process.stdout.write(JSON.stringify({
+    expanded: {
+        order: expandedIds,
+        attachedAfterSelected: expandedIds.slice(hostIndex + 1, hostIndex + 3),
+        attachedRows: visible(expanded)
+            .filter(item => item.attachedAlternative)
+            .map(item => item.row.id),
+        activeSections: activeSections(expanded),
+        uniqueRows: new Set(expandedIds).size === expandedIds.length,
+    },
+    partialFilter: {
+        visible: visible(partialFilterView).map(item => item.row.id),
+        frozenFilterPreserved: partialFrozen.filtered,
+        visibleAttached: visible(partialFilterView)
+            .filter(item => item.attachedAlternative)
+            .map(item => item.row.id),
+    },
+    filtered: {
+        selectedHidden: filteredSelected.filtered,
+        alternativeHidden: orphanAlternative.presentationHidden,
+        visible: visible(filteredView).map(item => item.row.id),
+        starts: filteredView
+            .filter(item => item.detachedAlternativeStart)
+            .map(item => item.row.id),
+        parent: filteredView.find(item => item.detachedAlternativeStart)
+            ?.detachedAlternativeParent?.id || null,
+    },
+    unresolved: {
+        visible: visible(unresolvedView).map(item => item.row.id),
+        starts: unresolvedView
+            .filter(item => item.requiredChoiceStart)
+            .map(item => item.row.id),
+        parent: unresolvedView.find(item => item.requiredChoiceStart)
+            ?.requiredChoiceParent?.id || null,
+    },
+    switched: {
+        activeSections: activeSections(switched),
+        attachedRows: visible(switched)
+            .filter(item => item.attachedAlternative)
+            .map(item => item.row.id),
+        repeatedOrder: repeated.map(item => item.row.id),
+        uniqueRows: new Set(repeated.map(item => item.row.id)).size === repeated.length,
+    },
+}));
+"""
+    completed = subprocess.run(
+        [node],
+        input=harness,
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    result = json.loads(completed.stdout)
+    assert result["expanded"] == {
+        "order": [
+            "before",
+            "cumin",
+            "after",
+            "fresh-corn",
+            "onion",
+            "frozen-corn",
+            "alternative-onion",
+        ],
+        "attachedAfterSelected": ["frozen-corn", "alternative-onion"],
+        "attachedRows": ["frozen-corn", "alternative-onion"],
+        "activeSections": ["misc", "spices", "dairy", "produce"],
+        "uniqueRows": True,
+    }
+    assert result["partialFilter"] == {
+        "visible": ["partial-selected", "partial-onion"],
+        "frozenFilterPreserved": True,
+        "visibleAttached": ["partial-onion"],
+    }
+    assert result["filtered"] == {
+        "selectedHidden": True,
+        "alternativeHidden": False,
+        "visible": ["orphan-alternative"],
+        "starts": ["orphan-alternative"],
+        "parent": "filtered-choice",
+    }
+    assert result["unresolved"] == {
+        "visible": ["required-a", "required-b"],
+        "starts": ["required-a"],
+        "parent": "required-choice",
+    }
+    assert result["switched"] == {
+        "activeSections": ["frozen", "produce"],
+        "attachedRows": ["previous-corn", "previous-cumin"],
+        "repeatedOrder": [
+            "selected-frozen",
+            "selected-onion",
+            "previous-corn",
+            "previous-cumin",
+        ],
+        "uniqueRows": True,
     }
 
 

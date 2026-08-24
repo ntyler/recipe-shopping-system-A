@@ -41721,6 +41721,16 @@ body.recipe-edit-standalone-page #recipeEditIngredients
 }
 
 body.recipe-edit-standalone-page #recipeEditIngredients
+    > .recipe-edit-ingredient-column-group-header:is(
+        .is-required-choice,
+        .is-filtered-alternative
+    ) {
+    border-color: var(--app-border);
+    background: var(--app-surface-soft);
+    color: var(--app-muted);
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
     > .recipe-edit-ingredient-column-group-header > div {
     display: flex;
     min-width: 0;
@@ -79173,6 +79183,13 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     box-sizing: border-box;
     width: 100% !important;
     padding-inline: 3px !important;
+}
+
+body.recipe-edit-standalone-page #recipeEditIngredients
+    > [data-recipe-ingredient-column-option-row]
+    .recipe-edit-alternative-component-option-spacer
+    > .recipe-edit-selected-option-toggle[hidden] {
+    display: none !important;
 }
 
 body.recipe-edit-standalone-page #recipeEditIngredients

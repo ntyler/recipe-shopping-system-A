@@ -29910,9 +29910,13 @@ function clearRecipeIngredientColumnViewSectionFragments(list) {
         row.removeAttribute("data-recipe-ingredient-option-interaction-anchor");
         row.removeAttribute("data-recipe-ingredient-option-section-context");
         row.removeAttribute("data-recipe-ingredient-choice-parent-id");
-        row.querySelector(
+        const optionSpacer = row.querySelector(
             ".recipe-edit-alternative-component-option-spacer",
-        )?.classList.remove("has-recipe-ingredient-grouped-option-menu");
+        );
+        optionSpacer?.classList.remove(
+            "has-recipe-ingredient-grouped-option-menu",
+        );
+        optionSpacer?.setAttribute("aria-hidden", "true");
         row.classList.remove("has-recipe-ingredient-grouped-management");
         organizeRecipeIngredientRowActions(row);
         delete row.recipeIngredientColumnViewHome;
@@ -30334,6 +30338,13 @@ function syncRecipeIngredientColumnViewManagementRows(
 }
 
 function recipeIngredientColumnViewEntryShowsOptionContext(entry) {
+    // An inactive option is presented as one attached comparison block while
+    // Store Section grouping is active. Its canonical data anchor can be a
+    // different member from the first rendered member, so only the block's
+    // presentation anchor should repeat the option label.
+    if (entry?.attachedAlternative) {
+        return Boolean(entry.sectionContextAnchor);
+    }
     return Boolean(entry?.anchor || entry?.sectionContextAnchor);
 }
 
@@ -30466,7 +30477,9 @@ function recipeIngredientColumnViewOptionInteractionAnchor(
 ) {
     const canonicalAnchor = optionEntries.find(entry => entry.anchor)
         || recipeIngredientColumnViewOptionAnchor(parentRow, optionEntries);
-    const visibleEntries = optionEntries.filter(entry => !entry.filtered);
+    const visibleEntries = optionEntries.filter(entry => (
+        !entry.filtered && !entry.presentationHidden
+    ));
     if (!visibleEntries.length) return null;
 
     // Selected-option disclosure and group actions keep their canonical data
@@ -30529,10 +30542,21 @@ function syncRecipeIngredientColumnViewVisibleOptionControls(
     optionEntries = [],
 ) {
     if (!parentRow || !optionEntries.length) return null;
+    const selectedOption = optionEntries.some(entry => entry.selected);
     const interactionAnchor = recipeIngredientColumnViewOptionInteractionAnchor(
         parentRow,
         optionEntries,
     );
+    if (!selectedOption) {
+        // Inactive option cells start as decorative summary cells. Reset all
+        // of them before rehoming the one actionable control so filtering can
+        // never leave a stale focusable cell exposed to assistive technology.
+        optionEntries.forEach(entry => {
+            entry.row.querySelector(
+                ".recipe-edit-alternative-component-option-spacer",
+            )?.setAttribute?.("aria-hidden", "true");
+        });
+    }
     optionEntries.forEach(entry => {
         entry.row.querySelectorAll(
             ":scope > .recipe-edit-alternative-component-handle-cell "
@@ -30558,7 +30582,6 @@ function syncRecipeIngredientColumnViewVisibleOptionControls(
         )?.classList.remove("has-recipe-ingredient-grouped-option-menu");
     });
 
-    const selectedOption = optionEntries.some(entry => entry.selected);
     const canonicalAnchor = optionEntries.find(entry => entry.anchor) || null;
     if (selectedOption) {
         parentRow.recipeIngredientGroupedChoiceAnchorSummary = (
@@ -30656,6 +30679,12 @@ function syncRecipeIngredientColumnViewVisibleOptionControls(
             "has-recipe-ingredient-grouped-option-menu",
             movedMenu,
         );
+        if (selectionControl || movedMenu) {
+            // These cells are decorative until an option action is rehomed
+            // into them. A visible, focusable action must not remain beneath
+            // the summary cell's original aria-hidden state.
+            targetCell.removeAttribute?.("aria-hidden");
+        }
     }
 
     if (selectedOption) {
@@ -30711,11 +30740,23 @@ function syncRecipeIngredientColumnViewVisibleSectionContexts(
                 return leftOrder - rightOrder
                     || Number(left.manualIndex || 0) - Number(right.manualIndex || 0);
             });
-            assignRecipeIngredientColumnViewSectionContextAnchors(
-                parentRow,
-                orderedOptionEntries,
-                { visibleOnly: true },
-            );
+            const attachedAlternative = orderedOptionEntries.every(entry => (
+                entry.counted === false
+            ));
+            if (attachedAlternative) {
+                const contextAnchor = orderedOptionEntries.find(entry => (
+                    !entry.filtered && !entry.presentationHidden
+                )) || null;
+                orderedOptionEntries.forEach(entry => {
+                    entry.sectionContextAnchor = entry === contextAnchor;
+                });
+            } else {
+                assignRecipeIngredientColumnViewSectionContextAnchors(
+                    parentRow,
+                    orderedOptionEntries,
+                    { visibleOnly: true },
+                );
+            }
             optionGroups.push({
                 parentRow,
                 optionEntries: orderedOptionEntries,
@@ -31018,6 +31059,10 @@ function recipeIngredientColumnViewOptions(columnKey) {
         recipeIngredientColumnViewDisplayRows(),
     );
     ingredientEntries.forEach(ingredientEntry => {
+        // Store Section filters describe aisles used by the active recipe.
+        // Inactive comparison members stay inside their attached option block
+        // and must not introduce a top-level aisle filter of their own.
+        if (columnKey === "store" && ingredientEntry.counted === false) return;
         const columnEntry = recipeIngredientColumnViewEntry(
             ingredientEntry.row,
             columnKey,
@@ -31271,8 +31316,220 @@ function recipeIngredientColumnViewCompare(left, right, storeOrder, manualStoreO
     return left.index - right.index;
 }
 
+function recipeIngredientColumnViewPresentationEntries(item) {
+    const row = item?.row || item;
+    return Array.isArray(row?.recipeIngredientColumnViewEntries)
+        ? row.recipeIngredientColumnViewEntries
+        : [];
+}
+
+function recipeIngredientColumnViewIsInactivePresentationRow(item) {
+    const entries = recipeIngredientColumnViewPresentationEntries(item);
+    return Boolean(
+        entries.length
+        && entries.every(entry => entry.counted === false),
+    );
+}
+
+function recipeIngredientColumnViewAttachedPresentationRows(sortedRows = []) {
+    const activeRows = [];
+    const groupsByParent = new Map();
+
+    sortedRows.forEach(item => {
+        item.presentationHidden = false;
+        item.requiredChoiceStart = false;
+        item.requiredChoiceParent = null;
+        item.detachedAlternativeStart = false;
+        item.detachedAlternativeParent = null;
+        item.detachedAlternativeLabel = "";
+        item.detachedAlternativeHelper = "";
+        item.attachedAlternative = recipeIngredientColumnViewIsInactivePresentationRow(
+            item,
+        );
+        const entries = recipeIngredientColumnViewPresentationEntries(item);
+        entries.forEach(entry => {
+            entry.presentationHidden = false;
+            entry.attachedAlternative = item.attachedAlternative;
+        });
+        if (!item.attachedAlternative) {
+            activeRows.push(item);
+            return;
+        }
+
+        const representative = entries[0] || {};
+        const parentRow = representative.parentRow || null;
+        const optionKey = String(
+            representative.optionContextKey
+            || (representative.optionId
+                ? `id:${representative.optionId}`
+                : "__option__"),
+        );
+        const optionsByKey = groupsByParent.get(parentRow) || new Map();
+        const group = optionsByKey.get(optionKey) || {
+            parentRow,
+            optionKey,
+            rows: [],
+        };
+        group.rows.push(item);
+        optionsByKey.set(optionKey, group);
+        groupsByParent.set(parentRow, optionsByKey);
+    });
+
+    const rowManualOrder = item => {
+        const entry = recipeIngredientColumnViewPresentationEntries(item)[0];
+        const componentOrder = Number(entry?.componentOrder);
+        const manualIndex = Number(entry?.manualIndex ?? item?.index);
+        return {
+            component: Number.isFinite(componentOrder)
+                ? componentOrder
+                : Number.MAX_SAFE_INTEGER,
+            manual: Number.isFinite(manualIndex)
+                ? manualIndex
+                : Number.MAX_SAFE_INTEGER,
+        };
+    };
+    const compareGroupRows = (left, right) => {
+        const leftOrder = rowManualOrder(left);
+        const rightOrder = rowManualOrder(right);
+        return leftOrder.component - rightOrder.component
+            || leftOrder.manual - rightOrder.manual;
+    };
+    const groupManualOrder = group => Math.min(
+        ...group.rows.map(item => rowManualOrder(item).manual),
+    );
+
+    const attachedAfter = new Map();
+    const unresolvedBlocks = [];
+    const detachedAlternativeBlocks = [];
+    const hiddenAlternativeRows = [];
+    groupsByParent.forEach((optionsByKey, parentRow) => {
+        const groups = [...optionsByKey.values()].sort((left, right) => (
+            groupManualOrder(left) - groupManualOrder(right)
+        ));
+        groups.forEach(group => group.rows.sort(compareGroupRows));
+        const selectedRows = activeRows.filter(item => (
+            recipeIngredientColumnViewPresentationEntries(item).some(entry => (
+                entry.parentRow === parentRow && entry.counted !== false
+            ))
+        ));
+        const visibleSelectedRows = activeRows.filter(item => (
+            !item.filtered
+            && recipeIngredientColumnViewPresentationEntries(item).some(entry => (
+                entry.parentRow === parentRow && entry.counted !== false
+            ))
+        ));
+        const host = visibleSelectedRows[visibleSelectedRows.length - 1] || null;
+        const requiredUnresolved = Boolean(
+            parentRow?.classList?.contains("has-ingredient-choice")
+            && recipeIngredientColumnViewChoiceOptions(parentRow).requiredUnresolved,
+        );
+        const matchingDetachedRows = groups.flatMap(group => group.rows)
+            .filter(item => !item.filtered);
+
+        if (!host && !requiredUnresolved && matchingDetachedRows.length) {
+            const firstDetachedRow = matchingDetachedRows[0];
+            firstDetachedRow.detachedAlternativeStart = true;
+            firstDetachedRow.detachedAlternativeParent = parentRow;
+            firstDetachedRow.detachedAlternativeLabel = selectedRows.length
+                ? "Alternative option"
+                : "Ingredient options";
+            firstDetachedRow.detachedAlternativeHelper = selectedRows.length
+                ? "Current option hidden by filter"
+                : "Choose an option";
+            detachedAlternativeBlocks.push({
+                parentRow,
+                rows: groups.flatMap(group => group.rows),
+                manualOrder: rowManualOrder(firstDetachedRow).manual,
+            });
+            return;
+        }
+
+        groups.forEach(group => {
+            if (host) {
+                group.rows.forEach(item => {
+                    item.presentationHidden = false;
+                    recipeIngredientColumnViewPresentationEntries(item)
+                        .forEach(entry => {
+                            entry.presentationHidden = false;
+                        });
+                });
+                const attached = attachedAfter.get(host) || [];
+                attached.push(...group.rows);
+                attachedAfter.set(host, attached);
+                return;
+            }
+
+            if (requiredUnresolved) {
+                group.rows.forEach(item => {
+                    // A required unresolved choice is the deliberate filter
+                    // exception: all choices must remain available until the
+                    // user makes a valid selection.
+                    item.filtered = false;
+                    item.presentationHidden = false;
+                    recipeIngredientColumnViewPresentationEntries(item)
+                        .forEach(entry => {
+                            entry.filtered = false;
+                            entry.presentationHidden = false;
+                        });
+                });
+                return;
+            }
+
+            group.rows.forEach(item => {
+                item.presentationHidden = true;
+                recipeIngredientColumnViewPresentationEntries(item)
+                    .forEach(entry => {
+                        entry.presentationHidden = true;
+                    });
+                hiddenAlternativeRows.push(item);
+            });
+        });
+
+        if (requiredUnresolved && !host) {
+            const requiredRows = groups.flatMap(group => group.rows);
+            const firstRequiredRow = requiredRows[0] || null;
+            if (firstRequiredRow) {
+                firstRequiredRow.requiredChoiceStart = true;
+                firstRequiredRow.requiredChoiceParent = parentRow;
+                unresolvedBlocks.push({
+                    parentRow,
+                    rows: requiredRows,
+                    manualOrder: rowManualOrder(firstRequiredRow).manual,
+                });
+            }
+        }
+    });
+
+    unresolvedBlocks.sort((left, right) => (
+        left.manualOrder - right.manualOrder
+    ));
+    detachedAlternativeBlocks.sort((left, right) => (
+        left.manualOrder - right.manualOrder
+    ));
+    const presentationRows = [];
+    activeRows.forEach(item => {
+        presentationRows.push(item);
+        presentationRows.push(...(attachedAfter.get(item) || []));
+    });
+    // Required unresolved choices have no active Store Section host. Keep the
+    // choices together and visible rather than hiding them behind the grouping
+    // disclosure or implying that one aisle is active.
+    unresolvedBlocks.forEach(block => presentationRows.push(...block.rows));
+    // A non-Store filter can intentionally match an inactive option while its
+    // selected host is filtered out. Preserve that established filter result
+    // beneath a neutral option boundary instead of inventing an active aisle.
+    detachedAlternativeBlocks.forEach(block => (
+        presentationRows.push(...block.rows)
+    ));
+    presentationRows.push(...hiddenAlternativeRows);
+    return presentationRows;
+}
+
 function clearRecipeIngredientColumnViewGroupHeaders(list) {
-    list?.querySelectorAll(":scope > [data-recipe-ingredient-column-group-header]")
+    list?.querySelectorAll(
+        ":scope > [data-recipe-ingredient-column-group-header], "
+        + ":scope > [data-recipe-ingredient-column-choice-boundary]",
+    )
         .forEach(header => header.remove());
 }
 
@@ -31315,7 +31572,9 @@ function reconcileRecipeIngredientColumnViewOrder(list, orderedNodes = []) {
 
 function renderRecipeIngredientColumnViewGroupHeaders(list, sortedRows) {
     if (!list || !recipeEditIngredientColumnView.groupByStoreSection) return;
-    const visibleRows = sortedRows.filter(entry => !entry.filtered);
+    const visibleRows = sortedRows.filter(entry => (
+        !entry.filtered && !entry.presentationHidden
+    ));
     const managementRows = [...list.querySelectorAll(
         ":scope > [data-recipe-ingredient-column-management-row]",
     )];
@@ -31340,52 +31599,98 @@ function renderRecipeIngredientColumnViewGroupHeaders(list, sortedRows) {
     )));
     const counts = new Map();
     visibleRows.forEach(entry => {
+        if (entry.attachedAlternative) return;
         const section = recipeIngredientColumnViewEntry(entry.row, "store");
-        const count = counts.get(section.key) || {
-            active: 0,
-            alternatives: 0,
-        };
-        const active = recipeIngredientColumnViewIngredientCount(entry.row);
-        const visible = Array.isArray(entry.row.recipeIngredientColumnViewEntries)
-            ? entry.row.recipeIngredientColumnViewEntries.filter(item => (
-                !item.filtered
-            )).length
-            : active;
-        count.active += active;
-        count.alternatives += Math.max(0, visible - active);
+        const count = counts.get(section.key) || { active: 0 };
+        count.active += recipeIngredientColumnViewIngredientCount(entry.row);
         counts.set(section.key, count);
     });
 
     let currentKey = null;
     const orderedNodes = [];
     visibleRows.forEach(entry => {
-        const section = recipeIngredientColumnViewEntry(entry.row, "store");
-        if (section.key !== currentKey) {
-            currentKey = section.key;
-            const count = counts.get(section.key) || {
-                active: 0,
-                alternatives: 0,
-            };
-            const countLabel = recipeIngredientColumnViewCountLabel(
-                count.active,
-                count.alternatives,
+        if (entry.requiredChoiceStart && entry.requiredChoiceParent) {
+            const presentation = recipeIngredientColumnViewChoiceOptions(
+                entry.requiredChoiceParent,
             );
-            const header = document.createElement("div");
-            header.className = "recipe-edit-ingredient-column-group-header";
-            header.dataset.recipeIngredientColumnGroupHeader = section.key || "__unassigned__";
-            header.setAttribute("role", "row");
-            header.setAttribute(
+            const statusText = presentation.statusText || "Selection required";
+            const helperText = presentation.helperText || "Choose one option";
+            const expansionId = ensureRecipeIngredientExpansionId(
+                entry.requiredChoiceParent,
+            );
+            const boundary = document.createElement("div");
+            boundary.className = (
+                "recipe-edit-ingredient-column-group-header is-required-choice"
+            );
+            boundary.dataset.recipeIngredientColumnChoiceBoundary = expansionId;
+            boundary.id = `${expansionId}-column-choice-boundary`;
+            boundary.setAttribute("role", "row");
+            boundary.setAttribute(
                 "aria-label",
-                `${section.label}, ${countLabel}`,
+                `${statusText}. ${helperText}.`,
             );
-            header.innerHTML = `
+            boundary.innerHTML = `
                 <div role="cell">
-                    ${recipeIngredientStoreSectionIconHtml(section.value)}
-                    <strong>${escapeHtml(section.label)}</strong>
-                    <span>${escapeHtml(countLabel)}</span>
+                    <strong>${escapeHtml(statusText)}</strong>
+                    <span>${escapeHtml(helperText)}</span>
                 </div>
             `;
-            orderedNodes.push(header);
+            orderedNodes.push(boundary);
+            currentKey = null;
+        }
+        if (entry.detachedAlternativeStart && entry.detachedAlternativeParent) {
+            const expansionId = ensureRecipeIngredientExpansionId(
+                entry.detachedAlternativeParent,
+            );
+            const boundary = document.createElement("div");
+            boundary.className = (
+                "recipe-edit-ingredient-column-group-header "
+                + "is-filtered-alternative"
+            );
+            boundary.dataset.recipeIngredientColumnChoiceBoundary = (
+                `${expansionId}-filtered-alternative`
+            );
+            boundary.id = `${expansionId}-column-filtered-alternative-boundary`;
+            boundary.setAttribute("role", "row");
+            boundary.setAttribute(
+                "aria-label",
+                `${entry.detachedAlternativeLabel}. `
+                + `${entry.detachedAlternativeHelper}.`,
+            );
+            boundary.innerHTML = `
+                <div role="cell">
+                    <strong>${escapeHtml(entry.detachedAlternativeLabel)}</strong>
+                    <span>${escapeHtml(entry.detachedAlternativeHelper)}</span>
+                </div>
+            `;
+            orderedNodes.push(boundary);
+            currentKey = null;
+        }
+        if (!entry.attachedAlternative) {
+            const section = recipeIngredientColumnViewEntry(entry.row, "store");
+            if (section.key !== currentKey) {
+                currentKey = section.key;
+                const count = counts.get(section.key) || { active: 0 };
+                const countLabel = recipeIngredientColumnViewCountLabel(
+                    count.active,
+                );
+                const header = document.createElement("div");
+                header.className = "recipe-edit-ingredient-column-group-header";
+                header.dataset.recipeIngredientColumnGroupHeader = section.key || "__unassigned__";
+                header.setAttribute("role", "row");
+                header.setAttribute(
+                    "aria-label",
+                    `${section.label}, ${countLabel}`,
+                );
+                header.innerHTML = `
+                    <div role="cell">
+                        ${recipeIngredientStoreSectionIconHtml(section.value)}
+                        <strong>${escapeHtml(section.label)}</strong>
+                        <span>${escapeHtml(countLabel)}</span>
+                    </div>
+                `;
+                orderedNodes.push(header);
+            }
         }
         orderedNodes.push(entry.row);
         orderedNodes.push(...(managementRowsAfter.get(entry.row) || []));
@@ -31393,7 +31698,9 @@ function renderRecipeIngredientColumnViewGroupHeaders(list, sortedRows) {
     orderedNodes.push(...managementRows.filter(row => (
         row.classList.contains("is-ingredient-column-filtered")
     )));
-    orderedNodes.push(...sortedRows.filter(entry => entry.filtered).map(entry => entry.row));
+    orderedNodes.push(...sortedRows.filter(entry => (
+        entry.filtered || entry.presentationHidden
+    )).map(entry => entry.row));
     reconcileRecipeIngredientColumnViewOrder(list, orderedNodes);
 }
 
@@ -31512,6 +31819,7 @@ function applyRecipeIngredientColumnView(options = {}) {
     );
     const manualStoreOrder = new Map();
     [...ingredientEntries]
+        .filter(entry => entry.counted !== false)
         .sort((left, right) => left.manualIndex - right.manualIndex)
         .forEach(entry => {
             if (!manualStoreOrder.has(entry.store.key)) {
@@ -31554,16 +31862,28 @@ function applyRecipeIngredientColumnView(options = {}) {
             storeOrder,
             manualStoreOrder,
         ));
-    sortedRows.forEach(entry => {
-        entry.row.classList.toggle("is-ingredient-column-filtered", entry.filtered);
-    });
     if (recipeEditIngredientColumnView.groupByStoreSection) {
+        const presentationRows = recipeIngredientColumnViewAttachedPresentationRows(
+            sortedRows,
+        );
+        presentationRows.forEach(entry => {
+            entry.row.classList.toggle(
+                "is-ingredient-column-filtered",
+                entry.filtered || entry.presentationHidden,
+            );
+        });
         syncRecipeIngredientColumnViewVisibleSectionContexts(
             ingredientEntries,
-            sortedRows.map(entry => entry.row),
+            presentationRows.map(entry => entry.row),
         );
-        renderRecipeIngredientColumnViewGroupHeaders(list, sortedRows);
+        renderRecipeIngredientColumnViewGroupHeaders(list, presentationRows);
     } else {
+        sortedRows.forEach(entry => {
+            entry.row.classList.toggle(
+                "is-ingredient-column-filtered",
+                entry.filtered,
+            );
+        });
         reconcileRecipeIngredientColumnViewOrder(
             list,
             sortedRows.map(entry => entry.row),
@@ -36367,6 +36687,9 @@ function syncRecipeIngredientSelectedOptionToggles(row) {
                     optionRow.dataset.recipeIngredientChoiceParentId === parentId
                     && !optionRow.classList.contains(
                         "is-recipe-ingredient-column-selected-option",
+                    )
+                    && !optionRow.classList.contains(
+                        "is-ingredient-column-filtered",
                     )
                 )).map(optionRow => optionRow.id).filter(Boolean)
                 : recipeIngredientColumnViewAlternativeSummaryIds(row))]
