@@ -43,7 +43,7 @@ def test_custom_tag_choices_are_reusable_and_case_insensitive():
     assert choices == ["Family Favorites", "Freezer Meals", "Weeknight Dinners"]
 
 
-def test_cookbook_cuisine_options_keep_bare_values_and_display_labels(monkeypatch):
+def test_cookbook_cuisine_options_keep_bare_values_labels_and_separate_icons(monkeypatch):
     from PushShoppingList.services import cuisine_category_service
 
     monkeypatch.setattr(
@@ -54,6 +54,7 @@ def test_cookbook_cuisine_options_keep_bare_values_and_display_labels(monkeypatc
                 {
                     "value": "Italian",
                     "display_label": "🇮🇹 Italian",
+                    "icon": "flag:it",
                     "active": True,
                 },
                 {
@@ -82,10 +83,10 @@ def test_cookbook_cuisine_options_keep_bare_values_and_display_labels(monkeypatc
     choices = cookbook_service.cookbook_category_choices(user_id="cuisine-user")
 
     assert options == [
-        {"value": "Italian", "label": "🇮🇹 Italian"},
-        {"value": "Caribbean", "label": "🌴 Caribbean"},
+        {"value": "Italian", "label": "Italian", "icon": "flag:it"},
+        {"value": "Caribbean", "label": "Caribbean", "icon": "🌴"},
     ]
-    assert choices["cuisine"] == ["🇮🇹 Italian", "🌴 Caribbean"]
+    assert choices["cuisine"] == ["Italian", "Caribbean"]
     assert choices["meal_type"] == list(cookbook_service.COOKBOOK_CATEGORY_CHOICES["meal_type"])
 
 
@@ -101,13 +102,20 @@ def test_cookbook_category_choices_keep_safe_cuisine_fallback(monkeypatch):
         unavailable_registry,
     )
 
-    assert cookbook_service.active_cuisine_category_options() == [
-        {"value": choice, "label": choice}
-        for choice in cookbook_service.COOKBOOK_CATEGORY_CHOICES["cuisine"]
+    options = cookbook_service.active_cuisine_category_options()
+    assert options[0] == {
+        "value": "American",
+        "label": "American",
+        "icon": "flag:us",
+    }
+    assert options[-1] == {
+        "value": "Other / Fusion",
+        "label": "Other / Fusion",
+        "icon": "🌍",
+    }
+    assert cookbook_service.cookbook_category_choices()["cuisine"] == [
+        option["label"] for option in options
     ]
-    assert cookbook_service.cookbook_category_choices()["cuisine"] == list(
-        cookbook_service.COOKBOOK_CATEGORY_CHOICES["cuisine"]
-    )
 
 
 def test_cookbook_category_choices_honor_intentionally_empty_registry(monkeypatch):
@@ -320,12 +328,13 @@ const selectedInput = { value: "Legacy Cuisine" };
 const primaryInput = { value: "Legacy Cuisine" };
 const source = {
     dataset: {
-        recipeEditCuisineRegistrySignature: JSON.stringify([["Japanese", "Japanese"]]),
+        recipeEditCuisineRegistrySignature: JSON.stringify([["Japanese", "Japanese", ""]]),
     },
     children: [{
         dataset: {
             recipeEditMultiselectOption: "Japanese",
             recipeEditMultiselectLabel: "Japanese",
+            recipeEditMultiselectIcon: "",
         },
     }],
     replaceCount: 0,
@@ -433,13 +442,14 @@ const canonicalOptions = ["United Kingdom", "Chinese"];
 const source = {
     dataset: {
         recipeEditCuisineRegistrySignature: JSON.stringify(
-            canonicalOptions.map(value => [value, value]),
+            canonicalOptions.map(value => [value, value, ""]),
         ),
     },
     children: canonicalOptions.map(value => ({
         dataset: {
             recipeEditMultiselectOption: value,
             recipeEditMultiselectLabel: value,
+            recipeEditMultiselectIcon: "",
         },
     })),
     replaceCount: 0,
@@ -514,6 +524,7 @@ const payload = {
             category_name: "United Kingdom",
             name: "🇬🇧 United Kingdom",
             display_label: "🇬🇧 United Kingdom",
+            icon: "flag:gb",
             abbreviation: "GB",
             active: true,
             aliases: ["United Kingdom", "GB"],
@@ -523,6 +534,7 @@ const payload = {
             category_name: "Chinese",
             name: "🇨🇳 Chinese",
             display_label: "🇨🇳 Chinese",
+            icon: "flag:cn",
             abbreviation: "CN",
             active: true,
             aliases: ["Chinese", "CN"],
@@ -531,10 +543,12 @@ const payload = {
 };
 const aliases = recipeEditCuisineRegistryAliasMap(payload);
 const displayLabels = recipeEditCuisineRegistryDisplayLabelMap(payload);
+const icons = recipeEditCuisineRegistryIconMap(payload);
 const changed = updateRecipeEditCuisineRegistryOptions(
     recipeEditActiveCuisineRegistryLabels(payload),
     aliases,
     displayLabels,
+    icons,
 );
 const dirty = recipeEditorHasUnsavedChanges(form);
 const savedSnapshot = JSON.parse(recipeEditSavedFormSnapshots.get(form));
@@ -547,6 +561,7 @@ process.stdout.write(JSON.stringify({
     primary: primaryInput.value,
     choices: source.children.map(item => item.dataset.recipeEditMultiselectOption),
     choiceLabels: source.children.map(item => item.dataset.recipeEditMultiselectLabel),
+    choiceIcons: source.children.map(item => item.dataset.recipeEditMultiselectIcon),
     replaceCount: source.replaceCount,
     rendered,
     ukAlias: aliases.get(recipeEditTagKey("United Kingdom")),
@@ -579,7 +594,8 @@ process.stdout.write(JSON.stringify({
         "selected": "United Kingdom, Chinese",
         "primary": "United Kingdom",
         "choices": ["United Kingdom", "Chinese"],
-        "choiceLabels": ["🇬🇧 United Kingdom", "🇨🇳 Chinese"],
+        "choiceLabels": ["United Kingdom", "Chinese"],
+        "choiceIcons": ["flag:gb", "flag:cn"],
         "replaceCount": 1,
         "rendered": ["cuisine"],
         "ukAlias": "United Kingdom",
@@ -595,7 +611,7 @@ process.stdout.write(JSON.stringify({
     }
 
 
-def test_recipe_editor_cuisine_multiselect_renders_and_searches_display_labels():
+def test_recipe_editor_cuisine_multiselect_renders_icons_and_searches_metadata():
     node = shutil.which("node")
     if not node:
         return
@@ -610,7 +626,7 @@ def test_recipe_editor_cuisine_multiselect_renders_and_searches_display_labels()
         script.index("function recipeEditCuisineRegistryCategoryRows")
     ]
     option_rendering = script[
-        script.index("function recipeEditMultiselectOptionButton"):
+        script.index("function recipeEditCuisineIconVisual"):
         script.index("function selectRecipeEditMultiselectValue")
     ]
     chip_rendering = script[
@@ -640,13 +656,22 @@ const source = {
         {
             dataset: {
                 recipeEditMultiselectOption: "United Kingdom",
-                recipeEditMultiselectLabel: "\uD83C\uDDEC\uD83C\uDDE7 United Kingdom",
+                recipeEditMultiselectLabel: "United Kingdom",
+                recipeEditMultiselectIcon: "flag:gb",
             },
         },
         {
             dataset: {
                 recipeEditMultiselectOption: "Chinese",
-                recipeEditMultiselectLabel: "\uD83C\uDDE8\uD83C\uDDF3 Chinese",
+                recipeEditMultiselectLabel: "Chinese",
+                recipeEditMultiselectIcon: "flag:cn",
+            },
+        },
+        {
+            dataset: {
+                recipeEditMultiselectOption: "Caribbean",
+                recipeEditMultiselectLabel: "Caribbean",
+                recipeEditMultiselectIcon: "\u{1F334}",
             },
         },
     ],
@@ -675,6 +700,17 @@ const document = {
     createElement: makeElement,
     querySelector() { return null; },
 };
+const window = {
+    CuisineIconVisuals: {
+        create(token) {
+            const visual = makeElement("span");
+            visual.dataset.cuisineIconToken = token;
+            visual.classList.add("cuisine-category-icon-visual");
+            visual.setAttribute("aria-hidden", "true");
+            return visual;
+        },
+    },
+};
 const CATEGORY_SOURCE_AI_INFERRED = "ai_inferred";
 function recipeEditMultiselectField(kind) { return kind === "cuisine" ? field : null; }
 function recipeEditMultiselectParts(kind) { return kind === "cuisine" ? parts : null; }
@@ -690,18 +726,30 @@ function recipeEditStructuredCategoryMatch() { return null; }
 function scheduleRecipeEditMultiselectPopoverPosition() {}
 ''' + normalizers + option_records + option_rendering + chip_rendering + r'''
 
-parts.search.value = "\uD83C\uDDEC\uD83C\uDDE7";
+parts.search.value = "gb";
 renderRecipeEditMultiselectOptions("cuisine");
 const flagSearch = listbox.children.map(button => ({
-    label: button.textContent,
+    label: button.children[0].children.at(-1).textContent,
+    icon: button.children[0].children[0].dataset.cuisineIconToken,
+    iconHidden: button.children[0].children[0].attributes["aria-hidden"],
     value: button.dataset.recipeEditMultiselectValue,
     selected: button.attributes["aria-selected"],
+    accessibleLabel: button.attributes["aria-label"],
 }));
 
 parts.search.value = "Chinese";
 renderRecipeEditMultiselectOptions("cuisine");
 const nameSearch = listbox.children.map(button => ({
-    label: button.textContent,
+    label: button.children[0].children.at(-1).textContent,
+    icon: button.children[0].children[0].dataset.cuisineIconToken,
+    value: button.dataset.recipeEditMultiselectValue,
+}));
+
+parts.search.value = "\u{1F334}";
+renderRecipeEditMultiselectOptions("cuisine");
+const legacyIconSearch = listbox.children.map(button => ({
+    label: button.children[0].children.at(-1).textContent,
+    icon: button.children[0].children[0].dataset.cuisineIconToken,
     value: button.dataset.recipeEditMultiselectValue,
 }));
 
@@ -710,8 +758,11 @@ const chip = chips.children[0];
 process.stdout.write(JSON.stringify({
     flagSearch,
     nameSearch,
-    chipLabel: chip.children[0].textContent,
-    removeLabel: chip.children[1].attributes["aria-label"],
+    legacyIconSearch,
+    chipIcon: chip.children[0].dataset.cuisineIconToken,
+    chipIconHidden: chip.children[0].attributes["aria-hidden"],
+    chipLabel: chip.children[1].textContent,
+    removeLabel: chip.children[2].attributes["aria-label"],
 }));
 '''
     completed = subprocess.run(
@@ -728,14 +779,24 @@ process.stdout.write(JSON.stringify({
     assert json.loads(completed.stdout) == {
         "flagSearch": [
             {
-                "label": "🇬🇧 United Kingdom",
+                "label": "United Kingdom",
+                "icon": "flag:gb",
+                "iconHidden": "true",
                 "value": "United Kingdom",
                 "selected": "true",
+                "accessibleLabel": "United Kingdom, selected",
             }
         ],
-        "nameSearch": [{"label": "🇨🇳 Chinese", "value": "Chinese"}],
-        "chipLabel": "🇬🇧 United Kingdom",
-        "removeLabel": "Remove cuisine category 🇬🇧 United Kingdom",
+        "nameSearch": [
+            {"label": "Chinese", "icon": "flag:cn", "value": "Chinese"}
+        ],
+        "legacyIconSearch": [
+            {"label": "Caribbean", "icon": "🌴", "value": "Caribbean"}
+        ],
+        "chipIcon": "flag:gb",
+        "chipIconHidden": "true",
+        "chipLabel": "United Kingdom",
+        "removeLabel": "Remove cuisine category United Kingdom",
     }
 
 
@@ -929,6 +990,7 @@ def test_recipe_editor_renders_compact_classification_token_controls():
         'data-recipe-edit-multiselect-label="{{ option.label or option.value }}"'
         in category_markup
     )
+    assert 'data-recipe-edit-multiselect-icon="{{ option.icon or \'\' }}"' in category_markup
     assert 'data-recipe-edit-multiselect-option="{{ choice }}"' in category_markup
     assert "cookbook_view.custom_tag_choices" in category_markup
 
@@ -1005,8 +1067,12 @@ def test_recipe_editor_renders_compact_classification_token_controls():
     assert 'button.setAttribute("aria-selected", selected ? "true" : "false");' in script
     assert 'button.classList.add("is-selected");' in script
     assert "const labelKey = recipeEditTagKey(label);" in script
-    assert "(queryKey && (key.includes(queryKey) || labelKey.includes(queryKey)))" in script
+    assert "const iconKey = recipeEditTagKey(icon);" in script
+    assert "|| iconKey.includes(queryKey)" in script
     assert "label.toLocaleLowerCase().includes(queryText)" in script
+    assert "|| icon.toLocaleLowerCase().includes(queryText)" in script
+    assert "window.CuisineIconVisuals?.create" in script
+    assert 'visual.classList.add("recipe-edit-cuisine-icon");' in script
     assert 'return !selectedKeys.has(key)' not in script
     assert "function addRecipeEditMultiselectSearchValues" not in script
     assert "function updateRecipeEditMultiselectAddButton" not in script

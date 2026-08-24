@@ -26569,7 +26569,10 @@ function recipeEditMultiselectOptionRecords(kind) {
             const label = normalizeRecipeEditTagText(
                 option.dataset.recipeEditMultiselectLabel,
             ) || value;
-            return value ? { value, label } : null;
+            const icon = normalizeRecipeEditTagText(
+                option.dataset.recipeEditMultiselectIcon,
+            );
+            return value ? { value, label, icon } : null;
         })
         .filter(Boolean);
 }
@@ -26586,6 +26589,13 @@ function recipeEditMultiselectDisplayLabel(kind, value) {
         .find(option => recipeEditTagKey(option.value) === key)?.label || normalized;
 }
 
+function recipeEditMultiselectIcon(kind, value) {
+    const key = recipeEditTagKey(value);
+    if (!key) return "";
+    return recipeEditMultiselectOptionRecords(kind)
+        .find(option => recipeEditTagKey(option.value) === key)?.icon || "";
+}
+
 function recipeEditCuisineRegistryCategoryRows(payload) {
     const registry = payload?.registry && typeof payload.registry === "object"
         ? payload.registry
@@ -26597,6 +26607,41 @@ function recipeEditCuisineRegistryCategoryRows(payload) {
     return null;
 }
 
+function recipeEditCuisineLegacyPresentationParts(value) {
+    const text = normalizeRecipeEditTagText(value);
+    const match = text.match(/^([^\p{L}\p{N}\s]+)\s+(.+)$/u);
+    return match
+        ? { icon: normalizeRecipeEditTagText(match[1]), label: normalizeRecipeEditTagText(match[2]) }
+        : { icon: "", label: text };
+}
+
+function recipeEditCuisineRegistryRecord(item) {
+    if (!item || typeof item !== "object") return null;
+    const legacy = recipeEditCuisineLegacyPresentationParts(
+        item.display_label || item.name || item.label,
+    );
+    const value = normalizeRecipeEditTagText(
+        item.value
+        || item.category_name
+        || item.canonical_name
+        || legacy.label
+        || item.name
+        || item.label,
+    );
+    if (!value) return null;
+    return {
+        value,
+        label: normalizeRecipeEditTagText(
+            item.category_name
+            || item.canonical_name
+            || item.value
+            || legacy.label
+            || value,
+        ) || value,
+        icon: normalizeRecipeEditTagText(item.icon || legacy.icon),
+    };
+}
+
 function recipeEditActiveCuisineRegistryLabels(payload) {
     const rows = recipeEditCuisineRegistryCategoryRows(payload);
     if (!Array.isArray(rows)) return null;
@@ -26605,17 +26650,9 @@ function recipeEditActiveCuisineRegistryLabels(payload) {
     rows.forEach(item => {
         const record = item && typeof item === "object" ? item : null;
         if (record && record.active === false) return;
-        const value = normalizeRecipeEditTagText(
-            record
-                ? (
-                    record.value
-                    || record.category_name
-                    || record.canonical_name
-                    || record.name
-                    || record.label
-                )
-                : item,
-        );
+        const value = record
+            ? recipeEditCuisineRegistryRecord(record)?.value || ""
+            : normalizeRecipeEditTagText(item);
         const key = recipeEditTagKey(value);
         if (value && key && !seen.has(key)) {
             labels.push(value);
@@ -26630,22 +26667,25 @@ function recipeEditCuisineRegistryDisplayLabelMap(payload) {
     if (!Array.isArray(rows)) return null;
     const labels = new Map();
     rows.forEach(item => {
-        if (!item || typeof item !== "object") return;
-        const value = normalizeRecipeEditTagText(
-            item.value
-            || item.category_name
-            || item.canonical_name
-            || item.name
-            || item.label,
-        );
-        const key = recipeEditTagKey(value);
-        if (!value || !key || labels.has(key)) return;
-        const label = normalizeRecipeEditTagText(
-            item.display_label || item.name || item.label || value,
-        ) || value;
-        labels.set(key, label);
+        const record = recipeEditCuisineRegistryRecord(item);
+        const key = recipeEditTagKey(record?.value);
+        if (!record || !key || labels.has(key)) return;
+        labels.set(key, record.label);
     });
     return labels;
+}
+
+function recipeEditCuisineRegistryIconMap(payload) {
+    const rows = recipeEditCuisineRegistryCategoryRows(payload);
+    if (!Array.isArray(rows)) return null;
+    const icons = new Map();
+    rows.forEach(item => {
+        const record = recipeEditCuisineRegistryRecord(item);
+        const key = recipeEditTagKey(record?.value);
+        if (!record || !key || icons.has(key)) return;
+        icons.set(key, record.icon);
+    });
+    return icons;
 }
 
 function recipeEditCuisineRegistryAliasMap(payload) {
@@ -26659,14 +26699,9 @@ function recipeEditCuisineRegistryAliasMap(payload) {
         owners.get(aliasKey).add(canonical);
     };
     rows.forEach(item => {
-        if (!item || typeof item !== "object") return;
-        const canonical = normalizeRecipeEditTagText(
-            item.value
-            || item.category_name
-            || item.canonical_name
-            || item.name
-            || item.label,
-        );
+        const record = recipeEditCuisineRegistryRecord(item);
+        if (!record) return;
+        const canonical = record.value;
         const canonicalKey = recipeEditTagKey(canonical);
         if (!canonical || !canonicalKey) return;
         addOwner(canonical, canonical);
@@ -26795,6 +26830,7 @@ function updateRecipeEditCuisineRegistryOptions(
     values,
     aliases = new Map(),
     displayLabels = new Map(),
+    icons = new Map(),
 ) {
     const field = recipeEditMultiselectField("cuisine");
     const source = field?.querySelector("[data-recipe-edit-multiselect-options]");
@@ -26803,6 +26839,7 @@ function updateRecipeEditCuisineRegistryOptions(
         || !Array.isArray(values)
         || !(aliases instanceof Map)
         || !(displayLabels instanceof Map)
+        || !(icons instanceof Map)
     ) return false;
 
     const existingLabels = new Map(
@@ -26811,9 +26848,19 @@ function updateRecipeEditCuisineRegistryOptions(
             option.label,
         ]),
     );
+    const existingIcons = new Map(
+        recipeEditMultiselectOptionRecords("cuisine").map(option => [
+            recipeEditTagKey(option.value),
+            option.icon,
+        ]),
+    );
     const displayLabelFor = value => {
         const key = recipeEditTagKey(value);
         return displayLabels.get(key) || existingLabels.get(key) || value;
+    };
+    const iconFor = value => {
+        const key = recipeEditTagKey(value);
+        return icons.has(key) ? icons.get(key) : existingIcons.get(key) || "";
     };
 
     const active = [];
@@ -26844,7 +26891,7 @@ function updateRecipeEditCuisineRegistryOptions(
         }
     });
     const signature = JSON.stringify(
-        choices.map(value => [value, displayLabelFor(value)]),
+        choices.map(value => [value, displayLabelFor(value), iconFor(value)]),
     );
     const optionsChanged = source.dataset.recipeEditCuisineRegistrySignature !== signature;
     rebaseRecipeEditCuisineAliasBaselines(aliases);
@@ -26855,6 +26902,7 @@ function updateRecipeEditCuisineRegistryOptions(
             const option = document.createElement("span");
             option.dataset.recipeEditMultiselectOption = value;
             option.dataset.recipeEditMultiselectLabel = displayLabelFor(value);
+            option.dataset.recipeEditMultiselectIcon = iconFor(value);
             return option;
         });
         source.replaceChildren(...options);
@@ -26891,6 +26939,7 @@ function refreshRecipeEditCuisineCategoryRegistry() {
             recipeEditActiveCuisineRegistryLabels(payload),
             recipeEditCuisineRegistryAliasMap(payload),
             recipeEditCuisineRegistryDisplayLabelMap(payload),
+            recipeEditCuisineRegistryIconMap(payload),
         ))
         .catch(error => {
             console.warn("Unable to refresh the cuisine category registry.", error);
@@ -27222,7 +27271,22 @@ function closeRecipeEditMultiselect(kind, options = {}) {
     }
 }
 
-function recipeEditMultiselectOptionButton(text, className = "", selected = false) {
+function recipeEditCuisineIconVisual(icon) {
+    const token = normalizeRecipeEditTagText(icon);
+    const createVisual = window.CuisineIconVisuals?.create;
+    if (!token || typeof createVisual !== "function") return null;
+    const visual = createVisual(token);
+    if (!visual) return null;
+    visual.classList.add("recipe-edit-cuisine-icon");
+    return visual;
+}
+
+function recipeEditMultiselectOptionButton(
+    text,
+    className = "",
+    selected = false,
+    icon = "",
+) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = `recipe-edit-multiselect-option ${className}`.trim();
@@ -27233,7 +27297,15 @@ function recipeEditMultiselectOptionButton(text, className = "", selected = fals
         button.setAttribute("aria-label", `${text}, selected`);
     }
     button.tabIndex = -1;
-    button.textContent = text;
+    const content = document.createElement("span");
+    content.className = "recipe-edit-multiselect-option-content";
+    const visual = recipeEditCuisineIconVisual(icon);
+    if (visual) content.appendChild(visual);
+    const label = document.createElement("span");
+    label.className = "recipe-edit-multiselect-option-label";
+    label.textContent = text;
+    content.appendChild(label);
+    button.appendChild(content);
     return button;
 }
 
@@ -27253,19 +27325,28 @@ function renderRecipeEditMultiselectOptions(kind) {
         const key = recipeEditTagKey(value);
         const label = recipeEditMultiselectDisplayLabel(kind, value);
         const labelKey = recipeEditTagKey(label);
+        const icon = kind === "cuisine" ? recipeEditMultiselectIcon(kind, value) : "";
+        const iconKey = recipeEditTagKey(icon);
         if (!queryText) return true;
         return (
-            (queryKey && (key.includes(queryKey) || labelKey.includes(queryKey)))
+            (queryKey && (
+                key.includes(queryKey)
+                || labelKey.includes(queryKey)
+                || iconKey.includes(queryKey)
+            ))
             || value.toLocaleLowerCase().includes(queryText)
             || label.toLocaleLowerCase().includes(queryText)
+            || icon.toLocaleLowerCase().includes(queryText)
         );
     });
     const buttons = choices.map(value => {
         const label = recipeEditMultiselectDisplayLabel(kind, value);
+        const icon = kind === "cuisine" ? recipeEditMultiselectIcon(kind, value) : "";
         const button = recipeEditMultiselectOptionButton(
             label,
             "",
             selectedKeys.has(recipeEditTagKey(value)),
+            icon,
         );
         button.dataset.recipeEditMultiselectValue = value;
         return button;
@@ -27419,7 +27500,12 @@ function renderRecipeEditMultiselect(kind) {
         const chip = document.createElement("span");
         chip.className = "recipe-edit-tag-chip";
         if (aiInferred) chip.classList.add("is-ai-inferred");
+        if (kind === "cuisine") {
+            const visual = recipeEditCuisineIconVisual(recipeEditMultiselectIcon(kind, value));
+            if (visual) chip.appendChild(visual);
+        }
         const text = document.createElement("span");
+        text.className = "recipe-edit-tag-chip-label";
         text.textContent = label;
         chip.appendChild(text);
         const remove = document.createElement("button");

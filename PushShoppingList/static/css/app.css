@@ -66013,6 +66013,34 @@ body.recipe-edit-standalone-page :is(
     line-height: 1;
 }
 
+/* Shared deterministic cuisine visuals. Flag tokens never rely on platform emoji. */
+.cuisine-category-icon-visual {
+    display: inline-flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+.cuisine-category-flag-svg {
+    display: block;
+    width: 1.5em;
+    height: 1em;
+    overflow: hidden;
+    border-radius: 2px;
+    background: #fff;
+    box-shadow: 0 0 0 1px rgb(148 163 184 / 45%);
+    forced-color-adjust: none;
+}
+
+.cuisine-category-icon-visual.is-unsupported {
+    color: var(--app-muted);
+}
+
+.cuisine-category-flag-generic {
+    font-size: .75em;
+}
+
 .cuisine-category-master-abbreviation {
     min-width: 0;
     overflow-wrap: anywhere;
@@ -66031,14 +66059,227 @@ body.recipe-edit-standalone-page :is(
 
 .cuisine-category-master-identity-fields {
     display: grid;
-    grid-template-columns: minmax(88px, .35fr) minmax(160px, .65fr) minmax(230px, 1fr);
+    grid-template-columns: minmax(190px, .8fr) minmax(130px, .5fr) minmax(210px, 1fr);
     gap: 12px;
     align-items: start;
 }
 
-.cuisine-category-master-identity-fields
-    [data-cuisine-category-master-icon] {
-    font-size: 18px;
+.cuisine-category-master-icon-picker {
+    position: relative;
+    min-width: 0;
+}
+
+.cuisine-category-master-icon-picker.is-enhanced
+    > [data-cuisine-category-master-icon] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.cuisine-category-master-page
+    .cuisine-category-master-icon-trigger {
+    box-sizing: border-box;
+    display: grid;
+    width: 100%;
+    min-width: 0;
+    min-height: 38px;
+    grid-template-columns: 32px minmax(0, 1fr) 14px;
+    align-items: center;
+    justify-content: stretch;
+    gap: 9px;
+    padding: 6px 9px;
+    overflow: hidden;
+    border-color: var(--app-border);
+    background: var(--app-surface-soft);
+    color: var(--app-text-strong);
+    font-size: 12px;
+    text-align: left;
+    user-select: none;
+}
+
+.cuisine-category-master-page
+    .cuisine-category-master-icon-trigger:is(:hover, :focus-visible),
+.cuisine-category-master-icon-picker.is-open
+    .cuisine-category-master-icon-trigger {
+    border-color: var(--app-primary);
+    background: color-mix(in srgb, var(--app-primary-soft) 34%, var(--app-surface-soft));
+}
+
+.cuisine-category-master-page
+    .cuisine-category-master-icon-trigger[aria-invalid="true"] {
+    border-color: var(--app-danger);
+}
+
+.cuisine-category-master-icon-trigger
+    > [data-cuisine-category-master-icon-label] {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cuisine-category-master-icon-trigger
+    > .cuisine-category-icon-visual {
+    width: 32px;
+    height: 22px;
+    font-size: 20px;
+}
+
+.cuisine-category-master-icon-chevron {
+    display: inline-flex;
+    width: 14px;
+    height: 14px;
+    align-items: center;
+    justify-content: center;
+    color: var(--app-muted);
+    font-size: 15px;
+    transition: transform 140ms ease;
+}
+
+.cuisine-category-master-icon-picker.is-open
+    .cuisine-category-master-icon-chevron {
+    transform: rotate(180deg);
+}
+
+.cuisine-category-master-icon-menu {
+    position: fixed;
+    z-index: 1400;
+    display: grid;
+    min-width: 260px;
+    max-width: min(390px, calc(100vw - 20px));
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 9px;
+    overflow: hidden;
+    border: 1px solid var(--app-border-strong);
+    border-radius: 9px;
+    background: var(--app-surface);
+    box-shadow: 0 18px 40px rgb(0 0 0 / 44%);
+}
+
+.cuisine-category-master-icon-menu[hidden] {
+    display: none;
+}
+
+.cuisine-category-master-icon-search {
+    display: grid;
+    gap: 5px;
+    color: var(--app-muted);
+    font-size: 10px;
+    font-weight: 800;
+}
+
+.cuisine-category-master-icon-search > input {
+    min-height: 36px;
+}
+
+.cuisine-category-master-icon-listbox {
+    display: grid;
+    min-height: 0;
+    gap: 8px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 2px;
+}
+
+.cuisine-category-master-icon-group {
+    display: grid;
+    gap: 2px;
+}
+
+.cuisine-category-master-icon-group-label {
+    padding: 5px 8px 3px;
+    color: var(--app-muted);
+    font-size: 9px;
+    font-weight: 850;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+
+.cuisine-category-master-page
+    .cuisine-category-master-icon-option {
+    display: grid;
+    width: 100%;
+    min-height: 42px;
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+    align-items: center;
+    justify-content: stretch;
+    gap: 10px;
+    padding: 7px 9px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--app-text);
+    font-size: 11px;
+    text-align: left;
+}
+
+.cuisine-category-master-page
+    .cuisine-category-master-icon-option:is(:hover, :focus-visible) {
+    outline: 0;
+    background: var(--app-surface-soft);
+}
+
+.cuisine-category-master-page
+    .cuisine-category-master-icon-option.is-selected {
+    background: var(--app-primary-soft);
+    color: var(--app-primary-hover);
+}
+
+.cuisine-category-master-icon-option-visual {
+    width: 34px;
+    height: 24px;
+    font-size: 20px;
+}
+
+.cuisine-category-master-icon-option-copy {
+    display: grid;
+    min-width: 0;
+    gap: 2px;
+}
+
+.cuisine-category-master-icon-option-copy strong {
+    overflow: hidden;
+    color: inherit;
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cuisine-category-master-icon-option-copy small {
+    color: var(--app-muted);
+    font-size: 9px;
+    font-weight: 750;
+    letter-spacing: .05em;
+}
+
+.cuisine-category-master-icon-option-state {
+    color: var(--app-primary-hover);
+    font-size: 9px;
+    font-weight: 850;
+}
+
+.cuisine-category-master-icon-empty {
+    margin: 0;
+    padding: 12px;
+    color: var(--app-muted);
+    font-size: 11px;
+    text-align: center;
+}
+
+.cuisine-category-master-table
+    .cuisine-category-icon-visual {
+    width: 30px;
+    height: 22px;
+}
+
+.cuisine-category-master-table
+    .cuisine-category-icon-visual:not(.is-flag) {
+    font-size: 21px;
 }
 
 @media (max-width: 760px) {
@@ -66131,6 +66372,28 @@ body.recipe-edit-standalone-page :is(
 
     .cuisine-category-master-identity-fields {
         grid-template-columns: minmax(0, 1fr);
+    }
+
+    .cuisine-category-master-icon-menu {
+        max-width: calc(100vw - 12px);
+    }
+}
+
+@media (max-width: 520px) {
+    .cuisine-category-master-page .unit-master-dialog {
+        width: calc(100vw - 12px);
+        max-height: calc(100vh - 12px);
+    }
+
+    .cuisine-category-master-page .unit-master-editor {
+        gap: 15px;
+        padding: 16px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cuisine-category-master-icon-chevron {
+        transition: none;
     }
 }
 
@@ -78414,6 +78677,18 @@ body.recipe-edit-standalone-page .recipe-edit-multiselect-option {
     overflow-wrap: anywhere;
 }
 
+body.recipe-edit-standalone-page .recipe-edit-multiselect-option-content {
+    display: inline-flex;
+    min-width: 0;
+    align-items: center;
+    gap: 7px;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-multiselect-option-label {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
 body.recipe-edit-standalone-page .recipe-edit-multiselect-option:is(:hover, :focus-visible),
 body.recipe-edit-standalone-page .recipe-edit-multiselect-option.is-create-action,
 body.recipe-edit-standalone-page .recipe-edit-multiselect-option.is-selected {
@@ -78507,6 +78782,32 @@ body.recipe-edit-standalone-page .recipe-edit-tag-chip {
 body.recipe-edit-standalone-page .recipe-edit-tag-chip > span:first-child {
     min-width: 0;
     overflow-wrap: anywhere;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-cuisine-icon {
+    display: inline-flex;
+    width: 18px;
+    height: 14px;
+    flex: 0 0 18px;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border-radius: 2px;
+    font-size: 14px;
+    line-height: 1;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-multiselect-option .recipe-edit-cuisine-icon {
+    width: 20px;
+    height: 15px;
+    flex-basis: 20px;
+    font-size: 16px;
+}
+
+body.recipe-edit-standalone-page .recipe-edit-cuisine-icon .cuisine-category-flag-svg {
+    display: block;
+    width: 100%;
+    height: 100%;
 }
 
 body.recipe-edit-standalone-page .recipe-edit-tag-chip > button {

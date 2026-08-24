@@ -15,21 +15,38 @@ from PushShoppingList.services.recipe_url_service import normalize_recipe_url_ke
 
 
 CUISINE_CATEGORY_SEEDS = (
-    ("american", "🇺🇸", "US", "American"),
-    ("mexican", "🇲🇽", "MX", "Mexican"),
-    ("peruvian", "🇵🇪", "PE", "Peruvian"),
-    ("italian", "🇮🇹", "IT", "Italian"),
-    ("japanese", "🇯🇵", "JP", "Japanese"),
-    ("thai", "🇹🇭", "TH", "Thai"),
-    ("chinese", "🇨🇳", "CN", "Chinese"),
-    ("indian", "🇮🇳", "IN", "Indian"),
-    ("french", "🇫🇷", "FR", "French"),
-    ("other_fusion", "🌍", "FUS", "Other / Fusion"),
+    ("american", "flag:us", "US", "American"),
+    ("mexican", "flag:mx", "MX", "Mexican"),
+    ("peruvian", "flag:pe", "PE", "Peruvian"),
+    ("italian", "flag:it", "IT", "Italian"),
+    ("japanese", "flag:jp", "JP", "Japanese"),
+    ("thai", "flag:th", "TH", "Thai"),
+    ("chinese", "flag:cn", "CN", "Chinese"),
+    ("indian", "flag:in", "IN", "Indian"),
+    ("french", "flag:fr", "FR", "French"),
+    ("other_fusion", "symbol:globe", "FUS", "Other / Fusion"),
 )
-CUISINE_CATEGORY_SEED_VERSION = "cuisine_categories_v2"
+CUISINE_CATEGORY_SEED_VERSION = "cuisine_categories_v4"
 CUISINE_CATEGORY_NAME_LIMIT = 60
 CUISINE_CATEGORY_ICON_LIMIT = 16
 CUISINE_CATEGORY_ABBREVIATION_LIMIT = 8
+CUISINE_CATEGORY_FLAG_ICON_TOKEN_PATTERN = re.compile(
+    r"^flag\s*:\s*([a-z]{2})$",
+    flags=re.IGNORECASE,
+)
+CUISINE_CATEGORY_SYMBOL_ICONS = {
+    "globe": "🌍",
+    "bowl": "🍲",
+    "noodles": "🍜",
+    "taco": "🌮",
+    "curry": "🍛",
+    "bread": "🍞",
+    "plate": "🍽️",
+}
+CUISINE_CATEGORY_SYMBOL_ICON_TOKEN_PATTERN = re.compile(
+    r"^symbol\s*:\s*([a-z][a-z0-9_-]*)$",
+    flags=re.IGNORECASE,
+)
 _CUISINE_CATEGORY_DATA_LOCK = threading.RLock()
 
 
@@ -191,6 +208,39 @@ def country_flag_emoji(country_code):
     )
 
 
+def cuisine_category_flag_icon_token(country_code):
+    """Return the stable storage token for an ISO-style alpha-2 flag."""
+    country_code = str(country_code or "").strip().lower()
+    if not re.fullmatch(r"[a-z]{2}", country_code):
+        return ""
+    return f"flag:{country_code}"
+
+
+def cuisine_category_symbol_icon_token(symbol_name):
+    """Return a stable token for a supported cuisine symbol."""
+    symbol_name = str(symbol_name or "").strip().lower()
+    if symbol_name not in CUISINE_CATEGORY_SYMBOL_ICONS:
+        return ""
+    return f"symbol:{symbol_name}"
+
+
+def country_code_from_flag(value):
+    """Resolve either a stable flag token or a legacy flag emoji."""
+    icon = clean_cuisine_category_name(value)
+    token_match = CUISINE_CATEGORY_FLAG_ICON_TOKEN_PATTERN.fullmatch(icon)
+    if token_match:
+        return token_match.group(1).upper()
+    if len(icon) != 2:
+        return ""
+    codepoints = [ord(character) for character in icon]
+    if not all(0x1F1E6 <= codepoint <= 0x1F1FF for codepoint in codepoints):
+        return ""
+    return "".join(
+        chr(ord("A") + codepoint - 0x1F1E6)
+        for codepoint in codepoints
+    )
+
+
 def decorate_recognized_cuisine_name(value):
     """Add a flag to exact national cuisine labels without guessing regions."""
     name = clean_cuisine_category_name(value)
@@ -202,7 +252,16 @@ def decorate_recognized_cuisine_name(value):
 
 
 def clean_cuisine_category_icon(value):
-    return clean_cuisine_category_name(value)
+    icon = clean_cuisine_category_name(value)
+    country_code = country_code_from_flag(icon)
+    if country_code:
+        return cuisine_category_flag_icon_token(country_code)
+    symbol_match = CUISINE_CATEGORY_SYMBOL_ICON_TOKEN_PATTERN.fullmatch(icon)
+    if symbol_match:
+        token = cuisine_category_symbol_icon_token(symbol_match.group(1))
+        if token:
+            return token
+    return icon
 
 
 def clean_cuisine_category_abbreviation(value):
@@ -212,7 +271,13 @@ def clean_cuisine_category_abbreviation(value):
 def split_legacy_cuisine_category_label(value):
     """Split a legacy icon-bearing label into presentation and plain name."""
     label = clean_cuisine_category_name(value)
-    match = re.match(r"^([^\w\s]+)\s+(.+)$", label, flags=re.UNICODE)
+    match = re.match(
+        r"^((?:flag\s*:\s*[a-z]{2})|(?:symbol\s*:\s*[a-z][a-z0-9_-]*))\s+(.+)$",
+        label,
+        flags=re.IGNORECASE,
+    )
+    if not match:
+        match = re.match(r"^([^\w\s]+)\s+(.+)$", label, flags=re.UNICODE)
     if not match:
         return "", label
     icon = clean_cuisine_category_icon(match.group(1))
@@ -220,18 +285,20 @@ def split_legacy_cuisine_category_label(value):
     return (icon, name) if cuisine_category_key(name) else ("", label)
 
 
-def country_code_from_flag(value):
+def cuisine_category_icon_display(value):
+    """Return a legacy-compatible glyph/text presentation for an icon token."""
     icon = clean_cuisine_category_icon(value)
-    if len(icon) != 2:
-        return ""
-    codepoints = [ord(character) for character in icon]
-    if not all(0x1F1E6 <= codepoint <= 0x1F1FF for codepoint in codepoints):
-        return ""
-    return "".join(chr(ord("A") + codepoint - 0x1F1E6) for codepoint in codepoints)
+    country_code = country_code_from_flag(icon)
+    if country_code:
+        return country_flag_emoji(country_code)
+    symbol_match = CUISINE_CATEGORY_SYMBOL_ICON_TOKEN_PATTERN.fullmatch(icon)
+    if symbol_match:
+        return CUISINE_CATEGORY_SYMBOL_ICONS.get(symbol_match.group(1).lower(), icon)
+    return icon
 
 
 def cuisine_category_display_label(icon, name):
-    icon = clean_cuisine_category_icon(icon)
+    icon = cuisine_category_icon_display(icon)
     name = clean_cuisine_category_name(name)
     return f"{icon} {name}" if icon else name
 
@@ -267,7 +334,7 @@ def resolve_cuisine_category_parts(
         else (
             legacy_icon
             or str(seed.get("icon") or "")
-            or country_flag_emoji(inferred_country_code)
+            or cuisine_category_flag_icon_token(inferred_country_code)
         )
     )
     resolved_abbreviation = (
@@ -501,6 +568,37 @@ def _seed_registry(connection, user_id):
                 timestamp,
             ),
         )
+        stored_row = connection.execute(
+            """
+            SELECT icon
+              FROM workspace_cuisine_categories
+             WHERE user_id = ? AND id = ? AND is_seeded = 1
+            """,
+            (user_id, category_id),
+        ).fetchone()
+        stored_icon = stored_row["icon"] if stored_row is not None else None
+        if (
+            stored_row is not None
+            and (icon.startswith("flag:") or icon.startswith("symbol:"))
+            and stored_icon != icon
+            and (
+                stored_icon is None
+                or clean_cuisine_category_icon(stored_icon) == icon
+                or clean_cuisine_category_name(stored_icon)
+                == cuisine_category_icon_display(icon)
+            )
+        ):
+            # Earlier registries stored default flags and symbols as emoji.
+            # Canonicalize only equivalent defaults so a user's custom icon
+            # (including an intentional blank) is preserved.
+            connection.execute(
+                """
+                UPDATE workspace_cuisine_categories
+                   SET icon = ?
+                 WHERE user_id = ? AND id = ?
+                """,
+                (icon, user_id, category_id),
+            )
     connection.execute(
         """
         INSERT INTO workspace_cuisine_category_registry_seeds (
@@ -1304,8 +1402,13 @@ def save_workspace_cuisine_category(values, category_id="", user_id=None):
         raw_name = None
     icon_supplied = "icon" in values
     abbreviation_supplied = "abbreviation" in values
+    raw_supplied_icon = (
+        clean_cuisine_category_name(values.get("icon"))
+        if icon_supplied
+        else None
+    )
     supplied_icon = (
-        clean_cuisine_category_icon(values.get("icon"))
+        clean_cuisine_category_icon(raw_supplied_icon)
         if icon_supplied
         else None
     )
@@ -1352,6 +1455,11 @@ def save_workspace_cuisine_category(values, category_id="", user_id=None):
         legacy_input_icon, _legacy_input_name = split_legacy_cuisine_category_label(
             normalized_raw_name
         )
+        raw_icon_input = (
+            raw_supplied_icon
+            if icon_supplied
+            else (legacy_input_icon or None)
+        )
         if existing_item:
             resolved_icon = (
                 supplied_icon
@@ -1395,7 +1503,39 @@ def save_workspace_cuisine_category(values, category_id="", user_id=None):
             errors["name"] = (
                 "Enter a cuisine category name containing letters or numbers."
             )
-        if len(icon) > CUISINE_CATEGORY_ICON_LIMIT:
+        invalid_flag_token = (
+            raw_icon_input is not None
+            and re.match(
+                r"^flag\s*:",
+                str(raw_icon_input or ""),
+                flags=re.IGNORECASE,
+            )
+            and not CUISINE_CATEGORY_FLAG_ICON_TOKEN_PATTERN.fullmatch(
+                str(raw_icon_input or "")
+            )
+        )
+        symbol_token_match = CUISINE_CATEGORY_SYMBOL_ICON_TOKEN_PATTERN.fullmatch(
+            str(raw_icon_input or "")
+        )
+        invalid_symbol_token = (
+            raw_icon_input is not None
+            and re.match(
+                r"^symbol\s*:",
+                str(raw_icon_input or ""),
+                flags=re.IGNORECASE,
+            )
+            and (
+                not symbol_token_match
+                or not cuisine_category_symbol_icon_token(
+                    symbol_token_match.group(1)
+                )
+            )
+        )
+        if invalid_flag_token:
+            errors["icon"] = "Use a flag token in the format flag:us."
+        elif invalid_symbol_token:
+            errors["icon"] = "Choose a supported cuisine symbol."
+        elif len(icon) > CUISINE_CATEGORY_ICON_LIMIT:
             errors["icon"] = (
                 f"Use {CUISINE_CATEGORY_ICON_LIMIT} characters or fewer."
             )

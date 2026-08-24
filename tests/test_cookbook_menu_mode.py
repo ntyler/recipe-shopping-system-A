@@ -439,7 +439,13 @@ def test_cookbook_recipe_rows_match_current_recipe_summary_layout():
     assert 'class="recipe-url-summary-header"' in template
     assert 'class="recipe-batch-select cookbook-restore-checkbox cookbook-recipe-restore-checkbox"' in template
     assert 'class="recipe-url-summary-actions cookbook-recipe-actions"' in template
-    assert "display: grid;\n                grid-template-columns: minmax(0, 1fr) auto;" not in css
+    header_selector = (
+        "#cookbooksCard .cookbook-recipe-card .recipe-url-summary-header"
+    )
+    header_start = css.index(header_selector)
+    header_block = css[header_start:css.index("}", header_start)]
+    assert "grid-template-columns: 18px 32px minmax(0, 1fr) auto;" in header_block
+    assert "grid-template-columns: minmax(0, 1fr) auto;" not in header_block
     assert "justify-content: flex-end;\n                width: 100%;\n                margin-left: auto;" not in css
     assert "#cookbooksCard .cookbook-recipe-card .recipe-url-summary-title-line" in css
     assert "#cookbooksCard .cookbook-recipe-card .recipe-url-summary-number,\n    #cookbooksCard .cookbook-recipe-card .recipe-url-summary-name" in css
@@ -1114,6 +1120,25 @@ def test_cookbook_menu_section_blank_falls_back_to_miscellaneous():
     assert menu_section["recipes"][0]["name"] == "Chicken Alfredo"
 
 
+def test_cookbook_cuisine_mode_groups_canonical_values_under_display_heading():
+    sections = cookbook_service.cookbook_menu_sections([
+        {
+            "url": "https://example.com/huancaina",
+            "name": "Papa a la Huancaina",
+            "cuisine": "Peruvian",
+        }
+    ])
+
+    peruvian = next(
+        section
+        for section in sections["cuisine"]
+        if section["label"] == "🇵🇪 Peruvian"
+    )
+
+    assert peruvian["recipes"][0]["name"] == "Papa a la Huancaina"
+    assert not any(section["label"] == "Peruvian" for section in sections["cuisine"])
+
+
 def test_cookbook_category_update_requires_confirmation_before_overwriting_manual_values():
     with TemporaryDirectory() as temp_dir, patch.object(
         cookbook_service,
@@ -1161,7 +1186,7 @@ def test_cookbook_category_update_requires_confirmation_before_overwriting_manua
 
         saved_recipe = cookbook_service.load_cookbooks()["cookbooks"][0]["recipes"][0]
         assert saved_recipe["category_metadata_user_set"] is True
-        assert saved_recipe["cuisine"] == "🌍 Other / Fusion"
+        assert saved_recipe["cuisine"] == "Other / Fusion"
         assert saved_recipe["custom_categories"] == ["🧪 Things We Want To Try"]
         assert saved_recipe["category_metadata_sources"]["cuisine"] == "user_selected"
         assert saved_recipe["category_metadata_sources"]["custom_categories"] == "user_selected"
@@ -1203,7 +1228,7 @@ def test_cookbook_category_update_can_fill_blank_categories_when_menu_section_ex
         saved_recipe = cookbook_service.load_cookbooks()["cookbooks"][0]["recipes"][0]
         assert saved_recipe["menu_section"] == "Appetizers"
         assert saved_recipe["meal_type"] == "🍽️ Appetizer / Snack"
-        assert saved_recipe["cuisine"] == "🇵🇪 Peruvian"
+        assert saved_recipe["cuisine"] == "Peruvian"
         assert saved_recipe["custom_categories"] == ["Restaurant Favorites"]
         assert saved_recipe["category_metadata_sources"]["meal_type"] == "ai_inferred"
         assert saved_recipe["category_metadata_sources"]["cuisine"] == "ai_inferred"

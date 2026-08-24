@@ -1599,7 +1599,8 @@
                             {% if editor_cuisine_options is not none %}
                                 {% for option in editor_cuisine_options %}
                                     <span data-recipe-edit-multiselect-option="{{ option.value }}"
-                                          data-recipe-edit-multiselect-label="{{ option.label or option.value }}"></span>
+                                          data-recipe-edit-multiselect-label="{{ option.label or option.value }}"
+                                          data-recipe-edit-multiselect-icon="{{ option.icon or '' }}"></span>
                                 {% endfor %}
                             {% else %}
                                 {% for choice in editor_category_choices.cuisine or [] %}

@@ -59,6 +59,8 @@
         let returnFocus = null;
         let usageReturnFocus = null;
         let usageRequestToken = 0;
+        let iconChoiceExplicit = false;
+        let suggestedIconToken = "";
 
         const source = document.getElementById("cuisineCategoryConfig");
         const status = root.querySelector("[data-cuisine-category-master-status]");
@@ -68,7 +70,15 @@
         const searchEmpty = root.querySelector("[data-cuisine-category-master-search-empty]");
         const dialog = root.querySelector("[data-cuisine-category-master-dialog]");
         const form = root.querySelector("[data-cuisine-category-master-form]");
+        const iconPicker = root.querySelector("[data-cuisine-category-master-icon-picker]");
         const iconInput = root.querySelector("[data-cuisine-category-master-icon]");
+        const iconTrigger = root.querySelector("[data-cuisine-category-master-icon-trigger]");
+        const iconPreview = root.querySelector("[data-cuisine-category-master-icon-preview]");
+        const iconLabel = root.querySelector("[data-cuisine-category-master-icon-label]");
+        const iconMenu = root.querySelector("[data-cuisine-category-master-icon-menu]");
+        const iconSearch = root.querySelector("[data-cuisine-category-master-icon-search]");
+        const iconListbox = root.querySelector("[data-cuisine-category-master-icon-listbox]");
+        const iconEmpty = root.querySelector("[data-cuisine-category-master-icon-empty]");
         const iconError = root.querySelector("[data-cuisine-category-master-icon-error]");
         const abbreviationInput = root.querySelector("[data-cuisine-category-master-abbreviation]");
         const abbreviationError = root.querySelector("[data-cuisine-category-master-abbreviation-error]");
@@ -100,12 +110,28 @@
             || cleanText(item?.name)
         );
 
-        const categoryDisplayLabel = item => (
-            cleanText(item?.display_label)
-            || cleanText(item?.name)
-            || [cleanText(item?.icon), categoryName(item)].filter(Boolean).join(" ")
-            || "Cuisine category"
+        const categoryDisplayLabel = item => categoryName(item) || "Cuisine category";
+
+        const iconVisuals = window.CuisineIconVisuals;
+        const iconDescriptor = value => (
+            iconVisuals?.descriptor(value)
+            || {
+                token: cleanText(value),
+                kind: cleanText(value) ? "custom" : "none",
+                label: cleanText(value) ? `Custom symbol ${cleanText(value)}` : "None",
+                glyph: cleanText(value),
+                code: "",
+                supported: true,
+            }
         );
+
+        const renderIconVisual = (container, value) => {
+            if (!container) return iconDescriptor(value);
+            if (iconVisuals?.render) return iconVisuals.render(container, value);
+            const item = iconDescriptor(value);
+            container.textContent = item.glyph || (item.kind === "none" ? "—" : "◆");
+            return item;
+        };
 
         const setStatus = (message, type = "success") => {
             status.textContent = String(message || "");
@@ -168,15 +194,19 @@
             row.dataset.categoryId = item.id;
             row.dataset.cuisineCategoryMasterSearchValue = [
                 item.icon,
+                iconDescriptor(item.icon).label,
                 item.abbreviation,
                 categoryName(item),
             ].filter(Boolean).join(" ");
 
             const icon = document.createElement("span");
-            icon.className = "cuisine-category-master-icon";
+            icon.className = "cuisine-category-master-icon cuisine-category-icon-visual";
             icon.setAttribute("role", "cell");
-            icon.setAttribute("aria-label", item.icon ? `Icon: ${item.icon}` : "No icon");
-            icon.textContent = item.icon || "—";
+            const iconItem = renderIconVisual(icon, item.icon);
+            icon.setAttribute(
+                "aria-label",
+                iconItem.kind === "none" ? "No icon" : `Icon: ${iconItem.label}`,
+            );
 
             const abbreviation = document.createElement("strong");
             abbreviation.className = "cuisine-category-master-abbreviation";
@@ -278,8 +308,226 @@
             renderRegistry();
         };
 
+        const iconOptionRecords = () => Array.from(iconInput.options).map(option => {
+            const token = iconVisuals?.normalizeToken(option.value) || cleanText(option.value);
+            const item = iconDescriptor(token);
+            const parentLabel = option.parentElement?.tagName === "OPTGROUP"
+                ? cleanText(option.parentElement.label)
+                : "Selection";
+            return {
+                token,
+                label: cleanText(option.textContent) || item.label,
+                group: cleanText(option.dataset.iconGroup) || parentLabel,
+                search: [option.textContent, item.label, item.code, token].filter(Boolean).join(" "),
+                item,
+            };
+        });
+
+        const ensureLegacyIconOption = value => {
+            iconInput.querySelectorAll("option[data-cuisine-category-custom-icon]")
+                .forEach(option => option.remove());
+            const token = iconVisuals?.normalizeToken(value) || cleanText(value);
+            if (!token || Array.from(iconInput.options).some(option => option.value === token)) {
+                return token;
+            }
+            const item = iconDescriptor(token);
+            const option = document.createElement("option");
+            option.value = token;
+            option.textContent = item.kind === "custom" ? `Current symbol: ${token}` : item.label;
+            option.dataset.iconGroup = "Current icon";
+            option.dataset.cuisineCategoryCustomIcon = "";
+            iconInput.appendChild(option);
+            return token;
+        };
+
+        const visibleIconOptions = () => Array.from(
+            iconListbox.querySelectorAll("[data-cuisine-category-master-icon-option]"),
+        );
+
+        const createIconOption = record => {
+            const option = document.createElement("button");
+            option.type = "button";
+            option.className = "cuisine-category-master-icon-option";
+            option.dataset.cuisineCategoryMasterIconOption = record.token;
+            option.setAttribute("role", "option");
+            option.setAttribute("aria-selected", String(record.token === iconInput.value));
+            option.tabIndex = -1;
+            option.classList.toggle("is-selected", record.token === iconInput.value);
+
+            const visual = iconVisuals?.create(record.token) || document.createElement("span");
+            if (!iconVisuals?.create) renderIconVisual(visual, record.token);
+            visual.classList.add("cuisine-category-master-icon-option-visual");
+
+            const copy = document.createElement("span");
+            copy.className = "cuisine-category-master-icon-option-copy";
+            const label = document.createElement("strong");
+            label.textContent = record.item.label;
+            copy.appendChild(label);
+            if (record.item.kind === "flag") {
+                const detail = document.createElement("small");
+                detail.textContent = record.item.code;
+                copy.appendChild(detail);
+            }
+
+            const state = document.createElement("span");
+            state.className = "cuisine-category-master-icon-option-state";
+            state.setAttribute("aria-hidden", "true");
+            state.textContent = record.token === suggestedIconToken && !iconChoiceExplicit
+                ? "Suggested"
+                : record.token === iconInput.value
+                    ? "✓"
+                    : "";
+            option.append(visual, copy, state);
+            return option;
+        };
+
+        const renderIconOptions = () => {
+            const query = categoryKey(iconSearch.value);
+            const records = iconOptionRecords().filter(record => (
+                !query || categoryKey(record.search).includes(query)
+            ));
+            const groups = new Map();
+            records.forEach(record => {
+                if (!groups.has(record.group)) groups.set(record.group, []);
+                groups.get(record.group).push(record);
+            });
+            const fragments = [];
+            let groupIndex = 0;
+            groups.forEach((groupRecords, groupName) => {
+                groupIndex += 1;
+                const group = document.createElement("div");
+                group.className = "cuisine-category-master-icon-group";
+                group.setAttribute("role", "group");
+                const heading = document.createElement("div");
+                heading.className = "cuisine-category-master-icon-group-label";
+                heading.id = `cuisineCategoryIconGroup${groupIndex}`;
+                heading.textContent = groupName;
+                group.setAttribute("aria-labelledby", heading.id);
+                group.append(heading, ...groupRecords.map(createIconOption));
+                fragments.push(group);
+            });
+            iconListbox.replaceChildren(...fragments);
+            iconEmpty.hidden = records.length > 0;
+        };
+
+        const syncIconPicker = () => {
+            const item = renderIconVisual(iconPreview, iconInput.value);
+            iconLabel.textContent = item.label;
+            iconTrigger.title = item.label;
+            renderIconOptions();
+        };
+
+        const setIconSelection = (value, options = {}) => {
+            const token = ensureLegacyIconOption(value);
+            iconInput.value = token;
+            if (options.explicit) {
+                iconChoiceExplicit = true;
+                suggestedIconToken = "";
+            }
+            setFieldError(iconTrigger, iconError, "");
+            syncIconPicker();
+        };
+
+        const positionIconMenu = () => {
+            if (iconMenu.hidden) return;
+            const rect = iconTrigger.getBoundingClientRect();
+            const gutter = 10;
+            const width = Math.min(
+                Math.max(300, rect.width),
+                Math.max(240, window.innerWidth - gutter * 2),
+            );
+            const left = Math.max(
+                gutter,
+                Math.min(rect.left, window.innerWidth - width - gutter),
+            );
+            const below = window.innerHeight - rect.bottom - gutter;
+            const above = rect.top - gutter;
+            const openAbove = below < 310 && above > below;
+            const available = Math.max(220, Math.min(430, openAbove ? above : below));
+            iconMenu.style.width = `${Math.round(width)}px`;
+            iconMenu.style.maxHeight = `${Math.round(available)}px`;
+            iconMenu.style.left = `${Math.round(left)}px`;
+            iconMenu.style.top = openAbove ? "auto" : `${Math.round(rect.bottom + 6)}px`;
+            iconMenu.style.bottom = openAbove
+                ? `${Math.round(window.innerHeight - rect.top + 6)}px`
+                : "auto";
+        };
+
+        const closeIconPicker = (options = {}) => {
+            if (!iconMenu.hidden) {
+                iconMenu.hidden = true;
+                iconPicker.classList.remove("is-open");
+                iconTrigger.setAttribute("aria-expanded", "false");
+                ["width", "max-height", "left", "top", "bottom"].forEach(
+                    property => iconMenu.style.removeProperty(property),
+                );
+            }
+            iconSearch.value = "";
+            renderIconOptions();
+            if (options.focusTrigger) iconTrigger.focus({ preventScroll: true });
+        };
+
+        const openIconPicker = (options = {}) => {
+            if (!iconMenu.hidden) {
+                if (options.focusOption) {
+                    const selected = iconListbox.querySelector('[role="option"][aria-selected="true"]');
+                    (selected || visibleIconOptions()[0])?.focus({ preventScroll: true });
+                }
+                return;
+            }
+            iconSearch.value = "";
+            renderIconOptions();
+            iconMenu.hidden = false;
+            iconPicker.classList.add("is-open");
+            iconTrigger.setAttribute("aria-expanded", "true");
+            positionIconMenu();
+            const selected = iconListbox.querySelector('[role="option"][aria-selected="true"]');
+            selected?.scrollIntoView({ block: "nearest" });
+            if (options.focusOption) {
+                (selected || visibleIconOptions()[0])?.focus({ preventScroll: true });
+            }
+        };
+
+        const chooseIconOption = option => {
+            if (!option) return;
+            setIconSelection(option.dataset.cuisineCategoryMasterIconOption, { explicit: true });
+            closeIconPicker({ focusTrigger: true });
+        };
+
+        const moveIconOptionFocus = (current, key) => {
+            const options = visibleIconOptions();
+            if (!options.length) return;
+            const currentIndex = options.indexOf(current);
+            const nextIndex = key === "Home"
+                ? 0
+                : key === "End"
+                    ? options.length - 1
+                    : (Math.max(0, currentIndex) + (key === "ArrowDown" ? 1 : -1) + options.length)
+                        % options.length;
+            options[nextIndex]?.focus({ preventScroll: true });
+        };
+
+        const suggestFlagFromAbbreviation = () => {
+            if (iconChoiceExplicit) return;
+            const code = cleanText(abbreviationInput.value).toLowerCase();
+            const supportedCodes = new Set(iconVisuals?.supportedFlagCodes || []);
+            const token = /^[a-z]{2}$/.test(code) && supportedCodes.has(code)
+                ? `flag:${code}`
+                : "";
+            suggestedIconToken = token;
+            setIconSelection(token);
+        };
+
+        const enhanceIconPicker = () => {
+            iconInput.tabIndex = -1;
+            iconInput.setAttribute("aria-hidden", "true");
+            iconPicker.classList.add("is-enhanced");
+            iconTrigger.hidden = false;
+            setIconSelection(iconInput.value);
+        };
+
         const clearEditorErrors = () => {
-            setFieldError(iconInput, iconError, "");
+            setFieldError(iconTrigger, iconError, "");
             setFieldError(abbreviationInput, abbreviationError, "");
             setFieldError(nameInput, nameError, "");
             setFieldError(activeInput, activeError, "");
@@ -287,15 +535,22 @@
         };
 
         const closeEditor = () => {
+            closeIconPicker();
             if (dialog.open) dialog.close();
         };
 
         const openEditor = (item = null, trigger = null) => {
             editorCategoryId = String(item?.id || "");
             returnFocus = trigger || document.activeElement;
+            closeIconPicker();
             clearEditorErrors();
-            iconInput.value = item?.icon || "";
             abbreviationInput.value = item?.abbreviation || "";
+            // Existing blank icons are intentional saved choices. Suggestions apply
+            // only while creating a new category before the user chooses an icon.
+            iconChoiceExplicit = Boolean(item);
+            suggestedIconToken = "";
+            setIconSelection(item?.icon || "");
+            if (!iconChoiceExplicit) suggestFlagFromAbbreviation();
             nameInput.value = categoryName(item);
             nameInput.disabled = Boolean(item?.seeded);
             nameHelp.textContent = item?.seeded
@@ -312,12 +567,12 @@
             deleteButton.style.display = item?.custom ? "" : "none";
             deleteButton.dataset.categoryId = item?.id || "";
             if (item?.custom && Number(item.recipe_count) > 0) {
-                deleteButton.title = `${item.name} is used by ${item.recipe_count} recipe${Number(item.recipe_count) === 1 ? "" : "s"}.`;
+                deleteButton.title = `${categoryDisplayLabel(item)} is used by ${item.recipe_count} recipe${Number(item.recipe_count) === 1 ? "" : "s"}.`;
             } else {
                 deleteButton.removeAttribute("title");
             }
             if (!dialog.open) dialog.showModal();
-            window.requestAnimationFrame(() => iconInput.focus());
+            window.requestAnimationFrame(() => iconTrigger.focus({ preventScroll: true }));
         };
 
         const requestJson = async (url, options = {}) => {
@@ -369,7 +624,7 @@
                 });
                 if (!response.ok || data.ok === false) {
                     const errors = data.errors || {};
-                    setFieldError(iconInput, iconError, errors.icon || "");
+                    setFieldError(iconTrigger, iconError, errors.icon || "");
                     setFieldError(
                         abbreviationInput,
                         abbreviationError,
@@ -400,13 +655,13 @@
             if (!item?.custom) return;
             if (Number(item.recipe_count) > 0) {
                 setEditorFeedback(
-                    `${item.name} is used by ${item.recipe_count} recipe${Number(item.recipe_count) === 1 ? "" : "s"}. Deactivate it instead.`,
+                    `${categoryDisplayLabel(item)} is used by ${item.recipe_count} recipe${Number(item.recipe_count) === 1 ? "" : "s"}. Deactivate it instead.`,
                     "warning",
                 );
                 activeInput.focus();
                 return;
             }
-            if (!window.confirm(`Delete custom cuisine category "${item.name}"?`)) return;
+            if (!window.confirm(`Delete custom cuisine category "${categoryDisplayLabel(item)}"?`)) return;
             deleteButton.disabled = true;
             try {
                 const url = root.dataset.updateUrlTemplate.replace(
@@ -575,6 +830,72 @@
             || localStorage.getItem(IMPORT_DISMISSED_KEY) === "true"
         );
 
+        iconTrigger.addEventListener("click", () => {
+            if (iconMenu.hidden) {
+                openIconPicker();
+            } else {
+                closeIconPicker({ focusTrigger: true });
+            }
+        });
+        iconTrigger.addEventListener("keydown", event => {
+            if (["ArrowDown", "ArrowUp"].includes(event.key)) {
+                event.preventDefault();
+                openIconPicker({ focusOption: true });
+            } else if (event.key === "Escape" && !iconMenu.hidden) {
+                event.preventDefault();
+                closeIconPicker({ focusTrigger: true });
+            }
+        });
+        iconSearch.addEventListener("input", renderIconOptions);
+        iconSearch.addEventListener("keydown", event => {
+            if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+                event.preventDefault();
+                const options = visibleIconOptions();
+                const target = ["ArrowUp", "End"].includes(event.key)
+                    ? options[options.length - 1]
+                    : options[0];
+                target?.focus({ preventScroll: true });
+            } else if (event.key === "Enter") {
+                const first = visibleIconOptions()[0];
+                if (first) {
+                    event.preventDefault();
+                    chooseIconOption(first);
+                }
+            } else if (event.key === "Escape") {
+                event.preventDefault();
+                closeIconPicker({ focusTrigger: true });
+            }
+        });
+        iconListbox.addEventListener("click", event => {
+            chooseIconOption(event.target.closest("[data-cuisine-category-master-icon-option]"));
+        });
+        iconListbox.addEventListener("keydown", event => {
+            const option = event.target.closest("[data-cuisine-category-master-icon-option]");
+            if (option && ["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+                event.preventDefault();
+                moveIconOptionFocus(option, event.key);
+            } else if (event.key === "Escape") {
+                event.preventDefault();
+                closeIconPicker({ focusTrigger: true });
+            }
+        });
+        iconPicker.addEventListener("focusout", () => {
+            // Pointer focus can temporarily leave the previous control before the
+            // option click is delivered. Wait for that click to commit the manual
+            // choice before deciding whether the picker actually lost focus.
+            window.setTimeout(() => {
+                if (!iconPicker.contains(document.activeElement)) closeIconPicker();
+            }, 0);
+        });
+        abbreviationInput.addEventListener("input", suggestFlagFromAbbreviation);
+        document.addEventListener("click", event => {
+            if (!iconMenu.hidden && !event.target.closest("[data-cuisine-category-master-icon-picker]")) {
+                closeIconPicker();
+            }
+        });
+        window.addEventListener("resize", () => closeIconPicker());
+        dialog.addEventListener("scroll", () => closeIconPicker(), { passive: true });
+
         root.addEventListener("click", event => {
             const add = event.target.closest("[data-cuisine-category-master-add-button]");
             if (add) {
@@ -638,6 +959,7 @@
             },
         );
 
+        enhanceIconPicker();
         renderRegistry();
     }
 

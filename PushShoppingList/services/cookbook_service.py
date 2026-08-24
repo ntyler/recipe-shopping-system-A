@@ -694,18 +694,61 @@ def normalized_label_key(value):
     return re.sub(r"[^a-z0-9]+", " ", str(value or "").lower()).strip()
 
 
+def _legacy_cuisine_category_option(value):
+    text = clean_text(value)
+    match = re.match(r"^([^\w\s]+)\s+(.+)$", text, flags=re.UNICODE)
+    if not match:
+        return {"value": text, "label": text, "icon": ""}
+
+    icon = clean_text(match.group(1))
+    label = clean_text(match.group(2))
+    if len(icon) == 2 and all(
+        0x1F1E6 <= ord(character) <= 0x1F1FF
+        for character in icon
+    ):
+        country_code = "".join(
+            chr(ord("a") + ord(character) - 0x1F1E6)
+            for character in icon
+        )
+        icon = f"flag:{country_code}"
+    return {"value": label, "label": label, "icon": icon}
+
+
 def category_choice_label(field, value):
     text = clean_text(value)
 
     if not text:
         return ""
 
+    if field == "cuisine":
+        text = _legacy_cuisine_category_option(text)["value"]
     text_key = normalized_label_key(text)
     for choice in COOKBOOK_CATEGORY_CHOICES.get(field, ()):
-        if normalized_label_key(choice) == text_key:
-            return choice
+        comparable_choice = (
+            _legacy_cuisine_category_option(choice)["value"]
+            if field == "cuisine"
+            else choice
+        )
+        if normalized_label_key(comparable_choice) == text_key:
+            return comparable_choice
 
     return text
+
+
+def cuisine_menu_section_label(value):
+    """Decorate a canonical cuisine only for legacy cookbook menu headings."""
+    canonical = _legacy_cuisine_category_option(value)["value"]
+    canonical_key = normalized_label_key(canonical)
+    if not canonical_key:
+        return ""
+
+    for choice in COOKBOOK_CATEGORY_CHOICES.get("cuisine", ()):
+        if normalized_label_key(
+            _legacy_cuisine_category_option(choice)["value"]
+        ) == canonical_key:
+            return choice
+
+    return canonical
 
 
 def clean_category_payload(payload):
@@ -1278,7 +1321,7 @@ def cookbook_menu_sort_options():
 
 def active_cuisine_category_options(user_id=None):
     fallback = [
-        {"value": choice, "label": choice}
+        _legacy_cuisine_category_option(choice)
         for choice in COOKBOOK_CATEGORY_CHOICES.get("cuisine", ())
     ]
     try:
@@ -1303,21 +1346,33 @@ def active_cuisine_category_options(user_id=None):
     for item in rows:
         if not isinstance(item, dict) or item.get("active") is False:
             continue
+        legacy = _legacy_cuisine_category_option(
+            item.get("display_label")
+            or item.get("name")
+            or item.get("label")
+            or ""
+        )
         value = clean_text(
             item.get("value")
             or item.get("category_name")
             or item.get("canonical_name")
-            or item.get("name")
+            or legacy["value"]
         )
         label = clean_text(
-            item.get("display_label")
-            or item.get("name")
-            or item.get("label")
+            item.get("category_name")
+            or item.get("canonical_name")
+            or item.get("value")
+            or legacy["label"]
             or value
         )
+        icon = clean_text(item.get("icon") or legacy["icon"])
         key = normalized_label_key(value)
         if value and key and key not in seen:
-            options.append({"value": value, "label": label or value})
+            options.append({
+                "value": value,
+                "label": label or value,
+                "icon": icon,
+            })
             seen.add(key)
     # An empty list is meaningful: the workspace may intentionally deactivate
     # every category. Only a missing/malformed registry should use the fallback.
@@ -1363,6 +1418,8 @@ def recipe_section_labels_for_mode(recipe, mode):
         return clean_text_list(recipe.get("custom_categories")) or [mode.get("fallback")]
 
     value = clean_text(recipe.get(field))
+    if value and mode.get("key") == "cuisine":
+        value = cuisine_menu_section_label(value)
     return [value or mode.get("fallback")]
 
 

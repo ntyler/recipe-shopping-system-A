@@ -83,70 +83,70 @@ def test_default_registry_is_read_only_and_has_stable_seed_ids(cuisine_workspace
     ] == [
         {
             "id": "american",
-            "icon": "🇺🇸",
+            "icon": "flag:us",
             "abbreviation": "US",
             "category_name": "American",
             "display_label": "🇺🇸 American",
         },
         {
             "id": "mexican",
-            "icon": "🇲🇽",
+            "icon": "flag:mx",
             "abbreviation": "MX",
             "category_name": "Mexican",
             "display_label": "🇲🇽 Mexican",
         },
         {
             "id": "peruvian",
-            "icon": "🇵🇪",
+            "icon": "flag:pe",
             "abbreviation": "PE",
             "category_name": "Peruvian",
             "display_label": "🇵🇪 Peruvian",
         },
         {
             "id": "italian",
-            "icon": "🇮🇹",
+            "icon": "flag:it",
             "abbreviation": "IT",
             "category_name": "Italian",
             "display_label": "🇮🇹 Italian",
         },
         {
             "id": "japanese",
-            "icon": "🇯🇵",
+            "icon": "flag:jp",
             "abbreviation": "JP",
             "category_name": "Japanese",
             "display_label": "🇯🇵 Japanese",
         },
         {
             "id": "thai",
-            "icon": "🇹🇭",
+            "icon": "flag:th",
             "abbreviation": "TH",
             "category_name": "Thai",
             "display_label": "🇹🇭 Thai",
         },
         {
             "id": "chinese",
-            "icon": "🇨🇳",
+            "icon": "flag:cn",
             "abbreviation": "CN",
             "category_name": "Chinese",
             "display_label": "🇨🇳 Chinese",
         },
         {
             "id": "indian",
-            "icon": "🇮🇳",
+            "icon": "flag:in",
             "abbreviation": "IN",
             "category_name": "Indian",
             "display_label": "🇮🇳 Indian",
         },
         {
             "id": "french",
-            "icon": "🇫🇷",
+            "icon": "flag:fr",
             "abbreviation": "FR",
             "category_name": "French",
             "display_label": "🇫🇷 French",
         },
         {
             "id": "other_fusion",
-            "icon": "🌍",
+            "icon": "symbol:globe",
             "abbreviation": "FUS",
             "category_name": "Other / Fusion",
             "display_label": "🌍 Other / Fusion",
@@ -156,6 +156,190 @@ def test_default_registry_is_read_only_and_has_stable_seed_ids(cuisine_workspace
         item["name"] for item in registry["categories"]
     ]
     assert not master_data.recipe_master_db_path().exists()
+
+
+@pytest.mark.parametrize(
+    ("raw_icon", "token", "country_code", "display"),
+    (
+        ("FLAG : GB", "flag:gb", "GB", "🇬🇧"),
+        ("🇬🇧", "flag:gb", "GB", "🇬🇧"),
+        ("flag:us", "flag:us", "US", "🇺🇸"),
+        (" SYMBOL : NOODLES ", "symbol:noodles", "", "🍜"),
+        ("🍜", "🍜", "", "🍜"),
+        ("", "", "", ""),
+    ),
+)
+def test_flag_icon_tokens_normalize_and_keep_legacy_presentations(
+    raw_icon,
+    token,
+    country_code,
+    display,
+):
+    assert cuisines.clean_cuisine_category_icon(raw_icon) == token
+    assert cuisines.country_code_from_flag(raw_icon) == country_code
+    assert cuisines.cuisine_category_icon_display(raw_icon) == display
+
+
+def test_flag_icon_token_create_normalizes_storage_and_legacy_display(
+    cuisine_workspace,
+):
+    assert cuisines.split_legacy_cuisine_category_label(
+        "flag:GB United Kingdom"
+    ) == ("flag:gb", "United Kingdom")
+    created = cuisines.save_workspace_cuisine_category(
+        {
+            "icon": " FLAG : gB ",
+            "abbreviation": "GBR",
+            "category_name": "British Isles",
+            "active": True,
+        },
+        user_id="user-a",
+    )
+
+    assert created["ok"] is True
+    assert created["icon"] == "flag:gb"
+    assert created["category_name"] == "British Isles"
+    assert created["display_label"] == "🇬🇧 British Isles"
+    with master_data.recipe_master_connection(user_id="user-a") as connection:
+        stored = connection.execute(
+            """
+            SELECT icon, name
+              FROM workspace_cuisine_categories
+             WHERE user_id = ? AND id = ?
+            """,
+            ("user-a", created["category_id"]),
+        ).fetchone()
+    assert dict(stored) == {
+        "icon": "flag:gb",
+        "name": "British Isles",
+    }
+
+
+def test_symbol_icon_token_create_normalizes_storage_and_display(
+    cuisine_workspace,
+):
+    created = cuisines.save_workspace_cuisine_category(
+        {
+            "icon": " SYMBOL : PLATE ",
+            "abbreviation": "MOD",
+            "category_name": "Modern Cuisine",
+        },
+        user_id="user-a",
+    )
+
+    assert created["ok"] is True
+    assert created["icon"] == "symbol:plate"
+    assert created["display_label"] == "🍽️ Modern Cuisine"
+    with master_data.recipe_master_connection(user_id="user-a") as connection:
+        stored_icon = connection.execute(
+            """
+            SELECT icon
+              FROM workspace_cuisine_categories
+             WHERE user_id = ? AND id = ?
+            """,
+            ("user-a", created["category_id"]),
+        ).fetchone()["icon"]
+    assert stored_icon == "symbol:plate"
+
+
+@pytest.mark.parametrize("icon", ("flag:GBR", "flag:1x", "flag:", "flag:gb extra"))
+def test_invalid_flag_icon_tokens_are_rejected(cuisine_workspace, icon):
+    result = cuisines.save_workspace_cuisine_category(
+        {
+            "icon": icon,
+            "abbreviation": "TEST",
+            "category_name": f"Invalid token {icon}",
+        },
+        user_id="user-a",
+    )
+
+    assert result["status"] == 422
+    assert result["errors"]["icon"] == (
+        "Use a flag token in the format flag:us."
+    )
+
+
+@pytest.mark.parametrize(
+    "icon",
+    ("symbol:alien", "symbol:", "symbol:two words", "symbol:bowl-extra"),
+)
+def test_invalid_or_unknown_symbol_icon_tokens_are_rejected(
+    cuisine_workspace,
+    icon,
+):
+    result = cuisines.save_workspace_cuisine_category(
+        {
+            "icon": icon,
+            "abbreviation": "TEST",
+            "category_name": f"Invalid symbol {icon}",
+        },
+        user_id="user-a",
+    )
+
+    assert result["status"] == 422
+    assert result["errors"]["icon"] == "Choose a supported cuisine symbol."
+
+
+def test_legacy_seed_icons_upgrade_to_tokens_without_overwriting_custom_icons(
+    cuisine_workspace,
+):
+    with master_data.recipe_master_connection(user_id="user-a") as connection:
+        cuisines._seed_registry(connection, "user-a")
+        connection.execute(
+            """
+            UPDATE workspace_cuisine_categories
+               SET icon = CASE id
+                    WHEN 'american' THEN '🇺🇸'
+                    WHEN 'italian' THEN '🍝'
+                    WHEN 'mexican' THEN ''
+                    WHEN 'other_fusion' THEN '🌍'
+                    ELSE icon
+               END
+             WHERE user_id = ?
+               AND id IN ('american', 'italian', 'mexican', 'other_fusion')
+            """,
+            ("user-a",),
+        )
+        connection.execute(
+            """
+            UPDATE workspace_cuisine_category_registry_seeds
+               SET seed_version = 'cuisine_categories_v2'
+             WHERE user_id = ?
+            """,
+            ("user-a",),
+        )
+
+        assert cuisines._seed_registry(connection, "user-a") is True
+        icons = {
+            row["id"]: row["icon"]
+            for row in connection.execute(
+                """
+                SELECT id, icon
+                 FROM workspace_cuisine_categories
+                 WHERE user_id = ?
+                   AND id IN (
+                       'american', 'italian', 'mexican', 'other_fusion'
+                   )
+                """,
+                ("user-a",),
+            ).fetchall()
+        }
+        marker = connection.execute(
+            """
+            SELECT seed_version
+              FROM workspace_cuisine_category_registry_seeds
+             WHERE user_id = ?
+            """,
+            ("user-a",),
+        ).fetchone()
+
+    assert icons == {
+        "american": "flag:us",
+        "italian": "🍝",
+        "mexican": "",
+        "other_fusion": "symbol:globe",
+    }
+    assert marker["seed_version"] == cuisines.CUISINE_CATEGORY_SEED_VERSION
 
 
 def test_seed_and_custom_categories_are_idempotent_and_workspace_isolated(
@@ -466,7 +650,7 @@ def test_legacy_combined_and_plain_rows_resolve_structured_fields_safely(
             ]
             if item["id"] == category_id
         )
-        assert category["icon"] == "🇬🇧"
+        assert category["icon"] == "flag:gb"
         assert category["abbreviation"] == "GB"
         assert category["category_name"] == "United Kingdom"
         assert category["display_label"] == "🇬🇧 United Kingdom"
@@ -842,6 +1026,70 @@ def test_icon_only_edit_updates_display_without_rewriting_recipe_values(
     assert category["category_name"] == "United Kingdom"
     assert "🇬🇧 United Kingdom" in category["aliases"]
     assert category["recipe_count"] == 1
+
+
+def test_icon_only_legacy_flag_normalization_does_not_rewrite_assignments(
+    cuisine_workspace,
+):
+    category_id = "custom_legacy_british_isles"
+    with master_data.recipe_master_connection(user_id="user-a") as connection:
+        cuisines._seed_registry(connection, "user-a")
+        timestamp = master_data.utc_now_iso()
+        connection.execute(
+            """
+            INSERT INTO workspace_cuisine_categories (
+                user_id, id, icon, abbreviation, name, normalized_name,
+                aliases_json, is_seeded, is_active, sort_order, created_at,
+                updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, '[]', 0, 1, 10, ?, ?)
+            """,
+            (
+                "user-a",
+                category_id,
+                "🇬🇧",
+                "GBR",
+                "British Isles",
+                "british isles",
+                timestamp,
+                timestamp,
+            ),
+        )
+    recipe_path = write_recipe_output(
+        "user-a",
+        "https://example.test/legacy-flag-token-normalization",
+        {
+            "recipe_title": "British plate",
+            "cuisine": "🇬🇧 British Isles",
+            "cuisine_tags": ["🇬🇧 British Isles", "Italian"],
+        },
+    )
+
+    updated = cuisines.save_workspace_cuisine_category(
+        {"icon": "FLAG:GB"},
+        category_id=category_id,
+        user_id="user-a",
+    )
+
+    assert updated["ok"] is True
+    assert updated["icon"] == "flag:gb"
+    assert updated["display_label"] == "🇬🇧 British Isles"
+    assert updated["migration"] == {"recipe_records": 0, "cookbook_records": 0}
+    recipe_payload = json.loads(recipe_path.read_text(encoding="utf-8"))
+    assert recipe_payload["cuisine"] == "🇬🇧 British Isles"
+    assert recipe_payload["cuisine_tags"] == ["🇬🇧 British Isles", "Italian"]
+    with master_data.recipe_master_connection(user_id="user-a") as connection:
+        stored = connection.execute(
+            """
+            SELECT icon, name
+              FROM workspace_cuisine_categories
+             WHERE user_id = ? AND id = ?
+            """,
+            ("user-a", category_id),
+        ).fetchone()
+    assert dict(stored) == {
+        "icon": "flag:gb",
+        "name": "British Isles",
+    }
 
 
 def test_usage_and_references_dedupe_primary_tags_and_cookbook_metadata(
