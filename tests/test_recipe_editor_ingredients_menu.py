@@ -3752,10 +3752,10 @@ def test_store_section_column_label_remains_in_the_sticky_scrolling_header():
     assert "overflow: hidden;" in sticky_css
 
 
-def test_grouped_choice_controls_use_one_stable_member_anchor_after_section_reordering():
+def test_grouped_choice_controls_repeat_on_each_section_context_after_reordering():
     node = shutil.which("node")
     if not node:
-        pytest.skip("Node.js is required for grouped choice anchor coverage")
+        pytest.skip("Node.js is required for grouped choice section coverage")
 
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     sync_toggles = javascript_function_source(
@@ -3821,18 +3821,21 @@ function source(id, order) {
         dataset: {ingredientExpansionId: id},
     };
 }
-function summary(id, sourceRow) {
+function summary(id, sourceRow, sectionContextAnchor = false) {
     return {
         id,
         hidden: false,
         isConnected: true,
+        dataset: {
+            recipeIngredientOptionSectionContext: String(sectionContextAnchor),
+        },
         recipeIngredientOptionSourceRow: sourceRow,
         button: button(),
     };
 }
-function alternativeSource(id, order) {
+function alternativeSource(id, order, sectionContextAnchor = true) {
     const item = source(id, order);
-    item.groupedSummary = summary("", item);
+    item.groupedSummary = summary("", item, sectionContextAnchor);
     return item;
 }
 function fieldValuesFromRow(row) { return row || {}; }
@@ -3878,8 +3881,8 @@ const sourceButton = {
 const cornSource = source("component-corn", 0);
 const cuminSource = source("component-cumin", 1);
 const onionSource = source("component-onion", 2);
-const corn = summary("corn", cornSource);
-const cumin = summary("cumin", cuminSource);
+const corn = summary("corn", cornSource, true);
+const cumin = summary("cumin", cuminSource, true);
 const onion = summary("onion", onionSource);
 const frozenCornSource = alternativeSource("component-frozen-corn", 0);
 const alternativeOnionSource = alternativeSource("component-alternative-onion", 1);
@@ -4012,9 +4015,12 @@ process.stdout.write(JSON.stringify({
     collapsed = result["collapsed"]
     expanded = result["expandedAfterReorder"]
     switched = result["switchedOption"]
-    assert collapsed["visibleIds"] == ["corn"]
-    assert collapsed["expanded"] == ["false"]
-    assert collapsed["labels"] == ["Show 2 ingredient options"]
+    assert collapsed["visibleIds"] == ["cumin", "corn"]
+    assert collapsed["expanded"] == ["false", "false"]
+    assert collapsed["labels"] == [
+        "Show 2 ingredient options",
+        "Show 2 ingredient options",
+    ]
     assert collapsed["hiddenCells"] is True
     assert len(collapsed["alternativeIds"]) == 2
     assert len(set(collapsed["alternativeIds"])) == 2
@@ -4028,9 +4034,12 @@ process.stdout.write(JSON.stringify({
     assert collapsed["visibleAlternativeIds"] == []
     assert collapsed["usesSourcePanelFallback"] is False
 
-    assert expanded["visibleIds"] == ["corn"]
-    assert expanded["expanded"] == ["true"]
-    assert expanded["labels"] == ["Collapse 2 ingredient options"]
+    assert expanded["visibleIds"] == ["corn", "cumin"]
+    assert expanded["expanded"] == ["true", "true"]
+    assert expanded["labels"] == [
+        "Collapse 2 ingredient options",
+        "Collapse 2 ingredient options",
+    ]
     assert expanded["hiddenCells"] is True
     assert set(expanded["alternativeIds"]) == set(collapsed["alternativeIds"])
     assert set(expanded["controlIds"]) == set(collapsed["alternativeIds"])
@@ -4038,9 +4047,15 @@ process.stdout.write(JSON.stringify({
     assert expanded["controlsResolveToVisibleAlternatives"] is True
     assert expanded["usesSourcePanelFallback"] is False
 
-    assert switched["visibleIds"] == [collapsed["alternativeIds"][0]]
-    assert switched["expanded"] == ["true"]
-    assert switched["labels"] == ["Collapse 2 ingredient options"]
+    assert switched["visibleIds"] == [
+        collapsed["alternativeIds"][1],
+        collapsed["alternativeIds"][0],
+    ]
+    assert switched["expanded"] == ["true", "true"]
+    assert switched["labels"] == [
+        "Collapse 2 ingredient options",
+        "Collapse 2 ingredient options",
+    ]
     assert switched["hiddenCells"] is True
     assert switched["alternativeIds"] == ["corn", "cumin", "onion"]
     assert set(switched["controlIds"]) == set(switched["alternativeIds"])

@@ -37163,7 +37163,12 @@ function syncRecipeIngredientSelectedOptionToggles(row) {
         if (!button || !cell) {
             return;
         }
-        const showOnSummary = Boolean(show && summary === groupedAnchor);
+        const showsSectionContext = (
+            summary.dataset.recipeIngredientOptionSectionContext === "true"
+        );
+        const showOnSummary = Boolean(
+            show && (summary === groupedAnchor || showsSectionContext)
+        );
         button.hidden = !showOnSummary;
         cell.classList.toggle(
             "has-visible-ingredient-selected-option-toggle",
