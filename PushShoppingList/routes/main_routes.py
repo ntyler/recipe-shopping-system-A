@@ -2505,8 +2505,30 @@ def ingredient_master_options_route():
                 "normalized_name": recipe_master_data.normalized_master_name(
                     row.get("normalized_name") or row.get("name")
                 ),
+                "canonical_ingredient": recipe_master_data.clean_text(
+                    row.get("canonical_ingredient")
+                ),
+                "form": recipe_master_data.clean_text(row.get("form")),
                 "store_section": recipe_master_data.clean_ingredient_store_section(
                     row.get("store_section")
+                ),
+                "store_section_source": recipe_master_data.clean_text(
+                    row.get("store_section_source")
+                ),
+                "store_section_confidence": recipe_master_data.ingredient_store_section_confidence(
+                    row.get("store_section_confidence")
+                ),
+                "store_section_user_confirmed": recipe_master_data.truthy(
+                    row.get("store_section_user_confirmed")
+                ),
+                "classifier_version": recipe_master_data.clean_text(
+                    row.get("classifier_version")
+                ),
+                "store_section_reason": recipe_master_data.clean_text(
+                    row.get("store_section_reason")
+                ),
+                "store_section_rule": recipe_master_data.clean_text(
+                    row.get("store_section_rule")
                 ),
                 "image_url": recipe_master_data.clean_text(row.get("image_url")),
                 "usage_count": int(row.get("usage_count") or 0),

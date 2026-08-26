@@ -3963,7 +3963,16 @@ def list_master_records(
     usage_table = config["usage_table"]
     usage_fk = config["usage_fk"]
     if table_name == "ingredients":
-        section_select = ",\n                m.store_section"
+        section_select = """,
+                m.canonical_ingredient,
+                m.form,
+                m.store_section,
+                m.store_section_source,
+                m.store_section_confidence,
+                m.store_section_user_confirmed,
+                m.classifier_version,
+                m.store_section_reason,
+                m.store_section_rule"""
         alias_select = """,
                 COALESCE((
                     SELECT GROUP_CONCAT(alias_rows.alias_name, CHAR(31))
@@ -7244,6 +7253,100 @@ def truthy(value):
     return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
+def selected_ingredient_master_metadata(
+    item,
+    master_record=None,
+    *,
+    user_id=None,
+    connection=None,
+):
+    """Return the exact master snapshot chosen by the recipe-editor picker."""
+    if not isinstance(item, dict):
+        return None
+
+    try:
+        ingredient_id = int(item.get("ingredient_id") or item.get("master_ingredient_id") or 0)
+    except (TypeError, ValueError):
+        ingredient_id = 0
+    match_source = normalized_master_name(
+        item.get("match_source") or item.get("matching_source")
+    ).replace("_", " ")
+    if ingredient_id <= 0 or match_source != "ingredient master data":
+        return None
+
+    current_name = normalized_master_name(item.get("ingredient") or item.get("name"))
+    selected_name = normalized_master_name(
+        item.get("master_ingredient_name")
+        or item.get("matched_master_ingredient")
+        or item.get("master_normalized_name")
+    )
+    if current_name and selected_name and current_name != selected_name:
+        return None
+
+    supplied_source = clean_ingredient_store_section_source(
+        item.get("store_section_source"),
+        default="legacy",
+    )
+    if supplied_source == "recipe_override" or (
+        supplied_source == "manual"
+        and truthy(item.get("store_section_save_to_master"))
+    ):
+        return None
+
+    metadata = master_record if isinstance(master_record, dict) else item
+
+    def first_present(*keys):
+        for key in keys:
+            if key in metadata:
+                return metadata.get(key)
+        return None
+
+    store_section = clean_ingredient_store_section(
+        first_present("master_store_section", "store_section"),
+        default="",
+        user_id=user_id,
+        connection=connection,
+    )
+    if not store_section:
+        return None
+
+    context = normalize_ingredient_classification_context({**metadata, **item})
+    return {
+        **context,
+        "canonical_ingredient": clean_text(
+            first_present("master_canonical_ingredient", "canonical_ingredient")
+        ),
+        "form": clean_text(first_present("master_form", "form")),
+        "store_section": store_section,
+        "store_section_source": clean_ingredient_store_section_source(
+            first_present("master_store_section_source", "store_section_source"),
+            default="legacy",
+        ),
+        "store_section_confidence": ingredient_store_section_confidence(
+            first_present(
+                "master_store_section_confidence",
+                "store_section_confidence",
+            )
+        ),
+        "store_section_user_confirmed": truthy(
+            first_present(
+                "master_store_section_user_confirmed",
+                "store_section_user_confirmed",
+            )
+        ),
+        "classifier_version": clean_text(
+            first_present("master_classifier_version", "classifier_version")
+        ),
+        "store_section_reason": clean_text(
+            first_present("master_store_section_reason", "store_section_reason")
+        ),
+        "store_section_rule": clean_text(
+            first_present("master_store_section_rule", "store_section_rule")
+        ),
+        "_selected_master_data": True,
+    }
+
+
 def compact_image_fields(record, *url_keys):
     record = record if isinstance(record, dict) else {}
     image_url = ""
@@ -7361,6 +7464,7 @@ def ingredient_rows_from_sources(
                 item.get("master_normalized_name") or item.get("normalized_name")
             )
             store_section_custom = truthy(item.get("store_section_custom"))
+            selected_master_metadata = None
             if store_section_custom:
                 custom_store_section = re.sub(
                     r"\s+",
@@ -7386,39 +7490,51 @@ def ingredient_rows_from_sources(
                     "store_section_rule": "manual.custom_section",
                 }
             else:
-                supplied_source = clean_ingredient_store_section_source(
-                    item.get("store_section_source"),
-                    default="legacy",
+                selected_master_metadata = selected_ingredient_master_metadata(
+                    item,
+                    user_id=user_id,
+                    connection=connection,
                 )
-                user_confirmed = truthy(item.get("store_section_user_confirmed"))
-                classification = classify_ingredient_store_section_result(
-                    {
-                        **item,
-                        "raw_name": raw_name or item.get("raw_name") or original_text or name,
-                        "normalized_name": normalized_name or item.get("normalized_name") or name,
-                        "preparation": preparation,
-                    },
-                    recipe_override=item.get("store_section") if user_confirmed else None,
-                    recipe_override_confirmed=user_confirmed,
-                    legacy_section=(
-                        item.get("store_section") or item.get("section")
-                        if supplied_source != "ai"
-                        else None
-                    ),
-                    ai_result=(
+                if selected_master_metadata:
+                    classification = selected_master_metadata
+                else:
+                    supplied_source = clean_ingredient_store_section_source(
+                        item.get("store_section_source"),
+                        default="legacy",
+                    )
+                    user_confirmed = truthy(item.get("store_section_user_confirmed"))
+                    classification = classify_ingredient_store_section_result(
                         {
-                            "store_section": item.get("store_section"),
-                            "confidence": item.get("store_section_confidence"),
-                            "reason": item.get("store_section_reason"),
-                            "normalized_name": normalized_name,
-                        }
-                        if supplied_source == "ai"
-                        else None
-                    ),
-                    default="MISC",
-                )
+                            **item,
+                            "raw_name": raw_name or item.get("raw_name") or original_text or name,
+                            "normalized_name": normalized_name or item.get("normalized_name") or name,
+                            "preparation": preparation,
+                        },
+                        recipe_override=item.get("store_section") if user_confirmed else None,
+                        recipe_override_confirmed=user_confirmed,
+                        legacy_section=(
+                            item.get("store_section") or item.get("section")
+                            if supplied_source != "ai"
+                            else None
+                        ),
+                        ai_result=(
+                            {
+                                "store_section": item.get("store_section"),
+                                "confidence": item.get("store_section_confidence"),
+                                "reason": item.get("store_section_reason"),
+                                "normalized_name": normalized_name,
+                            }
+                            if supplied_source == "ai"
+                            else None
+                        ),
+                        default="MISC",
+                    )
                 store_section = classification["store_section"]
-                if supplied_source == "manual" and truthy(item.get("store_section_save_to_master")):
+                if (
+                    not selected_master_metadata
+                    and supplied_source == "manual"
+                    and truthy(item.get("store_section_save_to_master"))
+                ):
                     classification.update({
                         "store_section_source": "manual",
                         "store_section_user_confirmed": True,
@@ -7464,6 +7580,7 @@ def ingredient_rows_from_sources(
             ingredient_type = "main"
             image_url = ""
             image_path = ""
+            selected_master_metadata = None
 
         rows.append({
             "ingredient_id": ingredient_id,
@@ -7495,7 +7612,12 @@ def ingredient_rows_from_sources(
             "store_section_save_to_master": truthy(
                 item.get("store_section_save_to_master") if isinstance(item, dict) else False
             ),
-            "classifier_version": classification.get("classifier_version") or INGREDIENT_STORE_SECTION_CLASSIFIER_VERSION,
+            "classifier_version": (
+                classification.get("classifier_version", "")
+                if selected_master_metadata
+                else classification.get("classifier_version")
+                or INGREDIENT_STORE_SECTION_CLASSIFIER_VERSION
+            ),
             "store_section_reason": classification.get("store_section_reason") or "",
             "store_section_rule": classification.get("store_section_rule") or "",
             "original_recipe_text": original_text,

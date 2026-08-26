@@ -472,6 +472,230 @@ def test_recipe_save_accepts_match_analysis_metadata_without_coercing_values(mon
         } == submitted_metadata
 
 
+def test_selected_master_ingredient_attributes_survive_two_saves(monkeypatch, tmp_path):
+    configure_recipe_save_storage(monkeypatch, tmp_path)
+    url = "https://example.test/selected-master-ingredient-round-trip"
+    seed_recipe(
+        url,
+        ingredients=[{
+            "id": "ingredient-butter",
+            "recipe_ingredient_id": "requirement-butter",
+            "row_id": "row-butter",
+            "ingredient": "Butter",
+            "original_text": "2 cups butter, cooked",
+            "source_text": "2 cups butter, cooked",
+            "raw_name": "butter",
+            "canonical_ingredient": "butter",
+            "form": "salted",
+            "quantity": "2",
+            "quantity_text": "2 cups",
+            "recipe_qty": "2",
+            "base_quantity": "2",
+            "unit": "cup",
+            "base_unit": "cup",
+            "size": "large",
+            "preparation": "cooked",
+            "notes": "Keep the recipe-specific details.",
+            "section": "main",
+            "optional": False,
+            "purchasable_item": "Cultured butter",
+            "store_section": "DAIRY & EGGS",
+            "ingredient_image_url": "/butter.png",
+            "ingredient_image_generated_at": "yesterday",
+            "ingredient_image_prompt": "butter prompt",
+        }],
+        instructions=[{"step_number": 1, "instruction": "Cook."}],
+    )
+
+    with master_data.recipe_master_connection(user_id=RECIPE_SAVE_TEST_USER_ID) as connection:
+        master_data.upsert_master_record(
+            connection,
+            "ingredients",
+            RECIPE_SAVE_TEST_USER_ID,
+            "Rice",
+            image_url="/rice.png",
+            store_section="PASTA, RICE & GRAINS",
+            force_store_section=True,
+            store_section_metadata={
+                "canonical_ingredient": "grain",
+                "form": "dry",
+                "store_section_source": "manual",
+                "store_section_confidence": 0.91,
+                "store_section_user_confirmed": True,
+                "classifier_version": "master-v3",
+                "store_section_reason": "Reviewed master section.",
+                "store_section_rule": "master.reviewed",
+            },
+        )
+    rice = master_data.master_record_for_name(
+        "ingredients",
+        RECIPE_SAVE_TEST_USER_ID,
+        "Rice",
+    )
+    assert rice
+
+    selected_rice = {
+        "id": "ingredient-butter",
+        "recipe_ingredient_id": "requirement-butter",
+        "row_id": "row-butter",
+        "ingredient_id": str(rice["id"]),
+        "ingredient": "Rice",
+        "parsed_name": "Rice",
+        "normalized_name": "rice",
+        "master_normalized_name": "rice",
+        "canonical_ingredient": "grain",
+        "form": "dry",
+        "original_text": "2 cups butter, cooked",
+        "source_text": "2 cups butter, cooked",
+        "raw_name": "butter",
+        "quantity": "2",
+        "quantity_text": "2 cups",
+        "recipe_qty": "2",
+        "base_quantity": "2",
+        "unit": "cup",
+        "base_unit": "cup",
+        "size": "large",
+        "preparation": "cooked",
+        "notes": "Keep the recipe-specific details.",
+        "section": "main",
+        "optional": False,
+        "purchasable_item": "Cultured butter",
+        "store_section": "PASTA, RICE & GRAINS",
+        "store_section_custom": False,
+        "store_section_source": "manual",
+        "store_section_confidence": 0.91,
+        "store_section_user_confirmed": True,
+        "store_section_save_to_master": False,
+        "classifier_version": "master-v3",
+        "store_section_reason": "Reviewed master section.",
+        "store_section_rule": "master.reviewed",
+        "ingredient_image_url": "/rice.png",
+        "ingredient_image_generated_at": "",
+        "ingredient_image_prompt": "",
+        "match_status": "Matched",
+        "match_source": "ingredient master data",
+        "master_ingredient_name": "Rice",
+        "matched_master_ingredient": "rice",
+    }
+    client = recipe_route_client()
+
+    def assert_selected_master_values(row):
+        assert str(row.get("ingredient_id") or "") == str(rice["id"])
+        assert row["ingredient"] == "Rice"
+        assert row["parsed_name"] == "Rice"
+        assert row["normalized_name"] == "rice"
+        assert row["master_normalized_name"] == "rice"
+        assert row["canonical_ingredient"] == "grain"
+        assert row["form"] == "dry"
+        assert row["store_section"] == "PASTA, RICE & GRAINS"
+        assert row["store_section_custom"] is False
+        assert row["store_section_source"] == "manual"
+        assert row["store_section_confidence"] == pytest.approx(0.91)
+        assert row["store_section_user_confirmed"] is True
+        assert row["store_section_save_to_master"] is False
+        assert row["classifier_version"] == "master-v3"
+        assert row["store_section_reason"] == "Reviewed master section."
+        assert row["store_section_rule"] == "master.reviewed"
+        assert row["ingredient_image_url"] == "/rice.png"
+        assert not row.get("ingredient_image_generated_at")
+        assert not row.get("ingredient_image_prompt")
+        assert row["match_source"] == "ingredient master data"
+
+    def assert_recipe_values(row):
+        assert row["id"] == "ingredient-butter"
+        assert row["recipe_ingredient_id"] == "requirement-butter"
+        assert row["row_id"] == "row-butter"
+        assert row["original_text"] == "2 cups butter, cooked"
+        assert row["source_text"] == "2 cups butter, cooked"
+        assert row["raw_name"] == "butter"
+        assert row["quantity"] == "2"
+        assert row["quantity_text"] == "2 cups"
+        assert row["recipe_qty"] == "2"
+        assert row["base_quantity"] == "2"
+        assert row["unit"] == "cup"
+        assert row["base_unit"] == "cup"
+        assert row["size"] == "large"
+        assert row["preparation"] == "cooked"
+        assert row["notes"] == "Keep the recipe-specific details."
+        assert row["section"] == "main"
+        assert row["optional"] is False
+        assert row["purchasable_item"] == "Cultured butter"
+
+    first_response = client.post(
+        "/api/recipe",
+        json={
+            "original_url": url,
+            "recipe": editable_payload(url, ingredients=[selected_rice]),
+        },
+    )
+    assert first_response.status_code == 200
+    first_saved = recipe_edit_service.load_recipe_output(url)["ingredients"][0]
+    first_loaded = first_response.get_json()["recipe"]["ingredients"][0]
+    for row in (first_saved, first_loaded):
+        assert_selected_master_values(row)
+        assert_recipe_values(row)
+
+    requirement_row = master_data.recipe_master_rows(
+        "recipe_ingredients",
+        url,
+        user_id=RECIPE_SAVE_TEST_USER_ID,
+    )[0]
+    assert requirement_row["canonical_ingredient"] == "grain"
+    assert requirement_row["form"] == "dry"
+    assert requirement_row["store_section"] == "PASTA, RICE & GRAINS"
+    assert requirement_row["store_section_source"] == "manual"
+    assert requirement_row["store_section_confidence"] == pytest.approx(0.91)
+    assert requirement_row["store_section_user_confirmed"] == 1
+    assert requirement_row["classifier_version"] == "master-v3"
+    assert requirement_row["store_section_reason"] == "Reviewed master section."
+    assert requirement_row["store_section_rule"] == "master.reviewed"
+
+    second_response = client.post(
+        "/api/recipe",
+        json={
+            "original_url": url,
+            "recipe": editable_payload(url, ingredients=[first_saved]),
+        },
+    )
+    assert second_response.status_code == 200
+    second_saved = recipe_edit_service.load_recipe_output(url)["ingredients"][0]
+    second_loaded = second_response.get_json()["recipe"]["ingredients"][0]
+    for row in (second_saved, second_loaded):
+        assert_selected_master_values(row)
+        assert_recipe_values(row)
+
+
+def test_recipe_store_section_override_wins_after_master_picker_selection():
+    submitted = {
+        "ingredient_id": "7648",
+        "ingredient": "Rice",
+        "normalized_name": "rice",
+        "master_normalized_name": "rice",
+        "master_ingredient_name": "Rice",
+        "match_source": "ingredient master data",
+        "store_section": "PRODUCE",
+        "store_section_source": "recipe_override",
+        "store_section_confidence": 1,
+        "store_section_user_confirmed": True,
+        "store_section_save_to_master": False,
+        "store_section_reason": "User selected this section for the current recipe.",
+        "store_section_rule": "recipe.user_confirmed",
+    }
+
+    sanitized = recipe_edit_service.sanitize_ingredients([submitted])[0]
+    requirement = master_data.ingredient_rows_from_sources(
+        recipe_data={"ingredients": [sanitized]},
+    )[0]
+
+    for row in (sanitized, requirement):
+        assert row["store_section"] == "PRODUCE"
+        assert row["store_section_source"] == "recipe_override"
+        assert row["store_section_confidence"] == 1
+        assert row["store_section_user_confirmed"] is True
+        assert row["store_section_reason"] == "User-confirmed section for this recipe ingredient."
+        assert row["store_section_rule"] == "recipe.user_confirmed"
+
+
 def test_single_ingredient_save_patches_only_the_stable_target_and_runs_existing_syncs(
     monkeypatch,
     tmp_path,

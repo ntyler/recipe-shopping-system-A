@@ -119,6 +119,7 @@ from PushShoppingList.services.recipe_master_data_service import normalized_mast
 from PushShoppingList.services.recipe_master_data_service import recipe_master_rows
 from PushShoppingList.services.recipe_master_data_service import remove_recipe_master_records_for_recipe
 from PushShoppingList.services.recipe_master_data_service import resolve_ingredient_store_section
+from PushShoppingList.services.recipe_master_data_service import selected_ingredient_master_metadata
 from PushShoppingList.services.recipe_master_data_service import sync_recipe_master_records
 from PushShoppingList.services.shopping_list_service import add_items
 from PushShoppingList.services.restaurant_hours_service import normalize_weekly_hours
@@ -11590,6 +11591,16 @@ def recipe_edit_store_section_for_ingredient(item, master_lookup, recipe_id=""):
     )
     if master_record:
         master_section = master_record.get("master_store_section") or master_record.get("store_section")
+        selected_master_metadata = selected_ingredient_master_metadata(
+            item,
+            master_record,
+        )
+        if selected_master_metadata:
+            return (
+                selected_master_metadata["store_section"],
+                master_record,
+                selected_master_metadata,
+            )
         master_confirmed = truthy(
             master_record.get("master_store_section_user_confirmed")
             or master_record.get("store_section_user_confirmed")
@@ -11841,7 +11852,12 @@ def normalize_edit_ingredients(ingredients, recipe_url=None):
                 or store_section_result.get("store_section_user_confirmed")
             ),
             "store_section_save_to_master": truthy(item.get("store_section_save_to_master")),
-            "classifier_version": store_section_result.get("classifier_version") or INGREDIENT_STORE_SECTION_CLASSIFIER_VERSION,
+            "classifier_version": (
+                store_section_result.get("classifier_version", "")
+                if store_section_result.get("_selected_master_data")
+                else store_section_result.get("classifier_version")
+                or INGREDIENT_STORE_SECTION_CLASSIFIER_VERSION
+            ),
             "store_section_reason": store_section_result.get("store_section_reason") or "",
             "store_section_rule": store_section_result.get("store_section_rule") or "",
             "store_section_order": ingredient_store_section_sort_key(store_section),
@@ -12242,6 +12258,7 @@ def sanitize_ingredients(value, existing_value=None):
             if store_section_custom
             else ""
         )
+        selected_master_metadata = None
         if custom_store_section:
             store_section = custom_store_section
             store_section_result = {
@@ -12259,40 +12276,50 @@ def sanitize_ingredients(value, existing_value=None):
             }
         else:
             store_section_custom = False
-            supplied_source = clean_ingredient_store_section_source(
-                item.get("store_section_source") or existing.get("store_section_source"),
-                default="legacy",
+            selected_master_metadata = selected_ingredient_master_metadata(
+                {**existing, **item},
             )
-            user_confirmed = truthy(
-                item.get("store_section_user_confirmed")
-                if "store_section_user_confirmed" in item
-                else existing.get("store_section_user_confirmed")
-            )
-            supplied_section = item.get("store_section") or existing.get("store_section")
-            store_section_result = classify_ingredient_store_section_result(
-                {
-                    **existing,
-                    **item,
-                    "raw_name": item.get("raw_name") or original_text or name,
-                    "normalized_name": item.get("normalized_name") or name,
-                },
-                recipe_override=supplied_section if user_confirmed else None,
-                recipe_override_confirmed=user_confirmed,
-                legacy_section=supplied_section if supplied_source != "ai" else None,
-                ai_result=(
+            if selected_master_metadata:
+                store_section_result = selected_master_metadata
+            else:
+                supplied_source = clean_ingredient_store_section_source(
+                    item.get("store_section_source") or existing.get("store_section_source"),
+                    default="legacy",
+                )
+                user_confirmed = truthy(
+                    item.get("store_section_user_confirmed")
+                    if "store_section_user_confirmed" in item
+                    else existing.get("store_section_user_confirmed")
+                )
+                supplied_section = item.get("store_section") or existing.get("store_section")
+                store_section_result = classify_ingredient_store_section_result(
                     {
-                        "store_section": supplied_section,
-                        "confidence": item.get("store_section_confidence"),
-                        "reason": item.get("store_section_reason"),
-                        "normalized_name": item.get("normalized_name"),
-                    }
-                    if supplied_source == "ai"
-                    else None
-                ),
-                default="MISC",
-            )
+                        **existing,
+                        **item,
+                        "raw_name": item.get("raw_name") or original_text or name,
+                        "normalized_name": item.get("normalized_name") or name,
+                    },
+                    recipe_override=supplied_section if user_confirmed else None,
+                    recipe_override_confirmed=user_confirmed,
+                    legacy_section=supplied_section if supplied_source != "ai" else None,
+                    ai_result=(
+                        {
+                            "store_section": supplied_section,
+                            "confidence": item.get("store_section_confidence"),
+                            "reason": item.get("store_section_reason"),
+                            "normalized_name": item.get("normalized_name"),
+                        }
+                        if supplied_source == "ai"
+                        else None
+                    ),
+                    default="MISC",
+                )
             store_section = store_section_result["store_section"]
-            if supplied_source == "manual" and truthy(item.get("store_section_save_to_master")):
+            if (
+                not selected_master_metadata
+                and supplied_source == "manual"
+                and truthy(item.get("store_section_save_to_master"))
+            ):
                 store_section_result.update({
                     "store_section_source": "manual",
                     "store_section_user_confirmed": True,
@@ -12300,18 +12327,29 @@ def sanitize_ingredients(value, existing_value=None):
                     "store_section_reason": "User confirmed this section for future occurrences.",
                     "store_section_rule": "manual.master_data",
                 })
-        ingredient_image_url = (
-            nullable_string(item.get("ingredient_image_url") or item.get("image_url"))
-            or nullable_string(existing.get("ingredient_image_url") or existing.get("image_url"))
-        )
-        ingredient_image_generated_at = (
-            nullable_string(item.get("ingredient_image_generated_at") or item.get("image_generated_at"))
-            or nullable_string(existing.get("ingredient_image_generated_at") or existing.get("image_generated_at"))
-        )
-        ingredient_image_prompt = (
-            nullable_string(item.get("ingredient_image_prompt") or item.get("image_prompt"))
-            or nullable_string(existing.get("ingredient_image_prompt") or existing.get("image_prompt"))
-        )
+        if selected_master_metadata:
+            ingredient_image_url = nullable_string(
+                item.get("ingredient_image_url") or item.get("image_url")
+            )
+            ingredient_image_generated_at = nullable_string(
+                item.get("ingredient_image_generated_at") or item.get("image_generated_at")
+            )
+            ingredient_image_prompt = nullable_string(
+                item.get("ingredient_image_prompt") or item.get("image_prompt")
+            )
+        else:
+            ingredient_image_url = (
+                nullable_string(item.get("ingredient_image_url") or item.get("image_url"))
+                or nullable_string(existing.get("ingredient_image_url") or existing.get("image_url"))
+            )
+            ingredient_image_generated_at = (
+                nullable_string(item.get("ingredient_image_generated_at") or item.get("image_generated_at"))
+                or nullable_string(existing.get("ingredient_image_generated_at") or existing.get("image_generated_at"))
+            )
+            ingredient_image_prompt = (
+                nullable_string(item.get("ingredient_image_prompt") or item.get("image_prompt"))
+                or nullable_string(existing.get("ingredient_image_prompt") or existing.get("image_prompt"))
+            )
         substitution_value = next(
             (item.get(field) for field in (
                 "substitutions",
@@ -12385,15 +12423,23 @@ def sanitize_ingredients(value, existing_value=None):
             "normalized_name": nullable_string(
                 item.get("normalized_name") or store_section_result.get("normalized_name")
             ),
-            "canonical_ingredient": nullable_string(
-                item.get("canonical_ingredient")
-                or store_section_result.get("canonical_ingredient")
-                or existing.get("canonical_ingredient")
+            "canonical_ingredient": (
+                nullable_string(store_section_result.get("canonical_ingredient"))
+                if selected_master_metadata
+                else nullable_string(
+                    item.get("canonical_ingredient")
+                    or store_section_result.get("canonical_ingredient")
+                    or existing.get("canonical_ingredient")
+                )
             ),
-            "form": nullable_string(
-                item.get("form")
-                or store_section_result.get("form")
-                or existing.get("form")
+            "form": (
+                nullable_string(store_section_result.get("form"))
+                if selected_master_metadata
+                else nullable_string(
+                    item.get("form")
+                    or store_section_result.get("form")
+                    or existing.get("form")
+                )
             ),
             "master_normalized_name": nullable_string(
                 item.get("master_normalized_name")
@@ -12421,7 +12467,12 @@ def sanitize_ingredients(value, existing_value=None):
                 store_section_result.get("store_section_user_confirmed")
             ),
             "store_section_save_to_master": truthy(item.get("store_section_save_to_master")),
-            "classifier_version": store_section_result.get("classifier_version") or INGREDIENT_STORE_SECTION_CLASSIFIER_VERSION,
+            "classifier_version": (
+                store_section_result.get("classifier_version", "")
+                if selected_master_metadata
+                else store_section_result.get("classifier_version")
+                or INGREDIENT_STORE_SECTION_CLASSIFIER_VERSION
+            ),
             "store_section_reason": nullable_string(store_section_result.get("store_section_reason")),
             "store_section_rule": nullable_string(store_section_result.get("store_section_rule")),
             "store_section_order": ingredient_store_section_sort_key(store_section),

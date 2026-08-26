@@ -2192,6 +2192,7 @@ function recipeIngredientExpansionIsOpen() { return false; }
 function ensureRecipeIngredientExpansionId(row) { return `expansion-${row.id}`; }
 const recipeEditExpandedIngredientIds = new Set();
 const recipeEditIngredientColumnView = {groupByStoreSection: false};
+function syncRecipeIngredientInlineEditor() {}
 """ + display_rows + "\n" + ensure_option_row_id + "\n" + move_node + "\n" + bind_option_selection + "\n" + source_carrier + "\n" + move_control + "\n" + option_action + "\n" + add_option_action + "\n" + create_management_row + "\n" + sync_management_rows + "\n" + shows_option_context + "\n" + sync_option_accessibility + "\n" + sync_option_context + "\n" + sync_option_metadata + "\n" + sync_fragments + "\n" + clear_fragments + r"""
 
 function lineItem(id) {
@@ -5070,6 +5071,8 @@ def test_store_section_grouping_promotes_actual_rows_with_compact_section_contex
     )
     assert "recipeIngredientColumnViewEntryShowsOptionContext" in context_sync
     assert "syncRecipeIngredientColumnViewOptionContext(entry);" in metadata
+    assert "syncEmptyFieldVisibility: false" in context_sync
+    assert "syncEmptyFieldVisibility: false" in metadata
     assert "if (!entry.anchor) return;" in metadata
     assert "assignRecipeIngredientColumnViewSectionContextAnchors" in visible_contexts
     assert "entry.optionContextKey" in visible_contexts
@@ -5081,6 +5084,7 @@ def test_store_section_grouping_promotes_actual_rows_with_compact_section_contex
         visible_contexts
     )
     assert "syncRecipeIngredientColumnViewVisibleSectionContexts" in apply_view
+    assert "syncRecipeIngredientEmptyFieldVisibility();" in apply_view
     assert (
         "syncRecipeIngredientColumnViewVisibleSectionContexts(\n"
         "            ingredientEntries,\n"
@@ -7443,11 +7447,30 @@ def test_ingredient_name_and_buy_as_fields_use_the_normalized_master_data_picker
         "ingredient_id",
         "normalized_name",
         "master_normalized_name",
+        "canonical_ingredient",
+        "form",
         "store_section",
+        "store_section_source",
+        "store_section_confidence",
+        "store_section_user_confirmed",
+        "classifier_version",
+        "store_section_reason",
+        "store_section_rule",
         "ingredient_image_url",
         "match_status",
     ):
         assert f"{field_name}:" in picker
+    for data_attribute in (
+        "data-master-ingredient-canonical-ingredient",
+        "data-master-ingredient-form",
+        "data-master-ingredient-store-section-source",
+        "data-master-ingredient-store-section-confidence",
+        "data-master-ingredient-store-section-user-confirmed",
+        "data-master-ingredient-classifier-version",
+        "data-master-ingredient-store-section-reason",
+        "data-master-ingredient-store-section-rule",
+    ):
+        assert data_attribute in picker
     assert 'match_source: "ingredient master data"' in picker
     assert "Manage master ingredients" in picker
     assert "ingredient.aliases" in picker
@@ -10250,9 +10273,310 @@ def test_master_ingredient_selection_batches_field_updates_before_one_summary_re
     assert "if (options.dispatch !== false)" in setter
     assert "const masterFieldValues = {" in selection
     assert "Object.entries(masterFieldValues).forEach" in selection
-    assert "setRowFieldValue(row, field, value, { dispatch: false });" in selection
+    assert "dispatch: false," in selection
+    assert "refreshGroupedView: false," in selection
     assert 'setRowFieldValue(row, "purchasable_item", name, { dispatch: false });' in selection
+    assert "applyRecipeIngredientColumnView();" not in selection
+    assert "syncRecipeIngredientColumnViewOpenMenu" not in selection
     assert selection.count("updateRecipeIngredientSummary(") == 4
+
+
+def test_substitution_rows_store_all_master_ingredient_attributes():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    option_markup = javascript_function_source(
+        script,
+        "recipeIngredientSubstitutionOptionRowHtml",
+    )
+
+    for field_name in (
+        "canonical_ingredient",
+        "form",
+        "store_section_source",
+        "store_section_confidence",
+        "store_section_user_confirmed",
+        "store_section_save_to_master",
+        "classifier_version",
+        "store_section_reason",
+        "store_section_rule",
+    ):
+        assert f'data-field="{field_name}"' in option_markup
+
+
+def test_master_ingredient_selection_syncs_master_fields_and_preserves_recipe_fields():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for the master ingredient selection contract")
+
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    selection = javascript_function_source(script, "chooseRecipeIngredientMasterOption")
+    harness = selection + r"""
+const fieldValues = {
+    ingredient: "Butter",
+    ingredient_id: "10",
+    parsed_name: "butter",
+    normalized_name: "butter",
+    master_normalized_name: "butter",
+    canonical_ingredient: "butter",
+    form: "salted",
+    store_section: "DAIRY & EGGS",
+    store_section_custom: "false",
+    store_section_source: "legacy",
+    store_section_confidence: "0",
+    store_section_user_confirmed: "false",
+    store_section_save_to_master: "false",
+    classifier_version: "",
+    store_section_reason: "",
+    store_section_rule: "",
+    ingredient_image_url: "/butter.png",
+    ingredient_image_generated_at: "yesterday",
+    ingredient_image_prompt: "butter prompt",
+    match_status: "",
+    confidence: "medium",
+    inferred: "true",
+    warning: "review",
+    purchasable_item: "Butter",
+    quantity: "2",
+    unit: "cup",
+    size: "large",
+    preparation: "cooked",
+    section: "main",
+    optional: "false",
+};
+const fields = new Map(Object.entries(fieldValues).map(([name, value]) => [
+    name,
+    {value, tagName: "INPUT", type: "text"},
+]));
+const form = {};
+const parentRow = {};
+const row = {
+    dataset: {
+        ingredientMatchDetails: JSON.stringify({existing: true}),
+        ingredientTextReview: "pending",
+        ingredientTextReviewKey: "butter",
+        foodReviewState: "open",
+    },
+    matches(selector) { return selector === "[data-substitution-option-row]"; },
+    querySelector(selector) {
+        const match = selector.match(/\[data-field="([^"]+)"\]/);
+        return match ? (fields.get(match[1]) || null) : null;
+    },
+    closest(selector) { return selector === "#recipeEditForm" ? form : null; },
+};
+let blurCount = 0;
+const input = {
+    dataset: {recipeIngredientMasterField: "ingredient"},
+    blur() { blurCount += 1; },
+    closest() { return null; },
+};
+const menu = {recipeEditAnchorButton: input};
+const button = {
+    dataset: {
+        masterIngredientId: "7648",
+        masterIngredientName: "Rice",
+        masterIngredientNormalizedName: "rice",
+        masterIngredientCanonicalIngredient: "grain",
+        masterIngredientForm: "dry",
+        masterIngredientStoreSection: "PASTA, RICE & GRAINS",
+        masterIngredientStoreSectionSource: "manual",
+        masterIngredientStoreSectionConfidence: "0.91",
+        masterIngredientStoreSectionUserConfirmed: "true",
+        masterIngredientClassifierVersion: "2.0",
+        masterIngredientStoreSectionReason: "Reviewed master section.",
+        masterIngredientStoreSectionRule: "master.reviewed",
+        masterIngredientImageUrl: "/rice.png",
+    },
+    closest() { return menu; },
+};
+const calls = {
+    close: 0,
+    modalFields: [],
+    optionSummary: 0,
+    parentSummary: 0,
+    regroup: 0,
+    menuSync: 0,
+    dirty: 0,
+    focus: 0,
+    status: "",
+};
+const recipeEditIngredientColumnView = {groupByStoreSection: true};
+function recipeIngredientMasterTargetRow() { return row; }
+function closeRecipeEditRowMenus() { calls.close += 1; }
+function recipeIngredientDirectField(_row, name) { return fields.get(name) || null; }
+function recipeIngredientComparableText(value) { return String(value || "").trim().toLowerCase(); }
+function recipeIngredientMatchFlag(value) { return [true, 1, "1", "true", "yes"].includes(value); }
+function setRowFieldValue(_row, name, value) {
+    if (fields.has(name)) fields.get(name).value = value;
+}
+function syncRecipeIngredientModalSelectedOptionMasterControls(_input, _row, names) {
+    calls.modalFields = names;
+}
+function updateRecipeIngredientSubstitutionRowSummary() { calls.optionSummary += 1; }
+function recipeIngredientParentRowFromControl() { return parentRow; }
+function updateRecipeIngredientSummary(target) {
+    if (target === parentRow) calls.parentSummary += 1;
+}
+function applyRecipeIngredientColumnView() { calls.regroup += 1; }
+function syncRecipeIngredientColumnViewOpenMenu() { calls.menuSync += 1; }
+function updateRecipeIngredientFoodRuleWarning() {}
+function updateRecipeEditorDirtyState() { calls.dirty += 1; }
+function focusRecipeIngredientMasterSelectionInput() { calls.focus += 1; }
+function setRecipeEditStatus(message) { calls.status = message; }
+function syncRecipeIngredientPurchaseGroup() {}
+
+chooseRecipeIngredientMasterOption(button);
+process.stdout.write(JSON.stringify({
+    values: Object.fromEntries([...fields].map(([name, field]) => [name, field.value])),
+    matchDetails: JSON.parse(row.dataset.ingredientMatchDetails),
+    reviewCleared: !(
+        "ingredientTextReview" in row.dataset
+        || "ingredientTextReviewKey" in row.dataset
+        || "foodReviewState" in row.dataset
+    ),
+    blurCount,
+    calls,
+}));
+"""
+    completed = subprocess.run(
+        [node, "-e", harness],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    result = json.loads(completed.stdout)
+
+    expected_master_values = {
+        "ingredient": "Rice",
+        "ingredient_id": "7648",
+        "parsed_name": "Rice",
+        "normalized_name": "rice",
+        "master_normalized_name": "rice",
+        "canonical_ingredient": "grain",
+        "form": "dry",
+        "store_section": "PASTA, RICE & GRAINS",
+        "store_section_custom": "false",
+        "store_section_source": "manual",
+        "store_section_confidence": "0.91",
+        "store_section_user_confirmed": "true",
+        "store_section_save_to_master": "false",
+        "classifier_version": "2.0",
+        "store_section_reason": "Reviewed master section.",
+        "store_section_rule": "master.reviewed",
+        "ingredient_image_url": "/rice.png",
+        "ingredient_image_generated_at": "",
+        "ingredient_image_prompt": "",
+        "match_status": "Matched",
+        "confidence": "high",
+        "inferred": "false",
+        "warning": "",
+        "purchasable_item": "Rice",
+    }
+    for name, value in expected_master_values.items():
+        assert result["values"][name] == value
+    for name, value in {
+        "quantity": "2",
+        "unit": "cup",
+        "size": "large",
+        "preparation": "cooked",
+        "section": "main",
+        "optional": "false",
+    }.items():
+        assert result["values"][name] == value
+    assert result["matchDetails"] == {
+        "existing": True,
+        "match_status": "Matched",
+        "master_ingredient_name": "Rice",
+        "matched_master_ingredient": "rice",
+        "match_confidence": "high",
+        "match_source": "ingredient master data",
+        "needs_match_review": False,
+        "review_match": False,
+        "multiple_matches": False,
+    }
+    assert result["reviewCleared"] is True
+    assert result["blurCount"] == 1
+    assert result["calls"] == {
+        "close": 1,
+        "modalFields": ["ingredient", "purchasable_item", "store_section"],
+        "optionSummary": 1,
+        "parentSummary": 1,
+        "regroup": 0,
+        "menuSync": 0,
+        "dirty": 1,
+        "focus": 1,
+        "status": "Selected Rice from Ingredient Master Data. Save Recipe to keep it.",
+    }
+
+
+def test_master_ingredient_selection_focus_uses_only_visible_candidates():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for the master ingredient focus contract")
+
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    visibility = javascript_function_source(
+        script,
+        "recipeIngredientMasterFocusCandidateIsVisible",
+    )
+    focus = javascript_function_source(
+        script,
+        "focusRecipeIngredientMasterSelectionInput",
+    )
+    harness = visibility + "\n" + focus + r"""
+function candidate(name, options = {}) {
+    return {
+        name,
+        isConnected: options.connected !== false,
+        recipeIngredientMasterTargetRow: options.targetRow,
+        focusCount: 0,
+        closest() { return options.blocked ? {} : null; },
+        getClientRects() { return options.hasRect === false ? [] : [{}]; },
+        focus() { this.focusCount += 1; },
+    };
+}
+function runScenario(options = {}) {
+    const row = {};
+    const input = candidate("input", options.input);
+    const projected = candidate("projected", options.projected);
+    const modal = candidate("modal", {...options.modal, targetRow: row});
+    row.recipeIngredientColumnViewPromotedSummary = {
+        querySelector() { return projected; },
+    };
+    const panel = options.withPanel ? {
+        querySelectorAll() { return [modal]; },
+    } : null;
+    focusRecipeIngredientMasterSelectionInput(input, row, "ingredient", panel);
+    return {
+        input: input.focusCount,
+        projected: projected.focusCount,
+        modal: modal.focusCount,
+    };
+}
+process.stdout.write(JSON.stringify({
+    filteredOriginal: runScenario({input: {blocked: true}}),
+    rebuiltModal: runScenario({
+        withPanel: true,
+        input: {connected: false},
+    }),
+    noVisibleCandidate: runScenario({
+        input: {blocked: true},
+        projected: {blocked: true},
+    }),
+}));
+"""
+    completed = subprocess.run(
+        [node, "-e", harness],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert json.loads(completed.stdout) == {
+        "filteredOriginal": {"input": 0, "projected": 1, "modal": 0},
+        "rebuiltModal": {"input": 0, "projected": 0, "modal": 1},
+        "noVisibleCandidate": {"input": 0, "projected": 0, "modal": 0},
+    }
 
 
 def test_recipe_editor_type_picker_uses_workspace_registry_and_drives_optional_state():

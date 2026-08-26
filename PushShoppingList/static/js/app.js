@@ -30851,6 +30851,7 @@ function syncRecipeIngredientColumnViewOptionContext(entry) {
                 || "",
             ).trim()
             : "",
+        syncEmptyFieldVisibility: false,
     });
     syncRecipeIngredientColumnViewOptionAccessibility(row, entry, values);
     row.dataset.recipeIngredientOptionSectionContext = String(
@@ -30866,6 +30867,11 @@ function syncRecipeIngredientColumnViewOptionMetadata(entry) {
     const row = entry?.row;
     if (!row) return;
     syncRecipeIngredientColumnViewOptionContext(entry);
+    // Projected option rows contain derived Store Section and Type widgets.
+    // Rebind them after projection so master-data updates reach the visible UI.
+    syncRecipeIngredientInlineEditor(entry.parentRow, row, {
+        syncEmptyFieldVisibility: false,
+    });
     if (!entry.anchor) return;
 
     const sourceText = row.querySelector("[data-ingredient-source-text]");
@@ -37026,7 +37032,9 @@ function updateRecipeIngredientOptionRowSummary(summary, sourceRow, values = {},
     if (editButton) {
         configureRecipeIngredientEditAction(editButton);
     }
-    syncRecipeIngredientEmptyFieldVisibility();
+    if (options.syncEmptyFieldVisibility !== false) {
+        syncRecipeIngredientEmptyFieldVisibility();
+    }
 }
 
 function updateRecipeIngredientAlternativeComponentSummary(optionRow) {
@@ -39174,7 +39182,7 @@ function recipeIngredientInlineEditorSourceRow(control, fallbackRow) {
         || fallbackRow;
 }
 
-function syncRecipeIngredientInlineEditor(row, scope = row) {
+function syncRecipeIngredientInlineEditor(row, scope = row, options = {}) {
     if (!row || !scope) return;
     scope.querySelectorAll("[data-recipe-ingredient-inline-store-section-display]").forEach(display => {
         const source = recipeIngredientStoreSectionDisplaySource(display, row);
@@ -39222,7 +39230,9 @@ function syncRecipeIngredientInlineEditor(row, scope = row) {
             control.setCustomValidity(source.validationMessage || "");
         }
     });
-    syncRecipeIngredientEmptyFieldVisibility();
+    if (options.syncEmptyFieldVisibility !== false) {
+        syncRecipeIngredientEmptyFieldVisibility();
+    }
 }
 
 function bindRecipeIngredientInlineEditor(row, scope = row) {
@@ -47555,7 +47565,9 @@ function setRowFieldValue(row, field, value, options = {}) {
             input.dispatchEvent(new Event(eventName, { bubbles: true }));
         }
         if (field === "store_section") {
-            syncRecipeIngredientStoreSectionControl(input);
+            syncRecipeIngredientStoreSectionControl(input, {
+                refreshGroupedView: options.refreshGroupedView !== false,
+            });
         }
     }
 }
@@ -49794,7 +49806,7 @@ function createRecipeIngredientStoreSectionTrigger(select) {
     return trigger;
 }
 
-function syncRecipeIngredientStoreSectionControl(select) {
+function syncRecipeIngredientStoreSectionControl(select, options = {}) {
     const label = select ? select.closest(".recipe-edit-store-section-label") : null;
     const row = select ? select.closest(".recipe-edit-ingredient-row") : null;
     const customField = row ? recipeIngredientDirectField(row, "store_section_custom") : null;
@@ -49818,7 +49830,10 @@ function syncRecipeIngredientStoreSectionControl(select) {
             syncRecipeIngredientStoreSectionDisplay(display, select);
         }
     });
-    if (row?.parentElement?.id === "recipeEditIngredients") {
+    if (
+        options.refreshGroupedView !== false
+        && row?.parentElement?.id === "recipeEditIngredients"
+    ) {
         applyRecipeIngredientColumnView();
         syncRecipeIngredientColumnViewOpenMenu({ render: true });
     }
@@ -51901,6 +51916,15 @@ function recipeIngredientSubstitutionOptionRowHtml(option = {}, index = 0, group
             <input type="hidden" data-field="unit_review_value" value="${escapeAttribute(option.unit_review_value || "")}">
             <input type="hidden" data-field="unit_custom" value="${escapeAttribute(recipeIngredientMatchFlag(option.unit_custom) ? "true" : "false")}">
             <input type="hidden" data-field="store_section_custom" value="${escapeAttribute(recipeIngredientMatchFlag(option.store_section_custom) ? "true" : "false")}">
+            <input type="hidden" data-field="canonical_ingredient" value="${escapeAttribute(option.canonical_ingredient || "")}">
+            <input type="hidden" data-field="form" value="${escapeAttribute(option.form || "")}">
+            <input type="hidden" data-field="store_section_source" value="${escapeAttribute(option.store_section_source || "legacy")}">
+            <input type="hidden" data-field="store_section_confidence" value="${escapeAttribute(option.store_section_confidence ?? "")}">
+            <input type="hidden" data-field="store_section_user_confirmed" value="${escapeAttribute(recipeIngredientMatchFlag(option.store_section_user_confirmed) ? "true" : "false")}">
+            <input type="hidden" data-field="store_section_save_to_master" value="${escapeAttribute(recipeIngredientMatchFlag(option.store_section_save_to_master) ? "true" : "false")}">
+            <input type="hidden" data-field="classifier_version" value="${escapeAttribute(option.classifier_version || "")}">
+            <input type="hidden" data-field="store_section_reason" value="${escapeAttribute(option.store_section_reason || "")}">
+            <input type="hidden" data-field="store_section_rule" value="${escapeAttribute(option.store_section_rule || "")}">
             <input type="hidden" data-field="recipe_qty" value="${escapeAttribute(option.recipe_qty || option.quantity || "")}">
             <input type="hidden" data-field="purchase_group" value="${escapeAttribute(option.purchase_group || "")}">
             <input type="hidden" data-field="parsed_name" value="${escapeAttribute(option.parsed_name || option.ingredient || "")}">
@@ -52007,6 +52031,18 @@ function syncRecipeIngredientModalSelectedOptionMasterControls(input, targetRow,
     updateRecipeEditorDirtyState(modalRow?.closest("#recipeEditForm"));
 }
 
+function recipeIngredientMasterFocusCandidateIsVisible(control) {
+    if (!control?.isConnected) return false;
+    if (control.closest?.(
+        '[hidden], [inert], [aria-hidden="true"], '
+        + ".is-ingredient-column-filtered, .is-ingredient-column-grouped-away",
+    )) {
+        return false;
+    }
+    return typeof control.getClientRects !== "function"
+        || control.getClientRects().length > 0;
+}
+
 function focusRecipeIngredientMasterSelectionInput(input, targetRow, fieldName, panel) {
     const projectedControl = targetRow?.recipeIngredientColumnViewPromotedSummary?.querySelector(
         `[data-recipe-ingredient-inline-field="${fieldName}"]`,
@@ -52014,9 +52050,10 @@ function focusRecipeIngredientMasterSelectionInput(input, targetRow, fieldName, 
     const modalControl = [...(panel?.querySelectorAll(
         `[data-recipe-ingredient-modal-selected-option-field="${fieldName}"]`,
     ) || [])].find(control => control.recipeIngredientMasterTargetRow === targetRow);
-    const replacement = input?.isConnected
-        ? input
-        : (projectedControl?.isConnected ? projectedControl : modalControl);
+    const candidates = panel
+        ? [input, modalControl, projectedControl]
+        : [input, projectedControl];
+    const replacement = candidates.find(recipeIngredientMasterFocusCandidateIsVisible);
     replacement?.focus({ preventScroll: true });
 }
 
@@ -52098,7 +52135,17 @@ function renderRecipeIngredientMasterMenu(menu, input, data = {}, options = {}) 
             const ingredientId = String(ingredient.ingredient_id || ingredient.id || "");
             const name = String(ingredient.name || ingredient.normalized_name || "").trim();
             const normalizedName = String(ingredient.normalized_name || name).trim();
+            const canonicalIngredient = String(ingredient.canonical_ingredient || "").trim();
+            const ingredientForm = String(ingredient.form || "").trim();
             const storeSection = String(ingredient.store_section || "MISC").trim();
+            const storeSectionSource = String(ingredient.store_section_source || "legacy").trim();
+            const storeSectionConfidence = String(ingredient.store_section_confidence ?? "0").trim();
+            const storeSectionUserConfirmed = recipeIngredientMatchFlag(
+                ingredient.store_section_user_confirmed,
+            );
+            const classifierVersion = String(ingredient.classifier_version || "").trim();
+            const storeSectionReason = String(ingredient.store_section_reason || "").trim();
+            const storeSectionRule = String(ingredient.store_section_rule || "").trim();
             const imageUrl = String(ingredient.image_url || "").trim();
             const usageCount = Number(ingredient.usage_count || 0);
             const aliases = Array.isArray(ingredient.aliases)
@@ -52116,7 +52163,15 @@ function renderRecipeIngredientMasterMenu(menu, input, data = {}, options = {}) 
                         data-master-ingredient-id="${escapeAttribute(ingredientId)}"
                         data-master-ingredient-name="${escapeAttribute(name)}"
                         data-master-ingredient-normalized-name="${escapeAttribute(normalizedName)}"
+                        data-master-ingredient-canonical-ingredient="${escapeAttribute(canonicalIngredient)}"
+                        data-master-ingredient-form="${escapeAttribute(ingredientForm)}"
                         data-master-ingredient-store-section="${escapeAttribute(storeSection)}"
+                        data-master-ingredient-store-section-source="${escapeAttribute(storeSectionSource)}"
+                        data-master-ingredient-store-section-confidence="${escapeAttribute(storeSectionConfidence)}"
+                        data-master-ingredient-store-section-user-confirmed="${storeSectionUserConfirmed ? "true" : "false"}"
+                        data-master-ingredient-classifier-version="${escapeAttribute(classifierVersion)}"
+                        data-master-ingredient-store-section-reason="${escapeAttribute(storeSectionReason)}"
+                        data-master-ingredient-store-section-rule="${escapeAttribute(storeSectionRule)}"
                         data-master-ingredient-image-url="${escapeAttribute(imageUrl)}"
                         onclick="return chooseRecipeIngredientMasterOption(this)">
                     <span class="recipe-edit-ingredient-master-media" aria-hidden="true">
@@ -52262,8 +52317,18 @@ function chooseRecipeIngredientMasterOption(button) {
     const previousNameField = recipeIngredientDirectField(row, "ingredient");
     const previousName = String(previousNameField ? previousNameField.value : "").trim();
     const normalizedName = String(button.dataset.masterIngredientNormalizedName || name).trim();
+    const canonicalIngredient = String(button.dataset.masterIngredientCanonicalIngredient || "").trim();
+    const ingredientForm = String(button.dataset.masterIngredientForm || "").trim();
     const ingredientId = String(button.dataset.masterIngredientId || "").trim();
     const storeSection = String(button.dataset.masterIngredientStoreSection || "MISC").trim();
+    const storeSectionSource = String(button.dataset.masterIngredientStoreSectionSource || "legacy").trim();
+    const storeSectionConfidence = String(button.dataset.masterIngredientStoreSectionConfidence ?? "0").trim();
+    const storeSectionUserConfirmed = recipeIngredientMatchFlag(
+        button.dataset.masterIngredientStoreSectionUserConfirmed,
+    );
+    const classifierVersion = String(button.dataset.masterIngredientClassifierVersion || "").trim();
+    const storeSectionReason = String(button.dataset.masterIngredientStoreSectionReason || "").trim();
+    const storeSectionRule = String(button.dataset.masterIngredientStoreSectionRule || "").trim();
     const imageUrl = String(button.dataset.masterIngredientImageUrl || "").trim();
     const currentBuyAs = row.querySelector('[data-field="purchasable_item"]');
     const shouldSyncBuyAs = !currentBuyAs
@@ -52276,16 +52341,20 @@ function chooseRecipeIngredientMasterOption(button) {
         parsed_name: name,
         normalized_name: normalizedName,
         master_normalized_name: normalizedName,
+        canonical_ingredient: canonicalIngredient,
+        form: ingredientForm,
         store_section: storeSection,
         store_section_custom: "false",
-        store_section_source: "user_master_data",
-        store_section_confidence: "1",
-        store_section_user_confirmed: "true",
+        store_section_source: storeSectionSource,
+        store_section_confidence: storeSectionConfidence,
+        store_section_user_confirmed: storeSectionUserConfirmed ? "true" : "false",
         store_section_save_to_master: "false",
-        classifier_version: "2.0",
-        store_section_reason: "Selected from Ingredient Master Data.",
-        store_section_rule: "master.user_exact",
+        classifier_version: classifierVersion,
+        store_section_reason: storeSectionReason,
+        store_section_rule: storeSectionRule,
         ingredient_image_url: imageUrl,
+        ingredient_image_generated_at: "",
+        ingredient_image_prompt: "",
         match_status: "Matched",
         confidence: "high",
         inferred: "false",
@@ -52295,7 +52364,10 @@ function chooseRecipeIngredientMasterOption(button) {
         masterFieldValues.purchasable_item = name;
     }
     Object.entries(masterFieldValues).forEach(([field, value]) => {
-        setRowFieldValue(row, field, value, { dispatch: false });
+        setRowFieldValue(row, field, value, {
+            dispatch: false,
+            refreshGroupedView: false,
+        });
     });
     syncRecipeIngredientModalSelectedOptionMasterControls(
         input,
