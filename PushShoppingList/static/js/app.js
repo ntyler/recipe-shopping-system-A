@@ -30916,19 +30916,6 @@ function syncRecipeIngredientColumnViewOptionMetadata(entry) {
             optionCell,
         );
     }
-    if (entry.expanded) {
-        const movedMenu = recipeIngredientColumnViewMoveControl(
-            row,
-            header?.querySelector(
-                ":scope > .recipe-edit-alternative-menu-wrap",
-            ),
-            optionCell,
-        );
-        optionCell?.classList.toggle(
-            "has-recipe-ingredient-grouped-option-menu",
-            movedMenu,
-        );
-    }
 }
 
 function recipeIngredientColumnViewOptionInteractionAnchor(
@@ -31125,21 +31112,7 @@ function syncRecipeIngredientColumnViewVisibleOptionControls(
             selectionControl,
             targetCell,
         );
-        const optionMenu = recipeIngredientColumnViewOptionControl(
-            optionEntries,
-            ":scope > .recipe-edit-alternative-component-option-spacer "
-                + "> .recipe-edit-alternative-menu-wrap",
-        );
-        const movedMenu = recipeIngredientColumnViewMoveControl(
-            interactionAnchor.row,
-            optionMenu,
-            targetCell,
-        );
-        targetCell.classList.toggle(
-            "has-recipe-ingredient-grouped-option-menu",
-            movedMenu,
-        );
-        if (selectionControl || movedMenu) {
+        if (selectionControl) {
             // These cells are decorative until an option action is rehomed
             // into them. A visible, focusable action must not remain beneath
             // the summary cell's original aria-hidden state.

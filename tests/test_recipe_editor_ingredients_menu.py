@@ -2584,9 +2584,7 @@ const expanded = {
     frozenOptionCellHasMenu: frozenCorn.summary.optionCell.classList.contains(
         "has-recipe-ingredient-grouped-option-menu",
     ),
-    frozenMenuPlacementIsSafe: frozenCorn.optionMenu.style.getPropertyValue(
-        "grid-column",
-    ) !== "10",
+    frozenMenuStayedInHeader: frozenCorn.optionMenu.parentNode === frozenCorn.header,
     frozenSelectionDelegates: frozenCorn.optionSelect.getAttribute("onclick")
         === "return selectRecipeIngredientColumnViewOption(this, event)",
     stableDatasets: expandedRows.every(row => (
@@ -2774,7 +2772,7 @@ process.stdout.write(JSON.stringify({
             "contextLabels",
             "frozenOptionControls",
             "frozenOptionCellHasMenu",
-            "frozenMenuPlacementIsSafe",
+            "frozenMenuStayedInHeader",
             "frozenSelectionDelegates",
         )
     }
@@ -2829,10 +2827,9 @@ process.stdout.write(JSON.stringify({
         },
         "frozenOptionControls": [
             "frozen-corn-use-option",
-            "frozen-corn-option-menu",
         ],
-        "frozenOptionCellHasMenu": True,
-        "frozenMenuPlacementIsSafe": True,
+        "frozenOptionCellHasMenu": False,
+        "frozenMenuStayedInHeader": True,
         "frozenSelectionDelegates": True,
     }
     assert restored_metadata == {
@@ -3516,6 +3513,10 @@ def test_grouped_store_section_forward_port_keeps_real_controls_and_actions():
         script,
         "syncRecipeIngredientColumnViewOptionMetadata",
     )
+    sync_visible_controls = javascript_function_source(
+        script,
+        "syncRecipeIngredientColumnViewVisibleOptionControls",
+    )
     sync_fragments = javascript_function_source(
         script,
         "syncRecipeIngredientColumnViewSectionFragments",
@@ -3540,10 +3541,15 @@ def test_grouped_store_section_forward_port_keeps_real_controls_and_actions():
     assert "entry.sourceRow === entry.parentRow" in sync_metadata
     assert "[data-ingredient-choice-group-drag]" in sync_metadata
     assert "> .recipe-edit-row-menu-wrap" in sync_metadata
-    assert sync_metadata.count("recipeIngredientColumnViewMoveControl(") >= 4
+    assert sync_metadata.count("recipeIngredientColumnViewMoveControl(") == 3
+    assert ".recipe-edit-alternative-menu-wrap" not in sync_metadata
     assert "{ preservePlacement: true }" in sync_metadata
     assert "organizeRecipeIngredientRowActions(row);" in sync_metadata
     assert "cloneNode" not in sync_metadata
+
+    assert "[data-ingredient-option-select]" in sync_visible_controls
+    assert "[data-ingredient-choice-group-menu]" in sync_visible_controls
+    assert ".recipe-edit-alternative-menu-wrap" not in sync_visible_controls
 
     assert "recipeIngredientColumnViewOriginalVisibility" in move_control
     assert "if (control.style && !options.preservePlacement)" in move_control
@@ -5016,7 +5022,7 @@ process.stdout.write(JSON.stringify({
     }
 
 
-def test_grouped_option_controls_follow_the_visible_interaction_anchor_and_restore():
+def test_grouped_option_controls_keep_selection_and_row_actions_without_option_menus():
     node = shutil.which("node")
     if not node:
         pytest.skip("Node.js is required for filtered option-control coverage")
@@ -5038,6 +5044,7 @@ def test_grouped_option_controls_follow_the_visible_interaction_anchor_and_resto
         script,
         "syncRecipeIngredientColumnViewVisibleOptionControls",
     )
+    assert ".recipe-edit-alternative-menu-wrap" not in sync_controls
     harness = r"""
 function fakeClassList() {
     const values = new Set();
@@ -5187,13 +5194,11 @@ const alternativeParent = {id: "corn-choice"};
 const frozen = fakeRow("frozen-corn");
 const alternativeOnion = fakeRow("alternative-onion");
 const useThisOption = control("select", "use-option");
-const alternativeMenu = control("menu", "alternative-menu");
 useThisOption.setAttribute(
     "onclick",
     "return selectRecipeIngredientColumnViewOption(this, event)",
 );
 frozen.cell.appendChild(useThisOption);
-frozen.cell.appendChild(alternativeMenu);
 const alternativeEntries = [
     {
         row: alternativeOnion,
@@ -5222,7 +5227,6 @@ const visibleAlternative = {
     interaction: alternativeEntries.filter(entry => entry.interactionAnchor)
         .map(entry => entry.row.id),
     selectionOwner: useThisOption.ownerRow.id,
-    menuOwner: alternativeMenu.ownerRow.id,
     selectionHandler: useThisOption.getAttribute("onclick"),
     actionCellAriaHidden: alternativeOnion.cell.getAttribute("aria-hidden"),
 };
@@ -5235,7 +5239,6 @@ const filteredAlternative = {
     interaction: alternativeEntries.filter(entry => entry.interactionAnchor)
         .map(entry => entry.row.id),
     selectionOwner: useThisOption.ownerRow.id,
-    menuOwner: alternativeMenu.ownerRow.id,
     previousCellAriaHidden: alternativeOnion.cell.getAttribute("aria-hidden"),
     actionCellAriaHidden: frozen.cell.getAttribute("aria-hidden"),
 };
@@ -5248,12 +5251,8 @@ const restoredAlternative = {
     interaction: alternativeEntries.filter(entry => entry.interactionAnchor)
         .map(entry => entry.row.id),
     selectionOwner: useThisOption.ownerRow.id,
-    menuOwner: alternativeMenu.ownerRow.id,
     selectionCount: [alternativeOnion, frozen].filter(row => (
         row.cell.controls.includes(useThisOption)
-    )).length,
-    menuCount: [alternativeOnion, frozen].filter(row => (
-        row.cell.controls.includes(alternativeMenu)
     )).length,
     previousCellAriaHidden: frozen.cell.getAttribute("aria-hidden"),
     actionCellAriaHidden: alternativeOnion.cell.getAttribute("aria-hidden"),
@@ -5279,13 +5278,11 @@ const selectedParent = {
 };
 const selectedCorn = fakeRow("selected-corn");
 const selectedCumin = fakeRow("selected-cumin");
-const selectedMenu = control("menu", "selected-menu");
 const selectedStatus = control("status", "selected-status");
 const cornMemberHandle = control("member-handle", "corn-member-handle");
 const cornMemberMenu = control("member-menu", "corn-member-menu");
 const cuminMemberHandle = control("member-handle", "cumin-member-handle");
 const cuminMemberMenu = control("member-menu", "cumin-member-menu");
-selectedCorn.cell.appendChild(selectedMenu);
 selectedCorn.sourceText.appendChild(selectedStatus);
 selectedCorn.handleCell.appendChild(cornMemberHandle);
 selectedCorn.actionsCell.appendChild(cornMemberMenu);
@@ -5328,7 +5325,6 @@ process.stdout.write(JSON.stringify({
         interaction: selectedEntries.filter(entry => entry.interactionAnchor)
             .map(entry => entry.row.id),
         pointer: selectedParent.recipeIngredientGroupedChoiceAnchorSummary.id,
-        menuOwner: selectedMenu.ownerRow.id,
         statusOwner: selectedCorn.sourceText.children.includes(selectedStatus)
             ? selectedCorn.id
             : selectedCumin.id,
@@ -5361,7 +5357,6 @@ process.stdout.write(JSON.stringify({
         "visibleAlternative": {
             "interaction": ["alternative-onion"],
             "selectionOwner": "alternative-onion",
-            "menuOwner": "alternative-onion",
             "selectionHandler": (
                 "return selectRecipeIngredientColumnViewOption(this, event)"
             ),
@@ -5370,23 +5365,19 @@ process.stdout.write(JSON.stringify({
         "filteredAlternative": {
             "interaction": ["frozen-corn"],
             "selectionOwner": "frozen-corn",
-            "menuOwner": "frozen-corn",
             "previousCellAriaHidden": "true",
             "actionCellAriaHidden": None,
         },
         "restoredAlternative": {
             "interaction": ["alternative-onion"],
             "selectionOwner": "alternative-onion",
-            "menuOwner": "alternative-onion",
             "selectionCount": 1,
-            "menuCount": 1,
             "previousCellAriaHidden": "true",
             "actionCellAriaHidden": None,
         },
         "selected": {
             "interaction": ["selected-corn"],
             "pointer": "selected-corn",
-            "menuOwner": "selected-corn",
             "statusOwner": "selected-corn",
             "toggleOwner": "selected-corn",
             "filteredSelected": {
@@ -5408,17 +5399,12 @@ process.stdout.write(JSON.stringify({
         },
         "moves": [
             "use-option:alternative-onion",
-            "alternative-menu:alternative-onion",
             "use-option:frozen-corn",
-            "alternative-menu:frozen-corn",
             "use-option:alternative-onion",
-            "alternative-menu:alternative-onion",
             "selected-group-handle:selected-cumin",
             "selected-group-menu:selected-cumin",
-            "selected-menu:selected-cumin",
             "selected-group-handle:selected-corn",
             "selected-group-menu:selected-corn",
-            "selected-menu:selected-corn",
         ],
     }
 
