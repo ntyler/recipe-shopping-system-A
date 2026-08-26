@@ -5059,7 +5059,7 @@ def test_store_section_grouping_promotes_actual_rows_with_compact_section_contex
     assert "recipeIngredientColumnViewIngredientEntries" in prepare
     assert "includeAlternatives: recipeEditIngredientColumnView.groupByStoreSection" in prepare
     assert "syncRecipeIngredientColumnViewSectionFragments" in prepare
-    assert "home.replaceWith(row);" in restore
+    assert "homeParent.insertBefore(row, nextSibling);" in restore
     assert 'row.removeAttribute("data-recipe-ingredient-column-option-row");' in restore
     assert 'row.removeAttribute("data-recipe-ingredient-option-member-id");' in restore
     assert 'row.removeAttribute("data-recipe-ingredient-option-id");' in restore
@@ -6179,7 +6179,7 @@ def test_ungrouped_selected_option_block_remains_the_canonical_source_after_grou
     assert "hostEntries" not in grouped_view
     assert "createRecipeIngredientOptionHeader" not in grouped_view
     assert "moveRecipeIngredientColumnViewNode(row, list)" in grouped_view
-    assert "home.replaceWith(row);" in restore
+    assert "homeParent.insertBefore(row, nextSibling);" in restore
     assert "delete row.recipeIngredientSelectedOptionBlock;" in restore
     assert "selectedChoiceUsesParentIngredientRow" not in substitution_state
     assert '"has-selected-implicit-default-choice"' not in substitution_state
@@ -7435,8 +7435,10 @@ def test_ingredient_name_and_buy_as_fields_use_the_normalized_master_data_picker
     assert "ingredient.aliases" in picker
     assert "const selected = index === selectedOptionIndex;" in picker
     assert picker.index("positionRecipeEditPopupMenu(menu, input);") < picker.index(
-        "setRecipeEditListboxActiveOption(menu, activeIndex >= 0 ? activeIndex : 0);"
+        "clearRecipeEditListboxActiveOption(menu);"
     )
+    assert 'tabindex="-1"' in picker
+    assert "if (event.isComposing)" in picker
     for field_name in (
         "ingredient_id",
         "normalized_name",
@@ -7464,6 +7466,137 @@ def test_ingredient_name_and_buy_as_fields_use_the_normalized_master_data_picker
     assert ".recipe-edit-ingredient-master-option" in v43
     assert ".recipe-edit-ingredient-master-manage" in v43
     assert "@media (max-width: 520px)" in v43
+
+
+def test_master_picker_requires_explicit_keyboard_navigation_before_selection():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for the master-picker keyboard contract")
+
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    harness = "\n".join(
+        javascript_function_source(script, function_name)
+        for function_name in (
+            "recipeEditListboxOptions",
+            "clearRecipeEditListboxActiveOption",
+            "setRecipeEditListboxActiveOption",
+            "handleRecipeIngredientMasterKeydown",
+        )
+    ) + r"""
+function classList() {
+    const values = new Set(["recipe-edit-floating-menu"]);
+    return {
+        contains(name) { return values.has(name); },
+        remove(name) { values.delete(name); },
+        toggle(name, force) { force ? values.add(name) : values.delete(name); },
+        has(name) { return values.has(name); },
+    };
+}
+function option(id) {
+    return {
+        id,
+        classList: classList(),
+        scrollCount: 0,
+        scrollIntoView() { this.scrollCount += 1; },
+    };
+}
+function keyEvent(key, {isComposing = false} = {}) {
+    return {
+        key,
+        isComposing,
+        prevented: false,
+        preventDefault() { this.prevented = true; },
+    };
+}
+const options = [option("rice"), option("rice-flour")];
+const attributes = new Map([["aria-activedescendant", "rice"]]);
+const input = {
+    setAttribute(name, value) { attributes.set(name, value); },
+    removeAttribute(name) { attributes.delete(name); },
+};
+const menu = {
+    hidden: false,
+    recipeEditAnchorButton: input,
+    dataset: {activeIndex: "0"},
+    classList: classList(),
+    querySelectorAll() { return options; },
+};
+global.document = {activeElement: input, getElementById() { return menu; }};
+let selected = [];
+function chooseRecipeIngredientMasterOption(value) { selected.push(value.id); }
+function openRecipeIngredientMasterPicker() {}
+function closeRecipeEditRowMenus() {}
+
+clearRecipeEditListboxActiveOption(menu);
+const printable = keyEvent("r");
+handleRecipeIngredientMasterKeydown(printable, input);
+const enterWithoutNavigation = keyEvent("Enter");
+handleRecipeIngredientMasterKeydown(enterWithoutNavigation, input);
+const home = keyEvent("Home");
+handleRecipeIngredientMasterKeydown(home, input);
+const composingArrow = keyEvent("ArrowDown", {isComposing: true});
+handleRecipeIngredientMasterKeydown(composingArrow, input);
+const arrow = keyEvent("ArrowDown");
+handleRecipeIngredientMasterKeydown(arrow, input);
+const enterAfterNavigation = keyEvent("Enter");
+handleRecipeIngredientMasterKeydown(enterAfterNavigation, input);
+
+process.stdout.write(JSON.stringify({
+    activeIndex: menu.dataset.activeIndex,
+    activeDescendant: attributes.get("aria-activedescendant") || null,
+    firstActive: options[0].classList.has("is-active"),
+    firstScrollCount: options[0].scrollCount,
+    printablePrevented: printable.prevented,
+    emptyEnterPrevented: enterWithoutNavigation.prevented,
+    homePrevented: home.prevented,
+    composingPrevented: composingArrow.prevented,
+    arrowPrevented: arrow.prevented,
+    selected,
+    focusStayedOnInput: document.activeElement === input,
+}));
+"""
+    completed = subprocess.run(
+        [node, "-e", harness],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert json.loads(completed.stdout) == {
+        "activeIndex": "0",
+        "activeDescendant": "rice",
+        "firstActive": True,
+        "firstScrollCount": 1,
+        "printablePrevented": False,
+        "emptyEnterPrevented": False,
+        "homePrevented": False,
+        "composingPrevented": False,
+        "arrowPrevented": True,
+        "selected": ["rice"],
+        "focusStayedOnInput": True,
+    }
+
+
+def test_live_ingredient_typing_defers_structural_refresh_until_commit():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    inline = javascript_function_source(script, "bindRecipeIngredientInlineEditor")
+    summary_binding = javascript_function_source(script, "bindRecipeIngredientSummaryUpdates")
+    option_binding = javascript_function_source(script, "bindRecipeIngredientSubstitutionRow")
+    summary = javascript_function_source(script, "updateRecipeIngredientSummary")
+
+    assert "source.dispatchEvent(new Event(eventName));" in inline
+    assert "currentSource.dispatchEvent(new Event(eventName));" in inline
+    assert "bubbles: true" not in inline
+    for binding in (summary_binding, option_binding):
+        assert 'eventName === "input"' in binding
+        assert 'input.addEventListener("change"' in binding
+        assert "deferStructuralRefresh" in binding
+    assert "const deferStructuralRefresh = options.deferStructuralRefresh === true;" in summary
+    assert "if (!deferStructuralRefresh)" in summary
+    assert summary.index("if (!deferStructuralRefresh)") < summary.index(
+        "applyRecipeIngredientColumnView();"
+    )
 
 
 def test_compact_ingredient_controls_do_not_compress_master_data_options():
@@ -11992,7 +12125,7 @@ def test_grouping_toggle_restores_one_canonical_selected_option_block_without_du
     assert "ingredientEntries" in fragments
     assert "cloneNode" not in fragments
     assert "replaceChildren" not in fragments
-    assert "home.replaceWith(row);" in restore
+    assert "homeParent.insertBefore(row, nextSibling);" in restore
     assert "row.recipeIngredientOptionSourceRow" in restore
     assert "recipeIngredientColumnViewPromotedSummary" in restore
     assert "parentRow.recipeIngredientColumnViewCarrierState" in restore

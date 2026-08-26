@@ -1752,6 +1752,8 @@ def test_group_parent_uses_one_persistent_selected_option_source_block():
     assert "lineItems.hidden = !hasRenderedRows;" in sync_selected_block
     assert "recipeEditIngredientColumnView.groupByStoreSection" not in sync_selected_block
     assert "row.insertBefore(header, row.firstChild);" in group_header
+    assert "const alreadyOrdered = currentChildren.length === children.length" in option_block_renderer
+    assert "if (!alreadyOrdered)" in option_block_renderer
     assert "block.replaceChildren(...children);" in option_block_renderer
     assert option_block_renderer.index("options.header") < option_block_renderer.index(
         "...ingredientContent"
@@ -1879,7 +1881,11 @@ function blockRef() {
     return {
         dataset: {},
         children: [],
-        replaceChildren(...children) { this.children = children; },
+        replaceCount: 0,
+        replaceChildren(...children) {
+            this.children = children;
+            this.replaceCount += 1;
+        },
     };
 }
 function renderIds({grouped = false, ingredients = []} = {}) {
@@ -1899,6 +1905,7 @@ function renderIds({grouped = false, ingredients = []} = {}) {
     return {
         ids: block.children.map(child => child.id),
         uniqueCount: new Set(block.children).size,
+        replaceCount: block.replaceCount,
         blockMarker: block.dataset.ingredientOptionBlock,
         grouped,
     };
@@ -1926,6 +1933,7 @@ process.stdout.write(JSON.stringify({
     ungroupedMulti,
     groupedMulti,
     alternative: alternative.children.map(child => child.id),
+    alternativeReplaceCount: alternative.replaceCount,
 }));
 """
     completed = subprocess.run(
@@ -1940,6 +1948,7 @@ process.stdout.write(JSON.stringify({
     assert result["ungroupedSingle"] == {
         "ids": ["default-header", "butter", "add-selected-ingredient"],
         "uniqueCount": 3,
+        "replaceCount": 1,
         "blockMarker": "",
         "grouped": False,
     }
@@ -1952,17 +1961,20 @@ process.stdout.write(JSON.stringify({
             "add-selected-ingredient",
         ],
         "uniqueCount": 5,
+        "replaceCount": 1,
         "blockMarker": "",
         "grouped": False,
     }
     assert result["groupedMulti"]["ids"] == result["ungroupedMulti"]["ids"]
     assert result["groupedMulti"]["uniqueCount"] == 5
+    assert result["groupedMulti"]["replaceCount"] == 1
     assert result["groupedMulti"]["grouped"] is True
     assert result["alternative"] == [
         "alternative-header",
         "unsalted-butter",
         "add-alternative-ingredient",
     ]
+    assert result["alternativeReplaceCount"] == 1
 
 
 def test_alternatives_panel_hides_only_its_selected_source_duplicate():
