@@ -55432,6 +55432,15 @@ function addRecipeIngredientDefaultComponent(button) {
 
     const values = fieldValuesFromRow(row);
     const alternativeId = nextRecipeIngredientAlternativeId();
+    const defaultField = row.querySelector('[data-field="default_option_id"]');
+    const selectionField = row.querySelector('[data-field="selection_required"]');
+    const originalOption = row.querySelector("[data-original-option-id]");
+    const originalOptionId = String(originalOption ? originalOption.value : "").trim();
+    const selected = Boolean(
+        originalOptionId
+        && defaultField
+        && String(defaultField.value || "").trim() === originalOptionId
+    );
     const originalValues = {
         ...values,
         id: "",
@@ -55442,8 +55451,8 @@ function addRecipeIngredientDefaultComponent(button) {
         alternative_label: String(values.ingredient || "Default option").trim(),
         option_type: "original",
         recipe_authored: true,
-        is_default: true,
-        preferred: true,
+        is_default: selected,
+        preferred: selected,
         optional: recipeIngredientIsOptional(values),
     };
     delete originalValues.substitutions;
@@ -55454,8 +55463,8 @@ function addRecipeIngredientDefaultComponent(button) {
         alternative_label: originalValues.alternative_label,
         option_type: "original",
         recipe_authored: true,
-        is_default: true,
-        preferred: true,
+        is_default: selected,
+        preferred: selected,
         optional: false,
         inferred: false,
         store_section: values.store_section || "",
@@ -55477,9 +55486,7 @@ function addRecipeIngredientDefaultComponent(button) {
         organizeRecipeEditSubstitutionOptionRow(optionRow);
         bindRecipeIngredientSubstitutionRow(optionRow);
     });
-    const defaultField = row.querySelector('[data-field="default_option_id"]');
-    const selectionField = row.querySelector('[data-field="selection_required"]');
-    if (defaultField) {
+    if (selected && defaultField) {
         defaultField.value = alternativeId;
         const originalDefaultField = row.querySelector('[data-field="original_is_default"]');
         if (originalDefaultField) originalDefaultField.value = "false";

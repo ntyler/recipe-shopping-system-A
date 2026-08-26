@@ -3311,6 +3311,188 @@ process.stdout.write(JSON.stringify({
     }
 
 
+def test_add_default_component_preserves_the_implicit_defaults_selection_state():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for default-option selection coverage")
+
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    add_default = javascript_function_source(
+        script,
+        "addRecipeIngredientDefaultComponent",
+    )
+    harness = r"""
+let activeFixture = null;
+
+function field(value) {
+    return {value: String(value)};
+}
+
+function optionRow(values, index) {
+    const ingredientField = {
+        focusCalls: [],
+        focus(options) { this.focusCalls.push(options); },
+    };
+    const fields = {
+        alternative_id: field(values.alternative_id || ""),
+        is_default: field(values.is_default ? "true" : "false"),
+        preferred: {
+            type: "checkbox",
+            checked: Boolean(values.preferred),
+        },
+    };
+    return {
+        id: `component-${index}`,
+        fields,
+        querySelector(selector) {
+            const fieldName = selector.match(/data-field="([^"]+)"/)?.[1];
+            if (fieldName && fields[fieldName]) return fields[fieldName];
+            return selector.includes("ingredient") ? ingredientField : null;
+        },
+    };
+}
+
+function fixture(name, defaultOptionId, originalIsDefault) {
+    const fields = {
+        default_option_id: field(defaultOptionId),
+        selection_required: field("true"),
+        original_is_default: field(originalIsDefault ? "true" : "false"),
+    };
+    const originalOption = field("original-option");
+    const state = {
+        name,
+        generatedId: `generated-${name}`,
+        createdValues: [],
+        rows: [],
+        fields,
+        originalOption,
+    };
+    state.list = {
+        insertAdjacentHTML() {
+            state.rows = state.createdValues.map(optionRow);
+        },
+        querySelectorAll() { return state.rows; },
+    };
+    state.card = {
+        querySelectorAll() { return state.rows; },
+    };
+    state.container = {
+        querySelector(selector) {
+            if (selector.includes("ingredient-substitution-list")) return state.list;
+            if (selector.includes("recipe-edit-alternative-card")) return state.card;
+            return null;
+        },
+    };
+    state.row = {
+        values: {
+            ingredient: "Butter",
+            store_section: "Dairy & Eggs",
+            section: "main",
+        },
+        classList: {contains() { return false; }},
+        querySelector(selector) {
+            if (selector === "[data-original-option-id]") return originalOption;
+            const fieldName = selector.match(/data-field="([^"]+)"/)?.[1];
+            return fieldName ? fields[fieldName] || null : null;
+        },
+    };
+    return state;
+}
+
+function recipeIngredientParentRowFromControl() { return activeFixture.row; }
+function recipeIngredientSubstitutionContainer() { return activeFixture.container; }
+function ensureRecipeIngredientModalOptionsExpanded() {}
+function fieldValuesFromRow(row) { return row.values || {}; }
+function nextRecipeIngredientAlternativeId() { return activeFixture.generatedId; }
+function recipeIngredientIsOptional() { return false; }
+function recipeIngredientSubstitutionOptionRowHtml(values) {
+    activeFixture.createdValues.push({...values});
+    return "<option-row>";
+}
+function organizeRecipeEditSubstitutionOptionRow() {}
+function bindRecipeIngredientSubstitutionRow() {}
+function updateRecipeIngredientSubstitutionState() {}
+function setRecipeIngredientAlternativeEditMode() {}
+function updateRecipeIngredientSummary() {}
+function applyRecipeIngredientColumnView() {}
+function updateRecipeEditorDirtyState() {}
+const CSS = {escape(value) { return value; }};
+""" + add_default + r"""
+
+function runCase(name, defaultOptionId, originalIsDefault) {
+    activeFixture = fixture(name, defaultOptionId, originalIsDefault);
+    const actionResult = addRecipeIngredientDefaultComponent({id: `add-${name}`});
+    return {
+        actionResult,
+        defaultOptionId: activeFixture.fields.default_option_id.value,
+        originalIsDefault: activeFixture.fields.original_is_default.value,
+        selectionRequired: activeFixture.fields.selection_required.value,
+        generatedId: activeFixture.generatedId,
+        createdRows: activeFixture.rows.map(row => ({
+            alternativeId: row.fields.alternative_id.value,
+            isDefault: row.fields.is_default.value,
+            preferred: row.fields.preferred.checked,
+        })),
+    };
+}
+
+process.stdout.write(JSON.stringify({
+    unselected: runCase("unselected", "selected-alternative", false),
+    selected: runCase("selected", "original-option", true),
+}));
+"""
+    completed = subprocess.run(
+        [node, "-"],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        input=harness,
+        text=True,
+        timeout=10,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    result = json.loads(completed.stdout)
+    assert result["unselected"] == {
+        "actionResult": False,
+        "defaultOptionId": "selected-alternative",
+        "originalIsDefault": "false",
+        "selectionRequired": "true",
+        "generatedId": "generated-unselected",
+        "createdRows": [
+            {
+                "alternativeId": "generated-unselected",
+                "isDefault": "false",
+                "preferred": False,
+            },
+            {
+                "alternativeId": "generated-unselected",
+                "isDefault": "false",
+                "preferred": False,
+            },
+        ],
+    }
+    assert result["selected"] == {
+        "actionResult": False,
+        "defaultOptionId": "generated-selected",
+        "originalIsDefault": "false",
+        "selectionRequired": "true",
+        "generatedId": "generated-selected",
+        "createdRows": [
+            {
+                "alternativeId": "generated-selected",
+                "isDefault": "true",
+                "preferred": True,
+            },
+            {
+                "alternativeId": "generated-selected",
+                "isDefault": "true",
+                "preferred": True,
+            },
+        ],
+    }
+
+
 def test_grouped_add_another_option_refreshes_and_focuses_its_promoted_row():
     node = shutil.which("node")
     if not node:

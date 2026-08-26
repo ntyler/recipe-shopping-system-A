@@ -2539,6 +2539,22 @@ def test_first_alternative_keeps_original_ingredient_as_the_default_choice():
         )
 
 
+def test_adding_ingredient_to_unselected_default_option_preserves_selection():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    add_default = script[
+        script.index("function addRecipeIngredientDefaultComponent"):
+        script.index("function updateRecipeIngredientSubstitutionState")
+    ]
+
+    assert 'const originalOption = row.querySelector("[data-original-option-id]");' in add_default
+    assert "const selected = Boolean(" in add_default
+    assert 'String(defaultField.value || "").trim() === originalOptionId' in add_default
+    assert add_default.count("is_default: selected") == 2
+    assert add_default.count("preferred: selected") == 2
+    assert "if (selected && defaultField)" in add_default
+    assert "applyRecipeIngredientOptionSelection" not in add_default
+
+
 def test_implicit_default_option_header_has_the_option_actions_submenu():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
