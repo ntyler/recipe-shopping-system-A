@@ -5666,7 +5666,7 @@ process.stdout.write(JSON.stringify({
     }
 
 
-def test_store_section_grouping_keeps_expanded_choice_members_in_their_aisles():
+def test_store_section_grouping_attaches_comparisons_to_the_canonical_aisle():
     node = shutil.which("node")
     if not node:
         pytest.skip("Node.js is required for attached option grouping coverage")
@@ -5701,8 +5701,9 @@ def test_store_section_grouping_keeps_expanded_choice_members_in_their_aisles():
     assert "item.expandedChoiceHost = false;" in attached_rows
     assert "item.expandedChoiceContinuation = false;" in attached_rows
     assert "entry.expandedChoiceBlock = false;" in attached_rows
-    assert "const consumedSelectedRows = new Set();" in attached_rows
-    assert "if (consumedSelectedRows.has(item)) return;" in attached_rows
+    assert "const canonicalStoreKey = String(" in attached_rows
+    assert "const host = [...visibleSelectedRows].reverse().find" in attached_rows
+    assert "consumedSelectedRows" not in attached_rows
     assert "is-filtered-alternative" in group_headers
     assert "recipeIngredientColumnChoiceBoundary" in group_headers
     assert "&& !entry.expandedChoiceContinuation" in group_headers
@@ -5791,9 +5792,8 @@ const alternativeOnion = displayItem({
     componentOrder: 1,
 });
 
-// Collapsed Store Section grouping receives active rows only. Once expanded,
-// every selected and alternative component keeps the aisle-sorted order that
-// applyRecipeIngredientColumnView already established.
+// Selected members keep the aisle-sorted order. Expanded inactive comparisons
+// stay contiguous after the final selected member in the canonical aisle.
 const collapsed = recipeIngredientColumnViewAttachedPresentationRows([
     before,
     cumin,
@@ -5890,6 +5890,27 @@ const switched = recipeIngredientColumnViewAttachedPresentationRows([
 ]);
 const repeated = recipeIngredientColumnViewAttachedPresentationRows(switched);
 
+// The selected rows arrive in the active view's current sort order. Do not
+// re-sort them by component/manual order when choosing the attachment host.
+const sortedHostParent = choiceParent("sorted-host-choice");
+const sortedHostCanonical = displayItem({
+    id: "sorted-host-canonical", parentRow: sortedHostParent, counted: true,
+    optionId: "selected", store: "produce", manualIndex: 9, anchor: true,
+});
+const sortedHostSibling = displayItem({
+    id: "sorted-host-sibling", parentRow: sortedHostParent, counted: true,
+    optionId: "selected", store: "produce", manualIndex: 1,
+});
+const sortedHostAlternative = displayItem({
+    id: "sorted-host-alternative", parentRow: sortedHostParent, counted: false,
+    optionId: "alternative", store: "frozen", manualIndex: 10,
+});
+const sortedHostView = recipeIngredientColumnViewAttachedPresentationRows([
+    sortedHostCanonical,
+    sortedHostSibling,
+    sortedHostAlternative,
+]);
+
 process.stdout.write(JSON.stringify({
     collapsed: {
         order: collapsedOrder,
@@ -5897,6 +5918,9 @@ process.stdout.write(JSON.stringify({
     },
     expanded: {
         order: expandedIds,
+        comparisonAfter: expandedIds[
+            expandedIds.indexOf("frozen-corn") - 1
+        ],
         attachedRows: visible(expanded)
             .filter(item => item.attachedAlternative)
             .map(item => item.row.id),
@@ -5936,6 +5960,9 @@ process.stdout.write(JSON.stringify({
     },
     switched: {
         order: switched.map(item => item.row.id),
+        comparisonAfter: switched[
+            switched.findIndex(item => item.row.id === "previous-corn") - 1
+        ]?.row.id || null,
         activeSections: activeSections(switched),
         attachedRows: visible(switched)
             .filter(item => item.attachedAlternative)
@@ -5948,6 +5975,14 @@ process.stdout.write(JSON.stringify({
             .filter(item => item.expandedChoiceHost)
             .map(item => item.row.id),
         uniqueRows: new Set(repeated.map(item => item.row.id)).size === repeated.length,
+    },
+    sortedHost: {
+        order: sortedHostView.map(item => item.row.id),
+        comparisonAfter: sortedHostView[
+            sortedHostView.findIndex(
+                item => item.row.id === "sorted-host-alternative",
+            ) - 1
+        ]?.row.id || null,
     },
 }));
 """
@@ -5974,13 +6009,14 @@ process.stdout.write(JSON.stringify({
             "after",
             "fresh-corn",
             "onion",
-            "alternative-onion",
             "frozen-corn",
+            "alternative-onion",
         ],
-        "attachedRows": [],
+        "comparisonAfter": "onion",
+        "attachedRows": ["frozen-corn", "alternative-onion"],
         "hosts": [],
         "continuations": [],
-        "activeSections": ["misc", "spices", "dairy", "produce", "frozen"],
+        "activeSections": ["misc", "spices", "dairy", "produce"],
         "uniqueRows": True,
     }
     assert result["partialFilter"] == {
@@ -6003,21 +6039,30 @@ process.stdout.write(JSON.stringify({
     assert result["switched"] == {
         "order": [
             "selected-frozen",
-            "selected-onion",
-            "previous-cumin",
             "previous-corn",
+            "previous-cumin",
+            "selected-onion",
         ],
-        "activeSections": ["frozen", "produce", "spices"],
-        "attachedRows": [],
+        "comparisonAfter": "selected-frozen",
+        "activeSections": ["frozen", "produce"],
+        "attachedRows": ["previous-corn", "previous-cumin"],
         "hosts": [],
         "repeatedOrder": [
             "selected-frozen",
-            "selected-onion",
-            "previous-cumin",
             "previous-corn",
+            "previous-cumin",
+            "selected-onion",
         ],
         "repeatedHosts": [],
         "uniqueRows": True,
+    }
+    assert result["sortedHost"] == {
+        "order": [
+            "sorted-host-canonical",
+            "sorted-host-sibling",
+            "sorted-host-alternative",
+        ],
+        "comparisonAfter": "sorted-host-sibling",
     }
 
 
@@ -10498,7 +10543,7 @@ process.stdout.write(JSON.stringify({
     }
 
 
-def test_master_selection_rehomes_expanded_option_component_without_changing_option_semantics():
+def test_master_selection_keeps_inactive_option_attached_then_rehomes_selected_components():
     node = shutil.which("node")
     if not node:
         pytest.skip("Node.js is required for grouped master-selection coverage")
@@ -10509,6 +10554,8 @@ def test_master_selection_rehomes_expanded_option_component_without_changing_opt
         for name in (
             "setRowFieldValue",
             "chooseRecipeIngredientMasterOption",
+            "applyRecipeIngredientOptionSelection",
+            "setRecipeIngredientDefaultOption",
             "recipeIngredientColumnViewSourceRow",
             "recipeIngredientColumnViewEntry",
             "recipeIngredientColumnViewPresentationEntries",
@@ -10589,8 +10636,14 @@ const document = {
     createElement() { return new FakeNode("section-header"); },
 };
 const form = {};
-function field(name, value) {
-    return {name, value: String(value), tagName: "INPUT", type: "hidden"};
+function field(name, value, type = "hidden") {
+    return {
+        name,
+        value: String(value),
+        tagName: "INPUT",
+        type,
+        checked: [true, 1, "1", "true", "yes"].includes(value),
+    };
 }
 function sourceRow(id, values, substitution = false) {
     const fields = new Map(Object.entries(values).map(([name, value]) => [
@@ -10614,7 +10667,7 @@ function sourceRow(id, values, substitution = false) {
 function values(row) {
     return Object.fromEntries([...row.fields].map(([name, input]) => [
         name,
-        input.value,
+        input.type === "checkbox" ? input.checked : input.value,
     ]));
 }
 function fieldValuesFromRow(row) {
@@ -10654,28 +10707,79 @@ function recipeIngredientStoreSectionIconHtml() { return ""; }
 function escapeHtml(value) { return String(value); }
 
 const parentRow = {
-    id: "requirement-corn",
+    id: "requirement-butter",
     parentElement: {id: "recipeEditIngredients"},
-    dataset: {ingredientSelectedOptionId: "option-fresh"},
+    dataset: {ingredientSelectedOptionId: "option-unsalted-egg"},
     classList: classes("has-ingredient-choice"),
     fields: new Map([
-        ["default_option_id", field("default_option_id", "option-fresh")],
-        ["original_option_id", field("original_option_id", "option-fresh")],
+        [
+            "default_option_id",
+            field("default_option_id", "option-unsalted-egg"),
+        ],
+        [
+            "original_option_id",
+            field("original_option_id", "option-butter-rice"),
+        ],
+        ["original_is_default", field("original_is_default", "false")],
     ]),
+    querySelector(selector) {
+        if (selector === "[data-original-option-id]") {
+            return this.fields.get("original_option_id");
+        }
+        const match = selector.match(/\[data-field="([^"]+)"\]/);
+        return match ? (this.fields.get(match[1]) || null) : null;
+    },
 };
-const selectedSource = sourceRow("fresh-corn-source", {
-    ingredient: "Fresh corn",
-    store_section: "PRODUCE",
-});
-const optionSource = sourceRow("butter-option-source", {
-    ingredient: "Unsalted butter",
+function optionSource(id, ingredient, optionId, componentOrder, selected, extra = {}) {
+    return sourceRow(id, {
+        ingredient,
+        ingredient_id: id,
+        parsed_name: ingredient,
+        normalized_name: ingredient.toLowerCase(),
+        master_normalized_name: ingredient.toLowerCase(),
+        store_section: "DAIRY & EGGS",
+        purchasable_item: ingredient,
+        quantity: "1",
+        unit: "item",
+        preparation: "",
+        section: "main",
+        optional: "false",
+        alternative_id: optionId,
+        alternative_order: optionId === "option-unsalted-egg" ? "0" : "1",
+        alternative_component_order: String(componentOrder),
+        alternative_label: optionId === "option-unsalted-egg"
+            ? "Unsalted butter and egg"
+            : "Butter and rice",
+        option_type: optionId === "option-butter-rice" ? "original" : "alternative",
+        recipe_authored: "true",
+        is_default: selected ? "true" : "false",
+        preferred: selected,
+        ...extra,
+    }, true);
+}
+const unsaltedSource = optionSource(
+    "unsalted-butter-source",
+    "Unsalted butter",
+    "option-unsalted-egg",
+    0,
+    true,
+);
+const eggSource = optionSource(
+    "egg-source",
+    "Egg",
+    "option-unsalted-egg",
+    1,
+    true,
+);
+const butterSource = optionSource(
+    "butter-source",
+    "Butter",
+    "option-butter-rice",
+    0,
+    false,
+);
+const riceSource = optionSource("rice-source", "Unnamed ingredient", "option-butter-rice", 1, false, {
     ingredient_id: "10",
-    parsed_name: "unsalted butter",
-    normalized_name: "unsalted butter",
-    master_normalized_name: "unsalted butter",
-    canonical_ingredient: "butter",
-    form: "unsalted",
-    store_section: "DAIRY & EGGS",
     store_section_custom: "false",
     store_section_source: "legacy",
     store_section_confidence: "0",
@@ -10691,62 +10795,80 @@ const optionSource = sourceRow("butter-option-source", {
     confidence: "medium",
     inferred: "true",
     warning: "review",
-    purchasable_item: "Unsalted butter",
+    purchasable_item: "Unnamed ingredient",
     quantity: "1/2",
     unit: "cup",
     preparation: "melted",
     section: "main",
     optional: "false",
-    alternative_id: "option-butter",
-    alternative_order: "1",
-    alternative_component_order: "2",
-    alternative_label: "Butter option",
-    option_type: "alternative",
-    recipe_authored: "true",
-    is_default: "false",
-}, true);
-optionSource.dataset.ingredientMatchDetails = JSON.stringify({existing: true});
-const selectedRow = new FakeNode("selected-fresh-corn");
-selectedRow.recipeIngredientOptionSourceRow = selectedSource;
-const optionRow = new FakeNode("expanded-butter-option");
-optionRow.recipeIngredientOptionSourceRow = optionSource;
-const selectedEntry = {
-    row: selectedRow,
-    sourceRow: selectedSource,
-    parentRow,
-    optionId: "option-fresh",
-    optionContextKey: "id:option-fresh",
-    componentOrder: 0,
-    manualIndex: 0,
-    selected: true,
-    counted: true,
-    anchor: true,
-    expanded: true,
-    filtered: false,
-};
-const optionEntry = {
-    row: optionRow,
-    sourceRow: optionSource,
-    parentRow,
-    optionId: "option-butter",
-    optionContextKey: "id:option-butter",
-    componentOrder: 2,
-    manualIndex: 1,
-    selected: false,
-    counted: false,
-    anchor: true,
-    expanded: true,
-    filtered: false,
-};
-selectedRow.recipeIngredientColumnViewEntries = [selectedEntry];
-optionRow.recipeIngredientColumnViewEntries = [optionEntry];
+});
+riceSource.dataset.ingredientMatchDetails = JSON.stringify({existing: true});
+riceSource.fields.set("preferred", field("preferred", false, "checkbox"));
+for (const source of [unsaltedSource, eggSource, butterSource]) {
+    source.fields.set(
+        "preferred",
+        field("preferred", source === unsaltedSource || source === eggSource, "checkbox"),
+    );
+}
+function displayEntry(id, source, optionId, componentOrder, manualIndex, anchor) {
+    const row = new FakeNode(id);
+    row.recipeIngredientOptionSourceRow = source;
+    const entry = {
+        row,
+        sourceRow: source,
+        parentRow,
+        optionId,
+        optionContextKey: `id:${optionId}`,
+        componentOrder,
+        manualIndex,
+        selected: false,
+        counted: false,
+        anchor,
+        expanded: true,
+        filtered: false,
+    };
+    row.recipeIngredientColumnViewEntries = [entry];
+    return entry;
+}
+const unsaltedEntry = displayEntry(
+    "unsalted-butter-component",
+    unsaltedSource,
+    "option-unsalted-egg",
+    0,
+    0,
+    true,
+);
+const eggEntry = displayEntry(
+    "egg-component",
+    eggSource,
+    "option-unsalted-egg",
+    1,
+    1,
+    false,
+);
+const butterEntry = displayEntry(
+    "butter-component",
+    butterSource,
+    "option-butter-rice",
+    0,
+    2,
+    true,
+);
+const riceEntry = displayEntry(
+    "rice-component",
+    riceSource,
+    "option-butter-rice",
+    1,
+    3,
+    false,
+);
+const entries = [unsaltedEntry, eggEntry, butterEntry, riceEntry];
 const list = new FakeNode("recipeEditIngredients");
-list.append(selectedRow, optionRow);
+list.append(...entries.map(entry => entry.row));
 const recipeEditIngredientColumnView = {groupByStoreSection: true};
 const storeOrder = new Map([
     ["dairy-eggs", 0],
-    ["produce", 1],
-    ["pasta-rice-grains", 2],
+    ["pasta-rice-grains", 1],
 ]);
 const contextAssignments = [];
 function assignRecipeIngredientColumnViewSectionContextAnchors(
@@ -10765,19 +10887,30 @@ function syncRecipeIngredientColumnViewVisibleOptionControls() {}
 const snapshots = [];
 function applyRecipeIngredientColumnView() {
     clearRecipeIngredientColumnViewGroupHeaders(list);
-    selectedEntry.store = recipeIngredientColumnViewEntry(selectedRow, "store");
-    optionEntry.store = recipeIngredientColumnViewEntry(optionRow, "store");
-    const items = [
-        {row: selectedRow, index: 0, filtered: false},
-        {row: optionRow, index: 1, filtered: false},
-    ].sort((left, right) => (
-        storeOrder.get(recipeIngredientColumnViewEntry(left.row, "store").key)
-        - storeOrder.get(recipeIngredientColumnViewEntry(right.row, "store").key)
-    ));
+    const selectedOptionId = parentRow.fields.get("default_option_id").value;
+    parentRow.dataset.ingredientSelectedOptionId = selectedOptionId;
+    entries.forEach(entry => {
+        entry.selected = entry.optionId === selectedOptionId;
+        entry.counted = entry.selected;
+        entry.active = entry.selected;
+        entry.store = recipeIngredientColumnViewEntry(entry.row, "store");
+    });
+    const items = entries.map(entry => ({
+        row: entry.row,
+        index: entry.manualIndex,
+        filtered: false,
+    })).sort((left, right) => {
+        const leftEntry = left.row.recipeIngredientColumnViewEntries[0];
+        const rightEntry = right.row.recipeIngredientColumnViewEntries[0];
+        return (
+            storeOrder.get(leftEntry.store.key) - storeOrder.get(rightEntry.store.key)
+            || leftEntry.manualIndex - rightEntry.manualIndex
+        );
+    });
     const assignmentStart = contextAssignments.length;
     const presentation = recipeIngredientColumnViewAttachedPresentationRows(items);
     syncRecipeIngredientColumnViewVisibleSectionContexts(
-        [selectedEntry, optionEntry],
+        entries,
         presentation.map(item => item.row),
     );
     renderRecipeIngredientColumnViewGroupHeaders(list, presentation);
@@ -10790,13 +10923,33 @@ function applyRecipeIngredientColumnView() {
         labels: list.children
             .filter(item => item.dataset.recipeIngredientColumnGroupHeader)
             .map(item => item.attributes["aria-label"]),
-        optionAttached: optionEntry.attachedAlternative,
-        optionExpandedBlock: Boolean(optionEntry.expandedChoiceBlock),
+        presentationOrder: presentation.map(item => item.row.id),
+        attachedRows: entries
+            .filter(entry => entry.attachedAlternative)
+            .map(entry => entry.row.id),
+        expandedHosts: entries
+            .filter(entry => entry.expandedChoiceHost)
+            .map(entry => entry.row.id),
+        expandedContinuations: presentation
+            .filter(item => item.expandedChoiceContinuation)
+            .map(item => item.row.id),
+        selectedRows: entries
+            .filter(entry => entry.selected)
+            .map(entry => entry.row.id),
+        stores: Object.fromEntries(entries.map(entry => [
+            entry.row.id,
+            entry.store.value,
+        ])),
         assignedOptions: contextAssignments.slice(assignmentStart).flat(),
     });
 }
 
-const calls = {blur: 0, parentSummary: 0, storeSyncRefreshes: []};
+const calls = {
+    blur: 0,
+    parentSummary: 0,
+    storeSyncRefreshes: [],
+    expandedRestores: 0,
+};
 const input = {
     dataset: {recipeIngredientMasterField: "ingredient"},
     blur() { calls.blur += 1; },
@@ -10821,13 +10974,32 @@ const button = {
     },
     closest() { return menu; },
 };
-function recipeIngredientMasterTargetRow() { return optionSource; }
+const alternativeGroups = [
+    {alternativeId: "option-unsalted-egg", rows: [unsaltedSource, eggSource]},
+    {alternativeId: "option-butter-rice", rows: [butterSource, riceSource]},
+];
+const substitutionList = {
+    querySelectorAll() { return alternativeGroups.flatMap(group => group.rows); },
+};
+const substitutionContainer = {
+    querySelector() { return substitutionList; },
+};
+function recipeIngredientSubstitutionContainer(row) {
+    return row === parentRow ? substitutionContainer : null;
+}
+function recipeIngredientSubstitutionDomGroups() { return alternativeGroups; }
+function recipeIngredientExpansionIsOpen() { return true; }
+function setRecipeIngredientSubstitutionsExpanded() {
+    calls.expandedRestores += 1;
+}
+function recipeIngredientMasterTargetRow() { return riceSource; }
 function closeRecipeEditRowMenus() {}
 function syncRecipeIngredientStoreSectionControl(_input, options) {
     calls.storeSyncRefreshes.push(options.refreshGroupedView);
 }
 function syncRecipeIngredientModalSelectedOptionMasterControls() {}
 function updateRecipeIngredientSubstitutionRowSummary() {}
+function updateRecipeIngredientSubstitutionState() {}
 function recipeIngredientParentRowFromControl() { return parentRow; }
 function updateRecipeIngredientSummary(row) {
     if (row === parentRow) {
@@ -10841,8 +11013,12 @@ function focusRecipeIngredientMasterSelectionInput() {}
 function setRecipeEditStatus() {}
 function syncRecipeIngredientPurchaseGroup() {}
 
-applyRecipeIngredientColumnView();
 chooseRecipeIngredientMasterOption(button);
+const afterMasterRecipeFields = values(riceSource);
+const optionSelected = applyRecipeIngredientOptionSelection(
+    parentRow,
+    "option-butter-rice",
+);
 const recipeSpecificFields = [
     "quantity",
     "unit",
@@ -10859,23 +11035,34 @@ const recipeSpecificFields = [
 ];
 process.stdout.write(JSON.stringify({
     snapshots,
-    selectedStore: optionSource.fields.get("store_section").value,
+    selectedStore: riceSource.fields.get("store_section").value,
     recipeSpecific: Object.fromEntries(recipeSpecificFields.map(name => [
         name,
-        optionSource.fields.get(name).value,
+        afterMasterRecipeFields[name],
     ])),
-    optionSemantics: {
-        optionId: optionEntry.optionId,
-        optionContextKey: optionEntry.optionContextKey,
-        componentOrder: optionEntry.componentOrder,
-        selected: optionEntry.selected,
-        counted: optionEntry.counted,
-        expanded: optionEntry.expanded,
+    optionSelected,
+    optionSemantics: entries.map(entry => ({
+        row: entry.row.id,
+        optionId: entry.optionId,
+        optionContextKey: entry.optionContextKey,
+        componentOrder: entry.componentOrder,
+        selected: entry.selected,
+        counted: entry.counted,
+        expanded: entry.expanded,
+        sourceAlternativeId: entry.sourceRow.fields.get("alternative_id").value,
+        sourceComponentOrder: entry.sourceRow.fields.get(
+            "alternative_component_order",
+        ).value,
+        isDefault: entry.sourceRow.fields.get("is_default").value,
+        preferred: entry.sourceRow.fields.get("preferred").checked,
+    })),
+    parentSemantics: {
         parentSelectedOptionId: parentRow.dataset.ingredientSelectedOptionId,
         defaultOptionId: parentRow.fields.get("default_option_id").value,
         originalOptionId: parentRow.fields.get("original_option_id").value,
+        originalIsDefault: parentRow.fields.get("original_is_default").value,
     },
-    sameNode: list.children.includes(optionRow),
+    sameNodes: entries.every(entry => list.children.includes(entry.row)),
     calls,
 }));
 """
@@ -10895,32 +11082,72 @@ process.stdout.write(JSON.stringify({
         {
             "sequence": [
                 "header:dairy-eggs",
-                "expanded-butter-option",
-                "header:produce",
-                "selected-fresh-corn",
+                "unsalted-butter-component",
+                "egg-component",
+                "butter-component",
+                "rice-component",
             ],
-            "labels": [
-                "Dairy & Eggs, 1 alternative ingredient",
-                "Produce, 1 ingredient",
+            "labels": ["Dairy & Eggs, 2 ingredients"],
+            "presentationOrder": [
+                "unsalted-butter-component",
+                "egg-component",
+                "butter-component",
+                "rice-component",
             ],
-            "optionAttached": False,
-            "optionExpandedBlock": False,
-            "assignedOptions": ["option-fresh", "option-butter"],
+            "attachedRows": ["butter-component", "rice-component"],
+            "expandedHosts": [],
+            "expandedContinuations": [],
+            "selectedRows": [
+                "unsalted-butter-component",
+                "egg-component",
+            ],
+            "stores": {
+                "unsalted-butter-component": "DAIRY & EGGS",
+                "egg-component": "DAIRY & EGGS",
+                "butter-component": "DAIRY & EGGS",
+                "rice-component": "PASTA, RICE & GRAINS",
+            },
+            "assignedOptions": [
+                "option-unsalted-egg",
+                "option-unsalted-egg",
+            ],
         },
         {
             "sequence": [
-                "header:produce",
-                "selected-fresh-corn",
+                "header:dairy-eggs",
+                "butter-component",
+                "unsalted-butter-component",
+                "egg-component",
                 "header:pasta-rice-grains",
-                "expanded-butter-option",
+                "rice-component",
             ],
             "labels": [
-                "Produce, 1 ingredient",
-                "Pasta, Rice & Grains, 1 alternative ingredient",
+                "Dairy & Eggs, 1 ingredient",
+                "Pasta, Rice & Grains, 1 ingredient",
             ],
-            "optionAttached": False,
-            "optionExpandedBlock": False,
-            "assignedOptions": ["option-fresh", "option-butter"],
+            "presentationOrder": [
+                "butter-component",
+                "unsalted-butter-component",
+                "egg-component",
+                "rice-component",
+            ],
+            "attachedRows": [
+                "unsalted-butter-component",
+                "egg-component",
+            ],
+            "expandedHosts": [],
+            "expandedContinuations": [],
+            "selectedRows": ["butter-component", "rice-component"],
+            "stores": {
+                "unsalted-butter-component": "DAIRY & EGGS",
+                "egg-component": "DAIRY & EGGS",
+                "butter-component": "DAIRY & EGGS",
+                "rice-component": "PASTA, RICE & GRAINS",
+            },
+            "assignedOptions": [
+                "option-butter-rice",
+                "option-butter-rice",
+            ],
         },
     ]
     assert result["selectedStore"] == "PASTA, RICE & GRAINS"
@@ -10930,30 +11157,81 @@ process.stdout.write(JSON.stringify({
         "preparation": "melted",
         "section": "main",
         "optional": "false",
-        "alternative_id": "option-butter",
+        "alternative_id": "option-butter-rice",
         "alternative_order": "1",
-        "alternative_component_order": "2",
-        "alternative_label": "Butter option",
-        "option_type": "alternative",
+        "alternative_component_order": "1",
+        "alternative_label": "Butter and rice",
+        "option_type": "original",
         "recipe_authored": "true",
         "is_default": "false",
     }
-    assert result["optionSemantics"] == {
-        "optionId": "option-butter",
-        "optionContextKey": "id:option-butter",
-        "componentOrder": 2,
-        "selected": False,
-        "counted": False,
-        "expanded": True,
-        "parentSelectedOptionId": "option-fresh",
-        "defaultOptionId": "option-fresh",
-        "originalOptionId": "option-fresh",
+    assert result["optionSelected"] is True
+    assert result["optionSemantics"] == [
+        {
+            "row": "unsalted-butter-component",
+            "optionId": "option-unsalted-egg",
+            "optionContextKey": "id:option-unsalted-egg",
+            "componentOrder": 0,
+            "selected": False,
+            "counted": False,
+            "expanded": True,
+            "sourceAlternativeId": "option-unsalted-egg",
+            "sourceComponentOrder": "0",
+            "isDefault": "false",
+            "preferred": False,
+        },
+        {
+            "row": "egg-component",
+            "optionId": "option-unsalted-egg",
+            "optionContextKey": "id:option-unsalted-egg",
+            "componentOrder": 1,
+            "selected": False,
+            "counted": False,
+            "expanded": True,
+            "sourceAlternativeId": "option-unsalted-egg",
+            "sourceComponentOrder": "1",
+            "isDefault": "false",
+            "preferred": False,
+        },
+        {
+            "row": "butter-component",
+            "optionId": "option-butter-rice",
+            "optionContextKey": "id:option-butter-rice",
+            "componentOrder": 0,
+            "selected": True,
+            "counted": True,
+            "expanded": True,
+            "sourceAlternativeId": "option-butter-rice",
+            "sourceComponentOrder": "0",
+            "isDefault": "true",
+            "preferred": True,
+        },
+        {
+            "row": "rice-component",
+            "optionId": "option-butter-rice",
+            "optionContextKey": "id:option-butter-rice",
+            "componentOrder": 1,
+            "selected": True,
+            "counted": True,
+            "expanded": True,
+            "sourceAlternativeId": "option-butter-rice",
+            "sourceComponentOrder": "1",
+            "isDefault": "true",
+            "preferred": True,
+        },
+    ]
+    assert result["parentSemantics"] == {
+        "parentSelectedOptionId": "option-butter-rice",
+        "defaultOptionId": "option-butter-rice",
+        "originalOptionId": "option-butter-rice",
+        "originalIsDefault": "true",
     }
-    assert result["sameNode"] is True
+    assert result["sameNodes"] is True
     assert result["calls"] == {
         "blur": 1,
-        "parentSummary": 1,
+        "parentSummary": 2,
         "storeSyncRefreshes": [False],
+        "expandedRestores": 1,
     }
 
 
