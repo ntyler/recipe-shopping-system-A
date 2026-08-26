@@ -31190,7 +31190,7 @@ function syncRecipeIngredientColumnViewVisibleSectionContexts(
                     || Number(left.manualIndex || 0) - Number(right.manualIndex || 0);
             });
             const attachedAlternative = orderedOptionEntries.every(entry => (
-                entry.counted === false
+                entry.attachedAlternative
             ));
             const expandedChoiceBlock = orderedOptionEntries.some(entry => (
                 entry.expandedChoiceBlock
@@ -31790,6 +31790,12 @@ function recipeIngredientColumnViewIsInactivePresentationRow(item) {
 function recipeIngredientColumnViewAttachedPresentationRows(sortedRows = []) {
     const activeRows = [];
     const groupsByParent = new Map();
+    const expandedChoiceParents = new Set(
+        sortedRows.flatMap(item => (
+            recipeIngredientColumnViewPresentationEntries(item)
+        )).filter(entry => entry.expanded && entry.parentRow)
+            .map(entry => entry.parentRow),
+    );
 
     sortedRows.forEach(item => {
         item.presentationHidden = false;
@@ -31802,10 +31808,14 @@ function recipeIngredientColumnViewAttachedPresentationRows(sortedRows = []) {
         item.expandedChoiceHost = false;
         item.expandedChoiceContinuation = false;
         item.expandedChoiceStore = null;
-        item.attachedAlternative = recipeIngredientColumnViewIsInactivePresentationRow(
-            item,
-        );
         const entries = recipeIngredientColumnViewPresentationEntries(item);
+        const expanded = entries.some(entry => (
+            expandedChoiceParents.has(entry.parentRow)
+        ));
+        item.attachedAlternative = (
+            recipeIngredientColumnViewIsInactivePresentationRow(item)
+            && !expanded
+        );
         entries.forEach(entry => {
             entry.presentationHidden = false;
             entry.attachedAlternative = item.attachedAlternative;
@@ -32124,8 +32134,14 @@ function renderRecipeIngredientColumnViewGroupHeaders(list, sortedRows) {
         if (entry.attachedAlternative) return;
         const section = entry.expandedChoiceStore
             || recipeIngredientColumnViewEntry(entry.row, "store");
-        const count = counts.get(section.key) || { active: 0 };
+        const count = counts.get(section.key) || {
+            active: 0,
+            alternatives: 0,
+        };
         count.active += recipeIngredientColumnViewIngredientCount(entry.row);
+        count.alternatives += recipeIngredientColumnViewAlternativeCount(
+            entry.row,
+        );
         counts.set(section.key, count);
     });
 
@@ -32194,9 +32210,13 @@ function renderRecipeIngredientColumnViewGroupHeaders(list, sortedRows) {
                 || recipeIngredientColumnViewEntry(entry.row, "store");
             if (section.key !== currentKey) {
                 currentKey = section.key;
-                const count = counts.get(section.key) || { active: 0 };
+                const count = counts.get(section.key) || {
+                    active: 0,
+                    alternatives: 0,
+                };
                 const countLabel = recipeIngredientColumnViewCountLabel(
                     count.active,
+                    count.alternatives,
                 );
                 const header = document.createElement("div");
                 header.className = "recipe-edit-ingredient-column-group-header";

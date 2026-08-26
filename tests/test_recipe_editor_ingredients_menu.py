@@ -1739,6 +1739,10 @@ function recipeIngredientColumnViewIngredientCount(row) {
     return (row.recipeIngredientColumnViewEntries || [{counted: true}])
         .filter(entry => entry.counted !== false).length;
 }
+function recipeIngredientColumnViewAlternativeCount(row) {
+    return (row.recipeIngredientColumnViewEntries || [])
+        .filter(entry => entry.counted === false).length;
+}
 function recipeIngredientColumnViewChoiceOptions() {
     return {statusText: "Selection required", helperText: "Choose one option"};
 }
@@ -5662,7 +5666,7 @@ process.stdout.write(JSON.stringify({
     }
 
 
-def test_store_section_grouping_expands_complete_choice_beneath_canonical_anchor():
+def test_store_section_grouping_keeps_expanded_choice_members_in_their_aisles():
     node = shutil.which("node")
     if not node:
         pytest.skip("Node.js is required for attached option grouping coverage")
@@ -5787,9 +5791,9 @@ const alternativeOnion = displayItem({
     componentOrder: 1,
 });
 
-// Collapsed Store Section grouping receives active rows only and preserves its
-// aisle-sorted order. Expanding the canonical fresh-corn anchor then presents
-// the complete selected option followed by its alternative as one block.
+// Collapsed Store Section grouping receives active rows only. Once expanded,
+// every selected and alternative component keeps the aisle-sorted order that
+// applyRecipeIngredientColumnView already established.
 const collapsed = recipeIngredientColumnViewAttachedPresentationRows([
     before,
     cumin,
@@ -5810,7 +5814,6 @@ const expanded = recipeIngredientColumnViewAttachedPresentationRows([
     frozenCorn,
 ]);
 const expandedIds = expanded.map(item => item.row.id);
-const hostIndex = expandedIds.indexOf("fresh-corn");
 
 const partialFilterParent = choiceParent("partial-filter-choice");
 const partialSelected = displayItem({
@@ -5894,7 +5897,6 @@ process.stdout.write(JSON.stringify({
     },
     expanded: {
         order: expandedIds,
-        contiguousChoiceBlock: expandedIds.slice(hostIndex, hostIndex + 5),
         attachedRows: visible(expanded)
             .filter(item => item.attachedAlternative)
             .map(item => item.row.id),
@@ -5968,29 +5970,17 @@ process.stdout.write(JSON.stringify({
     assert result["expanded"] == {
         "order": [
             "before",
+            "cumin",
             "after",
             "fresh-corn",
-            "cumin",
             "onion",
-            "frozen-corn",
             "alternative-onion",
-        ],
-        "contiguousChoiceBlock": [
-            "fresh-corn",
-            "cumin",
-            "onion",
             "frozen-corn",
-            "alternative-onion",
         ],
-        "attachedRows": ["frozen-corn", "alternative-onion"],
-        "hosts": ["fresh-corn"],
-        "continuations": [
-            "cumin",
-            "onion",
-            "frozen-corn",
-            "alternative-onion",
-        ],
-        "activeSections": ["misc", "dairy", "produce"],
+        "attachedRows": [],
+        "hosts": [],
+        "continuations": [],
+        "activeSections": ["misc", "spices", "dairy", "produce", "frozen"],
         "uniqueRows": True,
     }
     assert result["partialFilter"] == {
@@ -6014,19 +6004,19 @@ process.stdout.write(JSON.stringify({
         "order": [
             "selected-frozen",
             "selected-onion",
-            "previous-corn",
             "previous-cumin",
+            "previous-corn",
         ],
-        "activeSections": ["frozen"],
-        "attachedRows": ["previous-corn", "previous-cumin"],
-        "hosts": ["selected-frozen"],
+        "activeSections": ["frozen", "produce", "spices"],
+        "attachedRows": [],
+        "hosts": [],
         "repeatedOrder": [
             "selected-frozen",
             "selected-onion",
-            "previous-corn",
             "previous-cumin",
+            "previous-corn",
         ],
-        "repeatedHosts": ["selected-frozen"],
+        "repeatedHosts": [],
         "uniqueRows": True,
     }
 
@@ -10505,6 +10495,465 @@ process.stdout.write(JSON.stringify({
         "dirty": 1,
         "focus": 1,
         "status": "Selected Rice from Ingredient Master Data. Save Recipe to keep it.",
+    }
+
+
+def test_master_selection_rehomes_expanded_option_component_without_changing_option_semantics():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for grouped master-selection coverage")
+
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    functions = [
+        javascript_function_source(script, name)
+        for name in (
+            "setRowFieldValue",
+            "chooseRecipeIngredientMasterOption",
+            "recipeIngredientColumnViewSourceRow",
+            "recipeIngredientColumnViewEntry",
+            "recipeIngredientColumnViewPresentationEntries",
+            "recipeIngredientColumnViewIsInactivePresentationRow",
+            "recipeIngredientColumnViewAttachedPresentationRows",
+            "syncRecipeIngredientColumnViewVisibleSectionContexts",
+            "clearRecipeIngredientColumnViewGroupHeaders",
+            "reconcileRecipeIngredientColumnViewOrder",
+            "recipeIngredientColumnViewCountLabel",
+            "renderRecipeIngredientColumnViewGroupHeaders",
+        )
+    ]
+    harness = "\n".join(functions) + r"""
+function classes(...initial) {
+    const values = new Set(initial);
+    return {
+        add(...names) { names.forEach(name => values.add(name)); },
+        remove(...names) { names.forEach(name => values.delete(name)); },
+        contains(name) { return values.has(name); },
+        toggle(name, enabled) {
+            if (enabled) values.add(name);
+            else values.delete(name);
+        },
+    };
+}
+class FakeNode {
+    constructor(id = "") {
+        this.id = id;
+        this.children = [];
+        this.parentNode = null;
+        this.dataset = {};
+        this.attributes = {};
+        this.classList = classes();
+        this.style = {removeProperty() {}};
+        this.className = "";
+        this.innerHTML = "";
+    }
+    append(...nodes) { nodes.forEach(node => this.insertBefore(node, null)); }
+    insertBefore(node, reference) {
+        node.remove();
+        const index = reference ? this.children.indexOf(reference) : -1;
+        node.parentNode = this;
+        if (index < 0) this.children.push(node);
+        else this.children.splice(index, 0, node);
+        return node;
+    }
+    remove() {
+        if (!this.parentNode) return;
+        const index = this.parentNode.children.indexOf(this);
+        if (index >= 0) this.parentNode.children.splice(index, 1);
+        this.parentNode = null;
+    }
+    setAttribute(name, value) { this.attributes[name] = String(value); }
+    querySelectorAll(selector) {
+        if (
+            selector.includes("recipe-ingredient-column-group-header")
+            || selector.includes("recipe-ingredient-column-choice-boundary")
+        ) {
+            return this.children.filter(child => (
+                Object.hasOwn(child.dataset, "recipeIngredientColumnGroupHeader")
+                || Object.hasOwn(child.dataset, "recipeIngredientColumnChoiceBoundary")
+            ));
+        }
+        if (selector.includes("recipe-ingredient-column-management-row")) {
+            return [];
+        }
+        return [];
+    }
+    get firstChild() { return this.children[0] || null; }
+    get nextSibling() {
+        if (!this.parentNode) return null;
+        const index = this.parentNode.children.indexOf(this);
+        return this.parentNode.children[index + 1] || null;
+    }
+}
+const document = {
+    activeElement: null,
+    createElement() { return new FakeNode("section-header"); },
+};
+const form = {};
+function field(name, value) {
+    return {name, value: String(value), tagName: "INPUT", type: "hidden"};
+}
+function sourceRow(id, values, substitution = false) {
+    const fields = new Map(Object.entries(values).map(([name, value]) => [
+        name,
+        field(name, value),
+    ]));
+    return {
+        id,
+        fields,
+        dataset: {},
+        matches(selector) {
+            return substitution && selector === "[data-substitution-option-row]";
+        },
+        querySelector(selector) {
+            const match = selector.match(/\[data-field="([^"]+)"\]/);
+            return match ? (fields.get(match[1]) || null) : null;
+        },
+        closest(selector) { return selector === "#recipeEditForm" ? form : null; },
+    };
+}
+function values(row) {
+    return Object.fromEntries([...row.fields].map(([name, input]) => [
+        name,
+        input.value,
+    ]));
+}
+function fieldValuesFromRow(row) {
+    if (row?.fields) return values(row);
+    return row?.values || {};
+}
+function recipeIngredientDirectField(row, name) {
+    return row?.fields?.get(name) || null;
+}
+function recipeIngredientComparableText(value) {
+    return String(value || "").trim().toLowerCase();
+}
+function recipeIngredientMatchFlag(value) {
+    return [true, 1, "1", "true", "yes"].includes(value);
+}
+function recipeIngredientStoreSectionKey(value) {
+    return String(value || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-");
+}
+function recipeStoreSectionDisplayLabel(value) {
+    return String(value || "").toLowerCase().replace(/(^|\s|&)\S/g, match => (
+        match.toUpperCase()
+    ));
+}
+function recipeIngredientColumnViewIngredientCount(row) {
+    return (row.recipeIngredientColumnViewEntries || [])
+        .filter(entry => entry.counted !== false).length;
+}
+function recipeIngredientColumnViewAlternativeCount(row) {
+    return (row.recipeIngredientColumnViewEntries || [])
+        .filter(entry => entry.counted === false).length;
+}
+function recipeIngredientColumnViewChoiceOptions() {
+    return {requiredUnresolved: false};
+}
+function ensureRecipeIngredientExpansionId(row) { return row.id; }
+function recipeIngredientStoreSectionIconHtml() { return ""; }
+function escapeHtml(value) { return String(value); }
+
+const parentRow = {
+    id: "requirement-corn",
+    parentElement: {id: "recipeEditIngredients"},
+    dataset: {ingredientSelectedOptionId: "option-fresh"},
+    classList: classes("has-ingredient-choice"),
+    fields: new Map([
+        ["default_option_id", field("default_option_id", "option-fresh")],
+        ["original_option_id", field("original_option_id", "option-fresh")],
+    ]),
+};
+const selectedSource = sourceRow("fresh-corn-source", {
+    ingredient: "Fresh corn",
+    store_section: "PRODUCE",
+});
+const optionSource = sourceRow("butter-option-source", {
+    ingredient: "Unsalted butter",
+    ingredient_id: "10",
+    parsed_name: "unsalted butter",
+    normalized_name: "unsalted butter",
+    master_normalized_name: "unsalted butter",
+    canonical_ingredient: "butter",
+    form: "unsalted",
+    store_section: "DAIRY & EGGS",
+    store_section_custom: "false",
+    store_section_source: "legacy",
+    store_section_confidence: "0",
+    store_section_user_confirmed: "false",
+    store_section_save_to_master: "false",
+    classifier_version: "",
+    store_section_reason: "",
+    store_section_rule: "",
+    ingredient_image_url: "/butter.png",
+    ingredient_image_generated_at: "",
+    ingredient_image_prompt: "",
+    match_status: "",
+    confidence: "medium",
+    inferred: "true",
+    warning: "review",
+    purchasable_item: "Unsalted butter",
+    quantity: "1/2",
+    unit: "cup",
+    preparation: "melted",
+    section: "main",
+    optional: "false",
+    alternative_id: "option-butter",
+    alternative_order: "1",
+    alternative_component_order: "2",
+    alternative_label: "Butter option",
+    option_type: "alternative",
+    recipe_authored: "true",
+    is_default: "false",
+}, true);
+optionSource.dataset.ingredientMatchDetails = JSON.stringify({existing: true});
+const selectedRow = new FakeNode("selected-fresh-corn");
+selectedRow.recipeIngredientOptionSourceRow = selectedSource;
+const optionRow = new FakeNode("expanded-butter-option");
+optionRow.recipeIngredientOptionSourceRow = optionSource;
+const selectedEntry = {
+    row: selectedRow,
+    sourceRow: selectedSource,
+    parentRow,
+    optionId: "option-fresh",
+    optionContextKey: "id:option-fresh",
+    componentOrder: 0,
+    manualIndex: 0,
+    selected: true,
+    counted: true,
+    anchor: true,
+    expanded: true,
+    filtered: false,
+};
+const optionEntry = {
+    row: optionRow,
+    sourceRow: optionSource,
+    parentRow,
+    optionId: "option-butter",
+    optionContextKey: "id:option-butter",
+    componentOrder: 2,
+    manualIndex: 1,
+    selected: false,
+    counted: false,
+    anchor: true,
+    expanded: true,
+    filtered: false,
+};
+selectedRow.recipeIngredientColumnViewEntries = [selectedEntry];
+optionRow.recipeIngredientColumnViewEntries = [optionEntry];
+const list = new FakeNode("recipeEditIngredients");
+list.append(selectedRow, optionRow);
+const recipeEditIngredientColumnView = {groupByStoreSection: true};
+const storeOrder = new Map([
+    ["dairy-eggs", 0],
+    ["produce", 1],
+    ["pasta-rice-grains", 2],
+]);
+const contextAssignments = [];
+function assignRecipeIngredientColumnViewSectionContextAnchors(
+    _parent,
+    entries,
+) {
+    contextAssignments.push(entries.map(entry => entry.optionId));
+    const seen = new Set();
+    entries.forEach(entry => {
+        entry.sectionContextAnchor = !seen.has(entry.store.key);
+        seen.add(entry.store.key);
+    });
+}
+function syncRecipeIngredientColumnViewOptionContext() {}
+function syncRecipeIngredientColumnViewVisibleOptionControls() {}
+const snapshots = [];
+function applyRecipeIngredientColumnView() {
+    clearRecipeIngredientColumnViewGroupHeaders(list);
+    selectedEntry.store = recipeIngredientColumnViewEntry(selectedRow, "store");
+    optionEntry.store = recipeIngredientColumnViewEntry(optionRow, "store");
+    const items = [
+        {row: selectedRow, index: 0, filtered: false},
+        {row: optionRow, index: 1, filtered: false},
+    ].sort((left, right) => (
+        storeOrder.get(recipeIngredientColumnViewEntry(left.row, "store").key)
+        - storeOrder.get(recipeIngredientColumnViewEntry(right.row, "store").key)
+    ));
+    const assignmentStart = contextAssignments.length;
+    const presentation = recipeIngredientColumnViewAttachedPresentationRows(items);
+    syncRecipeIngredientColumnViewVisibleSectionContexts(
+        [selectedEntry, optionEntry],
+        presentation.map(item => item.row),
+    );
+    renderRecipeIngredientColumnViewGroupHeaders(list, presentation);
+    snapshots.push({
+        sequence: list.children.map(item => (
+            item.dataset.recipeIngredientColumnGroupHeader
+                ? `header:${item.dataset.recipeIngredientColumnGroupHeader}`
+                : item.id
+        )),
+        labels: list.children
+            .filter(item => item.dataset.recipeIngredientColumnGroupHeader)
+            .map(item => item.attributes["aria-label"]),
+        optionAttached: optionEntry.attachedAlternative,
+        optionExpandedBlock: Boolean(optionEntry.expandedChoiceBlock),
+        assignedOptions: contextAssignments.slice(assignmentStart).flat(),
+    });
+}
+
+const calls = {blur: 0, parentSummary: 0, storeSyncRefreshes: []};
+const input = {
+    dataset: {recipeIngredientMasterField: "ingredient"},
+    blur() { calls.blur += 1; },
+    closest() { return null; },
+};
+const menu = {recipeEditAnchorButton: input};
+const button = {
+    dataset: {
+        masterIngredientId: "7648",
+        masterIngredientName: "Rice",
+        masterIngredientNormalizedName: "rice",
+        masterIngredientCanonicalIngredient: "grain",
+        masterIngredientForm: "dry",
+        masterIngredientStoreSection: "PASTA, RICE & GRAINS",
+        masterIngredientStoreSectionSource: "manual",
+        masterIngredientStoreSectionConfidence: "0.91",
+        masterIngredientStoreSectionUserConfirmed: "true",
+        masterIngredientClassifierVersion: "2.0",
+        masterIngredientStoreSectionReason: "Reviewed master section.",
+        masterIngredientStoreSectionRule: "master.reviewed",
+        masterIngredientImageUrl: "/rice.png",
+    },
+    closest() { return menu; },
+};
+function recipeIngredientMasterTargetRow() { return optionSource; }
+function closeRecipeEditRowMenus() {}
+function syncRecipeIngredientStoreSectionControl(_input, options) {
+    calls.storeSyncRefreshes.push(options.refreshGroupedView);
+}
+function syncRecipeIngredientModalSelectedOptionMasterControls() {}
+function updateRecipeIngredientSubstitutionRowSummary() {}
+function recipeIngredientParentRowFromControl() { return parentRow; }
+function updateRecipeIngredientSummary(row) {
+    if (row === parentRow) {
+        calls.parentSummary += 1;
+        applyRecipeIngredientColumnView();
+    }
+}
+function updateRecipeIngredientFoodRuleWarning() {}
+function updateRecipeEditorDirtyState() {}
+function focusRecipeIngredientMasterSelectionInput() {}
+function setRecipeEditStatus() {}
+function syncRecipeIngredientPurchaseGroup() {}
+
+applyRecipeIngredientColumnView();
+chooseRecipeIngredientMasterOption(button);
+const recipeSpecificFields = [
+    "quantity",
+    "unit",
+    "preparation",
+    "section",
+    "optional",
+    "alternative_id",
+    "alternative_order",
+    "alternative_component_order",
+    "alternative_label",
+    "option_type",
+    "recipe_authored",
+    "is_default",
+];
+process.stdout.write(JSON.stringify({
+    snapshots,
+    selectedStore: optionSource.fields.get("store_section").value,
+    recipeSpecific: Object.fromEntries(recipeSpecificFields.map(name => [
+        name,
+        optionSource.fields.get(name).value,
+    ])),
+    optionSemantics: {
+        optionId: optionEntry.optionId,
+        optionContextKey: optionEntry.optionContextKey,
+        componentOrder: optionEntry.componentOrder,
+        selected: optionEntry.selected,
+        counted: optionEntry.counted,
+        expanded: optionEntry.expanded,
+        parentSelectedOptionId: parentRow.dataset.ingredientSelectedOptionId,
+        defaultOptionId: parentRow.fields.get("default_option_id").value,
+        originalOptionId: parentRow.fields.get("original_option_id").value,
+    },
+    sameNode: list.children.includes(optionRow),
+    calls,
+}));
+"""
+    completed = subprocess.run(
+        [node],
+        input=harness,
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    result = json.loads(completed.stdout)
+    assert result["snapshots"] == [
+        {
+            "sequence": [
+                "header:dairy-eggs",
+                "expanded-butter-option",
+                "header:produce",
+                "selected-fresh-corn",
+            ],
+            "labels": [
+                "Dairy & Eggs, 1 alternative ingredient",
+                "Produce, 1 ingredient",
+            ],
+            "optionAttached": False,
+            "optionExpandedBlock": False,
+            "assignedOptions": ["option-fresh", "option-butter"],
+        },
+        {
+            "sequence": [
+                "header:produce",
+                "selected-fresh-corn",
+                "header:pasta-rice-grains",
+                "expanded-butter-option",
+            ],
+            "labels": [
+                "Produce, 1 ingredient",
+                "Pasta, Rice & Grains, 1 alternative ingredient",
+            ],
+            "optionAttached": False,
+            "optionExpandedBlock": False,
+            "assignedOptions": ["option-fresh", "option-butter"],
+        },
+    ]
+    assert result["selectedStore"] == "PASTA, RICE & GRAINS"
+    assert result["recipeSpecific"] == {
+        "quantity": "1/2",
+        "unit": "cup",
+        "preparation": "melted",
+        "section": "main",
+        "optional": "false",
+        "alternative_id": "option-butter",
+        "alternative_order": "1",
+        "alternative_component_order": "2",
+        "alternative_label": "Butter option",
+        "option_type": "alternative",
+        "recipe_authored": "true",
+        "is_default": "false",
+    }
+    assert result["optionSemantics"] == {
+        "optionId": "option-butter",
+        "optionContextKey": "id:option-butter",
+        "componentOrder": 2,
+        "selected": False,
+        "counted": False,
+        "expanded": True,
+        "parentSelectedOptionId": "option-fresh",
+        "defaultOptionId": "option-fresh",
+        "originalOptionId": "option-fresh",
+    }
+    assert result["sameNode"] is True
+    assert result["calls"] == {
+        "blur": 1,
+        "parentSummary": 1,
+        "storeSyncRefreshes": [False],
     }
 
 
