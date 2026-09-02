@@ -240,6 +240,13 @@ def test_cuisine_categories_page_renders_registry_management_ui(master_data_app)
     assert soup.select_one("[data-cuisine-category-master-dialog]") is not None
     assert soup.select_one("[data-cuisine-category-master-usage-dialog]") is not None
     assert soup.select_one("[data-cuisine-category-master-search]") is not None
+    assert [
+        article.find("span").get_text(" ", strip=True)
+        for article in soup.select(".unit-master-stats > article")
+    ] == ["System-seeded", "User-created", "In use"]
+    assert soup.select_one(
+        "[data-cuisine-category-master-active-count]"
+    ) is None
     cuisine_category_list = soup.select_one(
         ".unit-master-catalog > "
         ".unit-master-category-list.cuisine-category-master-category-list"
@@ -259,12 +266,18 @@ def test_cuisine_categories_page_renders_registry_management_ui(master_data_app)
             ".cuisine-category-master-table [role='columnheader']"
         )
     ]
-    assert column_headers[:3] == [
+    assert column_headers == [
         "Icon",
         "Abbreviation",
         "Cuisine Category Name",
+        "Used in",
+        "Source",
+        "Action",
     ]
     assert soup.select("[data-cuisine-category-master-row]")
+    assert not soup.select(".cuisine-category-master-table .type-master-status-badge")
+    assert soup.select_one("[data-cuisine-category-master-active]") is None
+    assert soup.select_one("[data-cuisine-category-master-active-error]") is None
     assert soup.select_one("[data-cuisine-category-master-icon]") is not None
     assert soup.select_one(
         "[data-cuisine-category-master-abbreviation]"
@@ -287,6 +300,9 @@ def test_cuisine_categories_page_renders_registry_management_ui(master_data_app)
     assert "const openUsage = async (item, trigger) =>" in script
     assert 'body: JSON.stringify({ categories: importableNames })' in script
     assert '"__CATEGORY_ID__"' in script
+    assert "activeInput" not in script
+    assert "[data-cuisine-category-master-active]" not in script
+    assert "type-master-status-badge" not in script
 
 
 def test_cuisine_category_rows_share_unit_usage_and_action_contract(
@@ -453,7 +469,7 @@ def test_cuisine_category_routes_support_workspace_crud_and_references(
                 "icon": "🌊",
                 "abbreviation": "GLF",
                 "name": "Great Lakes Fusion",
-                "active": True,
+                "active": False,
             },
         )
         assert created.status_code == 201
@@ -465,6 +481,7 @@ def test_cuisine_category_routes_support_workspace_crud_and_references(
             and item["abbreviation"] == "GLF"
             and item["category_name"] == "Great Lakes Fusion"
             and item["name"] == "🌊 Great Lakes Fusion"
+            and item["active"] is True
             for item in created_payload["registry"]["categories"]
         )
 
@@ -477,6 +494,15 @@ def test_cuisine_category_routes_support_workspace_crud_and_references(
                 "active": False,
             },
         )
+        with master_data.recipe_master_connection(user_id="user-a") as connection:
+            stored_active = connection.execute(
+                """
+                SELECT is_active
+                  FROM workspace_cuisine_categories
+                 WHERE user_id = ? AND id = ?
+                """,
+                ("user-a", category_id),
+            ).fetchone()["is_active"]
         references = client.get(
             f"/api/master-data/cuisine-categories/{category_id}/references",
         )
@@ -491,9 +517,10 @@ def test_cuisine_category_routes_support_workspace_crud_and_references(
         and item["abbreviation"] == "MWF"
         and item["category_name"] == "Midwest Fusion"
         and item["name"] == "🌽 Midwest Fusion"
-        and item["active"] is False
+        and item["active"] is True
         for item in updated.get_json()["registry"]["categories"]
     )
+    assert stored_active == 1
     assert references.status_code == 200
     assert references.get_json()["category"]["id"] == category_id
     assert references.get_json()["references"] == []
@@ -504,6 +531,49 @@ def test_cuisine_category_routes_support_workspace_crud_and_references(
     )
     for response in (created, updated, references, deleted):
         assert_private_no_store(response)
+
+
+def test_cuisine_category_registry_get_normalizes_legacy_inactive_rows(
+    master_data_app,
+):
+    with master_data_app.test_client() as client:
+        sign_in(client, "user-a")
+        created = client.post(
+            "/api/master-data/cuisine-categories",
+            json={"name": "Legacy inactive cuisine"},
+        )
+        assert created.status_code == 201
+        category_id = created.get_json()["category_id"]
+        with master_data.recipe_master_connection(user_id="user-a") as connection:
+            connection.execute(
+                """
+                UPDATE workspace_cuisine_categories
+                   SET is_active = 0
+                 WHERE user_id = ? AND id = ?
+                """,
+                ("user-a", category_id),
+            )
+
+        response = client.get("/api/master-data/cuisine-categories")
+
+    assert response.status_code == 200
+    item = next(
+        category
+        for category in response.get_json()["registry"]["categories"]
+        if category["id"] == category_id
+    )
+    assert item["active"] is True
+    with master_data.existing_recipe_master_read_connection() as connection:
+        stored_active = connection.execute(
+            """
+            SELECT is_active
+              FROM workspace_cuisine_categories
+             WHERE user_id = ? AND id = ?
+            """,
+            ("user-a", category_id),
+        ).fetchone()["is_active"]
+    assert stored_active == 1
+    assert_private_no_store(response)
 
 
 @pytest.mark.parametrize("supplied_viewer", ("user-b", "USER-A"))

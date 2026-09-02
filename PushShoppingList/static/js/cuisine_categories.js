@@ -85,8 +85,6 @@
         const nameInput = root.querySelector("[data-cuisine-category-master-name]");
         const nameHelp = root.querySelector("[data-cuisine-category-master-name-help]");
         const nameError = root.querySelector("[data-cuisine-category-master-name-error]");
-        const activeInput = root.querySelector("[data-cuisine-category-master-active]");
-        const activeError = root.querySelector("[data-cuisine-category-master-active-error]");
         const editorTitle = root.querySelector("[data-cuisine-category-master-editor-title]");
         const editorKicker = root.querySelector("[data-cuisine-category-master-editor-kicker]");
         const editorFeedback = root.querySelector("[data-cuisine-category-master-editor-feedback]");
@@ -226,11 +224,6 @@
             sourceBadge.setAttribute("role", "cell");
             sourceBadge.textContent = item.custom ? "User-created" : "System-seeded";
 
-            const state = document.createElement("span");
-            state.className = `type-master-status-badge${item.active ? "" : " is-inactive"}`;
-            state.setAttribute("role", "cell");
-            state.textContent = item.active ? "Active" : "Inactive";
-
             const edit = document.createElement("button");
             edit.type = "button";
             edit.className = "unit-master-edit-button";
@@ -250,7 +243,6 @@
                 name,
                 createUsageCell(item),
                 sourceBadge,
-                state,
                 actionCell,
             );
             return row;
@@ -262,9 +254,6 @@
             );
             root.querySelector("[data-cuisine-category-master-custom-count]").textContent = String(
                 registry.categories.filter(item => item.custom).length,
-            );
-            root.querySelector("[data-cuisine-category-master-active-count]").textContent = String(
-                registry.categories.filter(item => item.active).length,
             );
             root.querySelector("[data-cuisine-category-master-used-count]").textContent = String(
                 registry.categories.filter(item => Number(item.recipe_count) > 0).length,
@@ -583,7 +572,6 @@
             setFieldError(iconTrigger, iconError, "");
             setFieldError(abbreviationInput, abbreviationError, "");
             setFieldError(nameInput, nameError, "");
-            setFieldError(activeInput, activeError, "");
             setEditorFeedback("");
         };
 
@@ -609,8 +597,6 @@
             nameHelp.textContent = item?.seeded
                 ? "Built-in category names stay tied to stable cuisine labels. You can edit the icon and abbreviation."
                 : "Enter the full category name shown in the recipe editor. Renaming preserves recipe assignments.";
-            activeInput.checked = item ? Boolean(item.active) : true;
-            activeInput.disabled = false;
             editorTitle.textContent = item
                 ? `Edit ${categoryDisplayLabel(item)}`
                 : "Add Cuisine Category";
@@ -660,7 +646,6 @@
                 icon,
                 abbreviation,
                 category_name: name,
-                active: activeInput.checked,
             };
             saveButton.disabled = true;
             saveButton.textContent = "Saving…";
@@ -684,7 +669,6 @@
                         errors.abbreviation || "",
                     );
                     setFieldError(nameInput, nameError, errors.name || "");
-                    setFieldError(activeInput, activeError, errors.active || "");
                     setEditorFeedback(data.error || "The cuisine category could not be saved.");
                     form.querySelector('[aria-invalid="true"]')?.focus();
                     return;
@@ -708,10 +692,10 @@
             if (!item?.custom) return;
             if (Number(item.recipe_count) > 0) {
                 setEditorFeedback(
-                    `${categoryDisplayLabel(item)} is used by ${item.recipe_count} recipe${Number(item.recipe_count) === 1 ? "" : "s"}. Deactivate it instead.`,
+                    `${categoryDisplayLabel(item)} is used by ${item.recipe_count} recipe${Number(item.recipe_count) === 1 ? "" : "s"}. Reassign or remove this cuisine category from those recipes before deleting it.`,
                     "warning",
                 );
-                activeInput.focus();
+                deleteButton.focus();
                 return;
             }
             if (!window.confirm(`Delete custom cuisine category "${categoryDisplayLabel(item)}"?`)) return;

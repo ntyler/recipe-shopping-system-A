@@ -26649,7 +26649,6 @@ function recipeEditActiveCuisineRegistryLabels(payload) {
     const seen = new Set();
     rows.forEach(item => {
         const record = item && typeof item === "object" ? item : null;
-        if (record && record.active === false) return;
         const value = record
             ? recipeEditCuisineRegistryRecord(record)?.value || ""
             : normalizeRecipeEditTagText(item);

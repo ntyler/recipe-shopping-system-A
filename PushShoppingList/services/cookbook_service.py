@@ -1344,7 +1344,7 @@ def active_cuisine_category_options(user_id=None):
     options = []
     seen = set()
     for item in rows:
-        if not isinstance(item, dict) or item.get("active") is False:
+        if not isinstance(item, dict):
             continue
         legacy = _legacy_cuisine_category_option(
             item.get("display_label")
@@ -1374,8 +1374,8 @@ def active_cuisine_category_options(user_id=None):
                 "icon": icon,
             })
             seen.add(key)
-    # An empty list is meaningful: the workspace may intentionally deactivate
-    # every category. Only a missing/malformed registry should use the fallback.
+    # An empty list is meaningful. Only a missing or malformed registry should
+    # use the fallback.
     return options
 
 

@@ -273,10 +273,9 @@ def test_types_table_reuses_unit_trailing_tracks_and_keeps_responsive_layout():
         "52px",
         "96px",
         "minmax(170px,1fr)",
-        "minmax(82px,.5fr)",
+        "minmax(90px,.5fr)",
         "118px",
-        "80px",
-        "54px",
+        "58px",
     ]
 
     type_full_width = block_from(css, "@media (max-width: 1640px)")

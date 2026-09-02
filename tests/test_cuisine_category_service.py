@@ -158,6 +158,43 @@ def test_default_registry_is_read_only_and_has_stable_seed_ids(cuisine_workspace
     assert not master_data.recipe_master_db_path().exists()
 
 
+def test_registry_read_reactivates_and_persists_legacy_inactive_rows(
+    cuisine_workspace,
+):
+    created = cuisines.save_workspace_cuisine_category(
+        {"name": "Legacy inactive cuisine"},
+        user_id="user-a",
+    )
+    assert created["ok"] is True
+    with master_data.recipe_master_connection(user_id="user-a") as connection:
+        connection.execute(
+            """
+            UPDATE workspace_cuisine_categories
+               SET is_active = 0
+             WHERE user_id = ?
+            """,
+            ("user-a",),
+        )
+
+    registry = cuisines.cuisine_category_registry_payload("user-a")
+
+    assert registry["categories"]
+    assert all(item["active"] is True for item in registry["categories"])
+    assert category_named(registry, "Legacy inactive cuisine")["id"] == (
+        created["category_id"]
+    )
+    with master_data.existing_recipe_master_read_connection() as connection:
+        inactive_count = connection.execute(
+            """
+            SELECT COUNT(*) AS count
+              FROM workspace_cuisine_categories
+             WHERE user_id = ? AND is_active = 0
+            """,
+            ("user-a",),
+        ).fetchone()["count"]
+    assert inactive_count == 0
+
+
 @pytest.mark.parametrize(
     ("raw_icon", "token", "country_code", "display"),
     (
@@ -363,7 +400,7 @@ def test_ui_patch_preserves_unchanged_existing_unassigned_flag_token(
     assert updated["migration"] == {"recipe_records": 0, "cookbook_records": 0}
     assert category["icon"] == legacy_icon
     assert category["category_name"] == "Legacy Cuisine"
-    assert category["active"] is False
+    assert category["active"] is True
     with master_data.recipe_master_connection(user_id="user-a") as connection:
         stored_icon = connection.execute(
             """
@@ -652,7 +689,7 @@ def test_explicit_blank_icon_and_abbreviation_persist_without_inference(
     }
 
 
-def test_partial_structured_edit_preserves_active_state_and_prefers_category_name(
+def test_partial_structured_edit_keeps_category_active_and_prefers_category_name(
     cuisine_workspace,
 ):
     created = cuisines.save_workspace_cuisine_category(
@@ -685,7 +722,7 @@ def test_partial_structured_edit_preserves_active_state_and_prefers_category_nam
     )
     assert category["category_name"] == "Eastern Mediterranean"
     assert category["icon"] == "🫓"
-    assert category["active"] is False
+    assert category["active"] is True
 
 
 def test_builtin_name_is_immutable_while_icon_and_abbreviation_are_editable(
@@ -876,7 +913,7 @@ def test_abbreviation_does_not_steal_a_legacy_category_name_or_block_edits(
         for item in updated["registry"]["categories"]
         if item["id"] == category_id
     )
-    assert updated_category["active"] is False
+    assert updated_category["active"] is True
     assert updated_category["category_name"] == "US"
 
 
@@ -954,7 +991,7 @@ def test_unchanged_duplicate_legacy_abbreviation_does_not_block_other_edits(
         for item in updated["registry"]["categories"]
         if item["id"] == "custom_legacy_united_kingdom"
     )
-    assert updated_category["active"] is False
+    assert updated_category["active"] is True
 
 
 def test_recognized_national_cuisines_receive_flags_without_guessing_regions(
@@ -1420,7 +1457,8 @@ def test_rename_migrates_recipe_and_cookbook_values_and_keeps_an_alias(
         user_id="user-a",
     )
     assert blocked["status"] == 409
-    assert "Deactivate it instead" in blocked["error"]
+    assert "Reassign or remove" in blocked["error"]
+    assert "deactivat" not in blocked["error"].lower()
 
 
 def test_rename_leaves_ambiguous_legacy_alias_assignments_unchanged(
@@ -1478,12 +1516,14 @@ def test_rename_leaves_ambiguous_legacy_alias_assignments_unchanged(
     assert direct["cuisine_tags"] == ["Renamed Cuisine"]
 
 
-def test_deactivation_import_and_safe_delete_rules(cuisine_workspace):
+def test_permanent_active_import_and_safe_delete_rules(cuisine_workspace):
     seeded_delete = cuisines.delete_workspace_cuisine_category(
         "italian",
         user_id="user-a",
     )
     assert seeded_delete["status"] == 422
+    assert "protected" in seeded_delete["error"].lower()
+    assert "deactivat" not in seeded_delete["error"].lower()
 
     seeded_rename = cuisines.save_workspace_cuisine_category(
         {"name": "Tuscan", "active": True},
@@ -1499,13 +1539,16 @@ def test_deactivation_import_and_safe_delete_rules(cuisine_workspace):
         "🇮🇹 Italian",
     )["seeded"] is True
 
-    deactivated = cuisines.save_workspace_cuisine_category(
+    forced_active = cuisines.save_workspace_cuisine_category(
         {"name": "🇮🇹 Italian", "active": False},
         category_id="italian",
         user_id="user-a",
     )
-    assert deactivated["ok"] is True
-    assert "🇮🇹 Italian" not in cuisines.active_workspace_cuisine_category_labels(
+    assert forced_active["ok"] is True
+    assert category_named(forced_active["registry"], "🇮🇹 Italian")[
+        "active"
+    ] is True
+    assert "🇮🇹 Italian" in cuisines.active_workspace_cuisine_category_labels(
         "user-a"
     )
 

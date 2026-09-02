@@ -66068,7 +66068,7 @@ body.recipe-edit-standalone-page :is(
 
 .cuisine-category-master-table > .unit-master-table-head,
 .cuisine-category-master-table .unit-master-row {
-    grid-template-columns: 52px 96px minmax(170px, 1fr) minmax(82px, .5fr) 118px 80px 58px;
+    grid-template-columns: 52px 96px minmax(170px, 1fr) minmax(90px, .5fr) 118px 58px;
     gap: 8px;
     padding-inline: 12px;
 }
@@ -66437,11 +66437,6 @@ body.recipe-edit-standalone-page :is(
         grid-column: 2;
         grid-row: 4;
         justify-self: start;
-    }
-
-    .cuisine-category-master-table .type-master-status-badge {
-        grid-column: 3;
-        grid-row: 3;
     }
 
     .cuisine-category-master-table .unit-master-action-cell {

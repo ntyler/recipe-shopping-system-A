@@ -1127,6 +1127,15 @@ def ensure_recipe_master_schema(connection=None):
         )
         """
     )
+    # Keep the legacy column compatible while enforcing the permanent-active
+    # cuisine category invariant for existing databases.
+    connection.execute(
+        """
+        UPDATE workspace_cuisine_categories
+           SET is_active = 1
+         WHERE COALESCE(is_active, 0) <> 1
+        """
+    )
     connection.execute(
         """
         CREATE TABLE IF NOT EXISTS workspace_cuisine_category_registry_seeds (

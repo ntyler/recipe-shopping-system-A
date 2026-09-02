@@ -459,7 +459,7 @@ def _category_item_from_row(row):
         **parts,
         "seeded": seeded,
         "custom": not seeded,
-        "active": bool(row["is_active"]),
+        "active": True,
         "sort_order": int(row["sort_order"] or 0),
         "updated_at": str(row["updated_at"] or ""),
         "_aliases": aliases,
@@ -540,6 +540,9 @@ def _public_category(item, recipe_count=None):
         "icon": icon,
         "abbreviation": abbreviation,
         "display_label": display_label,
+        # Retain the legacy field for API compatibility. Cuisine categories
+        # are permanently available in the recipe editor.
+        "active": True,
     })
     category_id = str(item.get("id") or "")
     raw_aliases = list(item.get("_aliases", []))
@@ -1180,14 +1183,31 @@ def _usage_counts(user_id, registry):
 
 def _stored_registry(user_id):
     registry = _internal_default_registry()
+    needs_active_normalization = False
     with master_data.existing_recipe_master_read_connection() as connection:
         if connection is not None and master_data.recipe_master_table_exists(
             connection,
             "workspace_cuisine_categories",
         ):
+            needs_active_normalization = bool(connection.execute(
+                """
+                SELECT 1
+                  FROM workspace_cuisine_categories
+                 WHERE user_id = ?
+                   AND COALESCE(is_active, 0) <> 1
+                 LIMIT 1
+                """,
+                (user_id,),
+            ).fetchone())
             stored = _registry_from_connection(connection, user_id)
             if stored.get("categories"):
                 registry = stored
+
+    if needs_active_normalization:
+        # Opening the managed write connection applies the idempotent schema
+        # migration before this GET returns, without write-locking normal reads.
+        with master_data.existing_recipe_master_connection(user_id=user_id):
+            pass
     return registry
 
 
@@ -1203,7 +1223,6 @@ def active_workspace_cuisine_category_labels(user_id=None):
     return [
         str(item["name"])
         for item in registry.get("categories", [])
-        if item.get("active")
     ]
 
 
@@ -1468,9 +1487,6 @@ def save_workspace_cuisine_category(values, category_id="", user_id=None):
         if abbreviation_supplied
         else None
     )
-    active_supplied = "active" in values
-    active = bool(values.get("active", True))
-
     migration = {"recipe_records": 0, "cookbook_records": 0}
     migration_keys = set()
     with master_data.recipe_master_connection(user_id=user_id) as connection:
@@ -1493,8 +1509,6 @@ def save_workspace_cuisine_category(values, category_id="", user_id=None):
                     "error": "Cuisine category not found.",
                 }
             existing_item = _category_item_from_row(existing)
-            if not active_supplied:
-                active = bool(existing_item.get("active"))
 
         effective_raw_name = raw_name
         if effective_raw_name is None and existing_item:
@@ -1711,7 +1725,7 @@ def save_workspace_cuisine_category(values, category_id="", user_id=None):
                 """
                 UPDATE workspace_cuisine_categories
                    SET icon = ?, abbreviation = ?, name = ?,
-                       normalized_name = ?, aliases_json = ?, is_active = ?,
+                       normalized_name = ?, aliases_json = ?, is_active = 1,
                        updated_at = ?
                  WHERE user_id = ? AND id = ?
                 """,
@@ -1721,7 +1735,6 @@ def save_workspace_cuisine_category(values, category_id="", user_id=None):
                     name,
                     cuisine_category_key(name),
                     json.dumps(aliases, ensure_ascii=False),
-                    1 if active else 0,
                     timestamp,
                     user_id,
                     category_id,
@@ -1743,7 +1756,7 @@ def save_workspace_cuisine_category(values, category_id="", user_id=None):
                     user_id, id, icon, abbreviation, name, normalized_name,
                     aliases_json, is_seeded, is_active, sort_order, created_at,
                     updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, '[]', 0, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, '[]', 0, 1, ?, ?, ?)
                 """,
                 (
                     user_id,
@@ -1752,7 +1765,6 @@ def save_workspace_cuisine_category(values, category_id="", user_id=None):
                     abbreviation,
                     name,
                     cuisine_category_key(name),
-                    1 if active else 0,
                     sort_order,
                     timestamp,
                     timestamp,
@@ -1811,7 +1823,7 @@ def delete_workspace_cuisine_category(category_id, user_id=None):
                 "ok": False,
                 "status": 422,
                 "error": (
-                    "Built-in cuisine categories can be deactivated but not deleted."
+                    "Built-in cuisine categories are protected and are not deleted."
                 ),
             }
         existing_item = _category_item_from_row(existing)
@@ -1824,7 +1836,8 @@ def delete_workspace_cuisine_category(category_id, user_id=None):
                 "status": 409,
                 "error": (
                     f"{existing_label} is used by {usage} "
-                    f'recipe{"s" if usage != 1 else ""}. Deactivate it instead.'
+                    f'recipe{"s" if usage != 1 else ""}. Reassign or remove '
+                    "that usage before deleting this cuisine category."
                 ),
             }
         connection.execute(

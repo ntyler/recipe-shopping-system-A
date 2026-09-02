@@ -43,7 +43,7 @@ def test_custom_tag_choices_are_reusable_and_case_insensitive():
     assert choices == ["Family Favorites", "Freezer Meals", "Weeknight Dinners"]
 
 
-def test_cookbook_cuisine_options_keep_bare_values_labels_and_separate_icons(monkeypatch):
+def test_cookbook_cuisine_options_include_legacy_inactive_registry_rows(monkeypatch):
     from PushShoppingList.services import cuisine_category_service
 
     monkeypatch.setattr(
@@ -85,8 +85,9 @@ def test_cookbook_cuisine_options_keep_bare_values_labels_and_separate_icons(mon
     assert options == [
         {"value": "Italian", "label": "Italian", "icon": "flag:it"},
         {"value": "Caribbean", "label": "Caribbean", "icon": "🌴"},
+        {"value": "Inactive", "label": "Inactive", "icon": "⛔"},
     ]
-    assert choices["cuisine"] == ["Italian", "Caribbean"]
+    assert choices["cuisine"] == ["Italian", "Caribbean", "Inactive"]
     assert choices["meal_type"] == list(cookbook_service.COOKBOOK_CATEGORY_CHOICES["meal_type"])
 
 
@@ -278,11 +279,12 @@ refreshRecipeEditCuisineCategoryRegistry().then(secondChanged => {
 
     assert completed.returncode == 0, completed.stderr
     result = json.loads(completed.stdout)
-    assert result["parsed"] == ["Italian", "Mexican"]
+    assert result["parsed"] == ["Italian", "Mexican", "Retired Cuisine"]
     assert result["firstChanged"] is True
     assert result["firstChoices"] == [
         "Italian",
         "Mexican",
+        "Retired Cuisine",
         "Legacy Cuisine",
         "Unregistered Cuisine",
     ]
@@ -290,8 +292,8 @@ refreshRecipeEditCuisineCategoryRegistry().then(secondChanged => {
     assert result["secondChoices"] == [
         "Japanese",
         "Korean",
-        "Unregistered Cuisine",
         "Italian",
+        "Unregistered Cuisine",
     ]
     assert result["emptyChanged"] is True
     assert result["emptyChoices"] == ["Japanese", "Unregistered Cuisine", "Italian"]

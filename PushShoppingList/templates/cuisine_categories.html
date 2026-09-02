@@ -67,10 +67,6 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                 <strong data-cuisine-category-master-custom-count>{{ master_data.custom_count }}</strong>
             </article>
             <article>
-                <span>Active</span>
-                <strong data-cuisine-category-master-active-count>{{ master_data.active_count }}</strong>
-            </article>
-            <article>
                 <span>In use</span>
                 <strong data-cuisine-category-master-used-count>{{ master_data.used_count }}</strong>
             </article>
@@ -98,7 +94,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                 <div>
                     <span>Workspace registry</span>
                     <h2 id="cuisineCategoryRegistryTitle">Cuisine Category Registry</h2>
-                    <p>Built-in cuisines keep consistent labels; custom cuisines can be renamed, deactivated, or safely deleted.</p>
+                    <p>Built-in cuisines keep consistent labels; custom cuisines can be renamed or safely deleted.</p>
                 </div>
                 <div class="unit-master-toolbar">
                     <label class="unit-master-search">
@@ -127,7 +123,6 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                             <span role="columnheader">Cuisine Category Name</span>
                             <span role="columnheader">Used in</span>
                             <span role="columnheader">Source</span>
-                            <span role="columnheader">Status</span>
                             <span role="columnheader">Action</span>
                         </div>
                         <div data-cuisine-category-master-rows>
@@ -170,9 +165,6 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                     </div>
                                     <span class="unit-master-source-badge{% if category.custom %} user-created{% endif %}" role="cell">
                                         {{ "User-created" if category.custom else "System-seeded" }}
-                                    </span>
-                                    <span class="type-master-status-badge{% if not category.active %} is-inactive{% endif %}" role="cell">
-                                        {{ "Active" if category.active else "Inactive" }}
                                     </span>
                                     <span class="unit-master-action-cell" role="cell">
                                         <button type="button"
@@ -320,15 +312,6 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                    hidden></small>
                         </label>
                     </div>
-
-                    <label class="type-master-availability">
-                        <input type="checkbox" data-cuisine-category-master-active checked>
-                        <span>
-                            <strong>Available in recipe editor</strong>
-                            <small>Inactive categories remain on existing recipes but are hidden from new selections.</small>
-                        </span>
-                    </label>
-                    <small class="unit-master-field-error" data-cuisine-category-master-active-error hidden></small>
                 </div>
 
                 <div class="unit-master-editor-feedback"
