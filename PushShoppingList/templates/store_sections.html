@@ -90,7 +90,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
             <div>
                 <a class="master-data-home-link" href="{{ url_for('main_bp.index') }}#userAccountSection">Account</a>
                 <h1 id="storeSectionsTitle">Store Sections</h1>
-                <p>Manage the names, icons, availability, and shopping order used by this workspace.</p>
+                <p>Manage the names, icons, and shopping order used by this workspace.</p>
             </div>
             <nav class="master-data-tabs" aria-label="Master data">
                 <a href="{{ master_data.ingredient_url }}">Ingredients</a>
@@ -114,15 +114,9 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
 
         <div class="store-section-master-stats" aria-label="Store Section summary">
             <article>
-                <span>Active sections</span>
-                <strong data-store-section-master-active-count>
-                    {{ master_data.active_count }}
-                </strong>
-            </article>
-            <article>
-                <span>Archived sections</span>
-                <strong data-store-section-master-archived-count>
-                    {{ master_data.archived_count }}
+                <span>Store sections</span>
+                <strong data-store-section-master-count>
+                    {{ master_data.section_count|default(master_data.sections|length, true) }}
                 </strong>
             </article>
             <article>
@@ -183,67 +177,27 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                autocomplete="off"
                                data-store-section-master-search>
                     </label>
-                    <label class="store-section-master-status-filter">
-                        <span class="sr-only">Filter Store Sections by status</span>
-                        <select data-store-section-master-status-filter>
-                            <option value="all">All sections</option>
-                            <option value="active">Active</option>
-                            <option value="archived">Archived</option>
-                        </select>
-                    </label>
-                    <div class="store-section-master-columns">
-                        <button type="button"
-                                class="store-section-master-columns-trigger"
-                                aria-controls="storeSectionMasterColumnsMenu"
-                                aria-expanded="false"
-                                data-store-section-master-columns-trigger>
-                            {{ shell.svg_icon("columns") }}
-                            Columns
-                            <span aria-hidden="true">⌄</span>
-                        </button>
-                        <div class="store-section-master-columns-menu"
-                             id="storeSectionMasterColumnsMenu"
-                             data-store-section-master-columns-menu
-                             hidden>
-                            <strong>Table columns</strong>
-                            <p>Choose visible columns. Drag a header grip to move it; drag a divider to resize it.</p>
-                            <div class="store-section-master-column-options"
-                                 data-store-section-master-column-options></div>
-                            <div class="store-section-master-column-menu-actions">
-                                <button type="button"
-                                        data-store-section-master-columns-fit
-                                        title="Resize visible columns to fit their content within the available table width."
-                                        aria-label="Fit visible column widths to their content">
-                                    Fit to content
-                                </button>
-                                <button type="button" data-store-section-master-columns-reset>
-                                    Reset
-                                </button>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </header>
 
             <p class="sr-only"
                role="status"
                aria-live="polite"
-               data-store-section-master-column-status></p>
+               data-store-section-master-live-region></p>
 
-            <div class="store-section-master-table"
-                 role="table"
-                 aria-label="Store Sections">
+            <div class="unit-master-category-list store-section-master-category-list">
+            <section class="unit-master-category store-section-master-category">
+                <div class="store-section-master-table"
+                     role="table"
+                     aria-colcount="6"
+                     aria-label="Store Sections">
                 <div class="store-section-master-table-head" role="row">
-                    <div role="columnheader" data-store-section-master-column="order">Order</div>
-                    <div role="columnheader" data-store-section-master-column="icon">Icon</div>
-                    <div role="columnheader" data-store-section-master-column="section">Display Name</div>
-                    <div role="columnheader" data-store-section-master-column="type">Section Type</div>
-                    <div role="columnheader"
-                         data-store-section-master-column="routing"
-                         hidden>Routing</div>
-                    <div role="columnheader" data-store-section-master-column="usage">Usage</div>
-                    <div role="columnheader" data-store-section-master-column="status">Status</div>
-                    <div role="columnheader" data-store-section-master-column="actions">Actions</div>
+                    <div role="columnheader" aria-colindex="1" data-store-section-master-column="order">Order</div>
+                    <div role="columnheader" aria-colindex="2" data-store-section-master-column="icon">Icon</div>
+                    <div role="columnheader" aria-colindex="3" data-store-section-master-column="section">Display Name</div>
+                    <div role="columnheader" aria-colindex="4" data-store-section-master-column="usage">Used in</div>
+                    <div role="columnheader" aria-colindex="5" data-store-section-master-column="source">Source</div>
+                    <div role="columnheader" aria-colindex="6" data-store-section-master-column="actions">Action</div>
                 </div>
 
                 <div class="store-section-master-list" role="rowgroup">
@@ -256,15 +210,15 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                     <form method="POST"
                           action="{{ url_for('main_bp.update_master_data_store_section_route', section_id=section.id) }}"
                           role="row"
-                          class="store-section-master-row{% if not section.is_active %} is-archived{% endif %}"
+                          class="store-section-master-row"
                           data-store-section-master-row
                           data-store-section-id="{{ section.id }}"
                           data-store-section-name="{{ section.display_name|lower }}"
                           data-store-section-key="{{ section.section_key|lower }}"
-                          data-store-section-is-built-in="{{ 'true' if section.is_builtin else 'false' }}"
-                          data-store-section-status="{% if section.is_active %}active{% else %}archived{% endif %}">
+                          data-store-section-is-built-in="{{ 'true' if section.is_builtin else 'false' }}">
                         <div class="store-section-master-order-cell"
                              role="cell"
+                             aria-colindex="1"
                              data-store-section-master-cell="order">
                             <div class="store-section-master-order">
                                 <button type="button"
@@ -311,12 +265,14 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
 
                         <div class="store-section-master-icon-field"
                              role="cell"
+                             aria-colindex="2"
                              data-store-section-master-cell="icon">
                             {{ store_section_icon_picker(section.icon, "Icon for " ~ section.display_name) }}
                         </div>
 
                         <div class="store-section-master-identity"
                              role="cell"
+                             aria-colindex="3"
                              data-store-section-master-cell="section">
                             <label>
                                 <input type="text"
@@ -332,10 +288,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                         required>
                                 {% if not section.is_builtin %}
                                     <span class="store-section-master-mobile-kind">
-                                        <span class="is-custom">Custom</span>
-                                        {% if not section.is_active %}
-                                            <span class="is-archived">Archived</span>
-                                        {% endif %}
+                                        <span class="is-custom">User-created</span>
                                     </span>
                                 {% endif %}
                             </label>
@@ -364,39 +317,10 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                             </svg>
                         </button>
 
-                        <div class="store-section-master-type"
-                             role="cell"
-                             data-mobile-label="Section type"
-                             data-store-section-master-cell="type">
-                            <span class="{% if section.is_builtin %}is-built-in{% else %}is-custom{% endif %}"
-                                  {% if section.is_builtin %}
-                                  title="Built-in identity and automatic routing are protected."
-                                  {% endif %}>
-                                {% if section.is_builtin %}Built in{% else %}Custom{% endif %}
-                            </span>
-                        </div>
-
-                        <div class="store-section-master-routing"
-                             role="cell"
-                             data-mobile-label="Routing"
-                             data-store-section-master-cell="routing"
-                             hidden
-                             title="{% if section.is_builtin %}Items enter through user-confirmed recipe choices, Ingredient Master Data, deterministic mappings and rules, existing assignments, then validated AI fallback.{% else %}AI does not automatically route items to custom sections. Assign them through Ingredient Master Data or a recipe override.{% endif %}">
-                            <span class="store-section-master-routing-badge {% if section.is_builtin %}is-automatic{% else %}is-manual{% endif %}">
-                                {% if section.is_builtin %}Automatic{% else %}Manual only{% endif %}
-                            </span>
-                            <small>
-                                {% if section.is_builtin %}
-                                    Saved assignments, routing rules, then AI fallback.
-                                {% else %}
-                                    Ingredient Master Data or recipe overrides.
-                                {% endif %}
-                            </small>
-                        </div>
-
                         <div class="store-section-master-usage"
                              role="cell"
-                             data-mobile-label="Usage"
+                             aria-colindex="4"
+                             data-mobile-label="Used in"
                              data-store-section-master-cell="usage">
                             <button type="button"
                                     class="store-section-master-usage-button"
@@ -408,7 +332,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                     {% if not section.ingredient_count %}disabled{% endif %}
                                     aria-label="Show {{ section.ingredient_count }} master ingredient{% if section.ingredient_count != 1 %}s{% endif %} in {{ section.display_name }}">
                                 <strong>{{ section.ingredient_count }}</strong>
-                                <span>master ingredient{% if section.ingredient_count != 1 %}s{% endif %}</span>
+                                <span>ingredient{% if section.ingredient_count != 1 %}s{% endif %}</span>
                             </button>
                             <button type="button"
                                     class="store-section-master-usage-button"
@@ -420,43 +344,29 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                     {% if not section.recipe_reference_count %}disabled{% endif %}
                                     aria-label="Show {{ section.recipe_reference_count }} recipe reference{% if section.recipe_reference_count != 1 %}s{% endif %} in {{ section.display_name }}">
                                 <strong>{{ section.recipe_reference_count }}</strong>
-                                <span>recipe reference{% if section.recipe_reference_count != 1 %}s{% endif %}</span>
+                                <span>recipe ref{% if section.recipe_reference_count != 1 %}s{% endif %}</span>
                             </button>
                         </div>
 
-                        <div class="store-section-master-state"
+                        <div class="store-section-master-type"
                              role="cell"
-                             data-mobile-label="Status"
-                             data-store-section-master-cell="status">
-                            <span class="{% if section.is_active %}is-active{% else %}is-archived{% endif %}">
-                                {% if section.is_active %}Active{% else %}Archived{% endif %}
+                             aria-colindex="5"
+                             data-mobile-label="Source"
+                             data-store-section-master-cell="source">
+                            <span class="{% if section.is_builtin %}is-built-in{% else %}is-custom{% endif %}"
+                                  {% if section.is_builtin %}
+                                  title="Built-in identity and automatic routing are protected."
+                                  {% endif %}>
+                                {% if section.is_builtin %}Built-in{% else %}User-created{% endif %}
                             </span>
                         </div>
 
                         <div class="store-section-master-actions"
                              role="cell"
-                             data-mobile-label="Actions"
+                             aria-colindex="6"
+                             data-mobile-label="Action"
                              data-store-section-master-cell="actions">
                             <button type="submit" name="action" value="save">Save</button>
-                            {% if section.is_active %}
-                                <button type="submit"
-                                        name="action"
-                                        value="archive"
-                                        class="danger"
-                                        {% if section.is_builtin %}disabled
-                                        {% endif %}
-                                        {% if section.is_builtin %}
-                                            title="Built-in Store Sections cannot be archived."
-                                            aria-label="Archive unavailable for {{ section.display_name }}: built-in Store Sections cannot be archived."
-                                        {% else %}
-                                            title="Archive this Store Section. Existing assignments will remain."
-                                            aria-label="Archive custom Store Section {{ section.display_name }}. Existing assignments will remain."
-                                        {% endif %}>
-                                    Archive
-                                </button>
-                            {% else %}
-                                <button type="submit" name="action" value="restore">Restore</button>
-                            {% endif %}
                             {% if not section.is_builtin %}
                                 <button type="submit"
                                         name="action"
@@ -479,7 +389,33 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                              id="storeSectionMobileDetails-{{ section.id }}"
                              role="presentation"
                              data-store-section-master-mobile-details
-                             hidden></div>
+                             hidden>
+                            <div class="store-section-master-mobile-order-controls"
+                                 data-mobile-label="Order">
+                                <button type="submit"
+                                        name="action"
+                                        value="move_up"
+                                        aria-label="Move {{ section.display_name }} up"
+                                        {% if loop.first %}disabled{% endif %}>
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M12 19V5"></path>
+                                        <path d="m6 11 6-6 6 6"></path>
+                                    </svg>
+                                    <span>Move up</span>
+                                </button>
+                                <button type="submit"
+                                        name="action"
+                                        value="move_down"
+                                        aria-label="Move {{ section.display_name }} down"
+                                        {% if loop.last %}disabled{% endif %}>
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M12 5v14"></path>
+                                        <path d="m6 13 6 6 6-6"></path>
+                                    </svg>
+                                    <span>Move down</span>
+                                </button>
+                            </div>
+                        </div>
                     </form>
                 {% else %}
                     <div class="master-data-empty-state">No Store Sections are configured.</div>
@@ -490,9 +426,11 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                      role="status"
                      data-store-section-master-filter-empty
                      hidden>
-                    <strong>No Store Sections match these filters.</strong>
-                    <span>Try a different search or status.</span>
+                    <strong>No Store Sections match this search.</strong>
+                    <span>Try a different search.</span>
                 </div>
+            </div>
+            </section>
             </div>
         </section>
 

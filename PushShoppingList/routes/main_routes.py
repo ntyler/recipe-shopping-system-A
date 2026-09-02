@@ -2295,15 +2295,13 @@ def store_section_master_data_context():
         user_id=user_id,
         include_inactive=True,
     )
-    active_sections = [section for section in sections if section["is_active"]]
     return {
         "title": "Store Sections",
         "record_type": "store_sections",
         "viewer_user_id": viewer_user_id,
         "scope_user_id": user_id,
         "sections": sections,
-        "active_count": len(active_sections),
-        "archived_count": len(sections) - len(active_sections),
+        "section_count": len(sections),
         "ingredient_count": sum(
             int(section.get("ingredient_count") or 0)
             for section in sections
@@ -2466,12 +2464,12 @@ def update_master_data_store_section_route(section_id):
         "move_up": "Store Section moved up: {name}.",
         "move_down": "Store Section moved down: {name}.",
         "move_to": "Store Section moved: {name}.",
-        "archive": "Store Section archived: {name}.",
-        "restore": "Store Section restored: {name}.",
         "delete": "Store Section deleted: {name}.",
     }
+    stale_availability_action = action in {"archive", "restore"}
     if (
-        request.headers.get("X-Requested-With") == "fetch"
+        stale_availability_action
+        or request.headers.get("X-Requested-With") == "fetch"
         or request.accept_mimetypes.best == "application/json"
     ):
         return jsonify(result), int(result.get("status") or 200)

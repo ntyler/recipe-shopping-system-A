@@ -2464,13 +2464,36 @@ def test_store_sections_page_manages_only_the_active_workspace(monkeypatch, tmp_
         assert "Change display names, icons, and order for this workspace." in html
         assert "Built-in identity and automatic routing stay protected" in html
         assert ">Display Name</div>" in html
+        soup = BeautifulSoup(html, "html.parser")
+        category_list = soup.select_one(
+            ".unit-master-category-list.store-section-master-category-list"
+        )
+        assert category_list is not None
+        category = next(
+            child
+            for child in category_list.children
+            if getattr(child, "name", None) == "section"
+        )
+        assert {
+            "unit-master-category",
+            "store-section-master-category",
+        }.issubset(category.get("class", []))
+        table = category.select_one(".store-section-master-table")
+        assert table is not None
+        assert table.get("aria-colcount") == "6"
+        assert [
+            header.get_text(" ", strip=True)
+            for header in table.select('[role="columnheader"]')
+        ] == ["Order", "Icon", "Display Name", "Used in", "Source", "Action"]
+        assert soup.select_one("[data-store-section-master-status-filter]") is None
+        assert soup.select_one("[data-store-section-master-columns-trigger]") is None
         bakery_row = html.split('data-store-section-key="bakery"', 1)[1].split("</form>", 1)[0]
-        bakery_archive_attributes = bakery_row.split('value="archive"', 1)[1].split(">", 1)[0]
-        assert "disabled" in bakery_archive_attributes
-        assert "Built-in Store Sections cannot be archived." in bakery_archive_attributes
+        assert 'value="archive"' not in bakery_row
+        assert 'value="restore"' not in bakery_row
         assert 'data-store-section-is-built-in="true"' in bakery_row
         assert "The built-in section identity and automatic routing stay unchanged." in bakery_row
         assert "store-section-master-mobile-kind" not in bakery_row
+        assert "Built-in" in bakery_row
         assert 'value="delete"' not in bakery_row
 
         created = client.post(
@@ -2485,14 +2508,14 @@ def test_store_sections_page_manages_only_the_active_workspace(monkeypatch, tmp_
             'data-store-section-key="international foods"',
             1,
         )[1].split("</form>", 1)[0]
-        custom_archive_attributes = custom_row.split('value="archive"', 1)[1].split(">", 1)[0]
-        assert "disabled" not in custom_archive_attributes
+        assert 'value="archive"' not in custom_row
+        assert 'value="restore"' not in custom_row
         custom_delete_attributes = custom_row.split('value="delete"', 1)[1].split(">", 1)[0]
         assert "disabled" not in custom_delete_attributes
         assert "Permanently delete International Foods" in custom_delete_attributes
         assert 'data-store-section-is-built-in="false"' in custom_row
         assert "store-section-master-mobile-kind" in custom_row
-        assert '<span class="is-custom">Custom</span>' in custom_row
+        assert '<span class="is-custom">User-created</span>' in custom_row
         section = next(
             item
             for item in master_data.ingredient_store_section_details(
@@ -2601,7 +2624,7 @@ def test_builtin_store_section_edit_preserves_identity_and_routing(monkeypatch, 
     assert archive_response.status_code == 409
     assert (
         archive_response.get_json()["error"]
-        == "Built-in Store Sections cannot be archived."
+        == "Store Sections are always active."
     )
 
 
@@ -2695,7 +2718,7 @@ def test_store_section_usage_route_lists_records_and_is_workspace_scoped(
     assert foreign_response.status_code == 404
 
 
-def test_store_section_archive_restore_fetch_is_json_without_flash_message(
+def test_store_section_archive_restore_fetch_is_rejected_without_flash_message(
     monkeypatch,
     tmp_path,
 ):
@@ -2749,13 +2772,35 @@ def test_store_section_archive_restore_fetch_is_json_without_flash_message(
         )
         with client.session_transaction() as session:
             assert "recipe_master_data_messages" not in session
+        plain_archive_response = client.post(
+            f"/admin/master-data/store-sections/{created['id']}",
+            data={"action": "archive"},
+        )
+        plain_restore_response = client.post(
+            f"/admin/master-data/store-sections/{created['id']}",
+            data={"action": "restore"},
+        )
+        with client.session_transaction() as session:
+            assert "recipe_master_data_messages" not in session
 
-    assert archive_response.status_code == 200
-    assert archive_response.get_json()["ok"] is True
-    assert archived_snapshot["is_active"] is False
+    assert archive_response.status_code == 409
+    assert archive_response.get_json() == {
+        "ok": False,
+        "error": "Store Sections are always active.",
+        "status": 409,
+    }
+    assert archived_snapshot["is_active"] is True
     assert archived_snapshot["recipe_reference_count"] == 1
-    assert restore_response.status_code == 200
-    assert restore_response.get_json()["ok"] is True
+    assert restore_response.status_code == 409
+    assert restore_response.get_json() == {
+        "ok": False,
+        "error": "Store Sections are always active.",
+        "status": 409,
+    }
+    assert plain_archive_response.status_code == 409
+    assert plain_archive_response.get_json() == archive_response.get_json()
+    assert plain_restore_response.status_code == 409
+    assert plain_restore_response.get_json() == restore_response.get_json()
     restored = next(
         section
         for section in master_data.ingredient_store_section_details(
@@ -2846,10 +2891,8 @@ def test_store_section_delete_is_custom_only_and_requires_no_usage(
             'value="delete"',
             1,
         )[1].split(">", 1)[0]
-        used_archive_attributes = used_row.split(
-            'value="archive"',
-            1,
-        )[1].split(">", 1)[0]
+        assert 'value="archive"' not in used_row
+        assert 'value="restore"' not in used_row
         built_in_response = client.post(
             f"/admin/master-data/store-sections/{produce['id']}",
             data={"action": "delete"},
@@ -2866,8 +2909,6 @@ def test_store_section_delete_is_custom_only_and_requires_no_usage(
             headers=headers,
         )
 
-    assert "disabled" not in used_archive_attributes
-    assert "Existing assignments will remain." in used_archive_attributes
     assert "disabled" in used_delete_attributes
     assert built_in_response.status_code == 409
     assert (
@@ -2900,277 +2941,159 @@ def test_store_section_delete_is_custom_only_and_requires_no_usage(
     assert produce["id"] in remaining_ids
 
 
-def test_recipe_editor_store_section_menu_links_to_management_page():
+def test_store_section_manager_uses_compact_registry_and_preserves_interactions():
     script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     store_section_table_script = script.split(
         "function initStoreSectionMasterTable()",
         1,
     )[1].split("function initStoreSectionMasterUsageDialog()", 1)[0]
     css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
-    template = Path("PushShoppingList/templates/master_data.html").read_text(encoding="utf-8")
-    page = Path("PushShoppingList/templates/store_sections.html").read_text(encoding="utf-8")
+    template = Path("PushShoppingList/templates/master_data.html").read_text(
+        encoding="utf-8",
+    )
+    page = Path("PushShoppingList/templates/store_sections.html").read_text(
+        encoding="utf-8",
+    )
 
     assert "Manage Store Sections" in script
     assert 'masterDataViewerUrl("/admin/master-data/store-sections")' in script
     assert 'href="/admin/master-data/store-sections"' not in script
     assert "Store Sections" in template
     assert "store_section_url" in template
-    assert "Store Sections" in page
+
+    soup = BeautifulSoup(page, "html.parser")
+    category_list = soup.select_one(
+        ".unit-master-category-list.store-section-master-category-list"
+    )
+    assert category_list is not None
+    category = next(
+        child
+        for child in category_list.children
+        if getattr(child, "name", None) == "section"
+    )
+    assert {
+        "unit-master-category",
+        "store-section-master-category",
+    }.issubset(category.get("class", []))
+    table = category.select_one(".store-section-master-table")
+    assert table is not None
+    assert table.get("aria-colcount") == "6"
+    assert [
+        header.get("data-store-section-master-column")
+        for header in table.select("[data-store-section-master-column]")
+    ] == ["order", "icon", "section", "usage", "source", "actions"]
+    assert [
+        cell.get("data-store-section-master-cell")
+        for cell in table.select("[data-store-section-master-cell]")
+    ] == ["order", "icon", "section", "usage", "source", "actions"]
+
     assert "Add Store Section" in page
-    assert "Built-in identity and automatic routing stay protected" in page
-    assert "Active sections" in page
-    assert "Archived sections" in page
-    assert "data-store-section-master-active-count" in page
-    assert "data-store-section-master-archived-count" in page
+    assert "Store sections" in page
+    assert "data-store-section-master-count" in page
     assert "Master ingredients" in page
     assert "Recipe references" in page
+    assert "Active sections" not in page
+    assert "Archived sections" not in page
+    assert "data-store-section-master-active-count" not in page
+    assert "data-store-section-master-archived-count" not in page
+    assert "data-store-section-master-status-filter" not in page
+    assert "data-store-section-master-columns-trigger" not in page
+    assert "data-store-section-master-columns-fit" not in page
+    assert 'data-store-section-master-column="status"' not in page
+    assert 'data-store-section-master-cell="status"' not in page
+    assert 'value="archive"' not in page
+    assert 'value="restore"' not in page
+
     assert "data-store-section-master-search" in page
-    assert "data-store-section-master-status-filter" in page
-    assert "data-store-section-master-columns-trigger" in page
-    assert "data-store-section-master-columns-fit" in page
-    assert "Fit to content" in page
-    assert "Fit columns" not in page
-    assert "within the available table width." in page
     assert "data-store-section-master-mobile-save" in page
     assert "data-store-section-master-mobile-details-toggle" in page
     assert "data-store-section-master-mobile-details" in page
-    assert 'aria-expanded="false"' in page
-    assert 'data-mobile-label="Section type"' in page
-    assert 'data-mobile-label="Routing"' in page
-    assert 'data-mobile-label="Usage"' in page
-    assert 'data-mobile-label="Status"' in page
-    assert 'data-mobile-label="Actions"' in page
+    assert "store-section-master-mobile-order-controls" in page
+    assert page.count('value="move_up"') == 2
+    assert page.count('value="move_down"') == 2
+    assert 'data-mobile-label="Used in"' in page
+    assert 'data-mobile-label="Source"' in page
+    assert 'data-mobile-label="Action"' in page
+    assert "Built-in" in page
+    assert "User-created" in page
     assert "data-store-section-master-usage-open" in page
     assert "data-store-section-master-usage-dialog" in page
     assert "data-store-section-master-usage-tab" in page
     assert "data-store-section-master-usage-search" in page
-    assert 'data-store-section-master-column="order"' in page
-    assert (
-        page.index('data-store-section-master-column="order"')
-        < page.index('data-store-section-master-column="icon"')
-        < page.index('data-store-section-master-column="section"')
-        < page.index('data-store-section-master-column="type"')
-        < page.index('data-store-section-master-column="routing"')
-        < page.index('data-store-section-master-column="usage"')
-    )
-    assert (
-        page.index('data-store-section-master-cell="order"')
-        < page.index('data-store-section-master-cell="icon"')
-        < page.index('data-store-section-master-cell="section"')
-        < page.index('data-store-section-master-cell="type"')
-        < page.index('data-store-section-master-cell="routing"')
-        < page.index('data-store-section-master-cell="usage"')
-    )
     assert "data-store-section-master-drag-handle" in page
-    assert "store-section-master-table-head" in page
-    assert ">Order</div>" in page
-    assert "Order / Icon" not in page
-    assert "Store Section" in page
-    assert "Section Type" in page
-    assert "Built in" in page
-    assert "Custom" in page
-    assert "Routing" in page
-    routing_header = page.split(
-        'data-store-section-master-column="routing"',
-        1,
-    )[1].split("</div>", 1)[0]
-    routing_cell = page.split(
-        'data-store-section-master-cell="routing"',
-        1,
-    )[1].split(">", 1)[0]
-    assert "hidden" in routing_header
-    assert "hidden" in routing_cell
-    assert "Automatic" in page
-    assert "Manual only" in page
-    assert "Saved assignments, routing rules, then AI fallback." in page
-    assert "Ingredient Master Data or recipe overrides." in page
-    assert "Usage" in page
-    assert "Actions" in page
+    assert 'value="save"' in page
     assert 'value="delete"' in page
-    assert "store-section-master-delete" in page
     assert "{% if not section.is_builtin %}" in page
     assert "data-store-section-master-icon-picker" in page
     assert "data-store-section-master-icon-option" in page
-    assert "<code>{{ section.section_key }}</code>" not in page
-    assert "store-section-master-kind" not in page
+
     assert "function initStoreSectionMasterTable()" in script
     assert "function initStoreSectionMasterIconPickers()" in script
     assert "function initStoreSectionMasterUsageDialog()" in script
-    assert "data-store-section-master-usage-image" in script
-    assert "recipe_image_url" in script
-    assert "STORE_SECTION_MASTER_COLUMN_STORAGE_KEY" in script
-    assert (
-        'const STORE_SECTION_MASTER_COLUMN_STORAGE_KEY = '
-        '"storeSectionMasterColumnsV5";'
-    ) in script
-    assert (
-        'const STORE_SECTION_MASTER_COLUMN_ORDER = [\n'
-        '    "order",\n'
-        '    "icon",\n'
-        '    "section",\n'
-    ) in script
-    assert "STORE_SECTION_MASTER_MOBILE_COLUMNS" in script
-    assert "STORE_SECTION_MASTER_MOBILE_DETAIL_COLUMNS" in script
-    assert "STORE_SECTION_MASTER_DEFAULT_HIDDEN_COLUMNS" in script
-    assert (
-        'const STORE_SECTION_MASTER_DEFAULT_HIDDEN_COLUMNS = [\n'
-        '    "routing",\n'
-        "];"
-    ) in script
-    assert "hidden: [...STORE_SECTION_MASTER_DEFAULT_HIDDEN_COLUMNS]" in script
-    assert ": [...fallback.hidden]" in script
-    assert (
-        'const STORE_SECTION_MASTER_MOBILE_COLUMNS = [\n'
-        '    "order",\n'
-        '    "icon",\n'
-        '    "section",\n'
-        "];"
-    ) in script
-    assert '!STORE_SECTION_MASTER_MOBILE_COLUMNS.includes(key)' in script
-    assert "...STORE_SECTION_MASTER_MOBILE_COLUMNS," in script
-    assert "row.requestSubmit(saveButton)" in script
-    assert '"type",' in script
-    assert 'label: "Section Type"' in script
-    assert '"routing",' in script
-    assert 'label: "Routing"' in script
-    assert "storeSectionMasterColumnResize" in script
-    assert "const fitColumnWidthsToBudget = (keys, requestedWidths, budget) => {" in script
-    assert "const columnWidthBudget = visibleCount => {" in script
-    assert "Object.assign(columnLayout.widths, fittedWidths)" in script
-    assert (
-        "Visible Store Section columns fitted within the available table width."
-        in script
-    )
-    assert "grid-template-columns: minmax(0, 1fr);" in css
-    assert "overscroll-behavior-inline: contain;" in css
+    assert 'const primaryColumns = ["order", "icon", "section"];' in script
+    assert 'const detailColumns = ["usage", "source", "actions"];' in script
+    assert 'table.setAttribute("role", desktop ? "table" : "list");' in script
+    assert 'table.setAttribute("aria-colcount", "6");' in script
+    assert 'table.removeAttribute("aria-colcount");' in script
+    assert 'row.setAttribute("role", "listitem");' in script
+    assert 'cell.setAttribute("role", "group");' in script
+    assert 'cell.setAttribute("aria-label", mobileColumnLabels[key]);' in script
+    assert "STORE_SECTION_MASTER_COLUMN_STORAGE_KEY" not in script
+    assert "STORE_SECTION_MASTER_COLUMN_ORDER" not in script
+    assert "storeSectionMasterColumnResize" not in script
+    assert "localStorage" not in store_section_table_script
+    assert "detailsPanel.append(cell)" in script
+    assert 'row.querySelectorAll(\'button[value="move_up"]\')' in script
+    assert 'row.querySelectorAll(\'button[value="move_down"]\')' in script
     assert 'action: "move_to"' in script
     assert "persistRowPosition" in script
     assert "moveRowByOrderControl" in script
     assert 'if (["move_up", "move_down"].includes(action)) {' in script
     assert 'const direction = action === "move_up" ? -1 : 1;' in script
     assert "storeSectionMasterOrderPending" in script
-    assert "submitter.focus({ preventScroll: true });" in script
+    assert "button.offsetWidth || button.offsetHeight || button.getClientRects().length" in script
     assert "const setMobileDetailsExpanded = (row, expanded, options = {}) => {" in script
-    assert "const closeOtherMobileDetails = activeRow => {" in script
-    assert "detailsPanel.append(cell)" in script
-    assert "setMobileDetailsExpanded(row, false, { focusToggle: true })" in script
-    assert '`${displayName} details ${expanded ? "expanded" : "collapsed"}.`' in script
-    assert "renderStoreSectionMasterIconVisual" in script
     assert "const updateRowDirtyState = () => {" in script
-    assert "nameInput?.classList.toggle(\"is-dirty\", nameIsDirty)" in script
-    assert "iconPicker?.classList.toggle(\"is-dirty\", iconIsDirty)" in script
-    assert "button.disabled = !rowIsDirty" in script
-    assert (
-        'if (![\"archive\", \"restore\", \"delete\"].includes(action)) return;'
-        in script
-    )
-    assert 'action === "delete"' in script
-    assert 'Permanently delete "${displayName}"?' in script
+    assert "row.requestSubmit(saveButton)" in script
+    assert 'if (action !== "delete") return;' in script
     assert "row.remove()" in script
-    assert "announce(`${displayName} deleted.`)" in script
-    assert '\"X-Requested-With\": \"fetch\"' in script
-    assert "row.dataset.storeSectionStatus" in store_section_table_script
-    assert 'statusBadge.textContent = isActive ? "Active" : "Archived"' in script
-    assert 'row.querySelector(\n                ".store-section-master-mobile-kind"' in script
-    assert 'mobileArchivedBadge?.remove()' in script
-    assert 'mobileKind.append(archivedBadge)' in script
-    assert "adjustCount(activeCount, isActive ? 1 : -1)" in script
     assert "applyFilters()" in store_section_table_script
     assert "window.location.reload()" not in store_section_table_script
-    assert 'selected?.scrollIntoView({ block: "nearest" });' in script
-    assert "Number(event.detail || 0) < 2" in script
-    assert "focusOption: Number(event.detail || 0) >= 2" in script
-    assert '["initStoreSectionMasterTable", initStoreSectionMasterTable]' in script
-    assert '["initStoreSectionMasterIconPickers", initStoreSectionMasterIconPickers]' in script
+    assert '"archive"' not in store_section_table_script
+    assert '"restore"' not in store_section_table_script
+
+    assert ".store-section-master-stats {" in css
+    assert "grid-template-columns: repeat(3, minmax(0, 1fr));" in css
+    assert ".store-section-master-category-list {" in css
+    assert ".store-section-master-category {" in css
     assert (
-        '["initStoreSectionMasterUsageDialog", initStoreSectionMasterUsageDialog]'
-        in script
+        "grid-template-columns: 116px 46px minmax(180px, 1fr) "
+        "104px 92px 112px;"
+    ) in css
+    assert "@media (min-width: 1641px) and (max-width: 1850px)" in css
+    assert (
+        "grid-template-columns: 96px 42px minmax(130px, 1fr) "
+        "82px 82px 108px;"
+    ) in css
+    assert "@media (max-width: 1640px)" in css
+    assert ".store-section-master-columns," in css
+    assert ".store-section-master-column-resize," in css
+    assert "display: none !important;" in css
+    assert ".store-section-master-mobile-order-controls" in css
+    assert '.store-section-master-mobile-order-controls > button[value="move_up"]' in css
+    assert '.store-section-master-mobile-order-controls > button[value="move_down"]' in css
+    assert (
+        ".store-section-master-create-form\n"
+        "        > :is(label, .store-section-master-icon-field, button)"
+        in css
     )
-    assert ".store-section-master-table-toolbar" in css
-    assert ".store-section-master-table-head" in css
-    assert ".store-section-master-row[hidden]" in css
-    assert ".store-section-master-column-resize" in css
-    assert ".store-section-master-drag-handle" in css
-    assert ".store-section-master-mobile-save" in css
-    assert ".store-section-master-mobile-save:disabled" in css
-    assert css.count(
-        "grid-template-columns: 36px 46px minmax(0, 1fr) 44px;"
-    ) == 2
-    assert "grid-template-columns: 24px;" in css
-    assert "24px handle + 12px breathing room" in css
-    assert "min-height: 44px;" in css
-    assert "justify-content: flex-start;" in css
-    assert ".store-section-master-mobile-details-toggle[aria-expanded=\"true\"]" in css
     assert ".store-section-master-mobile-details[hidden]" in css
-    assert ".store-section-master-row.is-mobile-expanded" in css
-    assert "content: attr(data-mobile-label);" in css
-    assert "> .store-section-master-usage {" in css
-    assert "display: contents;" in css
-    assert "flex-wrap: wrap;" in css
-    assert "order: 4;" in css
-    assert ".store-section-master-mobile-kind" in css
-    assert (
-        ".store-section-master-identity\n"
-        "    label\n"
-        "    > .store-section-master-mobile-kind {\n"
-        "    display: none;"
-    ) in css
-    assert (
-        ".store-section-master-identity\n"
-        "        label\n"
-        "        > .store-section-master-mobile-kind {\n"
-        "        display: flex;"
-    ) in css
-    assert 'data-store-section-is-built-in="false"' in css
-    assert 'data-store-section-status="archived"' in css
-    assert 'data-store-section-is-built-in="true"' in css
-    assert 'content: "ingredients";' in css
-    assert 'content: "recipe refs";' in css
-    assert "white-space: nowrap;" in css
-    assert (
-        ".store-section-master-order-step {\n"
-        "        display: none;\n"
-        "    }"
-    ) in css
-    assert "> [data-store-section-master-icon-label]," in css
-    assert '[data-store-section-master-column="icon"]' in css
-    assert '[data-store-section-master-cell="icon"]' in css
-    assert ".store-section-master-row .store-section-master-icon-picker" in css
-    assert "width: 38px;" in css
-    assert "grid-template-columns: 1fr;" in css
-    assert "place-items: center;" in css
-    assert (
-        ".store-section-master-row\n"
-        "    .store-section-master-icon-trigger\n"
-        "    .recipe-edit-store-section-icon {"
-    ) in css
-    assert "font-size: 20px;" in css
-    assert ":is(.recipe-edit-inline-icon, svg) {" in css
     assert ".is-row-drop-before" in css
-    assert ".store-section-master-icon-menu" in css
-    assert ".store-section-master-icon-option.is-selected" in css
-    assert ".store-section-master-routing" in css
-    assert ".store-section-master-routing-badge.is-automatic" in css
-    assert ".store-section-master-routing-badge.is-manual" in css
-    assert "var(--app-warning-soft)" in css
     assert ".store-section-master-usage-button" in css
     assert ".store-section-master-usage-dialog" in css
-    assert ".store-section-master-usage-result" in css
-    assert ".store-section-master-usage-result-icon > img" in css
-    assert ".store-section-master-identity input:hover" in css
-    assert ".store-section-master-icon-picker.is-open" in css
-    assert ".store-section-master-icon-picker.is-dirty" in css
-    assert ".store-section-master-row.is-dirty" in css
-    assert "grid-auto-flow: column;" in css
-    assert "grid-auto-columns: minmax(0, 1fr);" in css
-    assert "padding-inline: 6px;" in css
-    assert (
-        ".store-section-master-row\n"
-        "    :is(.store-section-master-identity, .store-section-master-icon-field)"
-    ) in css
-    assert "align-self: center;" in css
-    assert ".store-section-master-row .store-section-master-icon-field" in css
-    assert ".store-section-master-row .store-section-master-icon-picker" in css
+    assert ".store-section-master-icon-menu" in css
+
+
 
 
 def test_store_section_icon_picker_matches_recipe_table_dropdown_chrome():
@@ -3215,9 +3138,12 @@ def test_store_section_order_column_uses_step_badges_without_duplicate_icons():
         in css
     )
     assert ".store-section-master-row:is(:hover, :focus-within)" in css
-    assert 'label: "Order"' in script
+    assert 'const primaryColumns = ["order", "icon", "section"];' in script
+    assert 'row.querySelectorAll(\'button[value="move_up"]\')' in script
+    assert 'row.querySelectorAll(\'button[value="move_down"]\')' in script
+    assert "store-section-master-mobile-order-controls" in page
     assert '"[data-store-section-master-order-number]"' in script
-    assert 'number.setAttribute("aria-label", `Step ${index + 1}`);' in script
+    assert 'number.setAttribute("aria-label", "Step " + (index + 1));' in script
 
 
 def test_store_section_usage_dialog_title_uses_the_selected_section_icon():

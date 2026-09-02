@@ -68945,6 +68945,377 @@ body.is-resizing-store-section-master-column * {
     }
 }
 
+/* Store Section manager v4: Cuisine-style half-width registry card with a fixed compact table. */
+.store-section-master-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.store-section-master-category-list {
+    min-width: 0;
+    margin: 16px 14px 14px;
+}
+
+.store-section-master-category {
+    min-width: 0;
+    /* The enhanced icon picker is viewport-positioned and must escape the card. */
+    overflow: visible;
+}
+
+.store-section-master-category .store-section-master-table-head {
+    border-start-start-radius: 8px;
+    border-start-end-radius: 8px;
+}
+
+.store-section-master-table {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow: visible;
+}
+
+.store-section-master-columns,
+.store-section-master-status-filter,
+.store-section-master-column-move,
+.store-section-master-column-resize,
+.store-section-master-routing,
+.store-section-master-state,
+.store-section-master-table :is(
+    [data-store-section-master-column="routing"],
+    [data-store-section-master-column="status"],
+    [data-store-section-master-cell="routing"],
+    [data-store-section-master-cell="status"]
+) {
+    display: none !important;
+}
+
+.store-section-master-row.is-archived {
+    background: transparent;
+    opacity: 1;
+}
+
+@media (min-width: 760px) {
+    .store-section-master-table-head,
+    .store-section-master-row {
+        box-sizing: border-box;
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+        grid-template-columns: 116px 46px minmax(180px, 1fr) 104px 92px 112px;
+        column-gap: 12px;
+    }
+
+    .store-section-master-table-head {
+        padding-inline: 14px;
+    }
+
+    .store-section-master-row {
+        padding-inline: 14px;
+    }
+
+    .store-section-master-table-head > [data-store-section-master-column] {
+        position: static;
+        min-height: 0;
+        padding: 0;
+        cursor: default;
+        user-select: auto;
+    }
+
+    .store-section-master-table-head > [data-store-section-master-column="order"],
+    .store-section-master-row > [data-store-section-master-cell="order"] {
+        grid-column: 1;
+    }
+
+    .store-section-master-table-head > [data-store-section-master-column="icon"],
+    .store-section-master-row > [data-store-section-master-cell="icon"] {
+        grid-column: 2;
+    }
+
+    .store-section-master-table-head > [data-store-section-master-column="section"],
+    .store-section-master-row > [data-store-section-master-cell="section"] {
+        grid-column: 3;
+    }
+
+    .store-section-master-table-head > [data-store-section-master-column="usage"],
+    .store-section-master-row > [data-store-section-master-cell="usage"] {
+        grid-column: 4;
+    }
+
+    .store-section-master-table-head > [data-store-section-master-column="source"],
+    .store-section-master-row > [data-store-section-master-cell="source"] {
+        grid-column: 5;
+    }
+
+    .store-section-master-table-head > [data-store-section-master-column="actions"],
+    .store-section-master-row > [data-store-section-master-cell="actions"] {
+        grid-column: 6;
+    }
+
+    .store-section-master-row > [data-store-section-master-cell] {
+        min-width: 0;
+    }
+
+    .store-section-master-row .store-section-master-identity,
+    .store-section-master-row .store-section-master-identity label,
+    .store-section-master-row .store-section-master-identity input {
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    .store-section-master-row .store-section-master-usage {
+        min-width: 0;
+        align-content: center;
+    }
+
+    .store-section-master-page .store-section-master-usage-button {
+        max-width: 100%;
+    }
+
+    .store-section-master-row .store-section-master-actions {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-auto-columns: auto;
+        grid-auto-flow: row;
+    }
+}
+
+/* Keep the last two-column desktop band inside its half-width card. */
+@media (min-width: 1641px) and (max-width: 1850px) {
+    .store-section-master-table-head,
+    .store-section-master-row {
+        grid-template-columns: 96px 42px minmax(130px, 1fr) 82px 82px 108px;
+        column-gap: 8px;
+        padding-inline: 10px;
+    }
+
+    .store-section-master-order {
+        grid-template-columns: 22px 18px 30px 18px;
+        gap: 2px;
+    }
+
+    .store-section-master-order-step {
+        width: 28px;
+        height: 28px;
+    }
+
+    .store-section-master-order button {
+        width: 20px;
+    }
+}
+
+@media (max-width: 1640px) {
+    .store-section-master-category-list {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (min-width: 760px) and (max-width: 1180px) {
+    .store-section-master-table-head,
+    .store-section-master-row {
+        grid-template-columns: 96px 42px minmax(130px, 1fr) 90px 82px 100px;
+        column-gap: 8px;
+        padding-inline: 10px;
+    }
+
+    .store-section-master-order {
+        grid-template-columns: 22px 18px 30px 18px;
+        gap: 2px;
+    }
+
+    .store-section-master-order-step {
+        width: 28px;
+        height: 28px;
+    }
+
+    .store-section-master-order button {
+        width: 20px;
+    }
+}
+
+@media (max-width: 759px) {
+    .store-section-master-category-list {
+        margin-inline: 10px;
+        margin-bottom: 10px;
+    }
+
+    .store-section-master-table-actions {
+        width: 100%;
+        grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .store-section-master-visible-count {
+        grid-column: 1;
+    }
+
+    .store-section-master-search {
+        grid-column: 2;
+        width: 100%;
+    }
+
+    .store-section-master-row
+        > :is(
+            .store-section-master-type,
+            .store-section-master-source,
+            .store-section-master-usage,
+            .store-section-master-actions,
+            [data-store-section-master-cell="source"],
+            [data-store-section-master-cell="usage"],
+            [data-store-section-master-cell="actions"]
+        ) {
+        display: none;
+    }
+
+    .store-section-master-mobile-details {
+        box-sizing: border-box;
+        display: grid;
+        min-width: 0;
+        grid-template-columns: minmax(0, 1fr);
+        align-items: stretch;
+        gap: 0;
+    }
+
+    .store-section-master-mobile-details[hidden] {
+        display: none;
+    }
+
+    .store-section-master-mobile-details
+        > :is(
+            .store-section-master-type,
+            .store-section-master-source,
+            .store-section-master-usage,
+            .store-section-master-actions,
+            .store-section-master-mobile-order-controls
+        ) {
+        box-sizing: border-box;
+        display: grid;
+        width: 100%;
+        min-width: 0;
+        grid-template-columns: 92px minmax(0, 1fr);
+        grid-auto-flow: row;
+        align-items: center;
+        gap: 6px 10px;
+        padding: 9px 0;
+        border-bottom: 1px solid color-mix(
+            in srgb,
+            var(--app-border) 72%,
+            transparent
+        );
+    }
+
+    .store-section-master-mobile-details
+        > :is(
+            .store-section-master-type,
+            .store-section-master-source,
+            .store-section-master-usage,
+            .store-section-master-actions
+        )::before,
+    .store-section-master-mobile-order-controls::before {
+        display: block;
+        grid-column: 1;
+        color: var(--app-muted);
+        font-size: 9px;
+        font-weight: 850;
+        letter-spacing: .045em;
+        line-height: 22px;
+        text-transform: uppercase;
+        content: attr(data-mobile-label);
+    }
+
+    .store-section-master-mobile-details
+        > .store-section-master-mobile-order-controls {
+        grid-template-columns: 92px repeat(2, minmax(0, 1fr));
+    }
+
+    .store-section-master-mobile-order-controls::before {
+        grid-row: 1;
+        content: "Order";
+    }
+
+    .store-section-master-mobile-order-controls > button[value="move_up"] {
+        grid-column: 2;
+        grid-row: 1;
+    }
+
+    .store-section-master-mobile-order-controls > button[value="move_down"] {
+        grid-column: 3;
+        grid-row: 1;
+    }
+
+    .store-section-master-page
+        .store-section-master-mobile-order-controls > button {
+        display: inline-flex;
+        width: 100%;
+        min-width: 0;
+        min-height: 38px;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+    }
+
+    .store-section-master-mobile-order-controls > button > svg {
+        width: 14px;
+        height: 14px;
+        fill: none;
+        stroke: currentColor;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 1.9;
+    }
+
+    .store-section-master-mobile-details
+        > :is(.store-section-master-type, .store-section-master-source)
+        > span,
+    .store-section-master-mobile-details
+        > .store-section-master-usage
+        > .store-section-master-usage-button,
+    .store-section-master-mobile-details
+        > .store-section-master-actions
+        > button {
+        grid-column: 2;
+        min-width: 0;
+    }
+
+    .store-section-master-mobile-details
+        > .store-section-master-usage
+        > .store-section-master-usage-button {
+        width: max-content;
+        max-width: 100%;
+    }
+
+    .store-section-master-mobile-details
+        > .store-section-master-actions {
+        grid-template-columns: 92px repeat(2, minmax(0, 1fr));
+    }
+
+    .store-section-master-mobile-details
+        > .store-section-master-actions
+        > button {
+        width: 100%;
+    }
+
+    .store-section-master-mobile-details
+        > :is(
+            .store-section-master-actions,
+            .store-section-master-mobile-order-controls
+        ):last-child {
+        border-bottom: 0;
+    }
+}
+
+@media (max-width: 520px) {
+    .store-section-master-create-form
+        > :is(label, .store-section-master-icon-field, button) {
+        grid-column: 1;
+    }
+
+    .store-section-master-table-actions {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .store-section-master-visible-count,
+    .store-section-master-search {
+        grid-column: 1;
+    }
+}
+
 /* Ingredient editor v44: inline, atomic ingredient options. */
 body.recipe-edit-standalone-page .recipe-edit-ingredient-source-text {
     display: block;

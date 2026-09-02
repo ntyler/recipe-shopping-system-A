@@ -48266,83 +48266,6 @@ function syncStoreSectionMasterIconPicker(picker, iconName) {
     });
 }
 
-const STORE_SECTION_MASTER_COLUMN_STORAGE_KEY = "storeSectionMasterColumnsV5";
-const STORE_SECTION_MASTER_COLUMN_ORDER = [
-    "order",
-    "icon",
-    "section",
-    "type",
-    "routing",
-    "usage",
-    "status",
-    "actions",
-];
-const STORE_SECTION_MASTER_MOBILE_COLUMNS = [
-    "order",
-    "icon",
-    "section",
-];
-const STORE_SECTION_MASTER_MOBILE_DETAIL_COLUMNS = [
-    "type",
-    "routing",
-    "usage",
-    "status",
-    "actions",
-];
-const STORE_SECTION_MASTER_DEFAULT_HIDDEN_COLUMNS = [
-    "routing",
-];
-const STORE_SECTION_MASTER_COLUMNS = {
-    order: {
-        label: "Order",
-        fallbackWidth: 140,
-        minWidth: 126,
-        maxWidth: 260,
-    },
-    section: {
-        label: "Display Name",
-        fallbackWidth: 360,
-        minWidth: 190,
-        maxWidth: 640,
-    },
-    icon: {
-        label: "Icon",
-        fallbackWidth: 96,
-        minWidth: 76,
-        maxWidth: 160,
-    },
-    type: {
-        label: "Section Type",
-        fallbackWidth: 130,
-        minWidth: 108,
-        maxWidth: 220,
-    },
-    routing: {
-        label: "Routing",
-        fallbackWidth: 240,
-        minWidth: 190,
-        maxWidth: 380,
-    },
-    usage: {
-        label: "Usage",
-        fallbackWidth: 250,
-        minWidth: 150,
-        maxWidth: 380,
-    },
-    status: {
-        label: "Status",
-        fallbackWidth: 100,
-        minWidth: 82,
-        maxWidth: 200,
-    },
-    actions: {
-        label: "Actions",
-        fallbackWidth: 170,
-        minWidth: 150,
-        maxWidth: 280,
-    },
-};
-
 function initStoreSectionMasterTable() {
     const page = document.querySelector(".store-section-master-page");
     if (!page) return;
@@ -48351,85 +48274,35 @@ function initStoreSectionMasterTable() {
     const tableHead = table?.querySelector(".store-section-master-table-head");
     const list = table?.querySelector(".store-section-master-list");
     const search = page.querySelector("[data-store-section-master-search]");
-    const statusFilter = page.querySelector("[data-store-section-master-status-filter]");
     const visibleCount = page.querySelector("[data-store-section-master-visible-count]");
     const filterEmpty = page.querySelector("[data-store-section-master-filter-empty]");
-    const columnStatus = page.querySelector("[data-store-section-master-column-status]");
-    const columnsTrigger = page.querySelector("[data-store-section-master-columns-trigger]");
-    const columnsMenu = page.querySelector("[data-store-section-master-columns-menu]");
-    const columnOptions = page.querySelector("[data-store-section-master-column-options]");
-    const fitColumnsButton = page.querySelector("[data-store-section-master-columns-fit]");
-    const resetColumnsButton = page.querySelector("[data-store-section-master-columns-reset]");
-    const activeCount = page.querySelector("[data-store-section-master-active-count]");
-    const archivedCount = page.querySelector("[data-store-section-master-archived-count]");
+    const liveRegion = page.querySelector("[data-store-section-master-live-region]");
+    const sectionCount = page.querySelector("[data-store-section-master-count]");
     if (!table || !tableHead || !list) return;
 
-    const storageKey = (() => {
-        const userId = String(document.body?.dataset.userId || "workspace").trim();
-        return `${STORE_SECTION_MASTER_COLUMN_STORAGE_KEY}:${userId || "workspace"}`;
-    })();
-    const clampColumnWidth = (key, value) => {
-        const config = STORE_SECTION_MASTER_COLUMNS[key];
-        const numericValue = Number(value);
-        if (!config || !Number.isFinite(numericValue)) {
-            return config?.fallbackWidth || 160;
-        }
-        return Math.round(Math.max(config.minWidth, Math.min(config.maxWidth, numericValue)));
-    };
-    const defaultLayout = () => ({
-        order: [...STORE_SECTION_MASTER_COLUMN_ORDER],
-        widths: Object.fromEntries(
-            STORE_SECTION_MASTER_COLUMN_ORDER.map(key => [
-                key,
-                STORE_SECTION_MASTER_COLUMNS[key].fallbackWidth,
-            ]),
-        ),
-        hidden: [...STORE_SECTION_MASTER_DEFAULT_HIDDEN_COLUMNS],
-    });
-    const normalizeLayout = value => {
-        const fallback = defaultLayout();
-        const savedOrder = Array.isArray(value?.order) ? value.order : [];
-        const order = [
-            ...savedOrder.filter(
-                key => STORE_SECTION_MASTER_COLUMN_ORDER.includes(key),
-            ),
-            ...STORE_SECTION_MASTER_COLUMN_ORDER.filter(
-                key => !savedOrder.includes(key),
-            ),
-        ];
-        return {
-            order,
-            widths: Object.fromEntries(order.map(key => [
-                key,
-                clampColumnWidth(key, value?.widths?.[key] ?? fallback.widths[key]),
-            ])),
-            hidden: Array.isArray(value?.hidden)
-                ? value.hidden.filter(
-                    key => STORE_SECTION_MASTER_COLUMN_ORDER.includes(key)
-                        && key !== "order",
-                )
-                : [...fallback.hidden],
-        };
-    };
-    const loadLayout = () => {
-        try {
-            return normalizeLayout(JSON.parse(localStorage.getItem(storageKey) || "null"));
-        } catch (_error) {
-            return defaultLayout();
-        }
-    };
-    let columnLayout = loadLayout();
-    let columnMoveState = null;
-    let columnResizeState = null;
     let draggedRow = null;
     let rowDropTarget = null;
     let rowDropAfter = false;
 
     const rows = () => [...list.querySelectorAll("[data-store-section-master-row]")];
-    const desktopColumnsEnabled = () => window.matchMedia("(min-width: 760px)").matches;
-    const announce = message => {
-        if (columnStatus) columnStatus.textContent = message;
+    const desktopLayoutEnabled = () => window.matchMedia("(min-width: 760px)").matches;
+    const primaryColumns = ["order", "icon", "section"];
+    const detailColumns = ["usage", "source", "actions"];
+    const desktopColumns = [...primaryColumns, ...detailColumns];
+    const mobileColumnLabels = {
+        order: "Order",
+        icon: "Icon",
+        section: "Display name",
+        usage: "Used in",
+        source: "Source",
+        actions: "Action",
     };
+    const announce = message => {
+        if (liveRegion) liveRegion.textContent = message;
+    };
+    const cellFor = (row, key) => row.querySelector(
+        '[data-store-section-master-cell="' + key + '"]',
+    );
     const setMobileDetailsExpanded = (row, expanded, options = {}) => {
         if (!row) return;
         const toggle = row.querySelector(
@@ -48439,14 +48312,14 @@ function initStoreSectionMasterTable() {
             "[data-store-section-master-mobile-details]",
         );
         if (!toggle || !details) return;
-        const open = Boolean(expanded) && !desktopColumnsEnabled();
+        const open = Boolean(expanded) && !desktopLayoutEnabled();
         const displayName = row.querySelector('input[name="display_name"]')?.value
             || "Store Section";
         row.classList.toggle("is-mobile-expanded", open);
         toggle.setAttribute("aria-expanded", String(open));
         toggle.setAttribute(
             "aria-label",
-            `${open ? "Hide" : "Show"} details for ${displayName}`,
+            (open ? "Hide" : "Show") + " details for " + displayName,
         );
         details.hidden = !open;
         if (!open && options.focusToggle) {
@@ -48458,61 +48331,17 @@ function initStoreSectionMasterTable() {
             if (row !== activeRow) setMobileDetailsExpanded(row, false);
         });
     };
-    const saveLayout = () => {
-        try {
-            localStorage.setItem(storageKey, JSON.stringify(columnLayout));
-        } catch (_error) {
-            // The table remains usable when storage is unavailable.
+    const applyResponsiveLayout = () => {
+        const desktop = desktopLayoutEnabled();
+        tableHead.hidden = !desktop;
+        table.setAttribute("role", desktop ? "table" : "list");
+        list.setAttribute("role", desktop ? "rowgroup" : "presentation");
+        if (desktop) {
+            table.setAttribute("aria-colcount", "6");
+        } else {
+            table.removeAttribute("aria-colcount");
         }
-    };
-    const headerFor = key => tableHead.querySelector(
-        `[data-store-section-master-column="${key}"]`,
-    );
-    const cellFor = (row, key) => row.querySelector(
-        `[data-store-section-master-cell="${key}"]`,
-    );
-    const clearColumnDropState = () => {
-        tableHead.querySelectorAll(
-            ".is-column-drop-before, .is-column-drop-after",
-        ).forEach(header => {
-            header.classList.remove("is-column-drop-before", "is-column-drop-after");
-        });
-    };
-    const updateColumnMenu = () => {
-        if (!columnOptions) return;
-        columnOptions.innerHTML = "";
-        columnLayout.order.forEach(key => {
-            const config = STORE_SECTION_MASTER_COLUMNS[key];
-            const label = document.createElement("label");
-            const input = document.createElement("input");
-            const text = document.createElement("span");
-            input.type = "checkbox";
-            input.checked = !columnLayout.hidden.includes(key);
-            input.disabled = key === "order";
-            input.dataset.storeSectionMasterColumnToggle = key;
-            text.textContent = config.label;
-            label.append(input, text);
-            columnOptions.append(label);
-        });
-    };
-    const applyColumnLayout = () => {
-        const desktop = desktopColumnsEnabled();
-        const displayOrder = desktop
-            ? columnLayout.order
-            : [
-                ...STORE_SECTION_MASTER_MOBILE_COLUMNS,
-                ...STORE_SECTION_MASTER_COLUMN_ORDER.filter(
-                    key => !STORE_SECTION_MASTER_MOBILE_COLUMNS.includes(key),
-                ),
-            ];
-        const visibleOrder = desktop
-            ? displayOrder.filter(key => !columnLayout.hidden.includes(key))
-            : STORE_SECTION_MASTER_MOBILE_COLUMNS;
 
-        displayOrder.forEach(key => {
-            const header = headerFor(key);
-            if (header) tableHead.append(header);
-        });
         rows().forEach(row => {
             const detailsToggle = row.querySelector(
                 "[data-store-section-master-mobile-details-toggle]",
@@ -48520,389 +48349,83 @@ function initStoreSectionMasterTable() {
             const detailsPanel = row.querySelector(
                 "[data-store-section-master-mobile-details]",
             );
+            if (!detailsPanel) return;
+
             if (desktop) {
                 setMobileDetailsExpanded(row, false);
-                displayOrder.forEach(key => {
+                row.setAttribute("role", "row");
+                desktopColumns.forEach((key, index) => {
                     const cell = cellFor(row, key);
-                    if (cell) row.append(cell);
+                    if (!cell) return;
+                    cell.hidden = false;
+                    cell.setAttribute("role", "cell");
+                    cell.setAttribute("aria-colindex", String(index + 1));
+                    cell.removeAttribute("aria-label");
+                    row.append(cell);
                 });
                 if (detailsToggle) row.append(detailsToggle);
-                if (detailsPanel) row.append(detailsPanel);
+                row.append(detailsPanel);
                 return;
             }
 
-            STORE_SECTION_MASTER_MOBILE_COLUMNS.forEach(key => {
+            row.setAttribute("role", "listitem");
+            primaryColumns.forEach(key => {
                 const cell = cellFor(row, key);
-                if (cell) row.append(cell);
+                if (!cell) return;
+                cell.hidden = false;
+                cell.setAttribute("role", "group");
+                cell.setAttribute("aria-label", mobileColumnLabels[key]);
+                cell.removeAttribute("aria-colindex");
+                row.append(cell);
             });
             if (detailsToggle) row.append(detailsToggle);
-            if (detailsPanel) {
-                STORE_SECTION_MASTER_MOBILE_DETAIL_COLUMNS.forEach(key => {
-                    const cell = cellFor(row, key);
-                    if (cell) detailsPanel.append(cell);
-                });
-                row.append(detailsPanel);
-            }
-        });
-
-        STORE_SECTION_MASTER_COLUMN_ORDER.forEach(key => {
-            const headerHidden = desktop
-                ? columnLayout.hidden.includes(key)
-                : !STORE_SECTION_MASTER_MOBILE_COLUMNS.includes(key);
-            const header = headerFor(key);
-            if (header) {
-                header.hidden = headerHidden;
-                if (headerHidden) header.removeAttribute("aria-colindex");
-            }
-            rows().forEach(row => {
+            detailColumns.forEach(key => {
                 const cell = cellFor(row, key);
-                if (cell) {
-                    const cellHidden = desktop
-                        ? columnLayout.hidden.includes(key)
-                        : !(
-                            STORE_SECTION_MASTER_MOBILE_COLUMNS.includes(key)
-                            || STORE_SECTION_MASTER_MOBILE_DETAIL_COLUMNS.includes(key)
-                        );
-                    cell.hidden = cellHidden;
-                    if (
-                        cellHidden
-                        || (
-                            !desktop
-                            && STORE_SECTION_MASTER_MOBILE_DETAIL_COLUMNS.includes(key)
-                        )
-                    ) {
-                        cell.removeAttribute("aria-colindex");
-                    }
-                }
+                if (!cell) return;
+                cell.hidden = false;
+                cell.setAttribute("role", "group");
+                cell.setAttribute("aria-label", mobileColumnLabels[key]);
+                cell.removeAttribute("aria-colindex");
+                detailsPanel.append(cell);
             });
+            row.append(detailsPanel);
         });
-
-        if (desktop) {
-            const grid = visibleOrder
-                .map(key => `${clampColumnWidth(key, columnLayout.widths[key])}px`)
-                .join(" ");
-            const gridWidth = visibleOrder.reduce(
-                (total, key) => total + clampColumnWidth(key, columnLayout.widths[key]),
-                0,
-            ) + Math.max(0, visibleOrder.length - 1) * 12 + 28;
-            table.style.setProperty("--store-section-master-grid", grid);
-            table.style.setProperty("--store-section-master-grid-width", `${gridWidth}px`);
-        } else {
-            table.style.removeProperty("--store-section-master-grid");
-            table.style.removeProperty("--store-section-master-grid-width");
-        }
-        table.setAttribute("aria-colcount", String(visibleOrder.length));
-        visibleOrder.forEach((key, index) => {
-            headerFor(key)?.setAttribute("aria-colindex", String(index + 1));
-            rows().forEach(row => {
-                cellFor(row, key)?.setAttribute("aria-colindex", String(index + 1));
-            });
-        });
-        updateColumnMenu();
     };
-    const moveColumn = (key, targetKey, after = false) => {
-        if (!key || !targetKey || key === targetKey) return false;
-        const nextOrder = columnLayout.order.filter(item => item !== key);
-        let targetIndex = nextOrder.indexOf(targetKey);
-        if (targetIndex < 0) return false;
-        if (after) targetIndex += 1;
-        nextOrder.splice(targetIndex, 0, key);
-        columnLayout.order = nextOrder;
-        saveLayout();
-        applyColumnLayout();
-        announce(`${STORE_SECTION_MASTER_COLUMNS[key].label} column moved.`);
-        return true;
-    };
-    const measureColumnWidth = key => {
-        const config = STORE_SECTION_MASTER_COLUMNS[key];
-        if (!config) return 0;
-        const measurements = [headerFor(key), ...rows().map(row => cellFor(row, key))]
-            .filter(Boolean)
-            .map(element => {
-                const clone = element.cloneNode(true);
-                clone.style.position = "absolute";
-                clone.style.visibility = "hidden";
-                clone.style.width = "max-content";
-                clone.style.maxWidth = "none";
-                clone.style.inset = "auto";
-                document.body.append(clone);
-                const width = Math.ceil(clone.scrollWidth + 30);
-                clone.remove();
-                return width;
+    const reorderIsFiltered = () => Boolean(String(search?.value || "").trim());
+    const updateRowOrderControls = () => {
+        const currentRows = rows();
+        const filtered = reorderIsFiltered();
+        currentRows.forEach((row, index) => {
+            const number = row.querySelector("[data-store-section-master-order-number]");
+            const pending = row.dataset.storeSectionMasterOrderPending === "true";
+            if (number) {
+                number.textContent = String(index + 1);
+                number.setAttribute("aria-label", "Step " + (index + 1));
+            }
+            row.querySelectorAll('button[value="move_up"]').forEach(button => {
+                button.disabled = pending || filtered || index === 0;
+                button.title = filtered
+                    ? "Clear the search before reordering."
+                    : "Move this Store Section up from position " + (index + 1);
             });
-        return clampColumnWidth(
-            key,
-            Math.max(config.minWidth, ...measurements),
-        );
-    };
-    const fitColumnWidthsToBudget = (keys, requestedWidths, budget) => {
-        const widths = {};
-        keys.forEach(key => {
-            widths[key] = clampColumnWidth(key, requestedWidths[key]);
-        });
-
-        const minimumTotal = keys.reduce(
-            (total, key) => total + STORE_SECTION_MASTER_COLUMNS[key].minWidth,
-            0,
-        );
-        const target = Math.max(minimumTotal, Math.floor(Number(budget) || 0));
-        const shrinkTiers = [
-            ["section", "routing", "usage"],
-            ["actions", "order", "type"],
-            ["icon", "status"],
-        ];
-        let remaining = Math.max(
-            0,
-            keys.reduce((total, key) => total + widths[key], 0) - target,
-        );
-
-        shrinkTiers.forEach(tier => {
-            if (!remaining) return;
-            const tierKeys = tier.filter(key => keys.includes(key));
-            const capacities = tierKeys.map(key => Math.max(
-                0,
-                widths[key] - STORE_SECTION_MASTER_COLUMNS[key].minWidth,
-            ));
-            const tierCapacity = capacities.reduce((total, capacity) => total + capacity, 0);
-            const tierReduction = Math.min(remaining, tierCapacity);
-            let tierRemaining = tierReduction;
-
-            capacities.forEach((capacity, index) => {
-                if (!capacity || !tierRemaining) return;
-                const proportional = Math.floor((tierReduction * capacity) / tierCapacity);
-                const reduction = Math.min(capacity, proportional, tierRemaining);
-                widths[tierKeys[index]] -= reduction;
-                tierRemaining -= reduction;
+            row.querySelectorAll('button[value="move_down"]').forEach(button => {
+                button.disabled = pending || filtered || index === currentRows.length - 1;
+                button.title = filtered
+                    ? "Clear the search before reordering."
+                    : "Move this Store Section down from position " + (index + 1);
             });
-            tierKeys.forEach(key => {
-                if (!tierRemaining) return;
-                const reduction = Math.min(
-                    tierRemaining,
-                    widths[key] - STORE_SECTION_MASTER_COLUMNS[key].minWidth,
-                );
-                widths[key] -= reduction;
-                tierRemaining -= reduction;
-            });
-            remaining -= tierReduction;
-        });
-
-        return widths;
-    };
-    const columnWidthBudget = visibleCount => {
-        const horizontalPadding = 28;
-        const columnGap = 12;
-        const overflowSafety = 2;
-        return Math.max(
-            0,
-            Math.floor(
-                table.clientWidth
-                - horizontalPadding
-                - overflowSafety
-                - (columnGap * Math.max(0, visibleCount - 1)),
-            ),
-        );
-    };
-    const autoFitColumn = key => {
-        const config = STORE_SECTION_MASTER_COLUMNS[key];
-        if (!config) return;
-        columnLayout.widths[key] = measureColumnWidth(key);
-        saveLayout();
-        applyColumnLayout();
-        announce(`${config.label} column fitted to its content.`);
-    };
-    const fitAllColumns = () => {
-        const visibleKeys = columnLayout.order
-            .filter(key => !columnLayout.hidden.includes(key));
-        const measuredWidths = {};
-        visibleKeys.forEach(key => {
-            measuredWidths[key] = measureColumnWidth(key);
-        });
-        const fittedWidths = fitColumnWidthsToBudget(
-            visibleKeys,
-            measuredWidths,
-            columnWidthBudget(visibleKeys.length),
-        );
-        Object.assign(columnLayout.widths, fittedWidths);
-        saveLayout();
-        applyColumnLayout();
-        announce("Visible Store Section columns fitted within the available table width.");
-    };
-    const decorateHeaders = () => {
-        STORE_SECTION_MASTER_COLUMN_ORDER.forEach(key => {
-            const header = headerFor(key);
-            if (!header || header.dataset.storeSectionMasterColumnReady === "true") return;
-            header.dataset.storeSectionMasterColumnReady = "true";
-            header.tabIndex = 0;
-            header.title = `${STORE_SECTION_MASTER_COLUMNS[key].label}: drag the grip to move; drag the divider to resize; double-click the divider to auto-fit. Alt+Arrow moves; Alt+Shift+Arrow resizes.`;
-
-            const moveHandle = document.createElement("span");
-            moveHandle.className = "store-section-master-column-move";
-            moveHandle.setAttribute("aria-hidden", "true");
-            moveHandle.dataset.storeSectionMasterColumnMove = key;
-
-            const resizeHandle = document.createElement("span");
-            resizeHandle.className = "store-section-master-column-resize";
-            resizeHandle.setAttribute("aria-hidden", "true");
-            resizeHandle.dataset.storeSectionMasterColumnResize = key;
-            header.prepend(moveHandle);
-            header.append(resizeHandle);
-
-            moveHandle.addEventListener("pointerdown", event => {
-                if (!desktopColumnsEnabled() || event.button !== 0) return;
-                event.preventDefault();
-                moveHandle.setPointerCapture?.(event.pointerId);
-                columnMoveState = {
-                    key,
-                    startX: event.clientX,
-                    startY: event.clientY,
-                    pointerId: event.pointerId,
-                    active: false,
-                    targetKey: null,
-                    after: false,
-                };
-            });
-            resizeHandle.addEventListener("pointerdown", event => {
-                if (!desktopColumnsEnabled() || event.button !== 0) return;
-                event.preventDefault();
-                event.stopPropagation();
-                resizeHandle.setPointerCapture?.(event.pointerId);
-                columnResizeState = {
-                    key,
-                    startX: event.clientX,
-                    startWidth: clampColumnWidth(key, columnLayout.widths[key]),
-                    pointerId: event.pointerId,
-                };
-                document.body.classList.add("is-resizing-store-section-master-column");
-                header.classList.add("is-column-resizing");
-            });
-            resizeHandle.addEventListener("dblclick", event => {
-                event.preventDefault();
-                event.stopPropagation();
-                autoFitColumn(key);
-            });
-            header.addEventListener("keydown", event => {
-                if (!event.altKey || !["ArrowLeft", "ArrowRight"].includes(event.key)) {
-                    return;
-                }
-                event.preventDefault();
-                const direction = event.key === "ArrowLeft" ? -1 : 1;
-                if (event.shiftKey) {
-                    columnLayout.widths[key] = clampColumnWidth(
-                        key,
-                        columnLayout.widths[key] + direction * 16,
-                    );
-                    saveLayout();
-                    applyColumnLayout();
-                    announce(`${STORE_SECTION_MASTER_COLUMNS[key].label} column resized.`);
-                    return;
-                }
-                const currentIndex = columnLayout.order.indexOf(key);
-                const targetKey = columnLayout.order[currentIndex + direction];
-                if (targetKey) moveColumn(key, targetKey, direction > 0);
-            });
+            const handle = row.querySelector("[data-store-section-master-drag-handle]");
+            if (handle) {
+                const dragDisabled = pending || filtered;
+                handle.draggable = !dragDisabled;
+                handle.setAttribute("aria-disabled", String(dragDisabled));
+                handle.title = filtered
+                    ? "Clear the search before reordering."
+                    : "Drag to reorder Store Sections";
+            }
         });
     };
 
-    window.addEventListener("pointermove", event => {
-        if (columnResizeState) {
-            const { key, startX, startWidth } = columnResizeState;
-            columnLayout.widths[key] = clampColumnWidth(
-                key,
-                startWidth + event.clientX - startX,
-            );
-            applyColumnLayout();
-            return;
-        }
-        if (!columnMoveState) return;
-        const distance = Math.hypot(
-            event.clientX - columnMoveState.startX,
-            event.clientY - columnMoveState.startY,
-        );
-        if (!columnMoveState.active && distance < 6) return;
-        columnMoveState.active = true;
-        document.body.classList.add("is-moving-store-section-master-column");
-        headerFor(columnMoveState.key)?.classList.add("is-column-moving");
-        clearColumnDropState();
-        const target = document.elementFromPoint(event.clientX, event.clientY)
-            ?.closest("[data-store-section-master-column]");
-        if (!target || !tableHead.contains(target)) {
-            columnMoveState.targetKey = null;
-            return;
-        }
-        const targetKey = target.dataset.storeSectionMasterColumn;
-        const rect = target.getBoundingClientRect();
-        const after = event.clientX > rect.left + rect.width / 2;
-        columnMoveState.targetKey = targetKey;
-        columnMoveState.after = after;
-        if (targetKey !== columnMoveState.key) {
-            target.classList.add(after ? "is-column-drop-after" : "is-column-drop-before");
-        }
-    });
-    window.addEventListener("pointerup", () => {
-        if (columnResizeState) {
-            const key = columnResizeState.key;
-            columnResizeState = null;
-            document.body.classList.remove("is-resizing-store-section-master-column");
-            headerFor(key)?.classList.remove("is-column-resizing");
-            saveLayout();
-            announce(`${STORE_SECTION_MASTER_COLUMNS[key].label} column resized.`);
-        }
-        if (columnMoveState) {
-            const state = columnMoveState;
-            columnMoveState = null;
-            document.body.classList.remove("is-moving-store-section-master-column");
-            headerFor(state.key)?.classList.remove("is-column-moving");
-            clearColumnDropState();
-            if (state.active) moveColumn(state.key, state.targetKey, state.after);
-        }
-    });
-
-    const closeColumnsMenu = options => {
-        if (!columnsMenu || !columnsTrigger) return;
-        columnsMenu.hidden = true;
-        columnsTrigger.setAttribute("aria-expanded", "false");
-        if (options?.focusTrigger) columnsTrigger.focus({ preventScroll: true });
-    };
-    columnsTrigger?.addEventListener("click", () => {
-        if (!columnsMenu) return;
-        const open = columnsMenu.hidden;
-        columnsMenu.hidden = !open;
-        columnsTrigger.setAttribute("aria-expanded", String(open));
-        if (open) updateColumnMenu();
-    });
-    columnOptions?.addEventListener("change", event => {
-        const input = event.target.closest("[data-store-section-master-column-toggle]");
-        if (!input) return;
-        const key = input.dataset.storeSectionMasterColumnToggle;
-        if (input.checked) {
-            columnLayout.hidden = columnLayout.hidden.filter(item => item !== key);
-        } else {
-            columnLayout.hidden = [...new Set([...columnLayout.hidden, key])];
-        }
-        saveLayout();
-        applyColumnLayout();
-        announce(`${STORE_SECTION_MASTER_COLUMNS[key].label} column ${input.checked ? "shown" : "hidden"}.`);
-    });
-    fitColumnsButton?.addEventListener("click", fitAllColumns);
-    resetColumnsButton?.addEventListener("click", () => {
-        columnLayout = defaultLayout();
-        saveLayout();
-        applyColumnLayout();
-        announce("Store Section columns reset.");
-    });
-    document.addEventListener("click", event => {
-        if (
-            !columnsMenu?.hidden
-            && !event.target.closest(".store-section-master-columns")
-        ) {
-            closeColumnsMenu();
-        }
-    });
-    document.addEventListener("keydown", event => {
-        if (event.key === "Escape" && !columnsMenu?.hidden) {
-            closeColumnsMenu({ focusTrigger: true });
-        }
-    });
     list.addEventListener("click", event => {
         const toggle = event.target.closest(
             "[data-store-section-master-mobile-details-toggle]",
@@ -48915,7 +48438,7 @@ function initStoreSectionMasterTable() {
         setMobileDetailsExpanded(row, expanded);
         const displayName = row.querySelector('input[name="display_name"]')?.value
             || "Store Section";
-        announce(`${displayName} details ${expanded ? "expanded" : "collapsed"}.`);
+        announce(displayName + " details " + (expanded ? "expanded" : "collapsed") + ".");
     });
     list.addEventListener("keydown", event => {
         if (event.key !== "Escape") return;
@@ -48927,40 +48450,6 @@ function initStoreSectionMasterTable() {
         setMobileDetailsExpanded(row, false, { focusToggle: true });
     });
 
-    const updateRowOrderControls = () => {
-        const currentRows = rows();
-        currentRows.forEach((row, index) => {
-            const order = row.querySelector(".store-section-master-order");
-            const number = order?.querySelector(
-                "[data-store-section-master-order-number]",
-            );
-            const up = order?.querySelector('button[value="move_up"]');
-            const down = order?.querySelector('button[value="move_down"]');
-            const pending = row.dataset.storeSectionMasterOrderPending === "true";
-            if (number) {
-                number.textContent = String(index + 1);
-                number.setAttribute("aria-label", `Step ${index + 1}`);
-            }
-            if (up) up.disabled = pending || index === 0;
-            if (down) down.disabled = pending || index === currentRows.length - 1;
-        });
-    };
-    const reorderIsFiltered = () => (
-        Boolean(String(search?.value || "").trim())
-        || String(statusFilter?.value || "all") !== "all"
-    );
-    const updateDragAvailability = () => {
-        const disabled = reorderIsFiltered();
-        rows().forEach(row => {
-            const handle = row.querySelector("[data-store-section-master-drag-handle]");
-            if (!handle) return;
-            handle.draggable = !disabled;
-            handle.setAttribute("aria-disabled", String(disabled));
-            handle.title = disabled
-                ? "Clear the search and show all sections before reordering."
-                : "Drag to reorder Store Sections";
-        });
-    };
     const persistRowPosition = async (row, position, rollback) => {
         const body = new URLSearchParams({
             action: "move_to",
@@ -48981,7 +48470,7 @@ function initStoreSectionMasterTable() {
             }
             const displayName = row.querySelector('input[name="display_name"]')?.value
                 || "Store Section";
-            announce(`${displayName} moved to position ${position}.`);
+            announce(displayName + " moved to position " + position + ".");
             return true;
         } catch (error) {
             rollback();
@@ -48995,7 +48484,7 @@ function initStoreSectionMasterTable() {
         const currentIndex = currentRows.indexOf(row);
         const targetIndex = currentIndex + direction;
         const targetRow = currentRows[targetIndex];
-        if (currentIndex < 0 || !targetRow) return;
+        if (currentIndex < 0 || !targetRow || reorderIsFiltered()) return;
 
         const originalNextSibling = row.nextElementSibling;
         row.dataset.storeSectionMasterOrderPending = "true";
@@ -49019,7 +48508,18 @@ function initStoreSectionMasterTable() {
         delete row.dataset.storeSectionMasterOrderPending;
         row.removeAttribute("aria-busy");
         updateRowOrderControls();
-        submitter.focus({ preventScroll: true });
+
+        const oppositeDirection = direction < 0 ? "move_down" : "move_up";
+        const focusTarget = !submitter.disabled
+            ? submitter
+            : [...row.querySelectorAll('button[value="' + oppositeDirection + '"]')]
+                .find(button => (
+                    !button.disabled
+                    && Boolean(button.offsetWidth || button.offsetHeight || button.getClientRects().length)
+                ))
+                || row.querySelector("[data-store-section-master-mobile-details-toggle]")
+                || row.querySelector('input[name="display_name"]');
+        focusTarget?.focus({ preventScroll: true });
     };
     const clearRowDropState = () => {
         rows().forEach(row => row.classList.remove(
@@ -49057,7 +48557,7 @@ function initStoreSectionMasterTable() {
         rowDropTarget = target;
         target.classList.add(rowDropAfter ? "is-row-drop-after" : "is-row-drop-before");
     });
-    list.addEventListener("drop", event => {
+    list.addEventListener("drop", async event => {
         if (!draggedRow || !rowDropTarget) return;
         event.preventDefault();
         const movingRow = draggedRow;
@@ -49067,7 +48567,10 @@ function initStoreSectionMasterTable() {
         clearRowDropState();
         target.insertAdjacentElement(placeAfter ? "afterend" : "beforebegin", movingRow);
         const position = rows().indexOf(movingRow) + 1;
+        movingRow.dataset.storeSectionMasterOrderPending = "true";
+        movingRow.setAttribute("aria-busy", "true");
         updateRowOrderControls();
+
         const rollback = () => {
             if (originalNextSibling?.parentElement === list) {
                 list.insertBefore(movingRow, originalNextSibling);
@@ -49075,7 +48578,12 @@ function initStoreSectionMasterTable() {
                 list.append(movingRow);
             }
         };
-        persistRowPosition(movingRow, position, rollback);
+        await persistRowPosition(movingRow, position, rollback);
+        delete movingRow.dataset.storeSectionMasterOrderPending;
+        movingRow.removeAttribute("aria-busy");
+        updateRowOrderControls();
+        movingRow.querySelector("[data-store-section-master-drag-handle]")
+            ?.focus({ preventScroll: true });
         draggedRow = null;
     });
     list.addEventListener("dragend", () => {
@@ -49085,27 +48593,23 @@ function initStoreSectionMasterTable() {
 
     const applyFilters = () => {
         const query = String(search?.value || "").trim().toLocaleLowerCase();
-        const status = String(statusFilter?.value || "all");
         const currentRows = rows();
         let count = 0;
         currentRows.forEach(row => {
             const name = String(row.dataset.storeSectionName || "");
             const key = String(row.dataset.storeSectionKey || "");
-            const matchesQuery = !query || `${name} ${key}`.includes(query);
-            const matchesStatus = status === "all"
-                || row.dataset.storeSectionStatus === status;
-            const visible = matchesQuery && matchesStatus;
+            const visible = !query || (name + " " + key).includes(query);
             row.hidden = !visible;
             if (!visible) setMobileDetailsExpanded(row, false);
             if (visible) count += 1;
         });
         if (visibleCount) {
-            visibleCount.textContent = `${count} of ${currentRows.length} shown`;
+            visibleCount.textContent = count + " of " + currentRows.length + " shown";
         }
         if (filterEmpty) {
             filterEmpty.hidden = count > 0 || currentRows.length === 0;
         }
-        updateDragAvailability();
+        updateRowOrderControls();
     };
     rows().forEach(row => {
         const nameInput = row.querySelector('input[name="display_name"]');
@@ -49141,7 +48645,9 @@ function initStoreSectionMasterTable() {
             const detailsAreOpen = detailsToggle?.getAttribute("aria-expanded") === "true";
             detailsToggle?.setAttribute(
                 "aria-label",
-                `${detailsAreOpen ? "Hide" : "Show"} details for ${nameInput.value}`,
+                (detailsAreOpen ? "Hide" : "Show")
+                    + " details for "
+                    + nameInput.value,
             );
             applyFilters();
             updateRowDirtyState();
@@ -49150,7 +48656,7 @@ function initStoreSectionMasterTable() {
             if (event.key !== "Enter" || event.isComposing) return;
             event.preventDefault();
             const saveButton = row.querySelector(
-                '[data-store-section-master-mobile-save]',
+                "[data-store-section-master-mobile-save]",
             ) || row.querySelector('button[name="action"][value="save"]');
             if (saveButton) row.requestSubmit(saveButton);
         });
@@ -49165,6 +48671,7 @@ function initStoreSectionMasterTable() {
             const row = submitter?.closest("[data-store-section-master-row]");
             if (
                 !row
+                || reorderIsFiltered()
                 || row.dataset.storeSectionMasterOrderPending === "true"
                 || row.dataset.storeSectionMasterActionPending === "true"
             ) return;
@@ -49172,31 +48679,25 @@ function initStoreSectionMasterTable() {
             await moveRowByOrderControl(row, direction, submitter);
             return;
         }
-        if (!["archive", "restore", "delete"].includes(action)) return;
+        if (action !== "delete") return;
 
         event.preventDefault();
         const row = submitter.closest("[data-store-section-master-row]");
         if (!row || row.dataset.storeSectionMasterActionPending === "true") return;
         const displayName = row.querySelector('input[name="display_name"]')?.value
             || "Store Section";
-        if (
-            action === "delete"
-            && !window.confirm(
-                `Permanently delete "${displayName}"?\n\nThis cannot be undone.`,
-            )
-        ) {
+        if (!window.confirm(
+            'Permanently delete "' + displayName + '"?\n\nThis cannot be undone.',
+        )) {
             return;
         }
+
         row.dataset.storeSectionMasterActionPending = "true";
         row.setAttribute("aria-busy", "true");
         const originalLabel = submitter.textContent;
         const originalTitle = submitter.title;
         submitter.disabled = true;
-        submitter.textContent = action === "archive"
-            ? "Archiving…"
-            : action === "restore"
-                ? "Restoring…"
-                : "Deleting…";
+        submitter.textContent = "Deleting…";
 
         const body = new URLSearchParams(new FormData(row));
         body.set("action", action);
@@ -49211,88 +48712,35 @@ function initStoreSectionMasterTable() {
             });
             const result = await response.json().catch(() => ({}));
             if (!response.ok || result.ok === false) {
-                throw new Error(
-                    result.error
-                    || `Store Section could not be ${
-                        action === "archive"
-                            ? "archived"
-                            : action === "restore"
-                                ? "restored"
-                                : "deleted"
-                    }.`,
-                );
+                throw new Error(result.error || "Store Section could not be deleted.");
             }
-            const adjustCount = (element, delta) => {
-                if (!element) return;
-                const current = Number.parseInt(element.textContent, 10) || 0;
-                element.textContent = String(Math.max(0, current + delta));
-            };
-            if (action === "delete") {
-                const wasActive = row.dataset.storeSectionStatus !== "archived";
-                const nextRow = row.nextElementSibling || row.previousElementSibling;
-                delete row.dataset.storeSectionMasterActionPending;
-                row.removeAttribute("aria-busy");
-                row.remove();
-                adjustCount(activeCount, wasActive ? -1 : 0);
-                adjustCount(archivedCount, wasActive ? 0 : -1);
-                updateRowOrderControls();
-                applyFilters();
-                nextRow?.querySelector('input[name="display_name"]')
-                    ?.focus({ preventScroll: true });
-                announce(`${displayName} deleted.`);
-                return;
-            }
-            const isActive = action === "restore";
-            const nextAction = isActive ? "archive" : "restore";
-            const statusBadge = row.querySelector(
-                ".store-section-master-state > span",
-            );
-            row.dataset.storeSectionStatus = isActive ? "active" : "archived";
-            row.classList.toggle("is-archived", !isActive);
-            if (statusBadge) {
-                statusBadge.classList.toggle("is-active", isActive);
-                statusBadge.classList.toggle("is-archived", !isActive);
-                statusBadge.textContent = isActive ? "Active" : "Archived";
-            }
-            const mobileKind = row.querySelector(
-                ".store-section-master-mobile-kind",
-            );
-            const mobileArchivedBadge = mobileKind?.querySelector(".is-archived");
-            if (isActive) {
-                mobileArchivedBadge?.remove();
-            } else if (mobileKind && !mobileArchivedBadge) {
-                const archivedBadge = document.createElement("span");
-                archivedBadge.className = "is-archived";
-                archivedBadge.textContent = "Archived";
-                mobileKind.append(archivedBadge);
-            }
-            submitter.value = nextAction;
-            submitter.textContent = isActive ? "Archive" : "Restore";
-            submitter.classList.toggle("danger", isActive);
-            submitter.removeAttribute("title");
-            submitter.removeAttribute("aria-label");
-            submitter.disabled = false;
+
+            const nextRow = row.nextElementSibling || row.previousElementSibling;
             delete row.dataset.storeSectionMasterActionPending;
             row.removeAttribute("aria-busy");
-
-            adjustCount(activeCount, isActive ? 1 : -1);
-            adjustCount(archivedCount, isActive ? -1 : 1);
+            row.remove();
+            if (sectionCount) {
+                const current = Number.parseInt(sectionCount.textContent, 10) || 0;
+                sectionCount.textContent = String(Math.max(0, current - 1));
+            }
+            updateRowOrderControls();
             applyFilters();
-            announce(`${displayName} ${isActive ? "restored" : "archived"}.`);
+            nextRow?.querySelector('input[name="display_name"]')
+                ?.focus({ preventScroll: true });
+            announce(displayName + " deleted.");
         } catch (error) {
             delete row.dataset.storeSectionMasterActionPending;
             row.removeAttribute("aria-busy");
             submitter.disabled = false;
             submitter.textContent = originalLabel;
             submitter.title = error.message || originalTitle;
-            announce(error.message || "Store Section could not be updated.");
+            announce(error.message || "Store Section could not be deleted.");
         }
     });
+
     search?.addEventListener("input", applyFilters);
-    statusFilter?.addEventListener("change", applyFilters);
-    window.addEventListener("resize", applyColumnLayout);
-    decorateHeaders();
-    applyColumnLayout();
+    window.addEventListener("resize", applyResponsiveLayout);
+    applyResponsiveLayout();
     updateRowOrderControls();
     applyFilters();
 }

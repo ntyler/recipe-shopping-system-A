@@ -1270,6 +1270,15 @@ def ensure_recipe_master_schema(connection=None):
         )
         """
     )
+    # Keep the legacy column compatible while enforcing the permanent-active
+    # Store Section invariant for existing databases.
+    connection.execute(
+        """
+        UPDATE ingredient_store_sections
+           SET is_active = 1
+         WHERE COALESCE(is_active, 0) <> 1
+        """
+    )
     connection.execute(
         """
         CREATE TABLE IF NOT EXISTS equipment (
@@ -2776,11 +2785,15 @@ def ensure_ingredient_store_sections_for_user(connection, user_id):
 
 def ingredient_store_section_details(user_id=None, include_inactive=False, create=False):
     scoped_user_id = scoped_recipe_user_id(user_id)
+    # ``include_inactive`` remains accepted for compatibility. Store Sections
+    # are permanently active, so it intentionally no longer changes results.
+    del include_inactive
     if create:
         connection_manager = recipe_master_connection
     else:
         connection_manager = existing_recipe_master_read_connection
 
+    needs_active_normalization = False
     with connection_manager() as connection:
         if connection is None:
             return default_ingredient_store_section_details()
@@ -2828,11 +2841,15 @@ def ingredient_store_section_details(user_id=None, include_inactive=False, creat
             """,
             (scoped_user_id,),
         ).fetchall()
+        needs_active_normalization = any(
+            int(row["is_active"] or 0) != 1
+            for row in rows
+        )
         details = [
             {
                 **dict(row),
                 "is_builtin": bool(row["is_builtin"]),
-                "is_active": bool(row["is_active"]),
+                "is_active": True,
                 "ingredient_count": int(row["ingredient_count"] or 0),
                 "recipe_reference_count": int(row["recipe_reference_count"] or 0),
             }
@@ -2846,16 +2863,19 @@ def ingredient_store_section_details(user_id=None, include_inactive=False, creat
             for section in default_ingredient_store_section_details()
             if section["section_key"] not in existing_keys
         )
-        if not include_inactive:
-            details = [section for section in details if section["is_active"]]
-        return sorted(
-            details,
-            key=lambda section: (
-                int(section.get("sort_order") or 0),
-                str(section.get("display_name") or "").lower(),
-                int(section.get("id") or 0),
-            ),
-        )
+    if needs_active_normalization and not create:
+        # Opening the managed write connection applies the idempotent schema
+        # repair before this GET returns, without write-locking normal reads.
+        with existing_recipe_master_connection(user_id=scoped_user_id):
+            pass
+    return sorted(
+        details,
+        key=lambda section: (
+            int(section.get("sort_order") or 0),
+            str(section.get("display_name") or "").lower(),
+            int(section.get("id") or 0),
+        ),
+    )
 
 
 def ingredient_store_section_usage(section_id, user_id=None):
@@ -2867,6 +2887,7 @@ def ingredient_store_section_usage(section_id, user_id=None):
         return None
 
     scoped_user_id = scoped_recipe_user_id(user_id)
+    needs_active_normalization = False
     with existing_recipe_master_read_connection() as connection:
         if connection is None:
             return None
@@ -2884,7 +2905,8 @@ def ingredient_store_section_usage(section_id, user_id=None):
             return None
 
         section = dict(section_row)
-        section["is_active"] = bool(section["is_active"])
+        needs_active_normalization = int(section["is_active"] or 0) != 1
+        section["is_active"] = True
         ingredient_rows = connection.execute(
             """
             SELECT
@@ -2925,6 +2947,10 @@ def ingredient_store_section_usage(section_id, user_id=None):
             """,
             (scoped_user_id, section["section_key"]),
         ).fetchall()
+
+    if needs_active_normalization:
+        with existing_recipe_master_connection(user_id=scoped_user_id):
+            pass
 
     ingredients = [
         {
@@ -3233,27 +3259,11 @@ def update_ingredient_store_section_definition(
                 "display_name": row["display_name"],
             }
 
-        if action == "archive":
-            if bool(row["is_builtin"]):
-                return {
-                    "ok": False,
-                    "status": 409,
-                    "error": "Built-in Store Sections cannot be archived.",
-                }
-            connection.execute(
-                """
-                UPDATE ingredient_store_sections
-                   SET is_active = 0,
-                       updated_at = ?
-                 WHERE id = ?
-                """,
-                (utc_now_iso(), section_id),
-            )
+        if action in {"archive", "restore"}:
             return {
-                "ok": True,
-                "status": 200,
-                "changed": bool(row["is_active"]),
-                "display_name": row["display_name"],
+                "ok": False,
+                "status": 409,
+                "error": "Store Sections are always active.",
             }
 
         if action == "delete":
@@ -3339,23 +3349,6 @@ def update_ingredient_store_section_definition(
                 "display_name": row["display_name"],
             }
 
-        if action == "restore":
-            connection.execute(
-                """
-                UPDATE ingredient_store_sections
-                   SET is_active = 1,
-                       updated_at = ?
-                 WHERE id = ?
-                """,
-                (utc_now_iso(), section_id),
-            )
-            return {
-                "ok": True,
-                "status": 200,
-                "changed": not bool(row["is_active"]),
-                "display_name": row["display_name"],
-            }
-
         if action != "save":
             return {"ok": False, "status": 400, "error": "Unsupported Store Section action."}
 
@@ -3389,6 +3382,7 @@ def update_ingredient_store_section_definition(
             UPDATE ingredient_store_sections
                SET display_name = ?,
                    icon = ?,
+                   is_active = 1,
                    updated_at = ?
              WHERE id = ?
             """,

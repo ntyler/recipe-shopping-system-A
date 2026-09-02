@@ -24,7 +24,7 @@ def store_section_sequence(path):
     return int(row[0]) if row else None
 
 
-def test_store_section_read_path_is_byte_preserving_and_tenant_scoped(
+def test_store_section_all_active_read_path_is_byte_preserving_and_tenant_scoped(
     monkeypatch, tmp_path
 ):
     db_path = configure_master_db(monkeypatch, tmp_path)
@@ -38,9 +38,6 @@ def test_store_section_read_path_is_byte_preserving_and_tenant_scoped(
         "International Foods", "basket", user_id="user-a"
     )
     assert custom["ok"] is True
-    assert master_data.update_ingredient_store_section_definition(
-        custom["id"], action="archive", user_id="user-a"
-    )["ok"] is True
 
     before_hash = database_sha256(db_path)
     before_sequence = store_section_sequence(db_path)
@@ -50,8 +47,8 @@ def test_store_section_read_path_is_byte_preserving_and_tenant_scoped(
     user_a_second = master_data.ingredient_store_section_details(
         "user-a", include_inactive=True
     )
-    user_a_active = master_data.ingredient_store_section_options("user-a")
-    user_b_active = master_data.ingredient_store_section_options("user-b")
+    user_a_options = master_data.ingredient_store_section_options("user-a")
+    user_b_options = master_data.ingredient_store_section_options("user-b")
 
     assert user_a_first == user_a_second
     assert [row["section_key"] for row in user_a_first[:3]] == [
@@ -59,12 +56,59 @@ def test_store_section_read_path_is_byte_preserving_and_tenant_scoped(
         "MEAT & SEAFOOD",
         "DAIRY & EGGS",
     ]
-    archived = next(row for row in user_a_first if row["id"] == custom["id"])
-    assert archived["is_active"] is False
-    assert "INTERNATIONAL FOODS" not in user_a_active
-    assert "INTERNATIONAL FOODS" not in user_b_active
+    custom_row = next(row for row in user_a_first if row["id"] == custom["id"])
+    assert custom_row["is_active"] is True
+    assert all(row["is_active"] is True for row in user_a_first)
+    assert "INTERNATIONAL FOODS" in user_a_options
+    assert "INTERNATIONAL FOODS" not in user_b_options
     assert database_sha256(db_path) == before_hash
     assert store_section_sequence(db_path) == before_sequence
+
+
+def test_store_section_read_lazily_repairs_legacy_inactive_rows_once(
+    monkeypatch, tmp_path
+):
+    db_path = configure_master_db(monkeypatch, tmp_path)
+    master_data.ingredient_store_section_details("user-a", create=True)
+    custom = master_data.create_ingredient_store_section(
+        "International Foods", "basket", user_id="user-a"
+    )
+    assert custom["ok"] is True
+
+    with sqlite3.connect(db_path) as connection:
+        before_order = connection.execute(
+            "SELECT sort_order FROM ingredient_store_sections WHERE id = ?",
+            (custom["id"],),
+        ).fetchone()[0]
+        connection.execute(
+            "UPDATE ingredient_store_sections SET is_active = 0 WHERE id = ?",
+            (custom["id"],),
+        )
+
+    inactive_hash = database_sha256(db_path)
+    default_view = master_data.ingredient_store_section_details("user-a")
+    compatibility_view = master_data.ingredient_store_section_details(
+        "user-a", include_inactive=True
+    )
+    custom_row = next(row for row in default_view if row["id"] == custom["id"])
+
+    assert default_view == compatibility_view
+    assert custom_row["is_active"] is True
+    assert "INTERNATIONAL FOODS" in master_data.ingredient_store_section_options(
+        "user-a"
+    )
+    with sqlite3.connect(db_path) as connection:
+        stored = connection.execute(
+            "SELECT is_active, sort_order FROM ingredient_store_sections WHERE id = ?",
+            (custom["id"],),
+        ).fetchone()
+    assert stored == (1, before_order)
+    assert database_sha256(db_path) != inactive_hash
+
+    repaired_hash = database_sha256(db_path)
+    master_data.ingredient_store_section_details("user-a")
+    master_data.ingredient_store_section_options("user-a", include_inactive=True)
+    assert database_sha256(db_path) == repaired_hash
 
 
 def test_store_section_read_path_missing_database_or_tables_is_non_creating(
@@ -103,11 +147,17 @@ def test_store_section_create_and_explicit_admin_write_still_seed_transactionall
     assert created["ok"] is True
 
     with sqlite3.connect(db_path) as connection:
-        count = connection.execute(
-            "SELECT COUNT(*) FROM ingredient_store_sections WHERE user_id = ?",
+        count, inactive_count = connection.execute(
+            """
+            SELECT COUNT(*),
+                   SUM(CASE WHEN COALESCE(is_active, 0) <> 1 THEN 1 ELSE 0 END)
+              FROM ingredient_store_sections
+             WHERE user_id = ?
+            """,
             ("new-user",),
-        ).fetchone()[0]
+        ).fetchone()
     assert count == len(master_data.INGREDIENT_STORE_SECTION_ORDER) + 1
+    assert inactive_count == 0
 
 
 def test_sync_recipe_master_records_keeps_same_name_separate_per_user(monkeypatch, tmp_path):
@@ -275,6 +325,26 @@ def test_store_section_definitions_are_workspace_scoped_and_manageable(monkeypat
     assert custom["display_name"] == "Global Foods"
     assert custom["icon"] == "heart"
 
+    with sqlite3.connect(master_data.recipe_master_db_path()) as connection:
+        connection.execute(
+            "UPDATE ingredient_store_sections SET is_active = 0 WHERE id = ?",
+            (created["id"],),
+        )
+    saved = master_data.update_ingredient_store_section_definition(
+        created["id"],
+        action="save",
+        display_name="Global Foods",
+        icon="heart",
+        user_id="user-a",
+    )
+    assert saved["ok"] is True
+    with sqlite3.connect(master_data.recipe_master_db_path()) as connection:
+        is_active = connection.execute(
+            "SELECT is_active FROM ingredient_store_sections WHERE id = ?",
+            (created["id"],),
+        ).fetchone()[0]
+    assert is_active == 1
+
     moved_to = master_data.update_ingredient_store_section_definition(
         created["id"],
         action="move_to",
@@ -298,23 +368,31 @@ def test_store_section_definitions_are_workspace_scoped_and_manageable(monkeypat
     assert moved["ok"] is True
     assert moved["changed"] is True
 
-    archived = master_data.update_ingredient_store_section_definition(
+    archive_result = master_data.update_ingredient_store_section_definition(
         created["id"],
         action="archive",
         user_id="user-a",
     )
-    assert archived["ok"] is True
-    assert "INTERNATIONAL FOODS" not in master_data.ingredient_store_section_options("user-a")
-    restored = master_data.update_ingredient_store_section_definition(
+    assert archive_result == {
+        "ok": False,
+        "status": 409,
+        "error": "Store Sections are always active.",
+    }
+    assert "INTERNATIONAL FOODS" in master_data.ingredient_store_section_options("user-a")
+    restore_result = master_data.update_ingredient_store_section_definition(
         created["id"],
         action="restore",
         user_id="user-a",
     )
-    assert restored["ok"] is True
+    assert restore_result == {
+        "ok": False,
+        "status": 409,
+        "error": "Store Sections are always active.",
+    }
     assert "INTERNATIONAL FOODS" in master_data.ingredient_store_section_options("user-a")
 
 
-def test_store_section_definition_can_be_archived_while_in_use(monkeypatch, tmp_path):
+def test_store_section_archive_is_rejected_while_in_use(monkeypatch, tmp_path):
     configure_master_db(monkeypatch, tmp_path)
     created = master_data.create_ingredient_store_section(
         "Market Produce",
@@ -352,9 +430,10 @@ def test_store_section_definition_can_be_archived_while_in_use(monkeypatch, tmp_
         user_id="user-a",
     )
 
-    assert result["ok"] is True
-    assert result["status"] == 200
-    archived = next(
+    assert result["ok"] is False
+    assert result["status"] == 409
+    assert result["error"] == "Store Sections are always active."
+    refreshed = next(
         section
         for section in master_data.ingredient_store_section_details(
             "user-a",
@@ -363,10 +442,10 @@ def test_store_section_definition_can_be_archived_while_in_use(monkeypatch, tmp_
         )
         if section["id"] == custom_section["id"]
     )
-    assert archived["is_active"] is False
-    assert archived["ingredient_count"] == 1
-    assert archived["recipe_reference_count"] == 1
-    assert created["section_key"] not in master_data.ingredient_store_section_options(
+    assert refreshed["is_active"] is True
+    assert refreshed["ingredient_count"] == 1
+    assert refreshed["recipe_reference_count"] == 1
+    assert created["section_key"] in master_data.ingredient_store_section_options(
         "user-a"
     )
 
@@ -540,6 +619,11 @@ def test_store_section_usage_groups_references_by_recipe_and_workspace(
         )
         if section["section_key"] == "PRODUCE"
     )
+    with sqlite3.connect(master_data.recipe_master_db_path()) as connection:
+        connection.execute(
+            "UPDATE ingredient_store_sections SET is_active = 0 WHERE id = ?",
+            (produce["id"],),
+        )
 
     usage = master_data.ingredient_store_section_usage(
         produce["id"],
@@ -547,6 +631,7 @@ def test_store_section_usage_groups_references_by_recipe_and_workspace(
     )
 
     assert usage["section"]["display_name"] == "Produce"
+    assert usage["section"]["is_active"] is True
     assert usage["ingredient_total"] == 2
     assert usage["recipe_reference_total"] == 3
     assert usage["recipe_total"] == 2
@@ -566,9 +651,14 @@ def test_store_section_usage_groups_references_by_recipe_and_workspace(
         produce["id"],
         user_id="user-b",
     ) is None
+    with sqlite3.connect(master_data.recipe_master_db_path()) as connection:
+        assert connection.execute(
+            "SELECT is_active FROM ingredient_store_sections WHERE id = ?",
+            (produce["id"],),
+        ).fetchone()[0] == 1
 
 
-def test_builtin_store_section_cannot_be_archived_when_unused(monkeypatch, tmp_path):
+def test_builtin_store_section_archive_is_rejected_when_unused(monkeypatch, tmp_path):
     configure_master_db(monkeypatch, tmp_path)
     bakery = next(
         section
@@ -591,7 +681,7 @@ def test_builtin_store_section_cannot_be_archived_when_unused(monkeypatch, tmp_p
 
     assert result["ok"] is False
     assert result["status"] == 409
-    assert result["error"] == "Built-in Store Sections cannot be archived."
+    assert result["error"] == "Store Sections are always active."
     refreshed = next(
         section
         for section in master_data.ingredient_store_section_details(
