@@ -1878,6 +1878,10 @@ def test_grouped_option_rows_move_without_parent_summaries_and_restore_exact_nod
         script,
         "clearRecipeIngredientColumnViewSectionFragments",
     )
+    clear_grouped_expansion = javascript_function_source(
+        script,
+        "clearRecipeIngredientGroupedExpansionState",
+    )
     move_node = javascript_function_source(
         script,
         "moveRecipeIngredientColumnViewNode",
@@ -2197,7 +2201,7 @@ function ensureRecipeIngredientExpansionId(row) { return `expansion-${row.id}`; 
 const recipeEditExpandedIngredientIds = new Set();
 const recipeEditIngredientColumnView = {groupByStoreSection: false};
 function syncRecipeIngredientInlineEditor() {}
-""" + display_rows + "\n" + ensure_option_row_id + "\n" + move_node + "\n" + bind_option_selection + "\n" + source_carrier + "\n" + move_control + "\n" + option_action + "\n" + add_option_action + "\n" + create_management_row + "\n" + sync_management_rows + "\n" + shows_option_context + "\n" + sync_option_accessibility + "\n" + sync_option_context + "\n" + sync_option_metadata + "\n" + sync_fragments + "\n" + clear_fragments + r"""
+""" + display_rows + "\n" + ensure_option_row_id + "\n" + move_node + "\n" + bind_option_selection + "\n" + source_carrier + "\n" + move_control + "\n" + option_action + "\n" + add_option_action + "\n" + create_management_row + "\n" + sync_management_rows + "\n" + shows_option_context + "\n" + sync_option_accessibility + "\n" + sync_option_context + "\n" + sync_option_metadata + "\n" + sync_fragments + "\n" + clear_grouped_expansion + "\n" + clear_fragments + r"""
 
 function lineItem(id) {
     const row = new FakeNode(id);
@@ -3516,6 +3520,8 @@ def test_grouped_add_another_option_refreshes_and_focuses_its_promoted_row():
 function classList(...initial) {
     const values = new Set(initial);
     return {
+        add(...names) { names.forEach(name => values.add(name)); },
+        remove(...names) { names.forEach(name => values.delete(name)); },
         contains(name) { return values.has(name); },
         toggle(name, enabled) {
             if (enabled) values.add(name);
@@ -3602,6 +3608,7 @@ function closeRecipeEditRowMenus() { calls.closeMenus += 1; }
 function updateRecipeEditorDirtyState() { calls.dirty += 1; }
 function updateRecipeIngredientSubstitutionState() { calls.states += 1; }
 function ensureRecipeIngredientExpansionId() { return "expansion-source-parent"; }
+function recipeIngredientExpansionAnchorFromControl() { return row; }
 function setRecipeIngredientAlternativeEditMode() {}
 function syncRecipeIngredientColumnViewOpenMenu() { calls.syncMenus += 1; }
 function applyRecipeIngredientColumnView() {
@@ -3943,6 +3950,25 @@ def test_store_section_column_label_remains_in_the_sticky_scrolling_header():
     assert "position: sticky;" in sticky_css
     assert "z-index: 35;" in sticky_css
     assert "overflow: hidden;" in sticky_css
+
+
+def test_grouped_disclosure_controls_management_rows_but_not_its_host_summary():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    sync_toggles = javascript_function_source(
+        script,
+        "syncRecipeIngredientSelectedOptionToggles",
+    )
+
+    assert '"[data-recipe-ingredient-column-option-row], "' in sync_toggles
+    assert '"[data-recipe-ingredient-column-management-row]"' in sync_toggles
+    assert (
+        "controlledRow.dataset.recipeIngredientChoiceParentId === parentId"
+        in sync_toggles
+    )
+    assert "controlledRow !== summary" in sync_toggles
+    assert "&& !controlledRow.hidden" in sync_toggles
+    assert '"is-ingredient-column-filtered"' in sync_toggles
+    assert ".map(controlledRow => controlledRow.id).filter(Boolean)" in sync_toggles
 
 
 def test_grouped_choice_controls_repeat_on_each_section_context_after_reordering():
@@ -4542,6 +4568,209 @@ def test_store_section_grouping_toggle_preserves_choice_expansion_state():
     assert handler.index("applyRecipeIngredientColumnView({ announce: true });") < handler.index(
         "restoreRecipeIngredientChoiceExpansionState("
     )
+
+
+def test_grouped_choice_expansion_round_trip_restores_member_and_cleans_anchor_state():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for grouped choice expansion state coverage")
+
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    harness = "\n".join(
+        javascript_function_source(script, function_name)
+        for function_name in (
+            "recipeIngredientExpansionIsOpen",
+            "clearRecipeIngredientGroupedExpansionState",
+            "setRecipeIngredientSubstitutionsExpanded",
+            "captureRecipeIngredientChoiceExpansionState",
+            "restoreRecipeIngredientChoiceExpansionState",
+        )
+    ) + r"""
+function classes(...initial) {
+    const values = new Set(initial);
+    return {
+        add(...names) { names.forEach(name => values.add(name)); },
+        remove(...names) { names.forEach(name => values.delete(name)); },
+        contains(name) { return values.has(name); },
+        toggle(name, enabled) {
+            if (enabled) values.add(name);
+            else values.delete(name);
+        },
+        snapshot() { return [...values].sort(); },
+    };
+}
+function choiceRow(key, expansionId) {
+    const disclosure = {};
+    const panel = {hidden: true};
+    const row = {
+        classList: classes("has-ingredient-choice"),
+        dataset: {
+            stateKey: key,
+            ingredientExpansionId: expansionId,
+        },
+        isConnected: true,
+        recipeIngredientSubstitutionPanel: panel,
+        querySelector(selector) {
+            return selector === "[data-ingredient-substitutions-toggle]"
+                ? disclosure
+                : null;
+        },
+    };
+    disclosure.row = row;
+    return row;
+}
+
+const recipeEditIngredientColumnView = {groupByStoreSection: true};
+const recipeEditExpandedIngredientIds = new Set(["ingredient-1"]);
+let currentRows = [];
+let groupedViewRefreshes = 0;
+let initializedRows = 0;
+function recipeEditIngredientRows() { return currentRows; }
+function recipeIngredientChoiceExpansionStateKeys(row) {
+    return [row.dataset.stateKey];
+}
+function recipeIngredientExpansionIdForControl(row) {
+    return row.dataset.ingredientExpansionId;
+}
+function recipeIngredientSubstitutionContainer(row) {
+    return row.recipeIngredientSubstitutionPanel;
+}
+function recipeIngredientExpansionAnchorFromControl(row, control) {
+    return control?.anchor || row;
+}
+function ensureRecipeIngredientExpansionId(row) {
+    return row.dataset.ingredientExpansionId;
+}
+function closeRecipeEditRowMenus() {}
+function setRecipeIngredientAlternativeEditMode() {}
+function updateRecipeIngredientSubstitutionState() {}
+function applyRecipeIngredientColumnView() { groupedViewRefreshes += 1; }
+function syncRecipeIngredientColumnViewOpenMenu() {}
+function initializeRecipeIngredientRequiredChoice() { initializedRows += 1; }
+
+const original = choiceRow("rice-choice", "ingredient-1");
+original.dataset.ingredientRequiredChoiceInitialized = "true";
+original.recipeIngredientGroupedOptionsExpanded = true;
+original.recipeIngredientGroupedExpansionMemberId = "member-rice";
+original.recipeIngredientActiveExpansionId = "ingredient-1";
+currentRows = [original];
+const saved = captureRecipeIngredientChoiceExpansionState();
+
+const replacement = choiceRow("rice-choice", "ingredient-1");
+currentRows = [replacement];
+restoreRecipeIngredientChoiceExpansionState(saved);
+const restored = {
+    expanded: replacement.recipeIngredientGroupedOptionsExpanded,
+    memberId: replacement.recipeIngredientGroupedExpansionMemberId,
+    anchorIsParent: replacement.recipeIngredientExpansionAnchor === replacement,
+    panelHidden: replacement.recipeIngredientSubstitutionPanel.hidden,
+    expansionTracked: recipeEditExpandedIngredientIds.has("ingredient-1"),
+    groupedViewRefreshes,
+    initializedRows,
+};
+
+const connectedPrevious = {
+    classList: classes(),
+    dataset: {recipeIngredientOptionMemberId: "member-connected"},
+    isConnected: true,
+};
+const disconnectedControlAnchor = {
+    classList: classes(),
+    dataset: {recipeIngredientOptionMemberId: "member-disconnected"},
+    isConnected: false,
+};
+const guarded = choiceRow("guarded-choice", "ingredient-2");
+guarded.recipeIngredientExpansionAnchor = connectedPrevious;
+guarded.recipeIngredientGroupedExpansionMemberId = "member-connected";
+setRecipeIngredientSubstitutionsExpanded(
+    guarded,
+    {anchor: disconnectedControlAnchor},
+    true,
+    {refreshGroupedView: false},
+);
+const disconnectedGuard = {
+    retainedConnectedAnchor: guarded.recipeIngredientExpansionAnchor === connectedPrevious,
+    memberId: guarded.recipeIngredientGroupedExpansionMemberId,
+    disconnectedClasses: disconnectedControlAnchor.classList.snapshot(),
+};
+
+const projectedAnchor = {classList: classes(
+    "recipe-edit-substitutions-open",
+    "is-ingredient-expansion-anchor",
+)};
+replacement.classList.remove("is-ingredient-expansion-anchor");
+replacement.recipeIngredientExpansionAnchor = projectedAnchor;
+clearRecipeIngredientGroupedExpansionState(replacement);
+const cleaned = {
+    parentClasses: replacement.classList.snapshot(),
+    anchorClasses: projectedAnchor.classList.snapshot(),
+    activeExpansionId: replacement.recipeIngredientActiveExpansionId,
+    anchorIsNull: replacement.recipeIngredientExpansionAnchor === null,
+    memberStatePresent: "recipeIngredientGroupedExpansionMemberId" in replacement,
+    groupedStatePresent: "recipeIngredientGroupedOptionsExpanded" in replacement,
+    expansionTracked: recipeEditExpandedIngredientIds.has("ingredient-1"),
+};
+
+process.stdout.write(JSON.stringify({restored, disconnectedGuard, cleaned}));
+"""
+    completed = subprocess.run(
+        [node],
+        input=harness,
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout) == {
+        "restored": {
+            "expanded": True,
+            "memberId": "member-rice",
+            "anchorIsParent": True,
+            "panelHidden": True,
+            "expansionTracked": True,
+            "groupedViewRefreshes": 1,
+            "initializedRows": 0,
+        },
+        "disconnectedGuard": {
+            "retainedConnectedAnchor": True,
+            "memberId": "member-connected",
+            "disconnectedClasses": [],
+        },
+        "cleaned": {
+            "parentClasses": ["has-ingredient-choice"],
+            "anchorClasses": [],
+            "activeExpansionId": "",
+            "anchorIsNull": True,
+            "memberStatePresent": False,
+            "groupedStatePresent": False,
+            "expansionTracked": False,
+        },
+    }
+
+
+def test_grouped_choice_cleanup_is_wired_to_view_teardown_and_last_option_removal():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    clear_fragments = javascript_function_source(
+        script,
+        "clearRecipeIngredientColumnViewSectionFragments",
+    )
+    update_state = javascript_function_source(
+        script,
+        "updateRecipeIngredientSubstitutionState",
+    )
+
+    assert "clearRecipeIngredientGroupedExpansionState(parentRow);" in clear_fragments
+    assert clear_fragments.index(
+        "clearRecipeIngredientGroupedExpansionState(parentRow);"
+    ) < clear_fragments.index("if (panel) panel.hidden = !expanded;")
+    assert "alternativeCount === 0" in update_state
+    assert "clearRecipeIngredientGroupedExpansionState(row);" in update_state
+    assert update_state.index(
+        "clearRecipeIngredientGroupedExpansionState(row);"
+    ) < update_state.index("const isExpanded = Boolean(")
 
 
 def test_selected_option_block_is_atomic_and_hides_only_its_duplicate_source():
@@ -5702,8 +5931,14 @@ def test_store_section_grouping_attaches_comparisons_to_the_canonical_aisle():
     assert "item.expandedChoiceContinuation = false;" in attached_rows
     assert "entry.expandedChoiceBlock = false;" in attached_rows
     assert "const canonicalStoreKey = String(" in attached_rows
-    assert "const host = [...visibleSelectedRows].reverse().find" in attached_rows
-    assert "consumedSelectedRows" not in attached_rows
+    assert "const requestedExpansionAnchor = parentRow" in attached_rows
+    assert "const requestedExpansionMemberId = String(" in attached_rows
+    assert "const host = expandedChoice" in attached_rows
+    assert "requestedHost || canonicalHost || visibleSelectedRows[0]" in attached_rows
+    assert ": ([...visibleSelectedRows].reverse().find" in attached_rows
+    assert "const consumedSelectedRows = new Set();" in attached_rows
+    assert "item.expandedChoiceHost = item === host;" in attached_rows
+    assert "item.expandedChoiceContinuation = item !== host;" in attached_rows
     assert "is-filtered-alternative" in group_headers
     assert "recipeIngredientColumnChoiceBoundary" in group_headers
     assert "&& !entry.expandedChoiceContinuation" in group_headers
@@ -5792,8 +6027,8 @@ const alternativeOnion = displayItem({
     componentOrder: 1,
 });
 
-// Selected members keep the aisle-sorted order. Expanded inactive comparisons
-// stay contiguous after the final selected member in the canonical aisle.
+// Without an explicit clicked member anchor, selected members stay aisle-sorted
+// while expanded inactive comparisons remain contiguous in the canonical aisle.
 const collapsed = recipeIngredientColumnViewAttachedPresentationRows([
     before,
     cumin,
@@ -6066,6 +6301,705 @@ process.stdout.write(JSON.stringify({
     }
 
 
+def test_grouped_rice_disclosure_owns_one_complete_choice_block_then_restores_aisles():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for grouped disclosure-anchor coverage")
+
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    function_names = (
+        "recipeIngredientExpansionSelectedOptionSummary",
+        "recipeIngredientExpansionSourceRow",
+        "recipeIngredientExpansionIdForControl",
+        "recipeIngredientExpansionAnchorFromControl",
+        "recipeIngredientExpansionIsOpen",
+        "setRecipeIngredientSubstitutionsExpanded",
+        "toggleRecipeIngredientSubstitutions",
+        "openRecipeIngredientAlternativesDialog",
+        "closeRecipeIngredientAlternativesDialog",
+        "recipeIngredientColumnViewOptionInteractionAnchor",
+        "recipeIngredientColumnViewSourceRow",
+        "recipeIngredientColumnViewEntry",
+        "recipeIngredientColumnViewPresentationEntries",
+        "recipeIngredientColumnViewIsInactivePresentationRow",
+        "recipeIngredientColumnViewAttachedPresentationRows",
+        "clearRecipeIngredientColumnViewGroupHeaders",
+        "reconcileRecipeIngredientColumnViewOrder",
+        "recipeIngredientColumnViewCountLabel",
+        "renderRecipeIngredientColumnViewGroupHeaders",
+    )
+    functions = [
+        javascript_function_source(script, function_name)
+        for function_name in function_names
+    ]
+    assert all(
+        "applyRecipeIngredientOptionSelection" not in function_source
+        for function_source in functions
+    )
+    harness = "\n".join(functions) + r"""
+function classes(...initial) {
+    const values = new Set(initial);
+    return {
+        add(...names) { names.forEach(name => values.add(name)); },
+        remove(...names) { names.forEach(name => values.delete(name)); },
+        contains(name) { return values.has(name); },
+        toggle(name, enabled) {
+            if (enabled) values.add(name);
+            else values.delete(name);
+        },
+    };
+}
+class FakeNode {
+    constructor(id = "") {
+        this.id = id;
+        this.children = [];
+        this.parentNode = null;
+        this.parentElement = null;
+        this.dataset = {};
+        this.attributes = {};
+        this.classList = classes();
+        this.style = {removeProperty() {}};
+        this.className = "";
+        this.innerHTML = "";
+        this.hidden = false;
+    }
+    append(...nodes) { nodes.forEach(node => this.insertBefore(node, null)); }
+    appendChild(node) { this.append(node); return node; }
+    insertBefore(node, reference) {
+        node.remove();
+        const index = reference ? this.children.indexOf(reference) : -1;
+        node.parentNode = this;
+        node.parentElement = this;
+        if (index < 0) this.children.push(node);
+        else this.children.splice(index, 0, node);
+        return node;
+    }
+    remove() {
+        if (!this.parentNode) return;
+        const index = this.parentNode.children.indexOf(this);
+        if (index >= 0) this.parentNode.children.splice(index, 1);
+        this.parentNode = null;
+        this.parentElement = null;
+    }
+    setAttribute(name, value) { this.attributes[name] = String(value); }
+    getAttribute(name) { return this.attributes[name] ?? null; }
+    querySelector() { return null; }
+    querySelectorAll(selector) {
+        if (
+            selector.includes("recipe-ingredient-column-group-header")
+            || selector.includes("recipe-ingredient-column-choice-boundary")
+        ) {
+            return this.children.filter(child => (
+                Object.hasOwn(child.dataset, "recipeIngredientColumnGroupHeader")
+                || Object.hasOwn(child.dataset, "recipeIngredientColumnChoiceBoundary")
+            ));
+        }
+        if (selector.includes("recipe-ingredient-column-management-row")) return [];
+        return [];
+    }
+    get firstChild() { return this.children[0] || null; }
+    get nextSibling() {
+        if (!this.parentNode) return null;
+        const index = this.parentNode.children.indexOf(this);
+        return this.parentNode.children[index + 1] || null;
+    }
+}
+const document = {
+    activeElement: null,
+    createElement() { return new FakeNode("section-header"); },
+};
+const window = {};
+const recipeEditExpandedIngredientIds = new Set();
+const recipeEditIngredientColumnView = {groupByStoreSection: true};
+const list = new FakeNode("recipeEditIngredients");
+const parentRow = new FakeNode("requirement-butter");
+parentRow.classList.add("has-ingredient-choice");
+parentRow.dataset.ingredientExpansionId = "ingredient:butter-choice";
+parentRow.defaultOptionId = "option-butter-rice";
+const container = new FakeNode("butter-options-panel");
+container.hidden = true;
+container.querySelectorAll = () => [];
+parentRow.recipeIngredientSubstitutionPanel = container;
+
+function source(id, ingredient, storeSection, optionId, componentOrder) {
+    return {
+        id,
+        values: {
+            ingredient,
+            store_section: storeSection,
+            alternative_id: optionId,
+            alternative_component_order: String(componentOrder),
+        },
+    };
+}
+function entry(
+    id,
+    sourceRow,
+    optionId,
+    componentOrder,
+    manualIndex,
+    selected,
+    anchor,
+) {
+    const row = new FakeNode(id);
+    row.recipeIngredientOptionSourceRow = sourceRow;
+    row.recipeIngredientChoiceParentRow = parentRow;
+    const item = {
+        row,
+        sourceRow,
+        parentRow,
+        optionId,
+        optionContextKey: `id:${optionId}`,
+        componentOrder,
+        manualIndex,
+        selected,
+        active: selected,
+        counted: selected,
+        anchor,
+        expanded: false,
+        filtered: false,
+    };
+    row.recipeIngredientColumnViewEntries = [item];
+    return item;
+}
+const butterEntry = entry(
+    "butter-component",
+    source("butter-source", "Butter", "DAIRY & EGGS", "option-butter-rice", 0),
+    "option-butter-rice",
+    0,
+    0,
+    true,
+    true,
+);
+const riceEntry = entry(
+    "rice-component",
+    source("rice-source", "Rice", "PASTA, RICE & GRAINS", "option-butter-rice", 1),
+    "option-butter-rice",
+    1,
+    1,
+    true,
+    false,
+);
+const unsaltedEntry = entry(
+    "unsalted-butter-component",
+    source(
+        "unsalted-source",
+        "Unsalted butter",
+        "DAIRY & EGGS",
+        "option-unsalted-egg",
+        0,
+    ),
+    "option-unsalted-egg",
+    0,
+    2,
+    false,
+    true,
+);
+const eggEntry = entry(
+    "egg-component",
+    source("egg-source", "Egg", "DAIRY & EGGS", "option-unsalted-egg", 1),
+    "option-unsalted-egg",
+    1,
+    3,
+    false,
+    false,
+);
+const allEntries = [butterEntry, riceEntry, unsaltedEntry, eggEntry];
+const storeOrder = new Map([
+    ["dairy-eggs", 0],
+    ["pasta-rice-grains", 1],
+]);
+function fieldValuesFromRow(row) { return row?.values || {}; }
+function recipeIngredientStoreSectionKey(value) {
+    return String(value || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-");
+}
+function recipeStoreSectionDisplayLabel(value) {
+    return String(value || "").toLowerCase().replace(/(^|\s|&)\S/g, match => (
+        match.toUpperCase()
+    ));
+}
+function recipeIngredientColumnViewIngredientCount(row) {
+    return (row.recipeIngredientColumnViewEntries || [])
+        .filter(item => item.counted !== false).length;
+}
+function recipeIngredientColumnViewAlternativeCount(row) {
+    return (row.recipeIngredientColumnViewEntries || [])
+        .filter(item => item.counted === false).length;
+}
+function recipeIngredientColumnViewChoiceOptions() {
+    return {requiredUnresolved: false};
+}
+function recipeIngredientStoreSectionIconHtml() { return ""; }
+function escapeHtml(value) { return String(value); }
+function ensureRecipeIngredientExpansionId() {
+    return parentRow.dataset.ingredientExpansionId;
+}
+function recipeIngredientSubstitutionContainer() { return container; }
+function recipeIngredientParentRowFromControl() { return parentRow; }
+function closeRecipeEditRowMenus() {}
+function setRecipeIngredientAlternativeEditMode() {}
+function updateRecipeIngredientSubstitutionState() {}
+function syncRecipeIngredientColumnViewOpenMenu() {}
+function toggleRecipeIngredientExpansionWithAnchor(_row, _control, callback) {
+    return callback();
+}
+let optionSelectionCalls = 0;
+function applyRecipeIngredientOptionSelection() { optionSelectionCalls += 1; }
+const sourceDisclosure = {id: "parent-disclosure"};
+parentRow.querySelector = selector => (
+    selector === "[data-ingredient-substitutions-toggle]"
+        ? sourceDisclosure
+        : null
+);
+function disclosure(id, row) {
+    return {
+        id,
+        isConnected: true,
+        focusCount: 0,
+        closest(selector) {
+            if (selector === "[data-ingredient-selected-option-line-item]") return row;
+            if (selector === "[data-recipe-ingredient-column-option-row]") return row;
+            return null;
+        },
+        focus() { this.focusCount += 1; },
+    };
+}
+const butterDisclosure = disclosure("butter-disclosure", butterEntry.row);
+const riceDisclosure = disclosure("rice-disclosure", riceEntry.row);
+const snapshots = [];
+function applyRecipeIngredientColumnView() {
+    clearRecipeIngredientColumnViewGroupHeaders(list);
+    const expanded = Boolean(parentRow.recipeIngredientGroupedOptionsExpanded);
+    allEntries.forEach(item => {
+        item.expanded = expanded;
+        item.store = recipeIngredientColumnViewEntry(item.row, "store");
+    });
+    const visibleEntries = expanded
+        ? allEntries
+        : allEntries.filter(item => item.selected);
+    allEntries
+        .filter(item => !visibleEntries.includes(item))
+        .forEach(item => item.row.remove());
+    visibleEntries.forEach(item => {
+        if (item.row.parentNode !== list) list.append(item.row);
+    });
+    const items = visibleEntries.map(item => ({
+        row: item.row,
+        index: item.manualIndex,
+        filtered: false,
+    })).sort((left, right) => {
+        const leftEntry = left.row.recipeIngredientColumnViewEntries[0];
+        const rightEntry = right.row.recipeIngredientColumnViewEntries[0];
+        return (
+            storeOrder.get(leftEntry.store.key) - storeOrder.get(rightEntry.store.key)
+            || leftEntry.manualIndex - rightEntry.manualIndex
+        );
+    });
+    const presentation = recipeIngredientColumnViewAttachedPresentationRows(items);
+    renderRecipeIngredientColumnViewGroupHeaders(list, presentation);
+    const interactionAnchor = recipeIngredientColumnViewOptionInteractionAnchor(
+        parentRow,
+        allEntries.filter(item => item.selected),
+    );
+    const sourceIds = presentation.map(item => (
+        item.row.recipeIngredientColumnViewEntries[0].sourceRow.id
+    ));
+    snapshots.push({
+        expanded,
+        anchorId: parentRow.recipeIngredientExpansionAnchor?.id || null,
+        interactionAnchorId: interactionAnchor?.row?.id || null,
+        sequence: list.children.map(item => (
+            item.dataset.recipeIngredientColumnGroupHeader
+                ? `header:${item.dataset.recipeIngredientColumnGroupHeader}`
+                : item.id
+        )),
+        presentationOrder: presentation.map(item => item.row.id),
+        sourceIds,
+        uniqueSources: new Set(sourceIds).size === sourceIds.length,
+        expandedHosts: presentation
+            .filter(item => item.expandedChoiceHost)
+            .map(item => item.row.id),
+        expandedContinuations: presentation
+            .filter(item => item.expandedChoiceContinuation)
+            .map(item => item.row.id),
+        butterIsAnchor: butterEntry.row.classList.contains(
+            "is-ingredient-expansion-anchor",
+        ),
+        riceIsAnchor: riceEntry.row.classList.contains(
+            "is-ingredient-expansion-anchor",
+        ),
+        selectedOptionId: parentRow.defaultOptionId,
+        optionSelectionCalls,
+    });
+}
+
+const event = {
+    prevented: 0,
+    stopped: 0,
+    preventDefault() { this.prevented += 1; },
+    stopPropagation() { this.stopped += 1; },
+};
+applyRecipeIngredientColumnView();
+toggleRecipeIngredientSubstitutions(riceDisclosure, event);
+toggleRecipeIngredientSubstitutions(riceDisclosure, event);
+process.stdout.write(JSON.stringify({
+    snapshots,
+    event: {prevented: event.prevented, stopped: event.stopped},
+    riceFocusCount: riceDisclosure.focusCount,
+}));
+"""
+    completed = subprocess.run(
+        [node],
+        input=harness,
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    result = json.loads(completed.stdout)
+    collapsed = {
+        "expanded": False,
+        "anchorId": None,
+        "interactionAnchorId": "butter-component",
+        "sequence": [
+            "header:dairy-eggs",
+            "butter-component",
+            "header:pasta-rice-grains",
+            "rice-component",
+        ],
+        "presentationOrder": ["butter-component", "rice-component"],
+        "sourceIds": ["butter-source", "rice-source"],
+        "uniqueSources": True,
+        "expandedHosts": [],
+        "expandedContinuations": [],
+        "butterIsAnchor": False,
+        "riceIsAnchor": False,
+        "selectedOptionId": "option-butter-rice",
+        "optionSelectionCalls": 0,
+    }
+    assert result["snapshots"] == [
+        collapsed,
+        {
+            "expanded": True,
+            "anchorId": "rice-component",
+            "interactionAnchorId": "rice-component",
+            "sequence": [
+                "header:pasta-rice-grains",
+                "rice-component",
+                "butter-component",
+                "unsalted-butter-component",
+                "egg-component",
+            ],
+            "presentationOrder": [
+                "rice-component",
+                "butter-component",
+                "unsalted-butter-component",
+                "egg-component",
+            ],
+            "sourceIds": [
+                "rice-source",
+                "butter-source",
+                "unsalted-source",
+                "egg-source",
+            ],
+            "uniqueSources": True,
+            "expandedHosts": ["rice-component"],
+            "expandedContinuations": [
+                "butter-component",
+                "unsalted-butter-component",
+                "egg-component",
+            ],
+            "butterIsAnchor": False,
+            "riceIsAnchor": True,
+            "selectedOptionId": "option-butter-rice",
+            "optionSelectionCalls": 0,
+        },
+        collapsed,
+    ]
+    assert result["event"] == {"prevented": 4, "stopped": 4}
+    assert result["riceFocusCount"] == 1
+
+
+def test_filtered_requested_grouped_member_resumes_expansion_ownership():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for filtered expansion-anchor coverage")
+
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    functions = [
+        javascript_function_source(script, function_name)
+        for function_name in (
+            "recipeIngredientColumnViewPresentationEntries",
+            "recipeIngredientColumnViewIsInactivePresentationRow",
+            "recipeIngredientColumnViewAttachedPresentationRows",
+        )
+    ]
+    harness = "\n".join(functions) + r"""
+function classes(...initial) {
+    const values = new Set(initial);
+    return {
+        add(...names) { names.forEach(name => values.add(name)); },
+        remove(...names) { names.forEach(name => values.delete(name)); },
+        contains(name) { return values.has(name); },
+    };
+}
+function recipeIngredientColumnViewChoiceOptions() {
+    return {requiredUnresolved: false};
+}
+function recipeIngredientColumnViewEntry(row) {
+    return row.recipeIngredientColumnViewEntries[0].store;
+}
+const parentRow = {
+    classList: classes("has-ingredient-choice"),
+    recipeIngredientGroupedExpansionMemberId: "member-rice",
+};
+function displayItem({
+    id,
+    stableId,
+    optionId,
+    componentOrder,
+    manualIndex,
+    store,
+    counted,
+    anchor = false,
+    filtered = false,
+}) {
+    const row = {
+        id,
+        dataset: {recipeIngredientOptionMemberId: stableId},
+        classList: classes(),
+    };
+    const entry = {
+        row,
+        parentRow,
+        stableId,
+        optionId,
+        optionContextKey: `id:${optionId}`,
+        componentOrder,
+        manualIndex,
+        store: {key: store},
+        counted,
+        selected: counted,
+        active: counted,
+        anchor,
+        expanded: true,
+        filtered,
+    };
+    row.recipeIngredientColumnViewEntries = [entry];
+    return {row, index: manualIndex, filtered};
+}
+const butter = displayItem({
+    id: "butter-component",
+    stableId: "member-butter",
+    optionId: "option-butter-rice",
+    componentOrder: 0,
+    manualIndex: 0,
+    store: "dairy-eggs",
+    counted: true,
+    anchor: true,
+});
+const rice = displayItem({
+    id: "rice-component",
+    stableId: "member-rice",
+    optionId: "option-butter-rice",
+    componentOrder: 1,
+    manualIndex: 1,
+    store: "pasta-rice-grains",
+    counted: true,
+    filtered: true,
+});
+const unsalted = displayItem({
+    id: "unsalted-butter-component",
+    stableId: "member-unsalted",
+    optionId: "option-unsalted-egg",
+    componentOrder: 0,
+    manualIndex: 2,
+    store: "dairy-eggs",
+    counted: false,
+});
+const egg = displayItem({
+    id: "egg-component",
+    stableId: "member-egg",
+    optionId: "option-unsalted-egg",
+    componentOrder: 1,
+    manualIndex: 3,
+    store: "dairy-eggs",
+    counted: false,
+});
+const items = [butter, rice, unsalted, egg];
+parentRow.recipeIngredientExpansionAnchor = rice.row;
+rice.row.classList.add(
+    "recipe-edit-substitutions-open",
+    "is-ingredient-expansion-anchor",
+);
+function snapshot(presentation) {
+    return {
+        memberId: parentRow.recipeIngredientGroupedExpansionMemberId,
+        anchorId: parentRow.recipeIngredientExpansionAnchor?.id || null,
+        hosts: presentation
+            .filter(item => item.expandedChoiceHost)
+            .map(item => item.row.id),
+        butterIsAnchor: butter.row.classList.contains(
+            "is-ingredient-expansion-anchor",
+        ),
+        riceIsAnchor: rice.row.classList.contains(
+            "is-ingredient-expansion-anchor",
+        ),
+    };
+}
+const whileRiceFiltered = snapshot(
+    recipeIngredientColumnViewAttachedPresentationRows(items),
+);
+rice.filtered = false;
+rice.row.recipeIngredientColumnViewEntries[0].filtered = false;
+const afterRiceReturns = snapshot(
+    recipeIngredientColumnViewAttachedPresentationRows(items),
+);
+process.stdout.write(JSON.stringify({whileRiceFiltered, afterRiceReturns}));
+"""
+    completed = subprocess.run(
+        [node],
+        input=harness,
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout) == {
+        "whileRiceFiltered": {
+            "memberId": "member-rice",
+            "anchorId": "butter-component",
+            "hosts": ["butter-component"],
+            "butterIsAnchor": True,
+            "riceIsAnchor": False,
+        },
+        "afterRiceReturns": {
+            "memberId": "member-rice",
+            "anchorId": "rice-component",
+            "hosts": ["rice-component"],
+            "butterIsAnchor": False,
+            "riceIsAnchor": True,
+        },
+    }
+
+
+def test_failed_grouped_option_selection_restores_expansion_anchor_state():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for failed grouped selection coverage")
+
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    select_option = javascript_function_source(
+        script,
+        "selectRecipeIngredientColumnViewOption",
+    )
+    harness = select_option + r"""
+function classes(...initial) {
+    const values = new Set(initial);
+    return {
+        add(...names) { names.forEach(name => values.add(name)); },
+        remove(...names) { names.forEach(name => values.delete(name)); },
+        contains(name) { return values.has(name); },
+        toggle(name, enabled) {
+            if (enabled) values.add(name);
+            else values.delete(name);
+        },
+        snapshot() { return [...values].sort(); },
+    };
+}
+const riceRow = {
+    id: "rice-component",
+    classList: classes(
+        "recipe-edit-substitutions-open",
+        "is-ingredient-expansion-anchor",
+    ),
+};
+const groupedRow = {
+    id: "unsalted-butter-component",
+    dataset: {
+        recipeIngredientOptionId: "option-unsalted-egg",
+        recipeIngredientOptionMemberId: "member-unsalted",
+    },
+    classList: classes(),
+};
+const parentRow = {
+    recipeIngredientExpansionAnchor: riceRow,
+    recipeIngredientGroupedExpansionMemberId: "member-rice",
+};
+groupedRow.recipeIngredientChoiceParentRow = parentRow;
+const control = {
+    recipeIngredientChoiceParentRow: parentRow,
+    recipeIngredientOptionSourceRow: {},
+    closest(selector) {
+        return selector === "[data-recipe-ingredient-column-option-row]"
+            ? groupedRow
+            : null;
+    },
+};
+const calls = {
+    selectedOptionIds: [],
+    closeMenus: 0,
+    statuses: 0,
+};
+function recipeIngredientExpansionIsOpen() { return true; }
+function applyRecipeIngredientOptionSelection(_row, optionId) {
+    calls.selectedOptionIds.push(optionId);
+    return false;
+}
+function closeRecipeEditRowMenus() { calls.closeMenus += 1; }
+function setRecipeEditStatus() { calls.statuses += 1; }
+const event = {
+    prevented: 0,
+    stopped: 0,
+    preventDefault() { this.prevented += 1; },
+    stopImmediatePropagation() { this.stopped += 1; },
+};
+const result = selectRecipeIngredientColumnViewOption(control, event);
+process.stdout.write(JSON.stringify({
+    result,
+    anchorId: parentRow.recipeIngredientExpansionAnchor?.id || null,
+    memberId: parentRow.recipeIngredientGroupedExpansionMemberId || null,
+    riceClasses: riceRow.classList.snapshot(),
+    groupedClasses: groupedRow.classList.snapshot(),
+    event: {prevented: event.prevented, stopped: event.stopped},
+    calls,
+}));
+"""
+    completed = subprocess.run(
+        [node],
+        input=harness,
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout) == {
+        "result": False,
+        "anchorId": "rice-component",
+        "memberId": "member-rice",
+        "riceClasses": [
+            "is-ingredient-expansion-anchor",
+            "recipe-edit-substitutions-open",
+        ],
+        "groupedClasses": [],
+        "event": {"prevented": 1, "stopped": 1},
+        "calls": {
+            "selectedOptionIds": ["option-unsalted-egg"],
+            "closeMenus": 0,
+            "statuses": 0,
+        },
+    }
+
+
 def test_filtered_context_keeps_distinct_idless_legacy_options_isolated():
     node = shutil.which("node")
     if not node:
@@ -6239,7 +7173,7 @@ def test_ungrouped_selected_option_block_remains_the_canonical_source_after_grou
     assert "row.insertBefore(block, home);" in selected_block
 
 
-def test_ingredient_choice_panel_mounts_on_parent_row_after_the_home_marker():
+def test_ingredient_choice_panel_uses_the_clicked_grouped_summary_as_its_anchor():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
@@ -6261,12 +7195,14 @@ def test_ingredient_choice_panel_mounts_on_parent_row_after_the_home_marker():
     assert "controlledSummary.recipeIngredientChoiceParentRow === row" in expansion
     assert "controlledSummary.recipeIngredientOptionSourceRow !== row" not in expansion
     assert "summary.recipeIngredientOptionSourceRow !== row" not in expansion
-    assert "The parent disclosure always controls the parent's alternatives region." in expansion
     assert "return null;" in expansion
     assert "recipeIngredientExpansionSelectedOptionSummary(" in expansion
     assert "recipeIngredientExpansionAnchorFromControl" in expansion
     assert "function recipeIngredientExpansionAnchorFromControl(row, control = null)" in expansion
-    assert "return row;" in expansion
+    assert (
+        "return recipeIngredientExpansionSelectedOptionSummary(row, control) || row;"
+        in expansion
+    )
     assert '"[data-recipe-ingredient-column-group-projection]"' not in expansion
     assert '"[data-recipe-ingredient-column-section-fragment]"' not in expansion
     assert 'anchor.insertAdjacentElement("afterend", container);' in expansion
@@ -6282,6 +7218,12 @@ def test_ingredient_choice_panel_mounts_on_parent_row_after_the_home_marker():
     assert "const groupedStoreSectionChoice = Boolean(" in toggle
     assert 'row.classList.contains("has-ingredient-choice")' in toggle
     assert "row.recipeIngredientGroupedOptionsExpanded = Boolean(shouldOpen);" in toggle
+    assert "const requestedAnchor = shouldOpen" in toggle
+    assert "recipeIngredientExpansionAnchorFromControl(row, control)" in toggle
+    assert "row.recipeIngredientExpansionAnchor = requestedAnchor;" in toggle
+    assert "requestedAnchor.classList?.add(" in toggle
+    assert "row.recipeIngredientGroupedExpansionMemberId = memberId;" in toggle
+    assert "delete row.recipeIngredientGroupedExpansionMemberId;" in toggle
     assert "container.hidden = true;" in toggle
     assert "updateRecipeIngredientSubstitutionState(row, control);" in toggle
     assert "applyRecipeIngredientColumnView();" in toggle

@@ -86,61 +86,63 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                 </div>
             </header>
 
-            <section class="unit-master-category type-master-category"
-                     data-type-master-category
-                     aria-labelledby="allTypesTitle">
-                <header>
-                    <h3 id="allTypesTitle">Ingredient roles</h3>
-                    <span data-type-master-count-label>{{ master_data.types | length }} types</span>
-                </header>
-                <div class="unit-master-table type-master-table" role="table" aria-label="Ingredient types">
-                    <div class="unit-master-table-head" role="row">
-                        <span role="columnheader">Type name</span>
-                        <span role="columnheader">Used in</span>
-                        <span role="columnheader">Source</span>
-                        <span role="columnheader">Status</span>
-                        <span role="columnheader">Action</span>
-                    </div>
-                    <div data-type-master-rows>
-                        {% for type in master_data.types %}
-                            <div class="unit-master-row"
-                                 role="row"
-                                 data-type-master-row
-                                 data-type-id="{{ type.id }}"
-                                 data-type-master-search-value="{{ type.name }}">
-                                <strong role="cell">{{ type.name }}</strong>
-                                <div class="unit-master-usage" role="cell">
-                                    {% if type.recipe_count %}
-                                        <button type="button"
-                                                class="unit-master-usage-button"
-                                                data-type-master-usage-button
-                                                data-type-id="{{ type.id }}"
-                                                aria-haspopup="dialog"
-                                                aria-controls="typeMasterUsageDialog"
-                                                aria-label="Show {{ type.recipe_count }} recipe{% if type.recipe_count != 1 %}s{% endif %} using {{ type.name }}">
-                                            <strong>{{ type.recipe_count }}</strong>
-                                            <span>{{ "recipe" if type.recipe_count == 1 else "recipes" }}</span>
-                                        </button>
-                                    {% else %}
-                                        <span class="unit-master-usage-empty" aria-label="No recipes use {{ type.name }}">0</span>
-                                    {% endif %}
+            <div class="unit-master-category-list type-master-category-list">
+                <section class="unit-master-category type-master-category"
+                         data-type-master-category
+                         aria-labelledby="allTypesTitle">
+                    <header>
+                        <h3 id="allTypesTitle">Ingredient roles</h3>
+                        <span data-type-master-count-label>{{ master_data.types | length }} types</span>
+                    </header>
+                    <div class="unit-master-table type-master-table" role="table" aria-label="Ingredient types">
+                        <div class="unit-master-table-head" role="row">
+                            <span role="columnheader">Type name</span>
+                            <span role="columnheader">Used in</span>
+                            <span role="columnheader">Source</span>
+                            <span role="columnheader">Status</span>
+                            <span role="columnheader">Action</span>
+                        </div>
+                        <div data-type-master-rows>
+                            {% for type in master_data.types %}
+                                <div class="unit-master-row"
+                                     role="row"
+                                     data-type-master-row
+                                     data-type-id="{{ type.id }}"
+                                     data-type-master-search-value="{{ type.name }}">
+                                    <strong role="cell">{{ type.name }}</strong>
+                                    <div class="unit-master-usage" role="cell">
+                                        {% if type.recipe_count %}
+                                            <button type="button"
+                                                    class="unit-master-usage-button"
+                                                    data-type-master-usage-button
+                                                    data-type-id="{{ type.id }}"
+                                                    aria-haspopup="dialog"
+                                                    aria-controls="typeMasterUsageDialog"
+                                                    aria-label="Show {{ type.recipe_count }} recipe{% if type.recipe_count != 1 %}s{% endif %} using {{ type.name }}">
+                                                <strong>{{ type.recipe_count }}</strong>
+                                                <span>{{ "recipe" if type.recipe_count == 1 else "recipes" }}</span>
+                                            </button>
+                                        {% else %}
+                                            <span class="unit-master-usage-empty" aria-label="No recipes use {{ type.name }}">0</span>
+                                        {% endif %}
+                                    </div>
+                                    <span class="unit-master-source-badge{% if type.custom %} user-created{% endif %}" role="cell">
+                                        {{ "User-created" if type.custom else "System-seeded" }}
+                                    </span>
+                                    <span class="type-master-status-badge{% if not type.active %} is-inactive{% endif %}" role="cell">
+                                        {{ "Active" if type.active else "Inactive" }}
+                                    </span>
+                                    <button type="button"
+                                            class="unit-master-edit-button"
+                                            data-type-master-edit-button
+                                            data-type-id="{{ type.id }}"
+                                            aria-label="Edit {{ type.name }}">Edit</button>
                                 </div>
-                                <span class="unit-master-source-badge{% if type.custom %} user-created{% endif %}" role="cell">
-                                    {{ "User-created" if type.custom else "System-seeded" }}
-                                </span>
-                                <span class="type-master-status-badge{% if not type.active %} is-inactive{% endif %}" role="cell">
-                                    {{ "Active" if type.active else "Inactive" }}
-                                </span>
-                                <button type="button"
-                                        class="unit-master-edit-button"
-                                        data-type-master-edit-button
-                                        data-type-id="{{ type.id }}"
-                                        aria-label="Edit {{ type.name }}">Edit</button>
-                            </div>
-                        {% endfor %}
+                            {% endfor %}
+                        </div>
                     </div>
-                </div>
-            </section>
+                </section>
+            </div>
             <div class="unit-master-empty" data-type-master-search-empty hidden>
                 No types match that search.
             </div>

@@ -1,0 +1,799 @@
+{% extends "layouts/app_layout.html" %}
+{% import "includes/nutrition_macros.html" as nutrition %}
+
+{% set mode = nutrition_mode|default("dashboard", true) %}
+{% set selected_date = selected_date|default(today_date, true) %}
+{% set meal_filter = meal_filter|default("all", true) %}
+{% set app_page_title = ("Nutrition Insights" if mode == "insights" else "Log Meal" if mode == "log-meal" else "Water" if mode == "water" else "Saved Meals" if mode == "saved-meals" else "Nutrition") ~ " | AI Pantry" %}
+{% set app_shell_mode = "route" %}
+{% set app_active_nav_item = "nutrition" %}
+{% set app_search_id = "nutritionGlobalSearch" %}
+{% set app_body_class = "nutrition-route-page" %}
+{% set app_content_class = "nutrition-route-content" %}
+
+{% set dashboard_url = nutrition_dashboard_url|default("/nutrition", true) %}
+{% set insights_url = nutrition_insights_url|default("/nutrition/insights", true) %}
+{% set log_meal_url = nutrition_log_meal_url|default("/nutrition/log-meal", true) %}
+{% set water_url = nutrition_water_url|default("/nutrition/water", true) %}
+{% set saved_meals_url = nutrition_saved_meals_url|default("/nutrition/saved-meals", true) %}
+{% set meals_api_url = nutrition_meals_api_url|default("/api/nutrition/meals", true) %}
+{% set analyze_api_url = nutrition_analyze_api_url|default("/api/nutrition/meals/analyze", true) %}
+{% set saved_meals_api_url = nutrition_saved_meals_api_url|default("/api/nutrition/saved-meals", true) %}
+{% set water_api_url = nutrition_water_api_url|default("/api/nutrition/water", true) %}
+{% set dashboard_href = dashboard_url ~ "?date=" ~ selected_date ~ "&meal=" ~ meal_filter %}
+{% set insights_href = insights_url ~ "?date=" ~ selected_date ~ "&scope=" ~ meal_filter %}
+{% set log_meal_href = log_meal_url ~ "?date=" ~ selected_date %}
+{% set water_href = water_url ~ "?date=" ~ selected_date %}
+{% set saved_meals_href = saved_meals_url ~ "?date=" ~ selected_date %}
+
+{% block app_styles %}
+<link rel="stylesheet"
+      href="{{ url_for('static', filename='css/nutrition.css', v=nutrition_css_version|default(app_css_version)) }}">
+{% endblock %}
+
+{% block app_body_attributes %}
+data-nutrition-page
+data-nutrition-mode="{{ mode }}"
+data-selected-date="{{ selected_date }}"
+data-today-date="{{ today_date }}"
+data-date-query-key="{{ nutrition_date_query_key|default('date', true) }}"
+data-meals-api-url="{{ meals_api_url }}"
+data-analyze-api-url="{{ analyze_api_url }}"
+data-saved-meals-api-url="{{ saved_meals_api_url }}"
+data-water-api-url="{{ water_api_url }}"
+data-dashboard-url="{{ dashboard_url }}"
+data-photo-max-bytes="{{ nutrition_photo_max_bytes|default(10485760, true) }}"
+data-csrf-token="{{ csrf_token|default('', true) }}"
+{% endblock %}
+
+{% block app_content_attributes %}aria-label="Nutrition"{% endblock %}
+
+{% block app_content %}
+<div class="nutrition-shell" data-nutrition-shell>
+    {% if mode == "dashboard" %}
+        {% set totals = dashboard.nutrition|default(dashboard.totals|default({}, true), true) %}
+        {% set meals = dashboard.meals|default([], true) %}
+        {{ nutrition.page_heading(
+            "Nutrition",
+            "Daily meals, nutrients, and hydration in one place.",
+            url_for("main_bp.index"),
+            "Back to AI Pantry"
+        ) }}
+        {{ nutrition.date_navigator(selected_date, today_date, date_days, selected_date_label|default("", true)) }}
+
+        <section class="nutrition-dashboard" aria-labelledby="nutritionDailySummaryTitle">
+            <div class="nutrition-section-heading nutrition-section-heading-compact">
+                <div>
+                    <h2 id="nutritionDailySummaryTitle">Daily Totals</h2>
+                    <p>Nutrition recorded for the selected date.</p>
+                </div>
+            </div>
+            <div class="nutrition-daily-metrics">
+                {{ nutrition.metric("Calories", totals.calories|default(none), "kcal", "calories") }}
+                {{ nutrition.metric("Carbohydrates", totals.carbohydrates|default(none), "g", "carbohydrates") }}
+                {{ nutrition.metric("Fat", totals.fat|default(none), "g", "fat") }}
+                {{ nutrition.metric("Protein", totals.protein|default(none), "g", "protein") }}
+            </div>
+        </section>
+
+        <nav class="nutrition-primary-actions" aria-label="Nutrition actions">
+            <a class="nutrition-action-card" href="{{ insights_href }}">
+                <span class="nutrition-action-icon" aria-hidden="true">{{ nutrition.icon("chart") }}</span>
+                <span><strong>Nutrition Insights</strong><small>Daily details and weekly trends</small></span>
+                {{ nutrition.icon("chevron-right") }}
+            </a>
+            <a class="nutrition-action-card nutrition-action-card-primary" href="{{ log_meal_href }}">
+                <span class="nutrition-action-icon" aria-hidden="true">{{ nutrition.icon("plus") }}</span>
+                <span><strong>Log Meal</strong><small>Add food, a recipe, or a saved meal</small></span>
+                {{ nutrition.icon("chevron-right") }}
+            </a>
+            <a class="nutrition-action-card" href="{{ water_href }}">
+                <span class="nutrition-action-icon" aria-hidden="true">{{ nutrition.icon("droplet") }}</span>
+                <span><strong>Water</strong><small>Quickly record hydration</small></span>
+                {{ nutrition.icon("chevron-right") }}
+            </a>
+        </nav>
+
+        <section class="nutrition-meals-panel" aria-labelledby="nutritionMealsTitle">
+            <div class="nutrition-section-heading">
+                <div>
+                    <h2 id="nutritionMealsTitle">Meals</h2>
+                    <p>{{ meals|length }} entr{% if meals|length == 1 %}y{% else %}ies{% endif %} shown</p>
+                </div>
+                <a class="nutrition-text-link" href="{{ saved_meals_href }}">
+                    {{ nutrition.icon("bookmark") }} Saved Meals
+                </a>
+            </div>
+            {{ nutrition.meal_scope_filter(meal_filter, selected_date) }}
+
+            {% if meals %}
+            <ol class="nutrition-meal-list" data-nutrition-meal-list>
+                {% for meal in meals %}
+                    {% set meal_name = meal.name|default(meal.title|default("Meal", true), true) %}
+                    {% set meal_nutrients = meal.nutrition|default(meal.totals|default({}, true), true) %}
+                    {% set meal_id = meal.id|default("", true) %}
+                    <li class="nutrition-meal-row" data-meal-id="{{ meal_id }}">
+                        <div class="nutrition-meal-time">
+                            {{ nutrition.icon("clock") }}
+                            <time datetime="{{ meal.local_time|default(meal.time|default('', true), true) }}">{{ meal.display_time|default(meal.local_time|default(meal.time|default("", true), true), true) }}</time>
+                        </div>
+                        <div class="nutrition-meal-copy">
+                            <span>{{ nutrition.meal_type_label(meal.meal_type|default("")) }}</span>
+                            <strong>{{ meal_name }}</strong>
+                            {% if meal.summary|default("") %}<small>{{ meal.summary }}</small>{% endif %}
+                        </div>
+                        <div class="nutrition-meal-calories">
+                            <strong>{{ nutrition.number(meal_nutrients.calories|default(none)) }}</strong>
+                            <span>{% if meal_nutrients.calories is defined and meal_nutrients.calories is not none %}kcal{% else %}not estimated{% endif %}</span>
+                        </div>
+                        {% if meal_id %}
+                        <div class="nutrition-row-actions" aria-label="Actions for {{ meal_name }}">
+                            <a href="{{ log_meal_url }}?date={{ selected_date }}&amp;meal_id={{ meal_id }}">Edit</a>
+                            <button type="button"
+                                    class="nutrition-text-button nutrition-danger-text"
+                                    data-nutrition-delete
+                                    data-delete-kind="meal"
+                                    data-delete-name="{{ meal_name }}"
+                                    data-delete-url="{{ meal.api_url|default(meals_api_url ~ '/' ~ meal_id, true) }}">Delete</button>
+                        </div>
+                        {% endif %}
+                    </li>
+                {% endfor %}
+            </ol>
+            {% else %}
+            <div class="nutrition-empty-state">
+                <span class="nutrition-empty-icon" aria-hidden="true">{{ nutrition.icon("utensils") }}</span>
+                <div>
+                    <strong>No meals logged{% if meal_filter != "all" %} for {{ nutrition.meal_type_label(meal_filter)|lower }}{% endif %}</strong>
+                    <p>Log a meal to start building today&rsquo;s nutrition summary.</p>
+                </div>
+                <a class="nutrition-button nutrition-button-primary" href="{{ log_meal_href }}">Log a meal</a>
+            </div>
+            {% endif %}
+        </section>
+
+    {% elif mode == "insights" %}
+        {% set scope = insights.scope|default(meal_filter, true) %}
+        {% set daily_source = insights.daily_totals|default(insights.daily|default({}, true), true) %}
+        {% set daily = daily_source.nutrition|default(daily_source, true) %}
+        {% set weekly_source = insights.weekly|default([], true) %}
+        {% set weekly = weekly_source.days|default(weekly_source, true) %}
+        {{ nutrition.page_heading(
+            "Nutrition Insights",
+            "See what you logged today and how the week is trending.",
+            dashboard_href
+        ) }}
+        {{ nutrition.date_navigator(selected_date, today_date, date_days, selected_date_label|default("", true)) }}
+
+        <section class="nutrition-insights-summary" aria-labelledby="nutritionInsightsDailyTitle">
+            <div class="nutrition-section-heading nutrition-section-heading-compact">
+                <div>
+                    <h2 id="nutritionInsightsDailyTitle">{{ "Daily Totals" if scope == "all" else nutrition.meal_type_label(scope) }}</h2>
+                    <p>Selected-date totals; missing nutrients are shown as dashes.</p>
+                </div>
+            </div>
+            {{ nutrition.meal_scope_filter(scope, selected_date, "scope", "Nutrition insight scope", "Daily Totals") }}
+            {{ nutrition.nutrient_summary(daily) }}
+        </section>
+
+        <section class="nutrition-weekly-section" aria-labelledby="nutritionWeeklyTrendsTitle">
+            <div class="nutrition-section-heading nutrition-section-heading-compact">
+                <div>
+                    <h2 id="nutritionWeeklyTrendsTitle">Weekly trends</h2>
+                    <p>Seven days ending on the selected date.</p>
+                </div>
+            </div>
+            <script type="application/json" data-nutrition-chart-payload>{{ weekly|tojson }}</script>
+            <div class="nutrition-chart-grid">
+                {{ nutrition.chart("Calories", "Daily energy recorded", "calories", "kcal", "Log a meal to see calorie trends.") }}
+                {{ nutrition.chart("Macros", "Protein, carbohydrates, and fat", "macros", "g", "Log meals with macronutrients to see this trend.") }}
+                {{ nutrition.chart("Sugar", "Daily sugar recorded", "sugar", "g", "Log meals with sugar values to see this trend.") }}
+            </div>
+        </section>
+
+    {% elif mode == "log-meal" %}
+        {% set meal = editing_meal|default({}, true) %}
+        {% set meal_id = meal.id|default("", true) %}
+        {% set source_types = meal.source_types|default([], true) %}
+        {% set source_type = meal.source_type|default("recipe" if "recipe" in source_types else "saved" if "saved_meal" in source_types else "details", true) %}
+        {% set meal_recipe_snapshot = meal.recipe_snapshot|default({}, true) %}
+        {% set editing_recipe_id = meal.recipe_id|default(meal_recipe_snapshot.recipe_url|default("", true), true) %}
+        {% set review_items = meal.food_items|default([], true) %}
+        {% set initial_nutrition = meal.nutrition|default(meal.totals|default({}, true), true) %}
+        {{ nutrition.page_heading(
+            "Edit Meal" if meal_id else "Log Meal",
+            "Review every estimate before it becomes part of your nutrition history.",
+            dashboard_href
+        ) }}
+        {{ nutrition.date_navigator(selected_date, today_date, date_days, selected_date_label|default("", true)) }}
+
+        <form class="nutrition-meal-form"
+              data-nutrition-meal-form
+              data-editing-id="{{ meal_id }}"
+              data-save-url="{{ meal.api_url|default(meals_api_url ~ ('/' ~ meal_id if meal_id else ''), true) }}"
+              data-analysis-id="{{ meal.analysis_id|default('', true) }}"
+              data-media-id="{{ meal.media_id|default(meal.photo_id|default('', true), true) }}"
+              enctype="multipart/form-data"
+              novalidate>
+            <div class="nutrition-form-status" data-meal-form-status role="status" aria-live="polite"></div>
+
+            <section class="nutrition-form-panel" aria-labelledby="nutritionMealDetailsTitle">
+                <div class="nutrition-section-heading nutrition-section-heading-compact">
+                    <div>
+                        <h2 id="nutritionMealDetailsTitle">Meal details</h2>
+                        <p>Meal Type and Date are required.</p>
+                    </div>
+                </div>
+                <div class="nutrition-form-grid nutrition-form-grid-two">
+                    <label class="nutrition-field">
+                        <span>Meal Type <em aria-hidden="true">*</em></span>
+                        <select name="meal_type" required aria-describedby="mealTypeError">
+                            <option value="">Choose a meal type</option>
+                            {% for value, label in [("breakfast", "Breakfast"), ("lunch", "Lunch"), ("dinner", "Dinner"), ("snack", "Snack")] %}
+                            <option value="{{ value }}"{% if meal.meal_type|default("") == value %} selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                        <small id="mealTypeError" class="nutrition-field-error" data-field-error="meal_type"></small>
+                    </label>
+                    <div class="nutrition-field">
+                        <span>Date <em aria-hidden="true">*</em></span>
+                        <input type="hidden" name="local_date" value="{{ meal.local_date|default(selected_date, true) }}" required>
+                        <input type="hidden" name="local_time" value="{{ meal.local_time|default('', true) }}">
+                        <button type="button"
+                                class="nutrition-date-field-button"
+                                data-nutrition-calendar-open
+                                data-calendar-target="form"
+                                aria-haspopup="dialog"
+                                aria-controls="nutritionCalendarDialog">
+                            {{ nutrition.icon("calendar") }}
+                            <time datetime="{{ meal.local_date|default(selected_date, true) }}" data-meal-date-label>{{ meal.local_date|default(selected_date, true) }}</time>
+                        </button>
+                        <small id="mealDateError" class="nutrition-field-error" data-field-error="local_date"></small>
+                    </div>
+                </div>
+            </section>
+
+            <section class="nutrition-form-panel" aria-labelledby="nutritionMealSourceTitle">
+                <div class="nutrition-section-heading nutrition-section-heading-compact">
+                    <div>
+                        <h2 id="nutritionMealSourceTitle">Meal source</h2>
+                        <p>Provide a photo, description, AI Pantry recipe, or Saved Meal.</p>
+                    </div>
+                </div>
+                <fieldset class="nutrition-source-picker" aria-describedby="mealSourceError">
+                    <legend class="sr-only">Choose a meal source</legend>
+                    <label class="nutrition-source-option">
+                        <input type="radio" name="source_type" value="details"{% if source_type == "details" %} checked{% endif %}>
+                        <span>{{ nutrition.icon("camera") }}<strong>Photo or description</strong><small>Use either one, or both</small></span>
+                    </label>
+                    <label class="nutrition-source-option">
+                        <input type="radio" name="source_type" value="recipe"{% if source_type == "recipe" %} checked{% endif %}>
+                        <span>{{ nutrition.icon("utensils") }}<strong>AI Pantry recipe</strong><small>Choose servings</small></span>
+                    </label>
+                    <label class="nutrition-source-option">
+                        <input type="radio" name="source_type" value="saved"{% if source_type == "saved" %} checked{% endif %}>
+                        <span>{{ nutrition.icon("bookmark") }}<strong>Saved Meal</strong><small>Reuse a reviewed meal</small></span>
+                    </label>
+                </fieldset>
+                <small id="mealSourceError" class="nutrition-field-error" data-field-error="source"></small>
+
+                <div class="nutrition-source-panel" data-source-panel="details"{% if source_type != "details" %} hidden{% endif %}>
+                    <div class="nutrition-photo-field" data-nutrition-photo-field>
+                        <input id="nutritionMealPhoto"
+                               class="nutrition-file-input"
+                               type="file"
+                               data-photo-input
+                               accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
+                               aria-describedby="mealPhotoHelp mealPhotoError">
+                        <input id="nutritionMealCamera"
+                               class="nutrition-file-input"
+                               type="file"
+                               data-photo-input
+                               accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
+                               capture="environment"
+                               aria-describedby="mealPhotoHelp mealPhotoError">
+                        <div class="nutrition-photo-empty" data-photo-empty{% if meal.photo_url|default("") %} hidden{% endif %}>
+                            <span aria-hidden="true">{{ nutrition.icon("camera") }}</span>
+                            <div>
+                                <strong>Choose a meal photo</strong>
+                                <small id="mealPhotoHelp">JPEG, PNG, WebP, HEIC, or HEIF up to 10 MB.</small>
+                            </div>
+                            <div class="nutrition-photo-choose-actions">
+                                <button type="button" class="nutrition-button nutrition-button-secondary" data-photo-picker-target="nutritionMealPhoto">Choose photo</button>
+                                <button type="button" class="nutrition-button nutrition-button-secondary" data-photo-picker-target="nutritionMealCamera">Take photo</button>
+                            </div>
+                        </div>
+                        <div class="nutrition-photo-preview" data-photo-preview{% if not meal.photo_url|default("") %} hidden{% endif %}>
+                            <img{% if meal.photo_url|default("") %} src="{{ meal.photo_url }}"{% endif %} alt="Selected meal photo preview" data-photo-preview-image>
+                            <div class="nutrition-photo-preview-copy">
+                                <strong data-photo-name>{{ meal.photo_name|default("Meal photo", true) }}</strong>
+                                <span>Ready to analyze</span>
+                            </div>
+                            <div class="nutrition-photo-actions">
+                                <button type="button" class="nutrition-text-button" data-photo-picker-target="nutritionMealPhoto">Replace</button>
+                                <button type="button" class="nutrition-text-button nutrition-danger-text" data-photo-remove>Remove</button>
+                            </div>
+                        </div>
+                        <small id="mealPhotoError" class="nutrition-field-error" data-field-error="photo"></small>
+                    </div>
+
+                    <label class="nutrition-field nutrition-description-field">
+                        <span>Description <small>Optional when a photo is selected</small></span>
+                        <textarea name="description"
+                                  rows="4"
+                                  maxlength="200"
+                                  aria-describedby="mealDescriptionHelp mealDescriptionError"
+                                  placeholder="For example: two scrambled eggs, sourdough toast, and strawberries">{{ meal.description|default("", true) }}</textarea>
+                        <span id="mealDescriptionHelp" class="nutrition-field-help"><span data-description-count>0</span>/200 characters</span>
+                        <small id="mealDescriptionError" class="nutrition-field-error" data-field-error="description"></small>
+                    </label>
+                </div>
+
+                <div class="nutrition-source-panel" data-source-panel="recipe"{% if source_type != "recipe" %} hidden{% endif %}>
+                    <label class="nutrition-field">
+                        <span>AI Pantry recipe</span>
+                        <select name="recipe_id" aria-describedby="mealRecipeError">
+                            <option value="">Choose a recipe</option>
+                            {% for recipe in recipe_options|default([]) %}
+                                {% set recipe_id = recipe.id|default(recipe.url|default("", true), true) %}
+                                <option value="{{ recipe_id }}"{% if editing_recipe_id == recipe_id %} selected{% endif %}>{{ recipe.title|default(recipe.name|default("Untitled recipe", true), true) }}</option>
+                            {% endfor %}
+                        </select>
+                        <small id="mealRecipeError" class="nutrition-field-error" data-field-error="recipe_id"></small>
+                    </label>
+                </div>
+
+                <div class="nutrition-source-panel" data-source-panel="saved"{% if source_type != "saved" %} hidden{% endif %}>
+                    <label class="nutrition-field">
+                        <span>Saved Meal</span>
+                        <select name="saved_meal_id" aria-describedby="mealSavedError">
+                            <option value="">Choose a saved meal</option>
+                            {% for saved in saved_meals|default([]) %}
+                                <option value="{{ saved.id }}"{% if meal.saved_meal_id|default("") == saved.id %} selected{% endif %}>{{ saved.name|default("Saved Meal", true) }}</option>
+                            {% endfor %}
+                        </select>
+                        <small id="mealSavedError" class="nutrition-field-error" data-field-error="saved_meal_id"></small>
+                    </label>
+                </div>
+
+                <label class="nutrition-field nutrition-servings-field" data-source-servings{% if source_type == "details" %} hidden{% endif %}>
+                    <span>Servings</span>
+                    <input type="number"
+                           name="servings"
+                           min="0.25"
+                           max="100"
+                           step="0.25"
+                           inputmode="decimal"
+                           value="{{ meal.servings|default(1, true) }}"
+                           aria-describedby="mealServingsHelp mealServingsError">
+                    <small id="mealServingsHelp" class="nutrition-field-help">Nutrition is scaled to this serving amount and saved as a snapshot.</small>
+                    <small id="mealServingsError" class="nutrition-field-error" data-field-error="servings"></small>
+                </label>
+
+                <div class="nutrition-form-actions nutrition-form-actions-split">
+                    <button type="button" class="nutrition-button nutrition-button-secondary" data-start-manual>
+                        Enter nutrition manually
+                    </button>
+                    <button type="button" class="nutrition-button nutrition-button-primary" data-analyze-meal>
+                        {{ nutrition.icon("sparkles") }}
+                        <span data-analyze-label>{{ "Refresh review" if review_items else "Analyze meal" }}</span>
+                    </button>
+                </div>
+            </section>
+
+            <section class="nutrition-form-panel nutrition-review-panel"
+                     data-meal-review
+                     aria-labelledby="nutritionReviewTitle"
+                     {% if not review_items %}hidden{% endif %}>
+                <div class="nutrition-section-heading">
+                    <div>
+                        <h2 id="nutritionReviewTitle">Review food and nutrition</h2>
+                        <p>Nutrition is an estimate. Correct each item before saving.</p>
+                    </div>
+                    <span class="nutrition-estimate-label">Estimate</span>
+                </div>
+
+                <div class="nutrition-review-list" data-review-list></div>
+                <script type="application/json" data-initial-review-items>{{ review_items|tojson }}</script>
+                <script type="application/json" data-initial-review-totals>{{ initial_nutrition|tojson }}</script>
+
+                <button type="button" class="nutrition-add-food" data-add-food>
+                    {{ nutrition.icon("plus") }} Add food item
+                </button>
+
+                <div class="nutrition-review-totals" aria-live="polite">
+                    <div class="nutrition-review-total-primary">
+                        <span>Total calories</span>
+                        <strong><span data-review-total="calories">&mdash;</span> <small>kcal</small></strong>
+                    </div>
+                    <dl>
+                        <div><dt>Protein</dt><dd><span data-review-total="protein">&mdash;</span> g</dd></div>
+                        <div><dt>Carbohydrates</dt><dd><span data-review-total="carbohydrates">&mdash;</span> g</dd></div>
+                        <div><dt>Fat</dt><dd><span data-review-total="fat">&mdash;</span> g</dd></div>
+                        <div><dt>Fiber</dt><dd><span data-review-total="fiber">&mdash;</span> g</dd></div>
+                        <div><dt>Sugar</dt><dd><span data-review-total="sugar">&mdash;</span> g</dd></div>
+                        <div><dt>Sodium</dt><dd><span data-review-total="sodium">&mdash;</span> mg</dd></div>
+                    </dl>
+                </div>
+
+                <div class="nutrition-save-template-choice">
+                    <label>
+                        <input type="checkbox" name="save_as_template" value="true" data-save-template-toggle>
+                        <span><strong>Save to Saved Meals</strong><small>Reuse this reviewed meal without changing today&rsquo;s history.</small></span>
+                    </label>
+                    <label class="nutrition-field" data-template-name-field hidden>
+                        <span>Saved meal name</span>
+                        <input type="text" name="template_name" maxlength="80" autocomplete="off" aria-describedby="templateNameError">
+                        <small id="templateNameError" class="nutrition-field-error" data-field-error="template_name"></small>
+                    </label>
+                </div>
+
+                <div class="nutrition-form-actions nutrition-keyboard-safe-actions">
+                    <a class="nutrition-button nutrition-button-secondary" href="{{ dashboard_href }}">Cancel</a>
+                    <button type="submit" class="nutrition-button nutrition-button-primary" data-save-meal>
+                        {{ nutrition.icon("check") }}
+                        <span>{{ "Save changes" if meal_id else "Save meal" }}</span>
+                    </button>
+                </div>
+            </section>
+
+            <template id="nutritionReviewRowTemplate">
+                <article class="nutrition-review-row" data-review-row data-base-serving="1">
+                    <div class="nutrition-review-row-heading">
+                        <label class="nutrition-field">
+                            <span>Food item</span>
+                            <input type="text" data-item-field="name" maxlength="100" autocomplete="off">
+                        </label>
+                        <button type="button" class="nutrition-icon-button nutrition-danger-icon" data-remove-food aria-label="Remove food item" title="Remove food item">
+                            {{ nutrition.icon("trash") }}
+                        </button>
+                    </div>
+                    <div class="nutrition-serving-grid">
+                        <label class="nutrition-field">
+                            <span>Serving amount</span>
+                            <input type="number" data-item-field="serving_amount" min="0.01" max="10000" step="0.01" inputmode="decimal">
+                        </label>
+                        <label class="nutrition-field">
+                            <span>Serving unit</span>
+                            <input type="text" data-item-field="serving_unit" maxlength="40" autocomplete="off">
+                        </label>
+                    </div>
+                    <div class="nutrition-item-nutrients">
+                        {% for key, label, unit in [("calories", "Calories", "kcal"), ("protein", "Protein", "g"), ("carbohydrates", "Carbohydrates", "g"), ("fat", "Fat", "g")] %}
+                        <label class="nutrition-field nutrition-nutrient-input">
+                            <span>{{ label }} <small>{{ unit }}</small></span>
+                            <input type="number" data-nutrient="{{ key }}" min="0" max="100000" step="0.1" inputmode="decimal">
+                        </label>
+                        {% endfor %}
+                    </div>
+                    <details class="nutrition-more-nutrients">
+                        <summary>Fiber, sugar, and sodium</summary>
+                        <div class="nutrition-item-nutrients nutrition-item-nutrients-secondary">
+                            {% for key, label, unit in [("fiber", "Fiber", "g"), ("sugar", "Sugar", "g"), ("sodium", "Sodium", "mg")] %}
+                            <label class="nutrition-field nutrition-nutrient-input">
+                                <span>{{ label }} <small>{{ unit }}</small></span>
+                                <input type="number" data-nutrient="{{ key }}" min="0" max="100000" step="0.1" inputmode="decimal">
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </details>
+                    <small class="nutrition-confidence" data-item-confidence hidden></small>
+                    <small class="nutrition-field-error" data-row-error></small>
+                </article>
+            </template>
+        </form>
+
+    {% elif mode == "saved-meals" %}
+        {% set initial_saved_edit = editing_saved_meal|default({}, true) %}
+        {{ nutrition.page_heading(
+            "Saved Meals",
+            "Reusable meal templates stay separate from your nutrition history.",
+            dashboard_href
+        ) }}
+        {{ nutrition.date_navigator(selected_date, today_date, date_days, selected_date_label|default("", true)) }}
+
+        <section class="nutrition-saved-panel" aria-labelledby="nutritionSavedMealsTitle">
+            <div class="nutrition-section-heading">
+                <div>
+                    <h2 id="nutritionSavedMealsTitle">Your saved meals</h2>
+                    <p>{{ saved_meals|default([])|length }} template{% if saved_meals|default([])|length != 1 %}s{% endif %}</p>
+                </div>
+                <a class="nutrition-button nutrition-button-primary" href="{{ log_meal_href }}">{{ nutrition.icon("plus") }} Log Meal</a>
+            </div>
+            {% if saved_meals|default([]) %}
+            <div class="nutrition-saved-list">
+                {% for saved in saved_meals %}
+                    {% set saved_nutrients = saved.nutrition|default(saved.totals|default({}, true), true) %}
+                    {% set saved_meal_type = saved.meal_type|default(saved.default_meal_type|default("snack", true), true) %}
+                    {% set saved_servings = saved.servings|default(saved.base_servings|default(1, true), true) %}
+                    <article class="nutrition-saved-row" data-saved-meal-id="{{ saved.id }}">
+                        <span class="nutrition-saved-icon" aria-hidden="true">{{ nutrition.icon("bookmark") }}</span>
+                        <div class="nutrition-saved-copy">
+                            <strong>{{ saved.name|default("Saved Meal", true) }}</strong>
+                            <span>{{ nutrition.meal_type_label(saved_meal_type) }} &middot; {{ saved_servings }} serving{% if saved_servings != 1 %}s{% endif %}</span>
+                        </div>
+                        <div class="nutrition-saved-macros" aria-label="Nutrition per saved serving">
+                            <span>{{ nutrition.number(saved_nutrients.calories|default(none)) }} kcal</span>
+                            <span>{{ nutrition.number(saved_nutrients.protein|default(none)) }} g protein</span>
+                        </div>
+                        <div class="nutrition-row-actions">
+                            <a class="nutrition-button nutrition-button-primary" href="{{ log_meal_url }}?date={{ selected_date }}&amp;saved_meal_id={{ saved.id }}">Log</a>
+                            <button type="button"
+                                    class="nutrition-text-button"
+                                    data-edit-saved-meal
+                                    data-saved-id="{{ saved.id }}"
+                                    data-saved-name="{{ saved.name|default('Saved Meal', true) }}"
+                                    data-saved-meal-type="{{ saved_meal_type }}"
+                                    data-saved-servings="{{ saved_servings }}"
+                                    data-saved-url="{{ saved.api_url|default(saved_meals_api_url ~ '/' ~ saved.id, true) }}">Edit</button>
+                            <button type="button"
+                                    class="nutrition-text-button nutrition-danger-text"
+                                    data-nutrition-delete
+                                    data-delete-kind="saved meal"
+                                    data-delete-name="{{ saved.name|default('Saved Meal', true) }}"
+                                    data-delete-url="{{ saved.api_url|default(saved_meals_api_url ~ '/' ~ saved.id, true) }}">Delete</button>
+                        </div>
+                    </article>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="nutrition-empty-state">
+                <span class="nutrition-empty-icon" aria-hidden="true">{{ nutrition.icon("bookmark") }}</span>
+                <div>
+                    <strong>No Saved Meals yet</strong>
+                    <p>Review a meal, then choose Save to Saved Meals for faster logging next time.</p>
+                </div>
+                <a class="nutrition-button nutrition-button-primary" href="{{ log_meal_href }}">Log a meal</a>
+            </div>
+            {% endif %}
+        </section>
+
+        <dialog class="nutrition-dialog"
+                data-saved-meal-dialog
+                {% if initial_saved_edit.id|default("") %}
+                data-autopen="true"
+                data-saved-id="{{ initial_saved_edit.id }}"
+                data-saved-name="{{ initial_saved_edit.name|default('Saved Meal', true) }}"
+                data-saved-meal-type="{{ initial_saved_edit.meal_type|default(initial_saved_edit.default_meal_type|default('snack', true), true) }}"
+                data-saved-servings="{{ initial_saved_edit.servings|default(initial_saved_edit.base_servings|default(1, true), true) }}"
+                data-saved-url="{{ initial_saved_edit.api_url|default(saved_meals_api_url ~ '/' ~ initial_saved_edit.id, true) }}"
+                {% endif %}
+                aria-labelledby="savedMealDialogTitle">
+            <form class="nutrition-dialog-card" data-saved-meal-form novalidate>
+                <header class="nutrition-dialog-header">
+                    <div>
+                        <h2 id="savedMealDialogTitle">Edit Saved Meal</h2>
+                        <p>Changes apply only when you reuse this template.</p>
+                    </div>
+                    <button type="button" class="nutrition-icon-button" data-nutrition-dialog-close aria-label="Close Saved Meal editor">{{ nutrition.icon("x") }}</button>
+                </header>
+                <input type="hidden" name="saved_meal_id">
+                <label class="nutrition-field">
+                    <span>Name</span>
+                    <input type="text" name="name" maxlength="80" required>
+                    <small class="nutrition-field-error" data-saved-field-error="name"></small>
+                </label>
+                <label class="nutrition-field">
+                    <span>Default Meal Type</span>
+                    <select name="meal_type" required>
+                        <option value="breakfast">Breakfast</option>
+                        <option value="lunch">Lunch</option>
+                        <option value="dinner">Dinner</option>
+                        <option value="snack">Snack</option>
+                    </select>
+                </label>
+                <label class="nutrition-field">
+                    <span>Default servings</span>
+                    <input type="number" name="servings" min="0.25" max="100" step="0.25" inputmode="decimal" required>
+                    <small class="nutrition-field-error" data-saved-field-error="servings"></small>
+                </label>
+                <div class="nutrition-dialog-status" data-saved-dialog-status role="status" aria-live="polite"></div>
+                <footer class="nutrition-dialog-actions">
+                    <button type="button" class="nutrition-button nutrition-button-secondary" data-nutrition-dialog-close>Cancel</button>
+                    <button type="submit" class="nutrition-button nutrition-button-primary">Save changes</button>
+                </footer>
+            </form>
+        </dialog>
+
+    {% elif mode == "water" %}
+        {% set water_total = water.display_amount|default(water.total|default(water.total_amount|default(0))) %}
+        {% set water_unit = water.display_unit|default(water.unit|default("fl_oz", true), true) %}
+        {% set raw_water_goal = water.goal|default(water.goal_amount|default(water.goal_ml|default(none))) %}
+        {% set water_goal = (raw_water_goal / 29.5735295625) if raw_water_goal is not none and water.goal_ml is defined and water_unit == "fl_oz" else raw_water_goal %}
+        {% set water_entries = water.entries|default([], true) %}
+        {% set water_weekly_source = water.weekly|default([], true) %}
+        {% set water_weekly = water_weekly_source.days|default(water_weekly_source, true) %}
+        {{ nutrition.page_heading(
+            "Water",
+            "Fast hydration logging for the selected date.",
+            dashboard_href
+        ) }}
+        {{ nutrition.date_navigator(selected_date, today_date, date_days, selected_date_label|default("", true)) }}
+
+        <section class="nutrition-water-summary" aria-labelledby="nutritionWaterTotalTitle">
+            <div class="nutrition-water-total">
+                <span class="nutrition-water-total-icon" aria-hidden="true">{{ nutrition.icon("droplet") }}</span>
+                <div>
+                    <span id="nutritionWaterTotalTitle">Daily water total</span>
+                    <strong>{{ nutrition.number(water_total, 1) }} <small>{{ "mL" if water_unit == "ml" else "fl oz" }}</small></strong>
+                </div>
+                {% if water_goal is not none and water_goal > 0 %}
+                    {% set water_percent = (water_total / water_goal * 100) %}
+                    {% set visual_percent = 100 if water_percent > 100 else water_percent %}
+                    <div class="nutrition-water-progress" aria-label="{{ water_percent|round|int }} percent of daily water goal">
+                        <div><span style="width: {{ visual_percent }}%"></span></div>
+                        <small>{{ nutrition.number(water_goal, 1) }} {{ "mL" if water_unit == "ml" else "fl oz" }} goal</small>
+                    </div>
+                {% endif %}
+            </div>
+            <div class="nutrition-water-quick-add" aria-labelledby="nutritionWaterQuickAddTitle">
+                <div>
+                    <h2 id="nutritionWaterQuickAddTitle">Quick add</h2>
+                    <p>Tap once to log water now.</p>
+                </div>
+                <div class="nutrition-water-presets">
+                    {% for amount in [8, 12, 16, 24] %}
+                    <button type="button" class="nutrition-water-preset" data-water-quick-add data-amount="{{ amount }}" data-unit="fl_oz">
+                        <strong>+{{ amount }}</strong><span>fl oz</span>
+                    </button>
+                    {% endfor %}
+                    <button type="button" class="nutrition-water-preset" data-water-custom-open>
+                        {{ nutrition.icon("plus") }}<span>Custom</span>
+                    </button>
+                </div>
+                <div class="nutrition-inline-status" data-water-quick-status role="status" aria-live="polite"></div>
+            </div>
+        </section>
+
+        <section class="nutrition-weekly-section" aria-labelledby="nutritionWaterWeeklyTitle">
+            <div class="nutrition-section-heading nutrition-section-heading-compact">
+                <div>
+                    <h2 id="nutritionWaterWeeklyTitle">Weekly water</h2>
+                    <p>Seven days ending on the selected date.</p>
+                </div>
+            </div>
+            <script type="application/json" data-nutrition-chart-payload>{{ water_weekly|tojson }}</script>
+            <div class="nutrition-chart-grid nutrition-chart-grid-one">
+                {{ nutrition.chart("Water", "Daily hydration recorded", "water", "mL" if water_unit == "ml" else "fl oz", "Log water to see your weekly hydration.", water_goal) }}
+            </div>
+        </section>
+
+        <section class="nutrition-water-entries" aria-labelledby="nutritionWaterEntriesTitle">
+            <div class="nutrition-section-heading">
+                <div>
+                    <h2 id="nutritionWaterEntriesTitle">Tracked water</h2>
+                    <p>{{ water_entries|length }} entr{% if water_entries|length == 1 %}y{% else %}ies{% endif %}</p>
+                </div>
+                <button type="button" class="nutrition-button nutrition-button-primary" data-water-custom-open>{{ nutrition.icon("plus") }} Add water</button>
+            </div>
+            {% if water_entries %}
+            <ol class="nutrition-water-entry-list">
+                {% for entry in water_entries %}
+                <li class="nutrition-water-entry-row" data-water-entry-id="{{ entry.id }}">
+                    <span class="nutrition-water-entry-icon" aria-hidden="true">{{ nutrition.icon("droplet") }}</span>
+                    <div>
+                        <strong>{{ nutrition.number(entry.amount|default(none), 1) }} {{ "mL" if entry.unit|default("fl_oz") == "ml" else "fl oz" }}</strong>
+                        <span><time datetime="{{ entry.local_time|default('', true) }}">{{ entry.display_time|default(entry.local_time|default("", true), true) }}</time>{% if entry.source|default("") %} &middot; {{ entry.source_label|default(entry.source, true) }}{% endif %}</span>
+                    </div>
+                    <div class="nutrition-row-actions">
+                        <button type="button"
+                                class="nutrition-text-button"
+                                data-edit-water
+                                data-water-id="{{ entry.id }}"
+                                data-water-amount="{{ entry.amount }}"
+                                data-water-unit="{{ entry.unit }}"
+                                data-water-time="{{ entry.local_time|default('', true) }}"
+                                data-water-url="{{ entry.api_url|default(water_api_url ~ '/' ~ entry.id, true) }}">Edit</button>
+                        <button type="button"
+                                class="nutrition-text-button nutrition-danger-text"
+                                data-nutrition-delete
+                                data-delete-kind="water entry"
+                                data-delete-name="{{ nutrition.number(entry.amount, 1) }} {{ 'mL' if entry.unit == 'ml' else 'fl oz' }}"
+                                data-delete-url="{{ entry.api_url|default(water_api_url ~ '/' ~ entry.id, true) }}">Delete</button>
+                    </div>
+                </li>
+                {% endfor %}
+            </ol>
+            {% else %}
+            <div class="nutrition-empty-state">
+                <span class="nutrition-empty-icon" aria-hidden="true">{{ nutrition.icon("droplet") }}</span>
+                <div>
+                    <strong>No water logged</strong>
+                    <p>Use a quick-add amount or enter a custom value.</p>
+                </div>
+                <button type="button" class="nutrition-button nutrition-button-primary" data-water-custom-open>Add water</button>
+            </div>
+            {% endif %}
+        </section>
+
+        <dialog class="nutrition-dialog nutrition-water-dialog" data-water-dialog aria-labelledby="waterDialogTitle">
+            <form class="nutrition-dialog-card" data-water-form novalidate>
+                <header class="nutrition-dialog-header">
+                    <div>
+                        <h2 id="waterDialogTitle" data-water-dialog-title>Add water</h2>
+                        <p>Enter an amount and time. AI Pantry handles unit conversion.</p>
+                    </div>
+                    <button type="button" class="nutrition-icon-button" data-nutrition-dialog-close aria-label="Close water entry">{{ nutrition.icon("x") }}</button>
+                </header>
+                <input type="hidden" name="entry_id">
+                <div class="nutrition-form-grid nutrition-form-grid-two">
+                    <label class="nutrition-field">
+                        <span>Amount</span>
+                        <input type="number" name="amount" min="0.01" step="0.1" inputmode="decimal" required aria-describedby="waterAmountError">
+                        <small id="waterAmountError" class="nutrition-field-error" data-water-field-error="amount"></small>
+                    </label>
+                    <label class="nutrition-field">
+                        <span>Unit</span>
+                        <select name="unit" required>
+                            <option value="fl_oz">fl oz</option>
+                            <option value="ml">mL</option>
+                        </select>
+                    </label>
+                </div>
+                <label class="nutrition-field">
+                    <span>Time</span>
+                    <input type="time" name="local_time" required aria-describedby="waterTimeError">
+                    <small id="waterTimeError" class="nutrition-field-error" data-water-field-error="local_time"></small>
+                </label>
+                <p class="nutrition-unit-note">Maximum per entry: 338 fl oz or 10,000 mL. Totals display in your preferred unit.</p>
+                <div class="nutrition-dialog-status" data-water-dialog-status role="status" aria-live="polite"></div>
+                <footer class="nutrition-dialog-actions">
+                    <button type="button" class="nutrition-button nutrition-button-secondary" data-nutrition-dialog-close>Cancel</button>
+                    <button type="submit" class="nutrition-button nutrition-button-primary" data-water-submit>Save water</button>
+                </footer>
+            </form>
+        </dialog>
+    {% endif %}
+</div>
+
+<dialog id="nutritionCalendarDialog"
+        class="nutrition-dialog nutrition-calendar-dialog"
+        data-nutrition-calendar-dialog
+        aria-labelledby="nutritionCalendarTitle">
+    <div class="nutrition-dialog-card nutrition-calendar-card">
+        <header class="nutrition-dialog-header">
+            <div>
+                <h2 id="nutritionCalendarTitle">Choose a date</h2>
+                <p>Today and prior dates are available.</p>
+            </div>
+            <button type="button" class="nutrition-icon-button" data-nutrition-dialog-close aria-label="Close calendar">{{ nutrition.icon("x") }}</button>
+        </header>
+        <div class="nutrition-calendar-toolbar">
+            <button type="button" class="nutrition-icon-button" data-calendar-month-step="-1" aria-label="Previous month">{{ nutrition.icon("chevron-left") }}</button>
+            <strong data-calendar-month-label></strong>
+            <button type="button" class="nutrition-icon-button" data-calendar-month-step="1" aria-label="Next month">{{ nutrition.icon("chevron-right") }}</button>
+        </div>
+        <div class="nutrition-calendar-weekdays" aria-hidden="true">
+            <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+        </div>
+        <div class="nutrition-calendar-grid" role="group" aria-label="Calendar dates" data-calendar-grid></div>
+        <footer class="nutrition-calendar-footer">
+            <button type="button" class="nutrition-button nutrition-button-secondary" data-calendar-today>Today</button>
+            <button type="button" class="nutrition-button nutrition-button-secondary" data-nutrition-dialog-close>Cancel</button>
+        </footer>
+    </div>
+</dialog>
+
+<dialog class="nutrition-dialog nutrition-confirm-dialog"
+        data-nutrition-confirm-dialog
+        aria-labelledby="nutritionConfirmTitle">
+    <div class="nutrition-dialog-card">
+        <header class="nutrition-dialog-header">
+            <div>
+                <h2 id="nutritionConfirmTitle" data-confirm-title>Delete entry?</h2>
+                <p data-confirm-message>This cannot be undone.</p>
+            </div>
+            <button type="button" class="nutrition-icon-button" data-nutrition-dialog-close aria-label="Close confirmation">{{ nutrition.icon("x") }}</button>
+        </header>
+        <div class="nutrition-dialog-status" data-confirm-status role="status" aria-live="polite"></div>
+        <footer class="nutrition-dialog-actions">
+            <button type="button" class="nutrition-button nutrition-button-secondary" data-nutrition-dialog-close>Cancel</button>
+            <button type="button" class="nutrition-button nutrition-button-danger" data-confirm-delete>Delete</button>
+        </footer>
+    </div>
+</dialog>
+{% endblock %}
+
+{% block app_scripts %}
+<script src="{{ url_for('static', filename='js/nutrition.js', v=nutrition_js_version|default(app_js_version)) }}"></script>
+{% endblock %}

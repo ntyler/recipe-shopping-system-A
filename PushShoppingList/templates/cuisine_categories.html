@@ -112,76 +112,78 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                 </div>
             </header>
 
-            <section class="unit-master-category type-master-category"
-                     data-cuisine-category-master-category
-                     aria-labelledby="allCuisineCategoriesTitle">
-                <header>
-                    <h3 id="allCuisineCategoriesTitle">Cuisine categories</h3>
-                    <span data-cuisine-category-master-count-label>{{ master_data.categories | length }} categories</span>
-                </header>
-                <div class="unit-master-table type-master-table cuisine-category-master-table" role="table" aria-label="Cuisine categories">
-                    <div class="unit-master-table-head" role="row">
-                        <span role="columnheader">Icon</span>
-                        <span role="columnheader">Abbreviation</span>
-                        <span role="columnheader">Cuisine Category Name</span>
-                        <span role="columnheader">Used in</span>
-                        <span role="columnheader">Source</span>
-                        <span role="columnheader">Status</span>
-                        <span role="columnheader">Action</span>
-                    </div>
-                    <div data-cuisine-category-master-rows>
-                        {% for category in master_data.categories %}
-                            <div class="unit-master-row"
-                                 role="row"
-                                 data-cuisine-category-master-row
-                                 data-category-id="{{ category.id }}"
-                                 data-cuisine-category-master-search-value="{{ category.icon }} {{ category.abbreviation }} {{ category.category_name or category.canonical_name or category.name }}">
-                                <span class="cuisine-category-master-icon cuisine-category-icon-visual"
-                                      role="cell"
-                                      data-cuisine-category-icon-visual
-                                      data-icon-token="{{ category.icon }}">
-                                    {{ cuisine_icon_fallback(category.icon) }}
-                                </span>
-                                <strong class="cuisine-category-master-abbreviation" role="cell">
-                                    {{ category.abbreviation or "—" }}
-                                </strong>
-                                <strong class="cuisine-category-master-name" role="cell">
-                                    {{ category.category_name or category.canonical_name or category.name }}
-                                </strong>
-                                <div class="unit-master-usage" role="cell">
-                                    {% if category.recipe_count %}
+            <div class="unit-master-category-list cuisine-category-master-category-list">
+                <section class="unit-master-category type-master-category"
+                         data-cuisine-category-master-category
+                         aria-labelledby="allCuisineCategoriesTitle">
+                    <header>
+                        <h3 id="allCuisineCategoriesTitle">Cuisine categories</h3>
+                        <span data-cuisine-category-master-count-label>{{ master_data.categories | length }} categories</span>
+                    </header>
+                    <div class="unit-master-table type-master-table cuisine-category-master-table" role="table" aria-label="Cuisine categories">
+                        <div class="unit-master-table-head" role="row">
+                            <span role="columnheader">Icon</span>
+                            <span role="columnheader">Abbreviation</span>
+                            <span role="columnheader">Cuisine Category Name</span>
+                            <span role="columnheader">Used in</span>
+                            <span role="columnheader">Source</span>
+                            <span role="columnheader">Status</span>
+                            <span role="columnheader">Action</span>
+                        </div>
+                        <div data-cuisine-category-master-rows>
+                            {% for category in master_data.categories %}
+                                <div class="unit-master-row"
+                                     role="row"
+                                     data-cuisine-category-master-row
+                                     data-category-id="{{ category.id }}"
+                                     data-cuisine-category-master-search-value="{{ category.icon }} {{ category.abbreviation }} {{ category.category_name or category.canonical_name or category.name }}">
+                                    <span class="cuisine-category-master-icon cuisine-category-icon-visual"
+                                          role="cell"
+                                          data-cuisine-category-icon-visual
+                                          data-icon-token="{{ category.icon }}">
+                                        {{ cuisine_icon_fallback(category.icon) }}
+                                    </span>
+                                    <strong class="cuisine-category-master-abbreviation" role="cell">
+                                        {{ category.abbreviation or "—" }}
+                                    </strong>
+                                    <strong class="cuisine-category-master-name" role="cell">
+                                        {{ category.category_name or category.canonical_name or category.name }}
+                                    </strong>
+                                    <div class="unit-master-usage" role="cell">
+                                        {% if category.recipe_count %}
+                                            <button type="button"
+                                                    class="unit-master-usage-button"
+                                                    data-cuisine-category-master-usage-button
+                                                    data-category-id="{{ category.id }}"
+                                                    aria-haspopup="dialog"
+                                                    aria-controls="cuisineCategoryMasterUsageDialog"
+                                                    aria-label="Show {{ category.recipe_count }} recipe{% if category.recipe_count != 1 %}s{% endif %} using {{ category.category_name or category.canonical_name or category.name }}">
+                                                <strong>{{ category.recipe_count }}</strong>
+                                                <span>{{ "recipe" if category.recipe_count == 1 else "recipes" }}</span>
+                                            </button>
+                                        {% else %}
+                                            <span class="unit-master-usage-empty" aria-label="No recipes use {{ category.category_name or category.canonical_name or category.name }}">0</span>
+                                        {% endif %}
+                                    </div>
+                                    <span class="unit-master-source-badge{% if category.custom %} user-created{% endif %}" role="cell">
+                                        {{ "User-created" if category.custom else "System-seeded" }}
+                                    </span>
+                                    <span class="type-master-status-badge{% if not category.active %} is-inactive{% endif %}" role="cell">
+                                        {{ "Active" if category.active else "Inactive" }}
+                                    </span>
+                                    <span class="unit-master-action-cell" role="cell">
                                         <button type="button"
-                                                class="unit-master-usage-button"
-                                                data-cuisine-category-master-usage-button
+                                                class="unit-master-edit-button"
+                                                data-cuisine-category-master-edit-button
                                                 data-category-id="{{ category.id }}"
-                                                aria-haspopup="dialog"
-                                                aria-controls="cuisineCategoryMasterUsageDialog"
-                                                aria-label="Show {{ category.recipe_count }} recipe{% if category.recipe_count != 1 %}s{% endif %} using {{ category.category_name or category.canonical_name or category.name }}">
-                                            <strong>{{ category.recipe_count }}</strong>
-                                            <span>{{ "recipe" if category.recipe_count == 1 else "recipes" }}</span>
-                                        </button>
-                                    {% else %}
-                                        <span class="unit-master-usage-empty" aria-label="No recipes use {{ category.category_name or category.canonical_name or category.name }}">0</span>
-                                    {% endif %}
+                                                aria-label="Edit {{ category.category_name or category.canonical_name or category.name }}">Edit</button>
+                                    </span>
                                 </div>
-                                <span class="unit-master-source-badge{% if category.custom %} user-created{% endif %}" role="cell">
-                                    {{ "User-created" if category.custom else "System-seeded" }}
-                                </span>
-                                <span class="type-master-status-badge{% if not category.active %} is-inactive{% endif %}" role="cell">
-                                    {{ "Active" if category.active else "Inactive" }}
-                                </span>
-                                <span class="unit-master-action-cell" role="cell">
-                                    <button type="button"
-                                            class="unit-master-edit-button"
-                                            data-cuisine-category-master-edit-button
-                                            data-category-id="{{ category.id }}"
-                                            aria-label="Edit {{ category.category_name or category.canonical_name or category.name }}">Edit</button>
-                                </span>
-                            </div>
-                        {% endfor %}
+                            {% endfor %}
+                        </div>
                     </div>
-                </div>
-            </section>
+                </section>
+            </div>
             <div class="unit-master-empty" data-cuisine-category-master-search-empty hidden>
                 No cuisine categories match that search.
             </div>

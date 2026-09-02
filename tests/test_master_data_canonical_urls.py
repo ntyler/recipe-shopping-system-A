@@ -239,6 +239,19 @@ def test_cuisine_categories_page_renders_registry_management_ui(master_data_app)
     assert soup.select_one("[data-cuisine-category-master-dialog]") is not None
     assert soup.select_one("[data-cuisine-category-master-usage-dialog]") is not None
     assert soup.select_one("[data-cuisine-category-master-search]") is not None
+    cuisine_category_list = soup.select_one(
+        ".unit-master-catalog > "
+        ".unit-master-category-list.cuisine-category-master-category-list"
+    )
+    assert cuisine_category_list is not None
+    cuisine_category_children = cuisine_category_list.find_all(recursive=False)
+    assert len(cuisine_category_children) == 1
+    cuisine_category = cuisine_category_children[0]
+    assert cuisine_category.name == "section"
+    assert "unit-master-category" in cuisine_category.get("class", [])
+    assert cuisine_category.has_attr(
+        "data-cuisine-category-master-category"
+    )
     column_headers = [
         cell.get_text(" ", strip=True)
         for cell in soup.select(

@@ -86,10 +86,7 @@ def test_types_page_matches_master_data_navigation_and_exposes_editors(
 ):
     with ingredient_type_app.test_client() as client:
         sign_in(client, "user-a")
-        response = client.get(
-            "/admin/master-data/types",
-            query_string={"viewer_user_id": "user-a"},
-        )
+        response = client.get("/admin/master-data/types")
 
     assert response.status_code == 200
     soup = BeautifulSoup(response.get_data(as_text=True), "html.parser")
@@ -97,6 +94,17 @@ def test_types_page_matches_master_data_navigation_and_exposes_editors(
     assert soup.select_one("[data-type-master-page]") is not None
     assert soup.select_one("h1#typesTitle").get_text(strip=True) == "Types"
     assert soup.select_one("[data-type-master-add-button]").get_text(strip=True) == "Add Type"
+    type_category_list = soup.select_one(
+        ".unit-master-catalog > .unit-master-category-list.type-master-category-list"
+    )
+    assert type_category_list is not None
+    type_categories = type_category_list.find_all(
+        "section",
+        class_="type-master-category",
+        recursive=False,
+    )
+    assert len(type_categories) == 1
+    assert type_categories[0].has_attr("data-type-master-category")
     assert soup.select_one("dialog[data-type-master-dialog]") is not None
     assert soup.select_one("dialog[data-type-master-usage-dialog]") is not None
     assert len(soup.select("[data-type-master-row]")) == 6

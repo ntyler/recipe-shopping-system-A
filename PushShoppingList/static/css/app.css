@@ -65931,6 +65931,16 @@ body.recipe-edit-standalone-page :is(
     margin-top: 16px;
 }
 
+.type-master-category-list > .type-master-category {
+    margin-top: 0;
+}
+
+@media (max-width: 1640px) {
+    .type-master-category-list {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
 .type-master-table > .unit-master-table-head,
 .type-master-table .unit-master-row {
     grid-template-columns: minmax(180px, 1fr) minmax(90px, .55fr) 130px 90px 58px;
@@ -65999,9 +66009,21 @@ body.recipe-edit-standalone-page :is(
 }
 
 /* Cuisine Category master data: editable icon, abbreviation, and canonical name. */
+.cuisine-category-master-category-list > .type-master-category {
+    margin-top: 0;
+}
+
 .cuisine-category-master-table > .unit-master-table-head,
 .cuisine-category-master-table .unit-master-row {
-    grid-template-columns: 58px 104px minmax(180px, 1fr) minmax(90px, .5fr) 126px 86px 58px;
+    grid-template-columns: 52px 96px minmax(170px, 1fr) minmax(82px, .5fr) 118px 80px 54px;
+    gap: 8px;
+    padding-inline: 12px;
+}
+
+@media (max-width: 1860px) {
+    .cuisine-category-master-category-list {
+        grid-template-columns: minmax(0, 1fr);
+    }
 }
 
 .cuisine-category-master-icon {
@@ -66309,7 +66331,8 @@ body.recipe-edit-standalone-page :is(
         grid-row: 2;
     }
 
-    .type-master-table .unit-master-action-cell {
+    .type-master-table .unit-master-action-cell,
+    .type-master-category-list .unit-master-edit-button {
         grid-column: 2;
         grid-row: 1;
     }
