@@ -93,7 +93,7 @@ def _registry_from_connection(connection, user_id):
             "value": str(row["id"]) if seeded else str(row["name"]),
             "seeded": seeded,
             "custom": not seeded,
-            "active": bool(row["is_active"]),
+            "active": True,
             "sort_order": int(row["sort_order"] or 0),
             "updated_at": str(row["updated_at"] or ""),
         })
@@ -210,11 +210,22 @@ def ingredient_type_registry_payload(user_id=None, include_usage=False):
     user_id = str(user_id or master_data.scoped_recipe_user_id()).strip()
     registry = default_ingredient_type_registry_payload()
     counts = {}
+    needs_active_normalization = False
     with master_data.existing_recipe_master_read_connection() as connection:
         if connection is not None and master_data.recipe_master_table_exists(
             connection,
             "workspace_ingredient_types",
         ):
+            needs_active_normalization = bool(connection.execute(
+                """
+                SELECT 1
+                  FROM workspace_ingredient_types
+                 WHERE user_id = ?
+                   AND COALESCE(is_active, 0) <> 1
+                 LIMIT 1
+                """,
+                (user_id,),
+            ).fetchone())
             stored_registry = _registry_from_connection(connection, user_id)
             if stored_registry.get("types"):
                 registry = stored_registry
@@ -231,6 +242,12 @@ def ingredient_type_registry_payload(user_id=None, include_usage=False):
         if include_usage:
             for item in registry.get("types", []):
                 item["recipe_count"] = int(counts.get(str(item["id"])) or 0)
+
+    if needs_active_normalization:
+        # Opening the managed write connection applies the idempotent schema
+        # migration before this GET returns, without write-locking normal reads.
+        with master_data.existing_recipe_master_connection(user_id=user_id):
+            pass
     return registry
 
 
@@ -422,7 +439,6 @@ def save_workspace_ingredient_type(values, type_id="", user_id=None):
     type_id = str(type_id or "").strip()
     values = values if isinstance(values, dict) else {}
     name = clean_type_name(values.get("name") or values.get("canonical_name"))
-    active = bool(values.get("active", True))
     errors = {}
     if not name:
         errors["name"] = "Enter a type name."
@@ -442,8 +458,6 @@ def save_workspace_ingredient_type(values, type_id="", user_id=None):
             ).fetchone()
             if not existing:
                 return {"ok": False, "status": 404, "error": "Type not found."}
-        if type_id == "main" and not active:
-            errors["active"] = "Main must remain available as the default type."
         if name:
             collision = connection.execute(
                 """
@@ -468,10 +482,10 @@ def save_workspace_ingredient_type(values, type_id="", user_id=None):
             connection.execute(
                 """
                 UPDATE workspace_ingredient_types
-                   SET name = ?, normalized_name = ?, is_active = ?, updated_at = ?
+                   SET name = ?, normalized_name = ?, is_active = 1, updated_at = ?
                  WHERE user_id = ? AND id = ?
                 """,
-                (name, type_key(name), 1 if active else 0, timestamp, user_id, type_id),
+                (name, type_key(name), timestamp, user_id, type_id),
             )
             if previous_name != name and not bool(existing["is_seeded"]):
                 previous_keys = {type_key(type_id), type_key(previous_name)}
@@ -502,14 +516,13 @@ def save_workspace_ingredient_type(values, type_id="", user_id=None):
                 INSERT INTO workspace_ingredient_types (
                     user_id, id, name, normalized_name, is_seeded, is_active,
                     sort_order, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, 0, 1, ?, ?, ?)
                 """,
                 (
                     user_id,
                     type_id,
                     name,
                     type_key(name),
-                    1 if active else 0,
                     sort_order,
                     timestamp,
                     timestamp,
@@ -544,7 +557,7 @@ def delete_workspace_ingredient_type(type_id, user_id=None):
             return {
                 "ok": False,
                 "status": 422,
-                "error": "Built-in types can be deactivated but not deleted.",
+                "error": "Built-in types are protected and are not deleted.",
             }
         registry = _registry_from_connection(connection, user_id)
         usage = _usage_counts(connection, user_id, registry).get(type_id, 0)
@@ -554,7 +567,8 @@ def delete_workspace_ingredient_type(type_id, user_id=None):
                 "status": 409,
                 "error": (
                     f'{existing["name"]} is used by {usage} '
-                    f'recipe{"s" if usage != 1 else ""}. Deactivate it instead.'
+                    f'recipe{"s" if usage != 1 else ""}. Reassign or remove '
+                    "that usage before deleting this type."
                 ),
             }
         connection.execute(

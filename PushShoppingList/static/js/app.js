@@ -35276,7 +35276,6 @@ function recipeIngredientTypeRegistry() {
             label: String(item.name || item.label || item.value || item.id || ""),
             seeded: Boolean(item.seeded),
             custom: item.custom === true || !item.seeded,
-            active: item.active !== false,
             sortOrder: Number(item.sort_order) || index,
         })).filter(item => item.id && item.value && item.label)
         : RECIPE_INGREDIENT_BUILT_IN_TYPES.map((item, index) => ({
@@ -35285,7 +35284,6 @@ function recipeIngredientTypeRegistry() {
             label: item.label,
             seeded: true,
             custom: false,
-            active: true,
             sortOrder: index,
         }));
     recipeIngredientTypeRegistryCache = { signature, types };
@@ -50344,7 +50342,7 @@ function recipeIngredientCustomTypeNames() {
     const source = document.getElementById("ingredientTypeConfig");
     if (source) {
         return recipeIngredientTypeRegistry().types
-            .filter(item => item.custom && item.active)
+            .filter(item => item.custom)
             .map(item => item.label);
     }
     try {
@@ -50372,7 +50370,6 @@ function recipeIngredientTypeOptions(selected, optional = false) {
     const selectedDefinition = recipeIngredientTypeDefinition(fallbackValue);
     const selectedValue = selectedDefinition?.value || fallbackValue || "main";
     const values = recipeIngredientTypeRegistry().types
-        .filter(type => type.active || type === selectedDefinition)
         .map(type => ({
             value: type.value,
             label: type.label,
@@ -50476,7 +50473,7 @@ async function saveRecipeIngredientCustomTypeName(value) {
             "Content-Type": "application/json",
             "X-Requested-With": "fetch",
         },
-        body: JSON.stringify({ name, active: true }),
+        body: JSON.stringify({ name }),
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok || data.ok === false) {

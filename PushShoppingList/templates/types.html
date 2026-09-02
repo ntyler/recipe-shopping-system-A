@@ -45,10 +45,6 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                 <strong data-type-master-custom-count>{{ master_data.custom_count }}</strong>
             </article>
             <article>
-                <span>Active</span>
-                <strong data-type-master-active-count>{{ master_data.active_count }}</strong>
-            </article>
-            <article>
                 <span>In use</span>
                 <strong data-type-master-used-count>{{ master_data.used_count }}</strong>
             </article>
@@ -72,7 +68,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                 <div>
                     <span>Workspace registry</span>
                     <h2 id="typeRegistryTitle">Type Registry</h2>
-                    <p>Built-in roles keep stable behavior; custom roles can be renamed, deactivated, or safely deleted.</p>
+                    <p>Built-in roles keep stable behavior; custom roles can be renamed or safely deleted when unused.</p>
                 </div>
                 <div class="unit-master-toolbar">
                     <label class="unit-master-search">
@@ -99,7 +95,6 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                             <span role="columnheader">Type name</span>
                             <span role="columnheader">Used in</span>
                             <span role="columnheader">Source</span>
-                            <span role="columnheader">Status</span>
                             <span role="columnheader">Action</span>
                         </div>
                         <div data-type-master-rows>
@@ -129,14 +124,17 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                     <span class="unit-master-source-badge{% if type.custom %} user-created{% endif %}" role="cell">
                                         {{ "User-created" if type.custom else "System-seeded" }}
                                     </span>
-                                    <span class="type-master-status-badge{% if not type.active %} is-inactive{% endif %}" role="cell">
-                                        {{ "Active" if type.active else "Inactive" }}
+                                    <span class="unit-master-action-cell" role="cell">
+                                        {% if type.custom %}
+                                            <button type="button"
+                                                    class="unit-master-edit-button"
+                                                    data-type-master-edit-button
+                                                    data-type-id="{{ type.id }}"
+                                                    aria-label="Edit {{ type.name }}">Edit</button>
+                                        {% else %}
+                                            <span class="type-master-action-unavailable" aria-label="No actions available">&mdash;</span>
+                                        {% endif %}
                                     </span>
-                                    <button type="button"
-                                            class="unit-master-edit-button"
-                                            data-type-master-edit-button
-                                            data-type-id="{{ type.id }}"
-                                            aria-label="Edit {{ type.name }}">Edit</button>
                                 </div>
                             {% endfor %}
                         </div>
@@ -173,14 +171,6 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                         <small class="unit-master-field-error" id="typeNameError" data-type-master-name-error hidden></small>
                     </label>
 
-                    <label class="type-master-availability">
-                        <input type="checkbox" data-type-master-active checked>
-                        <span>
-                            <strong>Available in recipe editor</strong>
-                            <small>Inactive types remain on existing recipes but are hidden from new selections.</small>
-                        </span>
-                    </label>
-                    <small class="unit-master-field-error" data-type-master-active-error hidden></small>
                 </div>
 
                 <div class="unit-master-editor-feedback" role="alert" data-type-master-editor-feedback hidden></div>

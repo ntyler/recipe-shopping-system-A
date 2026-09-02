@@ -64,8 +64,6 @@
         const nameInput = root.querySelector("[data-type-master-name]");
         const nameHelp = root.querySelector("[data-type-master-name-help]");
         const nameError = root.querySelector("[data-type-master-name-error]");
-        const activeInput = root.querySelector("[data-type-master-active]");
-        const activeError = root.querySelector("[data-type-master-active-error]");
         const editorTitle = root.querySelector("[data-type-master-editor-title]");
         const editorKicker = root.querySelector("[data-type-master-editor-kicker]");
         const editorFeedback = root.querySelector("[data-type-master-editor-feedback]");
@@ -150,20 +148,27 @@
             sourceBadge.setAttribute("role", "cell");
             sourceBadge.textContent = item.custom ? "User-created" : "System-seeded";
 
-            const state = document.createElement("span");
-            state.className = `type-master-status-badge${item.active ? "" : " is-inactive"}`;
-            state.setAttribute("role", "cell");
-            state.textContent = item.active ? "Active" : "Inactive";
+            const action = document.createElement("span");
+            action.className = "unit-master-action-cell";
+            action.setAttribute("role", "cell");
+            if (item.custom) {
+                const edit = document.createElement("button");
+                edit.type = "button";
+                edit.className = "unit-master-edit-button";
+                edit.dataset.typeMasterEditButton = "";
+                edit.dataset.typeId = item.id;
+                edit.textContent = "Edit";
+                edit.setAttribute("aria-label", `Edit ${item.name}`);
+                action.appendChild(edit);
+            } else {
+                const unavailable = document.createElement("span");
+                unavailable.className = "type-master-action-unavailable";
+                unavailable.setAttribute("aria-label", "No actions available");
+                unavailable.textContent = "—";
+                action.appendChild(unavailable);
+            }
 
-            const edit = document.createElement("button");
-            edit.type = "button";
-            edit.className = "unit-master-edit-button";
-            edit.dataset.typeMasterEditButton = "";
-            edit.dataset.typeId = item.id;
-            edit.textContent = "Edit";
-            edit.setAttribute("aria-label", `Edit ${item.name}`);
-
-            row.append(name, createUsageCell(item), sourceBadge, state, edit);
+            row.append(name, createUsageCell(item), sourceBadge, action);
             return row;
         };
 
@@ -173,9 +178,6 @@
             );
             root.querySelector("[data-type-master-custom-count]").textContent = String(
                 registry.types.filter(item => item.custom).length,
-            );
-            root.querySelector("[data-type-master-active-count]").textContent = String(
-                registry.types.filter(item => item.active).length,
             );
             root.querySelector("[data-type-master-used-count]").textContent = String(
                 registry.types.filter(item => Number(item.recipe_count) > 0).length,
@@ -210,7 +212,6 @@
 
         const clearEditorErrors = () => {
             setFieldError(nameInput, nameError, "");
-            setFieldError(activeInput, activeError, "");
             setEditorFeedback("");
         };
 
@@ -225,10 +226,8 @@
             nameInput.value = item?.name || "";
             nameInput.disabled = Boolean(item?.seeded);
             nameHelp.textContent = item?.seeded
-                ? "Built-in names stay tied to stable recipe behavior. You can change availability."
+                ? "Built-in names stay tied to stable recipe behavior."
                 : "Custom type names can be changed without losing their recipe assignments.";
-            activeInput.checked = item ? Boolean(item.active) : true;
-            activeInput.disabled = item?.id === "main";
             editorTitle.textContent = item ? `Edit ${item.name}` : "Add Type";
             editorKicker.textContent = item?.seeded ? "Built-in type" : "Workspace type";
             saveButton.textContent = item ? "Save Changes" : "Add Type";
@@ -240,7 +239,7 @@
                 deleteButton.removeAttribute("title");
             }
             if (!dialog.open) dialog.showModal();
-            window.requestAnimationFrame(() => (nameInput.disabled ? activeInput : nameInput).focus());
+            window.requestAnimationFrame(() => nameInput.focus());
         };
 
         const requestJson = async (url, options = {}) => {
@@ -263,7 +262,6 @@
             const current = typeById(editorTypeId);
             const payload = {
                 name: current?.seeded ? current.name : cleanText(nameInput.value),
-                active: activeInput.checked,
             };
             saveButton.disabled = true;
             saveButton.textContent = "Saving…";
@@ -278,7 +276,6 @@
                 if (!response.ok || data.ok === false) {
                     const errors = data.errors || {};
                     setFieldError(nameInput, nameError, errors.name || "");
-                    setFieldError(activeInput, activeError, errors.active || "");
                     setEditorFeedback(data.error || "The type could not be saved.");
                     return;
                 }
@@ -299,10 +296,10 @@
             if (!item?.custom) return;
             if (Number(item.recipe_count) > 0) {
                 setEditorFeedback(
-                    `${item.name} is used by ${item.recipe_count} recipe${Number(item.recipe_count) === 1 ? "" : "s"}. Deactivate it instead.`,
+                    `${item.name} is used by ${item.recipe_count} recipe${Number(item.recipe_count) === 1 ? "" : "s"}. Reassign or remove this type from those recipes before deleting it.`,
                     "warning",
                 );
-                activeInput.focus();
+                deleteButton.focus();
                 return;
             }
             if (!window.confirm(`Delete custom type "${item.name}"?`)) return;

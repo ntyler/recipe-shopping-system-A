@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import pytest
 from bs4 import BeautifulSoup
@@ -105,9 +106,33 @@ def test_types_page_matches_master_data_navigation_and_exposes_editors(
     )
     assert len(type_categories) == 1
     assert type_categories[0].has_attr("data-type-master-category")
+    summary_labels = [
+        label.get_text(strip=True)
+        for label in soup.select(".unit-master-stats article > span")
+    ]
+    assert "Active" not in summary_labels
+    assert soup.select_one("[data-type-master-active-count]") is None
+    assert [
+        header.get_text(strip=True)
+        for header in soup.select(".type-master-table [role='columnheader']")
+    ] == ["Type name", "Used in", "Source", "Action"]
+    assert soup.select_one(".type-master-status-badge") is None
+    assert soup.select_one("[data-type-master-active]") is None
+    assert soup.select_one("[data-type-master-active-error]") is None
+    assert soup.select_one(".type-master-availability") is None
     assert soup.select_one("dialog[data-type-master-dialog]") is not None
     assert soup.select_one("dialog[data-type-master-usage-dialog]") is not None
     assert len(soup.select("[data-type-master-row]")) == 6
+    assert soup.select("[data-type-master-edit-button]") == []
+    assert soup.select_one("[data-type-master-delete][hidden]") is not None
+    css = (
+        Path(__file__).resolve().parents[1]
+        / "PushShoppingList"
+        / "static"
+        / "css"
+        / "app.css"
+    ).read_text(encoding="utf-8")
+    assert ".unit-master-page button[hidden]," in css
     active_tab = soup.select_one("nav.master-data-tabs a.active")
     assert active_tab.get_text(strip=True) == "Types"
     assert active_tab["href"].startswith("/admin/master-data/types")
@@ -151,7 +176,7 @@ def test_custom_type_persists_reaches_editor_and_is_workspace_isolated(
         assert forbidden.status_code == 404
 
 
-def test_rename_migrates_usage_and_safe_delete_requires_deactivation(
+def test_rename_migrates_usage_and_safe_delete_requires_reassignment(
     ingredient_type_app,
 ):
     recipe_url = "https://example.test/recipes/protein-shake"
@@ -211,14 +236,85 @@ def test_rename_migrates_usage_and_safe_delete_requires_deactivation(
 
         blocked = client.delete(f"/api/master-data/types/{type_id}")
         assert blocked.status_code == 409
-        assert "Deactivate it instead" in blocked.get_json()["error"]
+        blocked_error = blocked.get_json()["error"]
+        assert "Reassign or remove" in blocked_error
+        assert "deactivat" not in blocked_error.lower()
 
-        deactivated = client.patch(
+        remains_active = client.patch(
             f"/api/master-data/types/{type_id}",
             json={"name": "Protein", "active": False},
         )
-        assert deactivated.status_code == 200
-        assert type_named(deactivated.get_json()["registry"], "Protein")["active"] is False
+        assert remains_active.status_code == 200
+        assert type_named(
+            remains_active.get_json()["registry"],
+            "Protein",
+        )["active"] is True
+
+
+def test_type_api_forces_active_and_normalizes_legacy_inactive_rows(
+    ingredient_type_app,
+):
+    with ingredient_type_app.test_client() as client:
+        sign_in(client, "user-a")
+        created = client.post(
+            "/api/master-data/types",
+            json={"name": "Always available", "active": False},
+        )
+        assert created.status_code == 201
+        created_type = type_named(created.get_json()["registry"], "Always available")
+        assert created_type["active"] is True
+
+        custom_id = created_type["id"]
+        patched = client.patch(
+            f"/api/master-data/types/{custom_id}",
+            json={"name": "Still available", "active": False},
+        )
+        assert patched.status_code == 200
+        assert type_named(
+            patched.get_json()["registry"],
+            "Still available",
+        )["active"] is True
+
+        built_in = client.patch(
+            "/api/master-data/types/main",
+            json={"name": "Main", "active": False},
+        )
+        assert built_in.status_code == 200
+        assert type_named(built_in.get_json()["registry"], "Main")["active"] is True
+
+        with master_data.recipe_master_connection(user_id="user-a") as connection:
+            connection.execute(
+                """
+                UPDATE workspace_ingredient_types
+                   SET is_active = 0
+                 WHERE user_id = ? AND id = ?
+                """,
+                ("user-a", custom_id),
+            )
+
+        with master_data.existing_recipe_master_read_connection() as connection:
+            legacy_stored = connection.execute(
+                """
+                SELECT is_active
+                  FROM workspace_ingredient_types
+                 WHERE user_id = ? AND id = ?
+                """,
+                ("user-a", custom_id),
+            ).fetchone()
+        assert legacy_stored["is_active"] == 0
+
+        normalized_registry = registry_for(client)
+        assert type_named(normalized_registry, "Still available")["active"] is True
+        with master_data.existing_recipe_master_read_connection() as connection:
+            stored = connection.execute(
+                """
+                SELECT is_active
+                  FROM workspace_ingredient_types
+                 WHERE user_id = ? AND id = ?
+                """,
+                ("user-a", custom_id),
+            ).fetchone()
+        assert stored["is_active"] == 1
 
 
 def test_unused_custom_type_can_be_deleted_and_built_ins_are_protected(
@@ -235,13 +331,19 @@ def test_unused_custom_type_can_be_deleted_and_built_ins_are_protected(
             for item in deleted.get_json()["registry"]["types"]
         )
 
-        main_disabled = client.patch(
+        main_remains_active = client.patch(
             "/api/master-data/types/main",
             json={"name": "Main", "active": False},
         )
-        assert main_disabled.status_code == 422
+        assert main_remains_active.status_code == 200
+        assert type_named(
+            main_remains_active.get_json()["registry"],
+            "Main",
+        )["active"] is True
         built_in_delete = client.delete("/api/master-data/types/garnish")
         assert built_in_delete.status_code == 422
+        assert "not deleted" in built_in_delete.get_json()["error"].lower()
+        assert "deactivat" not in built_in_delete.get_json()["error"].lower()
 
 
 def test_legacy_import_is_persistent_and_duplicate_safe(ingredient_type_app):

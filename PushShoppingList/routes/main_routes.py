@@ -1920,7 +1920,6 @@ def ingredient_type_master_data_context(scope_info):
         "types": type_rows,
         "seeded_count": sum(1 for item in type_rows if item.get("seeded")),
         "custom_count": sum(1 for item in type_rows if item.get("custom")),
-        "active_count": sum(1 for item in type_rows if item.get("active")),
         "used_count": sum(1 for item in type_rows if item.get("recipe_count")),
         "create_url": url_for("main_bp.master_data_types_api_route"),
         "update_url_template": url_for(

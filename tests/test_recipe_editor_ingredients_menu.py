@@ -12248,6 +12248,68 @@ process.stdout.write(JSON.stringify({
     }
 
 
+def test_recipe_editor_type_picker_keeps_every_registry_type_available():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for the recipe editor type-picker behavior test")
+
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    custom_names = javascript_function_source(
+        script,
+        "recipeIngredientCustomTypeNames",
+    )
+    type_options = javascript_function_source(
+        script,
+        "recipeIngredientTypeOptions",
+    )
+    harness = r"""
+const registry = {types: [
+    {id: "main", value: "main", label: "Main", custom: false, active: true},
+    {id: "garnish", value: "garnish", label: "Garnish", custom: false, active: false},
+    {id: "custom_archived", value: "Archived", label: "Archived", custom: true, active: false},
+]};
+const document = {getElementById() { return {}; }};
+const localStorage = {};
+const console = {warn() {}};
+function safeStorageGet() { return "[]"; }
+function recipeIngredientTypeRegistry() { return registry; }
+function recipeIngredientTypeKey(value) {
+    return String(value || "").trim().toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ");
+}
+function recipeIngredientBuiltInType() { return null; }
+function recipeIngredientTypeDefinition(value) {
+    const key = recipeIngredientTypeKey(value);
+    return registry.types.find(item => (
+        recipeIngredientTypeKey(item.id) === key
+        || recipeIngredientTypeKey(item.value) === key
+        || recipeIngredientTypeKey(item.label) === key
+    )) || null;
+}
+function escapeAttribute(value) { return String(value); }
+function escapeHtml(value) { return String(value); }
+""" + custom_names + "\n" + type_options + r"""
+const html = recipeIngredientTypeOptions("main");
+process.stdout.write(JSON.stringify({
+    customNames: recipeIngredientCustomTypeNames(),
+    hasGarnish: html.includes('value="garnish"'),
+    hasArchived: html.includes('value="Archived"'),
+}));
+"""
+    completed = subprocess.run(
+        [node, "-e", harness],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert json.loads(completed.stdout) == {
+        "customNames": ["Archived"],
+        "hasGarnish": True,
+        "hasArchived": True,
+    }
+
+
 def test_recipe_editor_type_picker_uses_workspace_registry_and_drives_optional_state():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")

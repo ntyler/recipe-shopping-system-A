@@ -1089,6 +1089,15 @@ def ensure_recipe_master_schema(connection=None):
         )
         """
     )
+    # Keep the legacy column compatible while enforcing the permanent-active
+    # ingredient type invariant for existing databases.
+    connection.execute(
+        """
+        UPDATE workspace_ingredient_types
+           SET is_active = 1
+         WHERE COALESCE(is_active, 0) <> 1
+        """
+    )
     connection.execute(
         """
         CREATE TABLE IF NOT EXISTS workspace_ingredient_type_registry_seeds (
