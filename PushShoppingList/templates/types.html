@@ -113,12 +113,15 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                                     data-type-id="{{ type.id }}"
                                                     aria-haspopup="dialog"
                                                     aria-controls="typeMasterUsageDialog"
-                                                    aria-label="Show {{ type.recipe_count }} recipe{% if type.recipe_count != 1 %}s{% endif %} using {{ type.name }}">
+                                                    aria-label="Show {{ type.recipe_count }} recipe{% if type.recipe_count != 1 %}s{% endif %} using {{ type.name }}"
+                                                    title="Show recipes using {{ type.name }}">
                                                 <strong>{{ type.recipe_count }}</strong>
                                                 <span>{{ "recipe" if type.recipe_count == 1 else "recipes" }}</span>
                                             </button>
                                         {% else %}
-                                            <span class="unit-master-usage-empty" aria-label="No recipes use {{ type.name }}">0</span>
+                                            <span class="unit-master-usage-empty"
+                                                  aria-label="No recipes use {{ type.name }}"
+                                                  title="No recipes currently use {{ type.name }}">0</span>
                                         {% endif %}
                                     </div>
                                     <span class="unit-master-source-badge{% if type.custom %} user-created{% endif %}" role="cell">

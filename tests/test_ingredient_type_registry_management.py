@@ -291,12 +291,128 @@ def test_types_table_reuses_unit_trailing_tracks_and_keeps_responsive_layout():
         mobile,
         ".type-master-table .unit-master-row",
     )) == ["minmax(0,1fr)", "auto"]
+    mobile_usage = block_from(
+        mobile,
+        ".type-master-table .unit-master-usage",
+    )
+    assert "grid-column: 1;" in mobile_usage
+    assert "grid-row: 2;" in mobile_usage
     mobile_action = block_from(
         mobile,
         ".type-master-table .unit-master-action-cell",
     )
     assert "grid-column: 2;" in mobile_action
     assert "grid-row: 1;" in mobile_action
+
+
+def test_types_used_in_and_action_match_unit_row_markup(
+    ingredient_type_app,
+):
+    recipe_url = "https://example.test/recipes/shared-master-data-row-contract"
+    with ingredient_type_app.test_client() as client:
+        sign_in(client, "user-a")
+        master_data.sync_recipe_master_records(
+            recipe_url,
+            recipe_data={
+                "recipe_title": "Shared Master Data Row Contract",
+                "ingredients": [{
+                    "ingredient": "chicken",
+                    "quantity": "1",
+                    "unit": "pound",
+                    "section": "main",
+                }],
+            },
+            user_id="user-a",
+        )
+        types_response = client.get("/admin/master-data/types")
+
+    assert types_response.status_code == 200
+    types_soup = BeautifulSoup(types_response.get_data(as_text=True), "html.parser")
+    type_row = next(
+        row
+        for row in types_soup.select("[data-type-master-row]")
+        if row["data-type-id"] == "main"
+    )
+    templates_root = Path(__file__).resolve().parents[1] / "PushShoppingList" / "templates"
+    units_template = (templates_root / "units.html").read_text(encoding="utf-8")
+
+    type_usage = type_row.find(
+        "div",
+        class_="unit-master-usage",
+        recursive=False,
+    )
+    assert type_usage is not None
+    assert type_usage.get("class") == ["unit-master-usage"]
+    assert type_usage.get("role") == "cell"
+    assert 'class="unit-master-usage" role="cell"' in units_template
+    type_usage_button = type_usage.find(
+        "button",
+        class_="unit-master-usage-button",
+        recursive=False,
+    )
+    assert type_usage_button is not None
+    assert type_usage_button.get("class") == ["unit-master-usage-button"]
+    assert 'class="unit-master-usage-button"' in units_template
+    assert type_usage_button.select_one("strong").get_text(strip=True) == "1"
+    assert type_usage_button["title"] == "Show recipes using Main"
+    assert 'title="Show recipes using {{ unit.name }}"' in units_template
+
+    unused_type_row = next(
+        row
+        for row in types_soup.select("[data-type-master-row]")
+        if row["data-type-id"] == "optional"
+    )
+    unused_type = unused_type_row.select_one(".unit-master-usage-empty")
+    assert unused_type is not None
+    assert unused_type["title"] == "No recipes currently use Optional"
+    assert 'class="unit-master-usage-empty"' in units_template
+    assert 'title="No recipes currently use {{ unit.name }}"' in units_template
+
+    type_action_cell = type_row.find(
+        "span",
+        class_="unit-master-action-cell",
+        recursive=False,
+    )
+    assert type_action_cell is not None
+    assert type_action_cell.get("role") == "cell"
+    type_action = type_action_cell.find(
+        "button",
+        class_="unit-master-edit-button",
+        recursive=False,
+    )
+    assert type_action is not None
+    assert type_action.get("class") == ["unit-master-edit-button"]
+    assert 'class="unit-master-edit-button"' in units_template
+
+    static_root = Path(__file__).resolve().parents[1] / "PushShoppingList" / "static"
+    script = (
+        static_root
+        / "js"
+        / "types.js"
+    ).read_text(encoding="utf-8")
+    assert 'action.className = "unit-master-action-cell";' in script
+    assert 'action.setAttribute("role", "cell");' in script
+    assert "row.append(name, createUsageCell(item), sourceBadge, action);" in script
+    assert 'button.title = `Show recipes using ${item.name}`;' in script
+    assert 'empty.title = `No recipes currently use ${item.name}`;' in script
+
+    css = (
+        Path(__file__).resolve().parents[1]
+        / "PushShoppingList"
+        / "static"
+        / "css"
+        / "app.css"
+    ).read_text(encoding="utf-8")
+    type_edit_rules = [
+        (match.group(1), match.group(2))
+        for match in re.finditer(r"([^{}]+)\{([^{}]*)\}", css)
+        if "[data-type-master-page]" in match.group(1)
+        and ".unit-master-edit-button" in match.group(1)
+    ]
+    assert any(
+        "width: 100%;" in declarations
+        for _selectors, declarations in type_edit_rules
+    )
 
 
 def test_custom_type_persists_reaches_editor_and_is_workspace_isolated(

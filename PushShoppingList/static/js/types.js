@@ -108,6 +108,7 @@
                 empty.className = "unit-master-usage-empty";
                 empty.textContent = "0";
                 empty.setAttribute("aria-label", `No recipes use ${item.name}`);
+                empty.title = `No recipes currently use ${item.name}`;
                 usage.appendChild(empty);
                 return usage;
             }
@@ -122,6 +123,7 @@
                 "aria-label",
                 `Show ${recipeCount} recipe${recipeCount === 1 ? "" : "s"} using ${item.name}`,
             );
+            button.title = `Show recipes using ${item.name}`;
             const count = document.createElement("strong");
             count.textContent = String(recipeCount);
             const label = document.createElement("span");

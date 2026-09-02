@@ -65940,6 +65940,10 @@ body.recipe-edit-standalone-page :is(
     margin-top: 0;
 }
 
+[data-type-master-page] .unit-master-action-cell > .unit-master-edit-button {
+    width: 100%;
+}
+
 @media (max-width: 1640px) {
     .type-master-category-list {
         grid-template-columns: minmax(0, 1fr);
