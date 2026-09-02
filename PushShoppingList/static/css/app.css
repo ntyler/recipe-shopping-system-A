@@ -66505,6 +66505,11 @@ body.recipe-edit-standalone-page :is(
     max-width: 100%;
 }
 
+.store-section-master-page .master-data-header h1,
+.store-section-master-page .store-section-master-create h2 {
+    text-align: left;
+}
+
 .store-section-master-stats {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));

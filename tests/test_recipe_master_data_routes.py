@@ -3075,6 +3075,23 @@ def test_store_section_manager_uses_compact_registry_and_preserves_interactions(
 
     assert ".store-section-master-stats {" in css
     assert "grid-template-columns: repeat(3, minmax(0, 1fr));" in css
+    store_heading_alignment_rules = css.rsplit(
+        ".store-section-master-page .master-data-header h1,\n"
+        ".store-section-master-page .store-section-master-create h2 {",
+        1,
+    )[1].split("}", 1)[0]
+    assert "text-align: left;" in store_heading_alignment_rules
+    for layout_property in (
+        "display:",
+        "position:",
+        "margin:",
+        "padding:",
+        "width:",
+        "transform:",
+        "grid-",
+        "flex-",
+    ):
+        assert layout_property not in store_heading_alignment_rules
     assert ".store-section-master-category-list {" in css
     assert ".store-section-master-category {" in css
     store_header_rules = css.rsplit(
