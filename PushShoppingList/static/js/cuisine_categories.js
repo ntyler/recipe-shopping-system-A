@@ -282,7 +282,7 @@
                 row.hidden = !matches;
                 if (matches) visible += 1;
             });
-            countLabel.textContent = `${visible} categor${visible === 1 ? "y" : "ies"}`;
+            countLabel.textContent = `${visible} of ${registry.categories.length} shown`;
             searchEmpty.hidden = visible > 0;
         };
 

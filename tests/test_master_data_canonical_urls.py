@@ -241,10 +241,29 @@ def test_cuisine_categories_page_renders_registry_management_ui(master_data_app)
     assert soup.select_one("h1#cuisineCategoriesTitle").get_text(strip=True) == (
         "Cuisine Categories"
     )
-    assert soup.select_one("[data-cuisine-category-master-add-button]") is not None
+    create_panel = root.find(
+        "section",
+        class_="cuisine-category-master-create",
+        recursive=False,
+    )
+    assert create_panel is not None
+    assert create_panel.get("aria-labelledby") == "addCuisineCategoryTitle"
+    assert create_panel.select_one("h2#addCuisineCategoryTitle").get_text(
+        " ", strip=True,
+    ) == "Add a Cuisine Category"
+    create_actions = create_panel.find(
+        "div",
+        class_="cuisine-category-master-create-actions",
+        recursive=False,
+    )
+    assert create_actions is not None
+    add_buttons = soup.select("[data-cuisine-category-master-add-button]")
+    assert len(add_buttons) == 1
+    assert create_actions.select("[data-cuisine-category-master-add-button]") == (
+        add_buttons
+    )
     assert soup.select_one("[data-cuisine-category-master-dialog]") is not None
     assert soup.select_one("[data-cuisine-category-master-usage-dialog]") is not None
-    assert soup.select_one("[data-cuisine-category-master-search]") is not None
     assert [
         article.find("span").get_text(" ", strip=True)
         for article in soup.select(".unit-master-stats > article")
@@ -252,11 +271,40 @@ def test_cuisine_categories_page_renders_registry_management_ui(master_data_app)
     assert soup.select_one(
         "[data-cuisine-category-master-active-count]"
     ) is None
-    cuisine_category_list = soup.select_one(
-        ".unit-master-catalog > "
-        ".unit-master-category-list.cuisine-category-master-category-list"
+    registry_panel = root.find(
+        "section",
+        class_="cuisine-category-master-list-section",
+        recursive=False,
+    )
+    assert registry_panel is not None
+    registry_toolbar = registry_panel.find(
+        "header",
+        class_="cuisine-category-master-table-toolbar",
+        recursive=False,
+    )
+    assert registry_toolbar is not None
+    registry_actions = registry_toolbar.find(
+        "div",
+        class_="cuisine-category-master-table-actions",
+        recursive=False,
+    )
+    assert registry_actions is not None
+    assert registry_actions.select_one(
+        "[data-cuisine-category-master-search]"
+    ) is not None
+    visible_count = registry_actions.select_one(
+        "[data-cuisine-category-master-count-label]"
+    )
+    assert visible_count is not None
+    assert not registry_toolbar.select("[data-cuisine-category-master-add-button]")
+
+    cuisine_category_list = registry_panel.find(
+        "div",
+        class_="cuisine-category-master-category-list",
+        recursive=False,
     )
     assert cuisine_category_list is not None
+    assert "unit-master-category-list" in cuisine_category_list.get("class", [])
     cuisine_category_children = cuisine_category_list.find_all(recursive=False)
     assert len(cuisine_category_children) == 1
     cuisine_category = cuisine_category_children[0]
@@ -279,6 +327,20 @@ def test_cuisine_categories_page_renders_registry_management_ui(master_data_app)
         "Source",
         "Action",
     ]
+    rows = soup.select("[data-cuisine-category-master-row]")
+    assert rows
+    assert visible_count.get_text(" ", strip=True) == (
+        f"{len(rows)} of {len(rows)} shown"
+    )
+    for preserved_hook in (
+        "data-cuisine-category-master-rows",
+        "data-cuisine-category-master-edit-button",
+        "data-cuisine-category-master-search-empty",
+        "data-cuisine-category-master-status",
+        "data-cuisine-category-master-form",
+        "data-cuisine-category-master-save",
+    ):
+        assert root.select_one(f"[{preserved_hook}]") is not None
     header_identity = soup.select_one(
         ".cuisine-category-master-table > .unit-master-table-head > "
         ".cuisine-category-master-identity"
@@ -289,10 +351,9 @@ def test_cuisine_categories_page_renders_registry_management_ui(master_data_app)
         child.get("role")
         for child in header_identity.find_all(recursive=False)
     ] == ["columnheader", "columnheader", "columnheader"]
-    assert soup.select("[data-cuisine-category-master-row]")
     assert {
         row.select_one(".unit-master-source-badge").get_text(strip=True)
-        for row in soup.select("[data-cuisine-category-master-row]")
+        for row in rows
         if "user-created" not in row.select_one(
             ".unit-master-source-badge"
         ).get("class", [])
@@ -326,6 +387,35 @@ def test_cuisine_categories_page_renders_registry_management_ui(master_data_app)
     assert "[data-cuisine-category-master-active]" not in script
     assert "type-master-status-badge" not in script
     assert 'item.custom ? "User-created" : "Built-in"' in script
+    assert (
+        "countLabel.textContent = "
+        "`${visible} of ${registry.categories.length} shown`;"
+    ) in script
+
+    css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    cuisine_heading_rules = [
+        (match.group(1), match.group(2))
+        for match in re.finditer(r"([^{}]+)\{([^{}]*)\}", css)
+        if ".cuisine-category-master-page" in match.group(1)
+        and any(
+            heading in match.group(1)
+            for heading in (
+                ".master-data-header h1",
+                ".cuisine-category-master-create h2",
+                ".cuisine-category-master-list-section h2",
+            )
+        )
+    ]
+    assert cuisine_heading_rules
+    for heading in (
+        ".master-data-header h1",
+        ".cuisine-category-master-create h2",
+        ".cuisine-category-master-list-section h2",
+    ):
+        assert any(
+            heading in selectors and "text-align: left;" in declarations
+            for selectors, declarations in cuisine_heading_rules
+        )
 
 
 def test_cuisine_category_rows_share_unit_usage_and_action_contract(

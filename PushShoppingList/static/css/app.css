@@ -66498,15 +66498,19 @@ body.recipe-edit-standalone-page :is(
 }
 
 /* Store Section master data: workspace-scoped names, icons, order, and availability. */
-.store-section-master-page {
-    --store-section-card: color-mix(in srgb, var(--app-surface) 94%, var(--app-bg-soft));
+.store-section-master-page,
+.cuisine-category-master-page {
+    --master-data-workspace-card: color-mix(in srgb, var(--app-surface) 94%, var(--app-bg-soft));
     grid-template-columns: minmax(0, 1fr);
     min-width: 0;
     max-width: 100%;
 }
 
 .store-section-master-page .master-data-header h1,
-.store-section-master-page .store-section-master-create h2 {
+.store-section-master-page .store-section-master-create h2,
+.cuisine-category-master-page .master-data-header h1,
+.cuisine-category-master-page .cuisine-category-master-create h2,
+.cuisine-category-master-page .cuisine-category-master-list-section h2 {
     text-align: left;
 }
 
@@ -66524,12 +66528,14 @@ body.recipe-edit-standalone-page :is(
     padding: 14px 16px;
     border: 1px solid var(--app-border);
     border-radius: 9px;
-    background: var(--store-section-card);
+    background: var(--master-data-workspace-card);
 }
 
 .store-section-master-stats span,
 .store-section-master-create > div > span,
-.store-section-master-list-section > header > div > span {
+.store-section-master-list-section > header > div > span,
+.cuisine-category-master-create > div > span,
+.cuisine-category-master-table-toolbar > div > span {
     color: var(--app-primary-hover);
     font-size: 10px;
     font-weight: 850;
@@ -66544,29 +66550,44 @@ body.recipe-edit-standalone-page :is(
 }
 
 .store-section-master-create,
-.store-section-master-list-section {
+.store-section-master-list-section,
+.cuisine-category-master-create,
+.cuisine-category-master-list-section {
     border: 1px solid var(--app-border);
     border-radius: 10px;
-    background: var(--store-section-card);
+    background: var(--master-data-workspace-card);
 }
 
-.store-section-master-create {
+.store-section-master-create,
+.cuisine-category-master-create {
     display: grid;
-    grid-template-columns: minmax(220px, .7fr) minmax(520px, 1.3fr);
-    align-items: end;
     gap: 22px;
     padding: 16px;
 }
 
+.store-section-master-create {
+    grid-template-columns: minmax(220px, .7fr) minmax(520px, 1.3fr);
+    align-items: end;
+}
+
+.cuisine-category-master-create {
+    grid-template-columns: minmax(220px, 1fr) max-content;
+    align-items: center;
+}
+
 .store-section-master-create h2,
-.store-section-master-list-section h2 {
+.store-section-master-list-section h2,
+.cuisine-category-master-create h2,
+.cuisine-category-master-list-section h2 {
     margin: 3px 0 4px;
     color: var(--app-text-strong);
     font-size: 18px;
 }
 
 .store-section-master-create p,
-.store-section-master-list-section p {
+.store-section-master-list-section p,
+.cuisine-category-master-create p,
+.cuisine-category-master-list-section p {
     margin: 0;
     color: var(--app-muted);
     font-size: 11px;
@@ -66657,11 +66678,13 @@ body.recipe-edit-standalone-page :is(
     cursor: not-allowed;
 }
 
-.store-section-master-list-section {
+.store-section-master-list-section,
+.cuisine-category-master-list-section {
     overflow: hidden;
 }
 
-.store-section-master-list-section > header {
+.store-section-master-list-section > header,
+.cuisine-category-master-list-section > header {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -66944,7 +66967,8 @@ body.recipe-edit-standalone-page :is(
 }
 
 @media (max-width: 1180px) {
-    .store-section-master-create {
+    .store-section-master-create,
+    .cuisine-category-master-create {
         grid-template-columns: 1fr;
         align-items: stretch;
     }
@@ -67007,7 +67031,9 @@ body.recipe-edit-standalone-page :is(
 }
 
 /* Store Section manager v2: compact Ingredients-style table and toolbar. */
-.store-section-master-list-section > .store-section-master-table-toolbar {
+.store-section-master-list-section > .store-section-master-table-toolbar,
+.cuisine-category-master-list-section
+    > .cuisine-category-master-table-toolbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -67015,7 +67041,8 @@ body.recipe-edit-standalone-page :is(
     padding: 12px 14px;
 }
 
-.store-section-master-table-toolbar h2 {
+.store-section-master-table-toolbar h2,
+.cuisine-category-master-table-toolbar h2 {
     display: flex;
     align-items: baseline;
     gap: 5px;
@@ -67029,7 +67056,8 @@ body.recipe-edit-standalone-page :is(
     font-weight: 750;
 }
 
-.store-section-master-table-actions {
+.store-section-master-table-actions,
+.cuisine-category-master-table-actions {
     display: flex;
     min-width: 0;
     align-items: center;
@@ -67129,7 +67157,8 @@ body.recipe-edit-standalone-page :is(
     font-weight: 850;
 }
 
-.store-section-master-visible-count {
+.store-section-master-visible-count,
+.cuisine-category-master-visible-count {
     margin-left: auto;
     color: var(--app-primary-hover);
     font-weight: 800;
@@ -68016,12 +68045,15 @@ body.is-store-section-master-usage-dialog-open {
 }
 
 @media (max-width: 1180px) {
-    .store-section-master-list-section > .store-section-master-table-toolbar {
+    .store-section-master-list-section > .store-section-master-table-toolbar,
+    .cuisine-category-master-list-section
+        > .cuisine-category-master-table-toolbar {
         align-items: stretch;
         flex-direction: column;
     }
 
-    .store-section-master-table-actions {
+    .store-section-master-table-actions,
+    .cuisine-category-master-table-actions {
         justify-content: flex-start;
     }
 
@@ -68032,7 +68064,8 @@ body.is-store-section-master-usage-dialog-open {
 }
 
 @media (max-width: 759px) {
-    .store-section-master-table-actions {
+    .store-section-master-table-actions,
+    .cuisine-category-master-table-actions {
         display: grid;
         grid-template-columns: minmax(0, 1fr) 126px;
     }
@@ -68141,16 +68174,19 @@ body.is-store-section-master-usage-dialog-open {
     max-width: 100%;
 }
 
-.store-section-master-table-toolbar > div:first-child > span {
+.store-section-master-table-toolbar > div:first-child > span,
+.cuisine-category-master-table-toolbar > div:first-child > span {
     display: block;
     margin-bottom: 3px;
 }
 
-.store-section-master-table-toolbar h2 {
+.store-section-master-table-toolbar h2,
+.cuisine-category-master-table-toolbar h2 {
     margin: 0 0 3px;
 }
 
-.store-section-master-visible-count {
+.store-section-master-visible-count,
+.cuisine-category-master-visible-count {
     flex: 0 0 auto;
     margin-left: 0;
     white-space: nowrap;
@@ -68955,7 +68991,8 @@ body.is-resizing-store-section-master-column * {
     grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.store-section-master-category-list {
+.store-section-master-category-list,
+.cuisine-category-master-category-list {
     min-width: 0;
     margin: 16px 14px 14px;
 }
@@ -69126,7 +69163,8 @@ body.is-resizing-store-section-master-column * {
 }
 
 @media (max-width: 1640px) {
-    .store-section-master-category-list {
+    .store-section-master-category-list,
+    .cuisine-category-master-category-list {
         grid-template-columns: minmax(0, 1fr);
     }
 }
@@ -69155,21 +69193,25 @@ body.is-resizing-store-section-master-column * {
 }
 
 @media (max-width: 759px) {
-    .store-section-master-category-list {
+    .store-section-master-category-list,
+    .cuisine-category-master-category-list {
         margin-inline: 10px;
         margin-bottom: 10px;
     }
 
-    .store-section-master-table-actions {
+    .store-section-master-table-actions,
+    .cuisine-category-master-table-actions {
         width: 100%;
         grid-template-columns: auto minmax(0, 1fr);
     }
 
-    .store-section-master-visible-count {
+    .store-section-master-visible-count,
+    .cuisine-category-master-visible-count {
         grid-column: 1;
     }
 
-    .store-section-master-search {
+    .store-section-master-search,
+    .cuisine-category-master-table-actions .unit-master-search {
         grid-column: 2;
         width: 100%;
     }
@@ -69330,13 +69372,97 @@ body.is-resizing-store-section-master-column * {
         grid-column: 1;
     }
 
-    .store-section-master-table-actions {
+    .store-section-master-table-actions,
+    .cuisine-category-master-table-actions {
         grid-template-columns: minmax(0, 1fr);
     }
 
     .store-section-master-visible-count,
-    .store-section-master-search {
+    .store-section-master-search,
+    .cuisine-category-master-visible-count,
+    .cuisine-category-master-table-actions .unit-master-search {
         grid-column: 1;
+    }
+}
+
+/* Cuisine Category manager v2: Store Section-style composition deltas. */
+.cuisine-category-master-create,
+.cuisine-category-master-list-section {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.cuisine-category-master-create > div,
+.cuisine-category-master-table-toolbar > div {
+    min-width: 0;
+}
+
+.cuisine-category-master-create > div > span {
+    display: block;
+    margin-bottom: 3px;
+}
+
+.cuisine-category-master-create h2,
+.cuisine-category-master-list-section h2 {
+    overflow-wrap: anywhere;
+}
+
+.cuisine-category-master-create-actions {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.cuisine-category-master-create-actions > button {
+    white-space: nowrap;
+}
+
+.cuisine-category-master-list-section {
+    padding: 0;
+    overflow: hidden;
+}
+
+.cuisine-category-master-table-actions .unit-master-search {
+    position: relative;
+    flex: 0 1 190px;
+    width: 190px;
+    min-width: 150px;
+}
+
+.cuisine-category-master-table-actions .unit-master-search > input {
+    min-height: 36px;
+}
+
+.cuisine-category-master-list-section
+    > .cuisine-category-master-category-list {
+    box-sizing: border-box;
+    max-width: 100%;
+}
+
+@media (max-width: 1180px) {
+    .cuisine-category-master-create-actions {
+        justify-content: flex-start;
+    }
+}
+
+@media (max-width: 759px) {
+    .cuisine-category-master-table-actions .unit-master-search {
+        min-width: 0;
+    }
+}
+
+@media (max-width: 520px) {
+    .cuisine-category-master-create-actions {
+        display: grid;
+        width: 100%;
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .cuisine-category-master-create-actions > button {
+        width: 100%;
     }
 }
 

@@ -89,22 +89,37 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
              data-cuisine-category-master-status
              hidden></div>
 
-        <section class="unit-master-panel unit-master-catalog" aria-labelledby="cuisineCategoryRegistryTitle">
-            <header>
+        <section class="cuisine-category-master-create" aria-labelledby="addCuisineCategoryTitle">
+            <div>
+                <span>Workspace setup</span>
+                <h2 id="addCuisineCategoryTitle">Add a Cuisine Category</h2>
+                <p>Open the editor to configure the icon, abbreviation, and category name.</p>
+            </div>
+            <div class="cuisine-category-master-create-actions">
+                <button type="button" data-cuisine-category-master-add-button>Add Cuisine Category</button>
+            </div>
+        </section>
+
+        <section class="unit-master-panel unit-master-catalog cuisine-category-master-list-section"
+                 aria-labelledby="cuisineCategoryRegistryTitle">
+            <header class="cuisine-category-master-table-toolbar">
                 <div>
                     <span>Workspace registry</span>
                     <h2 id="cuisineCategoryRegistryTitle">Cuisine Category Registry</h2>
                     <p>Built-in cuisines keep consistent labels; custom cuisines can be renamed or safely deleted.</p>
                 </div>
-                <div class="unit-master-toolbar">
+                <div class="cuisine-category-master-table-actions">
+                    <span class="cuisine-category-master-visible-count"
+                          data-cuisine-category-master-count-label>
+                        {{ master_data.categories | length }} of {{ master_data.categories | length }} shown
+                    </span>
                     <label class="unit-master-search">
-                        <span>Search cuisine categories</span>
+                        <span class="sr-only">Search cuisine categories</span>
                         <input type="search"
                                placeholder="Icon, abbreviation, or name"
                                autocomplete="off"
                                data-cuisine-category-master-search>
                     </label>
-                    <button type="button" data-cuisine-category-master-add-button>Add Cuisine Category</button>
                 </div>
             </header>
 
@@ -112,10 +127,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                 <section class="unit-master-category type-master-category"
                          data-cuisine-category-master-category
                          aria-labelledby="allCuisineCategoriesTitle">
-                    <header>
-                        <h3 id="allCuisineCategoriesTitle">Cuisine categories</h3>
-                        <span data-cuisine-category-master-count-label>{{ master_data.categories | length }} categories</span>
-                    </header>
+                    <h3 class="sr-only" id="allCuisineCategoriesTitle">Cuisine categories</h3>
                     <div class="unit-master-table type-master-table cuisine-category-master-table" role="table" aria-label="Cuisine categories">
                         <div class="unit-master-table-head" role="row">
                             <div class="cuisine-category-master-identity"
