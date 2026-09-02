@@ -68962,8 +68962,27 @@ body.is-resizing-store-section-master-column * {
 }
 
 .store-section-master-category .store-section-master-table-head {
+    min-height: 0;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--app-border);
     border-start-start-radius: 8px;
     border-start-end-radius: 8px;
+    background: transparent;
+    color: var(--app-muted);
+    font-size: 12px;
+    font-weight: 850;
+    letter-spacing: .03em;
+    text-transform: uppercase;
+}
+
+.store-section-master-category .store-section-master-table-head
+    > [data-store-section-master-column] {
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    line-height: inherit;
+    text-align: left;
+    text-transform: inherit;
 }
 
 .store-section-master-table {

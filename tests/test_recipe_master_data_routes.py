@@ -2979,9 +2979,20 @@ def test_store_section_manager_uses_compact_registry_and_preserves_interactions(
     assert table is not None
     assert table.get("aria-colcount") == "6"
     assert [
-        header.get("data-store-section-master-column")
+        (
+            header.get("data-store-section-master-column"),
+            header.get_text(" ", strip=True),
+            header.get("aria-colindex"),
+        )
         for header in table.select("[data-store-section-master-column]")
-    ] == ["order", "icon", "section", "usage", "source", "actions"]
+    ] == [
+        ("order", "Order", "1"),
+        ("icon", "Icon", "2"),
+        ("section", "Display Name", "3"),
+        ("usage", "Used in", "4"),
+        ("source", "Source", "5"),
+        ("actions", "Action", "6"),
+    ]
     assert [
         cell.get("data-store-section-master-cell")
         for cell in table.select("[data-store-section-master-cell]")
@@ -3066,6 +3077,30 @@ def test_store_section_manager_uses_compact_registry_and_preserves_interactions(
     assert "grid-template-columns: repeat(3, minmax(0, 1fr));" in css
     assert ".store-section-master-category-list {" in css
     assert ".store-section-master-category {" in css
+    store_header_rules = css.rsplit(
+        ".store-section-master-category .store-section-master-table-head {",
+        1,
+    )[1].split("}", 1)[0]
+    assert "min-height: 0;" in store_header_rules
+    assert "padding: 10px 14px;" in store_header_rules
+    assert "border-bottom: 1px solid var(--app-border);" in store_header_rules
+    assert "background: transparent;" in store_header_rules
+    assert "color: var(--app-muted);" in store_header_rules
+    assert "font-size: 12px;" in store_header_rules
+    assert "font-weight: 850;" in store_header_rules
+    assert "letter-spacing: .03em;" in store_header_rules
+    assert "text-transform: uppercase;" in store_header_rules
+    store_header_cell_rules = css.rsplit(
+        ".store-section-master-category .store-section-master-table-head\n"
+        "    > [data-store-section-master-column] {",
+        1,
+    )[1].split("}", 1)[0]
+    assert "color: inherit;" in store_header_cell_rules
+    assert "font: inherit;" in store_header_cell_rules
+    assert "letter-spacing: inherit;" in store_header_cell_rules
+    assert "line-height: inherit;" in store_header_cell_rules
+    assert "text-align: left;" in store_header_cell_rules
+    assert "text-transform: inherit;" in store_header_cell_rules
     assert (
         "grid-template-columns: 116px 46px minmax(180px, 1fr) "
         "104px 92px 112px;"
