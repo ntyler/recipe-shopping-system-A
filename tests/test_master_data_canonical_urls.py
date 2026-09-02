@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 from urllib.parse import parse_qsl
 from urllib.parse import urlsplit
@@ -286,6 +287,159 @@ def test_cuisine_categories_page_renders_registry_management_ui(master_data_app)
     assert "const openUsage = async (item, trigger) =>" in script
     assert 'body: JSON.stringify({ categories: importableNames })' in script
     assert '"__CATEGORY_ID__"' in script
+
+
+def test_cuisine_category_rows_share_unit_usage_and_action_contract(
+    master_data_app,
+):
+    with master_data_app.test_client() as client:
+        sign_in(client, "user-a")
+        response = client.get("/admin/master-data/cuisine-categories")
+
+    assert response.status_code == 200
+    soup = BeautifulSoup(response.get_data(as_text=True), "html.parser")
+    row = soup.select_one("[data-cuisine-category-master-row]")
+    assert row is not None
+    category_name = row.select_one(
+        ".cuisine-category-master-name"
+    ).get_text(strip=True)
+
+    templates_root = Path("PushShoppingList/templates")
+    units_template = (templates_root / "units.html").read_text(encoding="utf-8")
+    cuisine_template = (templates_root / "cuisine_categories.html").read_text(
+        encoding="utf-8",
+    )
+    usage = row.find(
+        "div",
+        class_="unit-master-usage",
+        recursive=False,
+    )
+    assert usage is not None
+    assert usage.get("class") == ["unit-master-usage"]
+    assert usage.get("role") == "cell"
+    assert 'class="unit-master-usage" role="cell"' in units_template
+    assert 'class="unit-master-usage-button"' in cuisine_template
+    assert 'class="unit-master-usage-button"' in units_template
+    assert 'title="Show recipes using {{ unit.name }}"' in units_template
+    assert (
+        "title=\"Show recipes using {{ category.category_name or "
+        "category.canonical_name or category.name }}\""
+    ) in cuisine_template
+
+    empty_usage = usage.find(
+        "span",
+        class_="unit-master-usage-empty",
+        recursive=False,
+    )
+    assert empty_usage is not None
+    assert empty_usage["title"] == f"No recipes currently use {category_name}"
+    assert 'class="unit-master-usage-empty"' in units_template
+    assert 'title="No recipes currently use {{ unit.name }}"' in units_template
+
+    action_cell = row.find(
+        "span",
+        class_="unit-master-action-cell",
+        recursive=False,
+    )
+    assert action_cell is not None
+    assert action_cell.get("role") == "cell"
+    edit = action_cell.find(
+        "button",
+        class_="unit-master-edit-button",
+        recursive=False,
+    )
+    assert edit is not None
+    assert edit.get("class") == ["unit-master-edit-button"]
+    assert 'class="unit-master-edit-button"' in units_template
+
+    script = Path(
+        "PushShoppingList/static/js/cuisine_categories.js"
+    ).read_text(encoding="utf-8")
+    assert 'usage.className = "unit-master-usage";' in script
+    assert 'usage.setAttribute("role", "cell");' in script
+    assert 'button.className = "unit-master-usage-button";' in script
+    assert 'empty.className = "unit-master-usage-empty";' in script
+    assert (
+        "button.title = `Show recipes using ${categoryDisplayLabel(item)}`;"
+        in script
+    )
+    assert (
+        "empty.title = `No recipes currently use ${categoryDisplayLabel(item)}`;"
+        in script
+    )
+    assert 'actionCell.className = "unit-master-action-cell";' in script
+    assert 'actionCell.setAttribute("role", "cell");' in script
+    assert 'edit.className = "unit-master-edit-button";' in script
+
+    css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    cuisine_edit_rules = [
+        (match.group(1), match.group(2))
+        for match in re.finditer(r"([^{}]+)\{([^{}]*)\}", css)
+        if "[data-cuisine-category-master-page]" in match.group(1)
+        and ".unit-master-edit-button" in match.group(1)
+    ]
+    assert any(
+        "width: 100%;" in declarations
+        for _selectors, declarations in cuisine_edit_rules
+    )
+
+    def block_from(source, marker, start=0):
+        marker_start = source.index(marker, start)
+        opening = source.index("{", marker_start)
+        depth = 0
+        for index in range(opening, len(source)):
+            if source[index] == "{":
+                depth += 1
+            elif source[index] == "}":
+                depth -= 1
+                if depth == 0:
+                    return source[opening + 1:index]
+        raise AssertionError(f"Unclosed CSS block for {marker}")
+
+    unit_grid = block_from(css, ".unit-master-table-head,")
+    cuisine_grid = block_from(
+        css,
+        ".cuisine-category-master-table > .unit-master-table-head,",
+    )
+    unit_columns = re.search(
+        r"grid-template-columns:\s*([^;]+);",
+        unit_grid,
+    ).group(1).split()
+    cuisine_columns = re.search(
+        r"grid-template-columns:\s*([^;]+);",
+        cuisine_grid,
+    ).group(1).split()
+    assert unit_columns[-1] == cuisine_columns[-1] == "58px"
+
+    cuisine_section = css.index("/* Cuisine Category master data:")
+    mobile = block_from(css, "@media (max-width: 760px)", cuisine_section)
+    mobile_usage = block_from(
+        mobile,
+        ".cuisine-category-master-table .unit-master-usage",
+    )
+    assert "grid-column: 2;" in mobile_usage
+    assert "grid-row: 3;" in mobile_usage
+    mobile_action = block_from(
+        mobile,
+        ".cuisine-category-master-table .unit-master-action-cell",
+    )
+    assert "grid-column: 3;" in mobile_action
+    assert "grid-row: 1 / span 2;" in mobile_action
+    assert "align-self: center;" in mobile_action
+    mobile_edit_rules = [
+        (match.group(1), match.group(2))
+        for match in re.finditer(r"([^{}]+)\{([^{}]*)\}", mobile)
+        if ".unit-master-edit-button" in match.group(1)
+    ]
+    assert mobile_edit_rules
+    assert all(
+        "[data-cuisine-category-master-page]" in selectors
+        for selectors, _declarations in mobile_edit_rules
+    )
+    assert any(
+        "width: auto;" in declarations
+        for _selectors, declarations in mobile_edit_rules
+    )
 
 
 def test_cuisine_category_routes_support_workspace_crud_and_references(

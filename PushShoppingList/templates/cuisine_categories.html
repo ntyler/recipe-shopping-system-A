@@ -157,12 +157,15 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                                     data-category-id="{{ category.id }}"
                                                     aria-haspopup="dialog"
                                                     aria-controls="cuisineCategoryMasterUsageDialog"
-                                                    aria-label="Show {{ category.recipe_count }} recipe{% if category.recipe_count != 1 %}s{% endif %} using {{ category.category_name or category.canonical_name or category.name }}">
+                                                    aria-label="Show {{ category.recipe_count }} recipe{% if category.recipe_count != 1 %}s{% endif %} using {{ category.category_name or category.canonical_name or category.name }}"
+                                                    title="Show recipes using {{ category.category_name or category.canonical_name or category.name }}">
                                                 <strong>{{ category.recipe_count }}</strong>
                                                 <span>{{ "recipe" if category.recipe_count == 1 else "recipes" }}</span>
                                             </button>
                                         {% else %}
-                                            <span class="unit-master-usage-empty" aria-label="No recipes use {{ category.category_name or category.canonical_name or category.name }}">0</span>
+                                            <span class="unit-master-usage-empty"
+                                                  aria-label="No recipes use {{ category.category_name or category.canonical_name or category.name }}"
+                                                  title="No recipes currently use {{ category.category_name or category.canonical_name or category.name }}">0</span>
                                         {% endif %}
                                     </div>
                                     <span class="unit-master-source-badge{% if category.custom %} user-created{% endif %}" role="cell">
