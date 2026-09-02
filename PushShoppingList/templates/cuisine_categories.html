@@ -118,9 +118,12 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                     </header>
                     <div class="unit-master-table type-master-table cuisine-category-master-table" role="table" aria-label="Cuisine categories">
                         <div class="unit-master-table-head" role="row">
-                            <span role="columnheader">Icon</span>
-                            <span role="columnheader">Abbreviation</span>
-                            <span role="columnheader">Cuisine Category Name</span>
+                            <div class="cuisine-category-master-identity"
+                                 role="presentation">
+                                <span role="columnheader">Icon</span>
+                                <span role="columnheader">Abbreviation</span>
+                                <span role="columnheader">Cuisine Category Name</span>
+                            </div>
                             <span role="columnheader">Used in</span>
                             <span role="columnheader">Source</span>
                             <span role="columnheader">Action</span>
@@ -132,18 +135,21 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                      data-cuisine-category-master-row
                                      data-category-id="{{ category.id }}"
                                      data-cuisine-category-master-search-value="{{ category.icon }} {{ category.abbreviation }} {{ category.category_name or category.canonical_name or category.name }}">
-                                    <span class="cuisine-category-master-icon cuisine-category-icon-visual"
-                                          role="cell"
-                                          data-cuisine-category-icon-visual
-                                          data-icon-token="{{ category.icon }}">
-                                        {{ cuisine_icon_fallback(category.icon) }}
-                                    </span>
-                                    <strong class="cuisine-category-master-abbreviation" role="cell">
-                                        {{ category.abbreviation or "—" }}
-                                    </strong>
-                                    <strong class="cuisine-category-master-name" role="cell">
-                                        {{ category.category_name or category.canonical_name or category.name }}
-                                    </strong>
+                                    <div class="cuisine-category-master-identity"
+                                         role="presentation">
+                                        <span class="cuisine-category-master-icon cuisine-category-icon-visual"
+                                              role="cell"
+                                              data-cuisine-category-icon-visual
+                                              data-icon-token="{{ category.icon }}">
+                                            {{ cuisine_icon_fallback(category.icon) }}
+                                        </span>
+                                        <strong class="cuisine-category-master-abbreviation" role="cell">
+                                            {{ category.abbreviation or "—" }}
+                                        </strong>
+                                        <strong class="cuisine-category-master-name" role="cell">
+                                            {{ category.category_name or category.canonical_name or category.name }}
+                                        </strong>
+                                    </div>
                                     <div class="unit-master-usage" role="cell">
                                         {% if category.recipe_count %}
                                             <button type="button"

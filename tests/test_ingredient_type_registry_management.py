@@ -145,7 +145,7 @@ def test_types_page_matches_master_data_navigation_and_exposes_editors(
     assert soup.select_one('script[src*="/static/js/types.js"]') is not None
 
 
-def test_types_table_reuses_unit_trailing_tracks_and_keeps_responsive_layout():
+def test_types_and_cuisine_share_used_in_anchor_and_responsive_layout():
     css = (
         Path(__file__).resolve().parents[1]
         / "PushShoppingList"
@@ -240,10 +240,6 @@ def test_types_table_reuses_unit_trailing_tracks_and_keeps_responsive_layout():
     ]
     assert len(type_grid_rules) == 1
     type_tracks = grid_tracks(type_grid_rules[0])
-    cuisine_tracks = grid_tracks(block_from(
-        css,
-        ".cuisine-category-master-table > .unit-master-table-head,",
-    ))
 
     assert unit_tracks == [
         "minmax(105px,.7fr)",
@@ -269,14 +265,6 @@ def test_types_table_reuses_unit_trailing_tracks_and_keeps_responsive_layout():
         ]
         assert len(mappings) == 1
         assert f"grid-column: {expected_column};" in mappings[0][1]
-    assert cuisine_tracks == [
-        "52px",
-        "96px",
-        "minmax(170px,1fr)",
-        "minmax(90px,.5fr)",
-        "118px",
-        "58px",
-    ]
 
     type_full_width = block_from(css, "@media (max-width: 1640px)")
     assert grid_tracks(block_from(
@@ -285,7 +273,46 @@ def test_types_table_reuses_unit_trailing_tracks_and_keeps_responsive_layout():
     )) == ["minmax(0,1fr)"]
 
     cuisine_section = css.index("/* Cuisine Category master data:")
+    cuisine_desktop = block_from(
+        css,
+        "@media (min-width: 761px)",
+        cuisine_section,
+    )
+    assert ".cuisine-category-master-table > .unit-master-table-head" not in (
+        cuisine_desktop
+    )
+    identity = block_from(
+        cuisine_desktop,
+        ".cuisine-category-master-identity",
+    )
+    assert "grid-column: 1 / span 2;" in identity
+    assert grid_tracks(identity) == ["52px", "96px", "minmax(0,1fr)"]
+    assert "gap: 8px;" in identity
+    for marker, expected_column in (
+        (".cuisine-category-master-table .unit-master-usage", "3"),
+        (".cuisine-category-master-table .unit-master-source-badge", "4"),
+        (".cuisine-category-master-table .unit-master-action-cell", "5"),
+    ):
+        assert f"grid-column: {expected_column};" in block_from(
+            cuisine_desktop,
+            marker,
+        )
+
+    cuisine_full_width = block_from(
+        css,
+        "@media (max-width: 1640px)",
+        cuisine_section,
+    )
+    assert grid_tracks(block_from(
+        cuisine_full_width,
+        ".cuisine-category-master-category-list",
+    )) == ["minmax(0,1fr)"]
+
     mobile = block_from(css, "@media (max-width: 760px)", cuisine_section)
+    assert "display: contents;" in block_from(
+        mobile,
+        ".cuisine-category-master-identity",
+    )
     assert grid_tracks(block_from(
         mobile,
         ".type-master-table .unit-master-row",

@@ -274,6 +274,16 @@ def test_cuisine_categories_page_renders_registry_management_ui(master_data_app)
         "Source",
         "Action",
     ]
+    header_identity = soup.select_one(
+        ".cuisine-category-master-table > .unit-master-table-head > "
+        ".cuisine-category-master-identity"
+    )
+    assert header_identity is not None
+    assert header_identity.get("role") == "presentation"
+    assert [
+        child.get("role")
+        for child in header_identity.find_all(recursive=False)
+    ] == ["columnheader", "columnheader", "columnheader"]
     assert soup.select("[data-cuisine-category-master-row]")
     assert not soup.select(".cuisine-category-master-table .type-master-status-badge")
     assert soup.select_one("[data-cuisine-category-master-active]") is None
@@ -316,6 +326,18 @@ def test_cuisine_category_rows_share_unit_usage_and_action_contract(
     soup = BeautifulSoup(response.get_data(as_text=True), "html.parser")
     row = soup.select_one("[data-cuisine-category-master-row]")
     assert row is not None
+    identity = row.find(
+        "div",
+        class_="cuisine-category-master-identity",
+        recursive=False,
+    )
+    assert identity is not None
+    assert identity.get("role") == "presentation"
+    assert [
+        child.get("role")
+        for child in identity.find_all(recursive=False)
+    ] == ["cell", "cell", "cell"]
+    assert len(row.select("[role='cell']")) == 6
     category_name = row.select_one(
         ".cuisine-category-master-name"
     ).get_text(strip=True)
@@ -386,6 +408,10 @@ def test_cuisine_category_rows_share_unit_usage_and_action_contract(
     assert 'actionCell.className = "unit-master-action-cell";' in script
     assert 'actionCell.setAttribute("role", "cell");' in script
     assert 'edit.className = "unit-master-edit-button";' in script
+    assert 'identity.className = "cuisine-category-master-identity";' in script
+    assert 'identity.setAttribute("role", "presentation");' in script
+    assert "identity.append(icon, abbreviation, name);" in script
+    assert "identity," in script
 
     css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
     cuisine_edit_rules = [
@@ -413,22 +439,37 @@ def test_cuisine_category_rows_share_unit_usage_and_action_contract(
         raise AssertionError(f"Unclosed CSS block for {marker}")
 
     unit_grid = block_from(css, ".unit-master-table-head,")
-    cuisine_grid = block_from(
-        css,
-        ".cuisine-category-master-table > .unit-master-table-head,",
-    )
     unit_columns = re.search(
         r"grid-template-columns:\s*([^;]+);",
         unit_grid,
     ).group(1).split()
-    cuisine_columns = re.search(
-        r"grid-template-columns:\s*([^;]+);",
-        cuisine_grid,
-    ).group(1).split()
-    assert unit_columns[-1] == cuisine_columns[-1] == "58px"
+    assert unit_columns[-1] == "58px"
+    assert "gap: 12px;" in unit_grid
 
     cuisine_section = css.index("/* Cuisine Category master data:")
+    cuisine_desktop = block_from(
+        css,
+        "@media (min-width: 761px)",
+        cuisine_section,
+    )
+    desktop_identity = block_from(
+        cuisine_desktop,
+        ".cuisine-category-master-identity",
+    )
+    assert "grid-column: 1 / span 2;" in desktop_identity
+    assert "grid-template-columns: 52px 96px minmax(0, 1fr);" in (
+        desktop_identity
+    )
+    assert "grid-column: 3;" in block_from(
+        cuisine_desktop,
+        ".cuisine-category-master-table .unit-master-usage",
+    )
+
     mobile = block_from(css, "@media (max-width: 760px)", cuisine_section)
+    assert "display: contents;" in block_from(
+        mobile,
+        ".cuisine-category-master-identity",
+    )
     mobile_usage = block_from(
         mobile,
         ".cuisine-category-master-table .unit-master-usage",

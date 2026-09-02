@@ -219,6 +219,11 @@
             name.setAttribute("role", "cell");
             name.textContent = categoryName(item);
 
+            const identity = document.createElement("div");
+            identity.className = "cuisine-category-master-identity";
+            identity.setAttribute("role", "presentation");
+            identity.append(icon, abbreviation, name);
+
             const sourceBadge = document.createElement("span");
             sourceBadge.className = `unit-master-source-badge${item.custom ? " user-created" : ""}`;
             sourceBadge.setAttribute("role", "cell");
@@ -238,9 +243,7 @@
             actionCell.appendChild(edit);
 
             row.append(
-                icon,
-                abbreviation,
-                name,
+                identity,
                 createUsageCell(item),
                 sourceBadge,
                 actionCell,

@@ -66066,11 +66066,27 @@ body.recipe-edit-standalone-page :is(
     margin-top: 0;
 }
 
-.cuisine-category-master-table > .unit-master-table-head,
-.cuisine-category-master-table .unit-master-row {
-    grid-template-columns: 52px 96px minmax(170px, 1fr) minmax(90px, .5fr) 118px 58px;
-    gap: 8px;
-    padding-inline: 12px;
+@media (min-width: 761px) {
+    .cuisine-category-master-identity {
+        display: grid;
+        min-width: 0;
+        grid-column: 1 / span 2;
+        grid-template-columns: 52px 96px minmax(0, 1fr);
+        gap: 8px;
+        align-items: center;
+    }
+
+    .cuisine-category-master-table .unit-master-usage {
+        grid-column: 3;
+    }
+
+    .cuisine-category-master-table .unit-master-source-badge {
+        grid-column: 4;
+    }
+
+    .cuisine-category-master-table .unit-master-action-cell {
+        grid-column: 5;
+    }
 }
 
 [data-cuisine-category-master-page]
@@ -66078,7 +66094,7 @@ body.recipe-edit-standalone-page :is(
     width: 100%;
 }
 
-@media (max-width: 1860px) {
+@media (max-width: 1640px) {
     .cuisine-category-master-category-list {
         grid-template-columns: minmax(0, 1fr);
     }
@@ -66409,21 +66425,25 @@ body.recipe-edit-standalone-page :is(
         gap: 7px 10px;
     }
 
+    .cuisine-category-master-identity {
+        display: contents;
+    }
+
     .cuisine-category-master-table .cuisine-category-master-icon {
         grid-column: 1;
         grid-row: 1 / span 2;
         align-self: center;
     }
 
-    .cuisine-category-master-table .unit-master-row
-        > .cuisine-category-master-abbreviation {
+    .cuisine-category-master-table
+        .cuisine-category-master-abbreviation {
         grid-column: 2;
         grid-row: 1;
         align-self: end;
     }
 
-    .cuisine-category-master-table .unit-master-row
-        > .cuisine-category-master-name {
+    .cuisine-category-master-table
+        .cuisine-category-master-name {
         grid-column: 2;
         grid-row: 2;
     }
