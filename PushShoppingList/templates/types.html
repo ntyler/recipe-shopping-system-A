@@ -68,7 +68,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                 <div>
                     <span>Workspace registry</span>
                     <h2 id="typeRegistryTitle">Type Registry</h2>
-                    <p>Built-in roles keep stable behavior; custom roles can be renamed or safely deleted when unused.</p>
+                    <p>System-seeded IDs preserve recipe behavior; display names can be edited, and unused custom roles can be deleted.</p>
                 </div>
                 <div class="unit-master-toolbar">
                     <label class="unit-master-search">
@@ -125,15 +125,11 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                         {{ "User-created" if type.custom else "System-seeded" }}
                                     </span>
                                     <span class="unit-master-action-cell" role="cell">
-                                        {% if type.custom %}
-                                            <button type="button"
-                                                    class="unit-master-edit-button"
-                                                    data-type-master-edit-button
-                                                    data-type-id="{{ type.id }}"
-                                                    aria-label="Edit {{ type.name }}">Edit</button>
-                                        {% else %}
-                                            <span class="type-master-action-unavailable" aria-label="No actions available">&mdash;</span>
-                                        {% endif %}
+                                        <button type="button"
+                                                class="unit-master-edit-button"
+                                                data-type-master-edit-button
+                                                data-type-id="{{ type.id }}"
+                                                aria-label="Edit {{ type.name }}">Edit</button>
                                     </span>
                                 </div>
                             {% endfor %}
@@ -166,7 +162,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                data-type-master-name
                                aria-describedby="typeNameHelp typeNameError">
                         <small class="unit-master-field-help" id="typeNameHelp" data-type-master-name-help>
-                            Custom types can be renamed. Built-in names stay tied to stable recipe behavior.
+                            Display names can be edited. System-seeded IDs and recipe behavior remain stable.
                         </small>
                         <small class="unit-master-field-error" id="typeNameError" data-type-master-name-error hidden></small>
                     </label>

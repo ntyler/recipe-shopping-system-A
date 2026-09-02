@@ -151,22 +151,14 @@
             const action = document.createElement("span");
             action.className = "unit-master-action-cell";
             action.setAttribute("role", "cell");
-            if (item.custom) {
-                const edit = document.createElement("button");
-                edit.type = "button";
-                edit.className = "unit-master-edit-button";
-                edit.dataset.typeMasterEditButton = "";
-                edit.dataset.typeId = item.id;
-                edit.textContent = "Edit";
-                edit.setAttribute("aria-label", `Edit ${item.name}`);
-                action.appendChild(edit);
-            } else {
-                const unavailable = document.createElement("span");
-                unavailable.className = "type-master-action-unavailable";
-                unavailable.setAttribute("aria-label", "No actions available");
-                unavailable.textContent = "—";
-                action.appendChild(unavailable);
-            }
+            const edit = document.createElement("button");
+            edit.type = "button";
+            edit.className = "unit-master-edit-button";
+            edit.dataset.typeMasterEditButton = "";
+            edit.dataset.typeId = item.id;
+            edit.textContent = "Edit";
+            edit.setAttribute("aria-label", `Edit ${item.name}`);
+            action.appendChild(edit);
 
             row.append(name, createUsageCell(item), sourceBadge, action);
             return row;
@@ -224,12 +216,14 @@
             returnFocus = trigger || document.activeElement;
             clearEditorErrors();
             nameInput.value = item?.name || "";
-            nameInput.disabled = Boolean(item?.seeded);
+            nameInput.disabled = false;
             nameHelp.textContent = item?.seeded
-                ? "Built-in names stay tied to stable recipe behavior."
+                ? "You can change this display name; its system-seeded ID and recipe behavior remain stable."
                 : "Custom type names can be changed without losing their recipe assignments.";
             editorTitle.textContent = item ? `Edit ${item.name}` : "Add Type";
-            editorKicker.textContent = item?.seeded ? "Built-in type" : "Workspace type";
+            editorKicker.textContent = item?.seeded
+                ? "System-seeded type"
+                : (item ? "User-created type" : "New workspace type");
             saveButton.textContent = item ? "Save Changes" : "Add Type";
             deleteButton.hidden = !item?.custom;
             deleteButton.dataset.typeId = item?.id || "";
@@ -259,9 +253,8 @@
         const saveType = async event => {
             event.preventDefault();
             clearEditorErrors();
-            const current = typeById(editorTypeId);
             const payload = {
-                name: current?.seeded ? current.name : cleanText(nameInput.value),
+                name: cleanText(nameInput.value),
             };
             saveButton.disabled = true;
             saveButton.textContent = "Saving…";

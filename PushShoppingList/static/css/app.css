@@ -65946,9 +65946,31 @@ body.recipe-edit-standalone-page :is(
     }
 }
 
-.type-master-table > .unit-master-table-head,
-.type-master-table .unit-master-row {
-    grid-template-columns: minmax(180px, 1fr) minmax(90px, .55fr) 130px 58px;
+@media (min-width: 761px) {
+    [data-type-master-page] .type-master-table > .unit-master-table-head,
+    [data-type-master-page] .type-master-table .unit-master-row {
+        grid-template-columns: minmax(105px, .7fr) minmax(145px, 1.22fr) minmax(76px, .5fr) 108px 58px;
+    }
+
+    [data-type-master-page] .type-master-table > .unit-master-table-head > :nth-child(1),
+    [data-type-master-page] .type-master-table .unit-master-row > :nth-child(1) {
+        grid-column: 1 / span 2;
+    }
+
+    [data-type-master-page] .type-master-table > .unit-master-table-head > :nth-child(2),
+    [data-type-master-page] .type-master-table .unit-master-row > :nth-child(2) {
+        grid-column: 3;
+    }
+
+    [data-type-master-page] .type-master-table > .unit-master-table-head > :nth-child(3),
+    [data-type-master-page] .type-master-table .unit-master-row > :nth-child(3) {
+        grid-column: 4;
+    }
+
+    [data-type-master-page] .type-master-table > .unit-master-table-head > :nth-child(4),
+    [data-type-master-page] .type-master-table .unit-master-row > :nth-child(4) {
+        grid-column: 5;
+    }
 }
 
 .type-master-action-unavailable {

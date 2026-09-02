@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -123,8 +124,28 @@ def test_types_page_matches_master_data_navigation_and_exposes_editors(
     assert soup.select_one("dialog[data-type-master-dialog]") is not None
     assert soup.select_one("dialog[data-type-master-usage-dialog]") is not None
     assert len(soup.select("[data-type-master-row]")) == 6
-    assert soup.select("[data-type-master-edit-button]") == []
+    seeded_edit_buttons = soup.select("[data-type-master-edit-button]")
+    assert len(seeded_edit_buttons) == 6
+    assert {
+        button["data-type-id"]
+        for button in seeded_edit_buttons
+    } == {"main", "optional", "garnish", "topping", "sauce", "substitute"}
+    assert soup.select(".type-master-action-unavailable") == []
     assert soup.select_one("[data-type-master-delete][hidden]") is not None
+    static_root = Path(__file__).resolve().parents[1] / "PushShoppingList" / "static"
+    css = (static_root / "css" / "app.css").read_text(encoding="utf-8")
+    assert ".unit-master-page button[hidden]," in css
+    script = (static_root / "js" / "types.js").read_text(encoding="utf-8")
+    assert "nameInput.disabled = Boolean(item?.seeded);" not in script
+    assert "current?.seeded ? current.name : cleanText(nameInput.value)" not in script
+    assert "name: cleanText(nameInput.value)" in script
+    active_tab = soup.select_one("nav.master-data-tabs a.active")
+    assert active_tab.get_text(strip=True) == "Types"
+    assert active_tab["href"].startswith("/admin/master-data/types")
+    assert soup.select_one('script[src*="/static/js/types.js"]') is not None
+
+
+def test_types_table_reuses_unit_trailing_tracks_and_keeps_responsive_layout():
     css = (
         Path(__file__).resolve().parents[1]
         / "PushShoppingList"
@@ -132,11 +153,150 @@ def test_types_page_matches_master_data_navigation_and_exposes_editors(
         / "css"
         / "app.css"
     ).read_text(encoding="utf-8")
-    assert ".unit-master-page button[hidden]," in css
-    active_tab = soup.select_one("nav.master-data-tabs a.active")
-    assert active_tab.get_text(strip=True) == "Types"
-    assert active_tab["href"].startswith("/admin/master-data/types")
-    assert soup.select_one('script[src*="/static/js/types.js"]') is not None
+
+    def block_from(source, marker, start=0):
+        marker_start = source.index(marker, start)
+        opening = source.index("{", marker_start)
+        depth = 0
+        for index in range(opening, len(source)):
+            if source[index] == "{":
+                depth += 1
+            elif source[index] == "}":
+                depth -= 1
+                if depth == 0:
+                    return source[opening + 1:index]
+        raise AssertionError(f"Unclosed CSS block for {marker}")
+
+    def grid_tracks(declarations):
+        marker = "grid-template-columns:"
+        start = declarations.index(marker) + len(marker)
+        value = declarations[start:declarations.index(";", start)].strip()
+        tracks = []
+        current = []
+        depth = 0
+        for character in value:
+            if character == "(":
+                depth += 1
+            elif character == ")":
+                depth -= 1
+            if character.isspace() and depth == 0:
+                if current:
+                    tracks.append("".join("".join(current).split()))
+                    current = []
+                continue
+            current.append(character)
+        if current:
+            tracks.append("".join("".join(current).split()))
+        return tracks
+
+    unit_tracks = grid_tracks(block_from(
+        css,
+        ".unit-master-table-head,",
+    ))
+    type_section = css.index("/* Type master data:")
+    type_desktop = block_from(
+        css,
+        "@media (min-width: 761px)",
+        type_section,
+    )
+    type_desktop_rules = []
+    for match in re.finditer(r"([^{}]+)\{([^{}]*)\}", type_desktop):
+        selectors = [
+            selector.strip()
+            for selector in match.group(1).split(",")
+            if selector.strip()
+        ]
+        if any(".type-master-table" in selector for selector in selectors):
+            type_desktop_rules.append((selectors, match.group(2)))
+
+    assert len(type_desktop_rules) == 5
+    for selectors, _declarations in type_desktop_rules:
+        assert len(selectors) == 2
+        assert all(
+            selector.startswith("[data-type-master-page] ")
+            for selector in selectors
+        )
+        assert all(
+            not selector.startswith(".type-master-table")
+            for selector in selectors
+        )
+        assert all(
+            not selector.startswith(".type-master-page ")
+            for selector in selectors
+        )
+    assert re.search(
+        r"(?m)^\s*\.type-master-page\s+\.type-master-table",
+        type_desktop,
+    ) is None
+    assert re.search(
+        r"(?m)^\s*\.type-master-table[^\n,{]*:nth-child\(",
+        css,
+    ) is None
+
+    type_grid_rules = [
+        declarations
+        for _selectors, declarations in type_desktop_rules
+        if "grid-template-columns:" in declarations
+    ]
+    assert len(type_grid_rules) == 1
+    type_tracks = grid_tracks(type_grid_rules[0])
+    cuisine_tracks = grid_tracks(block_from(
+        css,
+        ".cuisine-category-master-table > .unit-master-table-head,",
+    ))
+
+    assert unit_tracks == [
+        "minmax(105px,.7fr)",
+        "minmax(145px,1.22fr)",
+        "minmax(76px,.5fr)",
+        "108px",
+        "58px",
+    ]
+    assert type_tracks == unit_tracks
+    for child, expected_column in (
+        (1, "1 / span 2"),
+        (2, "3"),
+        (3, "4"),
+        (4, "5"),
+    ):
+        mappings = [
+            (selectors, declarations)
+            for selectors, declarations in type_desktop_rules
+            if all(
+                f":nth-child({child})" in selector
+                for selector in selectors
+            )
+        ]
+        assert len(mappings) == 1
+        assert f"grid-column: {expected_column};" in mappings[0][1]
+    assert cuisine_tracks == [
+        "52px",
+        "96px",
+        "minmax(170px,1fr)",
+        "minmax(82px,.5fr)",
+        "118px",
+        "80px",
+        "54px",
+    ]
+
+    type_full_width = block_from(css, "@media (max-width: 1640px)")
+    assert grid_tracks(block_from(
+        type_full_width,
+        ".type-master-category-list",
+    )) == ["minmax(0,1fr)"]
+
+    cuisine_section = css.index("/* Cuisine Category master data:")
+    mobile = block_from(css, "@media (max-width: 760px)", cuisine_section)
+    assert grid_tracks(block_from(
+        mobile,
+        ".type-master-table .unit-master-row",
+    )) == ["minmax(0,1fr)", "auto"]
+    mobile_action = block_from(
+        mobile,
+        ".type-master-table .unit-master-action-cell",
+    )
+    assert "grid-column: 2;" in mobile_action
+    assert "grid-row: 1;" in mobile_action
 
 
 def test_custom_type_persists_reaches_editor_and_is_workspace_isolated(
@@ -174,6 +334,224 @@ def test_custom_type_persists_reaches_editor_and_is_workspace_isolated(
             json={"name": "Taken", "active": True},
         )
         assert forbidden.status_code == 404
+
+
+def test_seeded_display_name_can_change_without_changing_identity_or_usage(
+    ingredient_type_app,
+):
+    recipe_url = "https://example.test/recipes/stable-main-type"
+    with ingredient_type_app.test_client() as client:
+        sign_in(client, "user-a")
+        master_data.sync_recipe_master_records(
+            recipe_url,
+            recipe_data={
+                "recipe_title": "Stable Main Type",
+                "ingredients": [{
+                    "ingredient": "chicken",
+                    "quantity": "1",
+                    "unit": "pound",
+                    "section": "main",
+                }],
+            },
+            user_id="user-a",
+        )
+
+        before = type_named(registry_for(client), "Main")
+        assert before["id"] == "main"
+        assert before["value"] == "main"
+        assert before["recipe_count"] == 1
+
+        response = client.patch(
+            "/api/master-data/types/main",
+            json={"name": "Primary", "active": False},
+        )
+        assert response.status_code == 200
+        renamed = type_named(response.get_json()["registry"], "Primary")
+        assert renamed["id"] == "main"
+        assert renamed["value"] == "main"
+        assert renamed["seeded"] is True
+        assert renamed["active"] is True
+        assert renamed["recipe_count"] == 1
+
+        persisted = type_named(registry_for(client), "Primary")
+        assert persisted["id"] == "main"
+        assert persisted["value"] == "main"
+        assert persisted["active"] is True
+        assert persisted["recipe_count"] == 1
+
+        reserved_create = client.post(
+            "/api/master-data/types",
+            json={"name": "Main", "active": True},
+        )
+        assert reserved_create.status_code == 422
+        assert reserved_create.get_json()["errors"]["name"]
+
+        custom = create_type(client, "Finisher")
+        reserved_rename = client.patch(
+            f'/api/master-data/types/{custom["type_id"]}',
+            json={"name": "Main", "active": True},
+        )
+        assert reserved_rename.status_code == 422
+        assert reserved_rename.get_json()["errors"]["name"]
+
+        collision_safe_registry = registry_for(client)
+        seeded_main = type_named(collision_safe_registry, "Primary")
+        assert seeded_main["id"] == "main"
+        assert seeded_main["value"] == "main"
+        assert seeded_main["recipe_count"] == 1
+        assert type_named(collision_safe_registry, "Finisher")["id"] == custom["type_id"]
+        assert all(item["name"] != "Main" for item in collision_safe_registry["types"])
+
+        references = client.get("/api/master-data/types/main/references")
+        assert references.status_code == 200
+        reference_payload = references.get_json()
+        assert reference_payload["type"]["name"] == "Primary"
+        assert reference_payload["type"]["id"] == "main"
+        assert reference_payload["total"] == 1
+        assert reference_payload["total_reference_count"] == 1
+        assert reference_payload["references"][0]["matches"][0]["ingredient_name"] == (
+            "chicken"
+        )
+
+        with master_data.existing_recipe_master_read_connection() as connection:
+            stored = connection.execute(
+                """
+                SELECT ingredient_type
+                  FROM recipe_ingredients
+                 WHERE user_id = ?
+                """,
+                ("user-a",),
+            ).fetchone()
+        assert stored["ingredient_type"] == "main"
+
+        editor = client.get(
+            "/recipe/edit",
+            query_string={
+                "viewer_user_id": "user-a",
+                "url": recipe_url,
+            },
+        )
+        assert editor.status_code == 200
+        soup = BeautifulSoup(editor.get_data(as_text=True), "html.parser")
+        editor_registry = json.loads(soup.select_one("#ingredientTypeConfig").string)
+        editor_type = type_named(editor_registry, "Primary")
+        assert editor_type["id"] == "main"
+        assert editor_type["value"] == "main"
+        assert editor_type["active"] is True
+
+
+def test_second_seeded_rename_migrates_previous_display_labels_to_stable_id(
+    ingredient_type_app,
+):
+    recipe_url = "https://example.test/recipes/previous-main-display-label"
+    with ingredient_type_app.test_client() as client:
+        sign_in(client, "user-a")
+        first_rename = client.patch(
+            "/api/master-data/types/main",
+            json={"name": "Primary", "active": False},
+        )
+        assert first_rename.status_code == 200
+        assert type_named(first_rename.get_json()["registry"], "Primary")["id"] == "main"
+
+        master_data.sync_recipe_master_records(
+            recipe_url,
+            recipe_data={
+                "recipe_title": "Previous Main Display Label",
+                "ingredients": [{
+                    "ingredient": "tofu",
+                    "quantity": "8",
+                    "unit": "ounces",
+                    "section": "Primary",
+                }],
+            },
+            user_id="user-a",
+        )
+        with master_data.recipe_master_connection(user_id="user-a") as connection:
+            connection.execute(
+                """
+                UPDATE recipe_ingredient_option_items
+                   SET metadata_json = ?
+                 WHERE option_id IN (
+                       SELECT option.id
+                         FROM recipe_ingredient_options option
+                         JOIN recipe_ingredient_requirements requirement
+                           ON requirement.id = option.requirement_id
+                        WHERE requirement.user_id = ?
+                 )
+                """,
+                (json.dumps({"section": "Primary"}), "user-a"),
+            )
+
+        with master_data.existing_recipe_master_read_connection() as connection:
+            direct_before = connection.execute(
+                """
+                SELECT ingredient_type
+                  FROM recipe_ingredients
+                 WHERE user_id = ?
+                """,
+                ("user-a",),
+            ).fetchone()
+            option_before = connection.execute(
+                """
+                SELECT item.ingredient_type, item.metadata_json
+                  FROM recipe_ingredient_option_items item
+                  JOIN recipe_ingredient_options option ON option.id = item.option_id
+                  JOIN recipe_ingredient_requirements requirement
+                    ON requirement.id = option.requirement_id
+                 WHERE requirement.user_id = ?
+                """,
+                ("user-a",),
+            ).fetchone()
+        assert direct_before["ingredient_type"] == "Primary"
+        assert option_before["ingredient_type"] == "Primary"
+        assert json.loads(option_before["metadata_json"])["section"] == "Primary"
+
+        second_rename = client.patch(
+            "/api/master-data/types/main",
+            json={"name": "Core", "active": False},
+        )
+        assert second_rename.status_code == 200
+        renamed = type_named(second_rename.get_json()["registry"], "Core")
+        assert renamed["id"] == "main"
+        assert renamed["value"] == "main"
+        assert renamed["active"] is True
+        assert renamed["recipe_count"] == 1
+
+        with master_data.existing_recipe_master_read_connection() as connection:
+            direct_after = connection.execute(
+                """
+                SELECT ingredient_type
+                  FROM recipe_ingredients
+                 WHERE user_id = ?
+                """,
+                ("user-a",),
+            ).fetchone()
+            option_after = connection.execute(
+                """
+                SELECT item.ingredient_type, item.metadata_json
+                  FROM recipe_ingredient_option_items item
+                  JOIN recipe_ingredient_options option ON option.id = item.option_id
+                  JOIN recipe_ingredient_requirements requirement
+                    ON requirement.id = option.requirement_id
+                 WHERE requirement.user_id = ?
+                """,
+                ("user-a",),
+            ).fetchone()
+        assert direct_after["ingredient_type"] == "main"
+        assert option_after["ingredient_type"] == "main"
+        assert json.loads(option_after["metadata_json"])["section"] == "main"
+
+        persisted = type_named(registry_for(client), "Core")
+        assert persisted["id"] == "main"
+        assert persisted["value"] == "main"
+        assert persisted["recipe_count"] == 1
+        references = client.get("/api/master-data/types/main/references")
+        assert references.status_code == 200
+        reference_payload = references.get_json()
+        assert reference_payload["type"]["name"] == "Core"
+        assert reference_payload["type"]["id"] == "main"
+        assert reference_payload["total"] == 1
+        assert reference_payload["total_reference_count"] == 1
 
 
 def test_rename_migrates_usage_and_safe_delete_requires_reassignment(

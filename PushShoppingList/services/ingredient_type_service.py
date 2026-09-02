@@ -31,6 +31,13 @@ def type_key(value):
     return re.sub(r"\s+", " ", value).strip()
 
 
+INGREDIENT_TYPE_RESERVED_SEED_IDS_BY_KEY = {
+    type_key(value): type_id
+    for type_id, name in INGREDIENT_TYPE_SEEDS
+    for value in (type_id, name)
+}
+
+
 def _seed_registry(connection, user_id):
     marker = connection.execute(
         """
@@ -121,11 +128,18 @@ def default_ingredient_type_registry_payload():
 
 def _type_lookup(registry):
     lookup = {}
-    for item in registry.get("types", []):
+    items = registry.get("types", [])
+    for item in items:
         type_id = str(item.get("id") or "")
-        lookup[type_key(type_id)] = type_id
-        lookup[type_key(item.get("name"))] = type_id
-        lookup[type_key(item.get("value"))] = type_id
+        key = type_key(type_id)
+        if key:
+            lookup[key] = type_id
+    for item in items:
+        type_id = str(item.get("id") or "")
+        for value in (item.get("name"), item.get("value")):
+            key = type_key(value)
+            if key:
+                lookup.setdefault(key, type_id)
     return lookup
 
 
@@ -459,14 +473,24 @@ def save_workspace_ingredient_type(values, type_id="", user_id=None):
             if not existing:
                 return {"ok": False, "status": 404, "error": "Type not found."}
         if name:
+            name_key = type_key(name)
+            reserved_seed_id = INGREDIENT_TYPE_RESERVED_SEED_IDS_BY_KEY.get(
+                name_key
+            )
+            if reserved_seed_id and reserved_seed_id != type_id:
+                errors["name"] = "That name is reserved for a system-seeded type."
             collision = connection.execute(
                 """
                 SELECT id FROM workspace_ingredient_types
                  WHERE user_id = ? AND normalized_name = ?
                 """,
-                (user_id, type_key(name)),
+                (user_id, name_key),
             ).fetchone()
-            if collision and str(collision["id"]) != type_id:
+            if (
+                not errors.get("name")
+                and collision
+                and str(collision["id"]) != type_id
+            ):
                 errors["name"] = "A type with that name already exists."
         if errors:
             return {
@@ -487,19 +511,23 @@ def save_workspace_ingredient_type(values, type_id="", user_id=None):
                 """,
                 (name, type_key(name), timestamp, user_id, type_id),
             )
-            if previous_name != name and not bool(existing["is_seeded"]):
-                previous_keys = {type_key(type_id), type_key(previous_name)}
+            if previous_name != name:
+                seeded = bool(existing["is_seeded"])
+                previous_keys = {type_key(previous_name)}
+                replacement = type_id if seeded else name
+                if not seeded:
+                    previous_keys.add(type_key(type_id))
                 _update_ingredient_rows_type(
                     connection,
                     user_id,
                     previous_keys,
-                    name,
+                    replacement,
                 )
                 _update_option_metadata_type(
                     connection,
                     user_id,
                     previous_keys,
-                    name,
+                    replacement,
                 )
         else:
             type_id = f"custom_{uuid.uuid4().hex}"
