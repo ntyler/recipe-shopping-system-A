@@ -139,7 +139,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                             {% endif %}
                                         </div>
                                         <span class="unit-master-source-badge{% if not unit.seeded %} user-created{% endif %}" role="cell">
-                                            {{ "System-seeded" if unit.seeded else "User-created" }}
+                                            {{ "Built-in" if unit.seeded else "User-created" }}
                                         </span>
                                         <button type="button"
                                                 class="unit-master-edit-button"

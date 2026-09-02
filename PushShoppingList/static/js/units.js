@@ -280,7 +280,7 @@
             const sourceBadge = document.createElement("span");
             sourceBadge.className = `unit-master-source-badge${unit.seeded ? "" : " user-created"}`;
             sourceBadge.setAttribute("role", "cell");
-            sourceBadge.textContent = unit.seeded ? "System-seeded" : "User-created";
+            sourceBadge.textContent = unit.seeded ? "Built-in" : "User-created";
             const usage = createUsageCell(unit);
             const edit = document.createElement("button");
             edit.type = "button";

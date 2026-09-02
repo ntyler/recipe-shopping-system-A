@@ -196,6 +196,10 @@ def test_units_page_renders_the_persistent_registry_and_unit_editor(
     assert soup.select_one("[data-unit-master-alias-chips]") is not None
     built_in_rows = soup.select("[data-unit-master-row]")
     assert len(built_in_rows) == len(unit_registry_payload()["units"])
+    assert {
+        row.select_one(".unit-master-source-badge").get_text(strip=True)
+        for row in built_in_rows
+    } == {"Built-in"}
     assert {row.select_one("strong").get_text(strip=True) for row in built_in_rows} >= {
         "teaspoon",
         "cup",
@@ -215,6 +219,7 @@ def test_units_page_renders_the_persistent_registry_and_unit_editor(
     assert 'fetch(root.dataset.createUrl' not in units_script
     assert "const saveUnit = async event =>" in units_script
     assert "updateRegistry(result.registry)" in units_script
+    assert 'unit.seeded ? "Built-in" : "User-created"' in units_script
     assert "data-unit-master-search" in response.get_data(as_text=True)
 
 
@@ -285,6 +290,13 @@ def test_cuisine_categories_page_renders_registry_management_ui(master_data_app)
         for child in header_identity.find_all(recursive=False)
     ] == ["columnheader", "columnheader", "columnheader"]
     assert soup.select("[data-cuisine-category-master-row]")
+    assert {
+        row.select_one(".unit-master-source-badge").get_text(strip=True)
+        for row in soup.select("[data-cuisine-category-master-row]")
+        if "user-created" not in row.select_one(
+            ".unit-master-source-badge"
+        ).get("class", [])
+    } == {"Built-in"}
     assert not soup.select(".cuisine-category-master-table .type-master-status-badge")
     assert soup.select_one("[data-cuisine-category-master-active]") is None
     assert soup.select_one("[data-cuisine-category-master-active-error]") is None
@@ -313,6 +325,7 @@ def test_cuisine_categories_page_renders_registry_management_ui(master_data_app)
     assert "activeInput" not in script
     assert "[data-cuisine-category-master-active]" not in script
     assert "type-master-status-badge" not in script
+    assert 'item.custom ? "User-created" : "Built-in"' in script
 
 
 def test_cuisine_category_rows_share_unit_usage_and_action_contract(

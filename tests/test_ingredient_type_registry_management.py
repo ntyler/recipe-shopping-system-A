@@ -124,6 +124,10 @@ def test_types_page_matches_master_data_navigation_and_exposes_editors(
     assert soup.select_one("dialog[data-type-master-dialog]") is not None
     assert soup.select_one("dialog[data-type-master-usage-dialog]") is not None
     assert len(soup.select("[data-type-master-row]")) == 6
+    assert {
+        row.select_one(".unit-master-source-badge").get_text(strip=True)
+        for row in soup.select("[data-type-master-row]")
+    } == {"Built-in"}
     seeded_edit_buttons = soup.select("[data-type-master-edit-button]")
     assert len(seeded_edit_buttons) == 6
     assert {
@@ -139,6 +143,7 @@ def test_types_page_matches_master_data_navigation_and_exposes_editors(
     assert "nameInput.disabled = Boolean(item?.seeded);" not in script
     assert "current?.seeded ? current.name : cleanText(nameInput.value)" not in script
     assert "name: cleanText(nameInput.value)" in script
+    assert 'item.custom ? "User-created" : "Built-in"' in script
     active_tab = soup.select_one("nav.master-data-tabs a.active")
     assert active_tab.get_text(strip=True) == "Types"
     assert active_tab["href"].startswith("/admin/master-data/types")

@@ -227,7 +227,7 @@
             const sourceBadge = document.createElement("span");
             sourceBadge.className = `unit-master-source-badge${item.custom ? " user-created" : ""}`;
             sourceBadge.setAttribute("role", "cell");
-            sourceBadge.textContent = item.custom ? "User-created" : "System-seeded";
+            sourceBadge.textContent = item.custom ? "User-created" : "Built-in";
 
             const edit = document.createElement("button");
             edit.type = "button";
