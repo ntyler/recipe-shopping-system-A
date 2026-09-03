@@ -30,11 +30,16 @@ def test_shared_cuisine_icon_assets_load_before_the_main_application_script():
     assert "vendor/flag-icons/flags-4x3.svg" in layout
 
 
-def test_cuisine_icon_picker_has_progressive_select_and_accessible_combobox_contract():
+def test_cuisine_icon_picker_is_reused_by_accessible_inline_comboboxes():
     template = read_text("PushShoppingList/templates/cuisine_categories.html")
 
     assert "data-cuisine-category-master-icon-picker" in template
+    assert template.count("data-cuisine-category-master-icon-picker") == 1
     assert "data-cuisine-category-master-icon>" in template
+    assert "data-cuisine-category-master-create-icon-trigger" in template
+    assert "data-cuisine-category-master-row-icon-trigger" in template
+    assert "data-cuisine-category-master-create-icon-preview" in template
+    assert "data-cuisine-category-master-row-icon-preview" in template
     assert 'role="combobox"' in template
     assert 'aria-haspopup="listbox"' in template
     assert 'aria-expanded="false"' in template
@@ -47,6 +52,7 @@ def test_cuisine_icon_picker_has_progressive_select_and_accessible_combobox_cont
     assert '<optgroup label="Cuisine symbols">' in template
     assert "cuisine_flag_options" not in template
     assert '("plate", "Plate and utensils")' in template
+    assert "data-cuisine-category-master-dialog" not in template
 
 
 def test_shared_renderer_draws_every_iso_flag_locally_and_keeps_legacy_symbols():
@@ -209,20 +215,27 @@ def test_cuisine_picker_js_populates_catalog_and_preserves_manual_choices():
     assert "option.dataset.searchAliases" in script
     assert "marker.replaceWith(...groups);" in script
     assert "populateFlagOptions();" in script
-    assert "let iconChoiceExplicit = false;" in script
-    assert "const suggestFlagFromAbbreviation = () => {" in script
-    assert "if (iconChoiceExplicit) return;" in script
+    assert "let activeIconTarget = null;" in script
+    assert "let createIconChoiceExplicit = false;" in script
+    assert "const suggestFlagFromCreateAbbreviation = () => {" in script
+    assert "if (createIconChoiceExplicit) return;" in script
     assert "state.textContent = suggestedIconToken" in script
     assert "&& record.token === suggestedIconToken" in script
     assert "iconVisuals?.supportedFlagCodes" in script
-    assert 'setIconSelection(option.dataset.cuisineCategoryMasterIconOption, { explicit: true });' in script
-    assert 'abbreviationInput.addEventListener("input", suggestFlagFromAbbreviation);' in script
+    assert "const setActiveIconSelection = (value, options = {}) => {" in script
+    assert "if (activeIconTarget?.kind === \"create\")" in script
+    assert "if (activeIconTarget?.kind === \"row\")" in script
+    assert "draft.icon = token;" in script
+    assert "const pickerTargetForTrigger = trigger => {" in script
+    assert "setActiveIconSelection(option.dataset.cuisineCategoryMasterIconOption" in script
+    assert 'createAbbreviationInput.addEventListener("input", () => {' in script
     assert '["ArrowDown", "ArrowUp", "Home", "End"]' in script
     assert 'event.key === "Escape"' in script
-    assert 'iconTrigger.setAttribute("aria-expanded", "true");' in script
-    assert 'iconTrigger.setAttribute("aria-expanded", "false");' in script
-    assert "iconChoiceExplicit = Boolean(item);" in script
-    assert "iconTrigger.focus({ preventScroll: true })" in script
+    assert 'target.trigger.setAttribute("aria-expanded", "true");' in script
+    assert 'trigger?.setAttribute("aria-expanded", "false");' in script
+    assert "trigger.focus({ preventScroll: true });" in script
+    assert 'option.scrollIntoView({ block: "nearest", inline: "nearest" });' in script
+    assert "activeIconTarget = null;" in script
     assert "iconInput.focus" not in script
     assert "requestAnimationFrame(() => iconInput.focus" not in script
 
@@ -232,7 +245,9 @@ def test_cuisine_picker_focusout_waits_for_pointer_selection_to_commit():
 
     assert 'iconPicker.addEventListener("focusout", () => {' in script
     assert "window.setTimeout(() => {" in script
-    assert "if (!iconPicker.contains(document.activeElement)) closeIconPicker();" in script
+    assert "!iconPicker.contains(document.activeElement)" in script
+    assert "document.activeElement !== activeIconTarget?.trigger" in script
+    assert ") closeIconPicker();" in script
     assert "queueMicrotask(" not in script
 
 

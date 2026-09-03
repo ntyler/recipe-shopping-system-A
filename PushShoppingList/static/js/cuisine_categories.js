@@ -55,12 +55,14 @@
         if (!root) return;
 
         let registry = parseRegistry();
-        let editorCategoryId = "";
-        let returnFocus = null;
+        const rowDrafts = new Map();
         let usageReturnFocus = null;
         let usageRequestToken = 0;
-        let iconChoiceExplicit = false;
+        let activeIconTarget = null;
+        let createIconChoiceExplicit = false;
         let suggestedIconToken = "";
+        let createValidationErrors = {};
+        let createValidationFeedback = "";
 
         const source = document.getElementById("cuisineCategoryConfig");
         const status = root.querySelector("[data-cuisine-category-master-status]");
@@ -68,28 +70,23 @@
         const rows = root.querySelector("[data-cuisine-category-master-rows]");
         const countLabel = root.querySelector("[data-cuisine-category-master-count-label]");
         const searchEmpty = root.querySelector("[data-cuisine-category-master-search-empty]");
-        const dialog = root.querySelector("[data-cuisine-category-master-dialog]");
-        const form = root.querySelector("[data-cuisine-category-master-form]");
+        const createForm = root.querySelector("[data-cuisine-category-master-create-form]");
+        const createNameInput = root.querySelector("[data-cuisine-category-master-create-name]");
+        const createAbbreviationInput = root.querySelector(
+            "[data-cuisine-category-master-create-abbreviation]",
+        );
+        const createIconInput = root.querySelector("[data-cuisine-category-master-create-icon]");
+        const createIconTrigger = root.querySelector(
+            "[data-cuisine-category-master-create-icon-trigger]",
+        );
+        const createError = root.querySelector("[data-cuisine-category-master-create-error]");
+        const createSubmit = root.querySelector("[data-cuisine-category-master-create-submit]");
         const iconPicker = root.querySelector("[data-cuisine-category-master-icon-picker]");
         const iconInput = root.querySelector("[data-cuisine-category-master-icon]");
-        const iconTrigger = root.querySelector("[data-cuisine-category-master-icon-trigger]");
-        const iconPreview = root.querySelector("[data-cuisine-category-master-icon-preview]");
-        const iconLabel = root.querySelector("[data-cuisine-category-master-icon-label]");
         const iconMenu = root.querySelector("[data-cuisine-category-master-icon-menu]");
         const iconSearch = root.querySelector("[data-cuisine-category-master-icon-search]");
         const iconListbox = root.querySelector("[data-cuisine-category-master-icon-listbox]");
         const iconEmpty = root.querySelector("[data-cuisine-category-master-icon-empty]");
-        const iconError = root.querySelector("[data-cuisine-category-master-icon-error]");
-        const abbreviationInput = root.querySelector("[data-cuisine-category-master-abbreviation]");
-        const abbreviationError = root.querySelector("[data-cuisine-category-master-abbreviation-error]");
-        const nameInput = root.querySelector("[data-cuisine-category-master-name]");
-        const nameHelp = root.querySelector("[data-cuisine-category-master-name-help]");
-        const nameError = root.querySelector("[data-cuisine-category-master-name-error]");
-        const editorTitle = root.querySelector("[data-cuisine-category-master-editor-title]");
-        const editorKicker = root.querySelector("[data-cuisine-category-master-editor-kicker]");
-        const editorFeedback = root.querySelector("[data-cuisine-category-master-editor-feedback]");
-        const saveButton = root.querySelector("[data-cuisine-category-master-save]");
-        const deleteButton = root.querySelector("[data-cuisine-category-master-delete]");
         const importPanel = root.querySelector("[data-cuisine-category-master-import]");
         const importButton = root.querySelector("[data-cuisine-category-master-import-button]");
         const usageDialog = root.querySelector("[data-cuisine-category-master-usage-dialog]");
@@ -138,17 +135,204 @@
             status.hidden = !status.textContent;
         };
 
-        const setFieldError = (input, output, message) => {
-            const text = String(message || "");
-            output.textContent = text;
-            output.hidden = !text;
-            input.toggleAttribute("aria-invalid", Boolean(text));
+        const setAriaInvalid = (input, invalid) => {
+            if (!input) return;
+            if (invalid) input.setAttribute("aria-invalid", "true");
+            else input.removeAttribute("aria-invalid");
         };
 
-        const setEditorFeedback = (message, type = "error") => {
-            editorFeedback.textContent = String(message || "");
-            editorFeedback.dataset.status = type;
-            editorFeedback.hidden = !editorFeedback.textContent;
+        const normalizeAbbreviation = value => cleanText(value).toUpperCase();
+
+        const categorySnapshot = item => ({
+            icon: cleanText(item?.icon),
+            abbreviation: normalizeAbbreviation(item?.abbreviation),
+            name: categoryName(item),
+        });
+
+        const normalizedDraft = draft => ({
+            icon: cleanText(draft?.icon),
+            abbreviation: normalizeAbbreviation(draft?.abbreviation),
+            name: cleanText(draft?.name),
+        });
+
+        const valuesMatch = (left, right) => (
+            left.icon === right.icon
+            && left.abbreviation === right.abbreviation
+            && left.name === right.name
+        );
+
+        const freshRowDraft = item => {
+            const baseline = categorySnapshot(item);
+            return {
+                ...baseline,
+                baseline,
+                errors: {},
+                feedback: "",
+                saving: false,
+                deleting: false,
+                wasDirty: false,
+            };
+        };
+
+        const ensureRowDraft = item => {
+            const categoryId = String(item.id);
+            if (!rowDrafts.has(categoryId)) {
+                rowDrafts.set(categoryId, freshRowDraft(item));
+            }
+            return rowDrafts.get(categoryId);
+        };
+
+        const draftIsDirty = draft => !valuesMatch(
+            normalizedDraft(draft),
+            normalizedDraft(draft.baseline),
+        );
+
+        const validateValues = (values, item = null) => {
+            const normalized = normalizedDraft(values);
+            const errors = {};
+            if (!normalized.name) {
+                errors.name = "Enter a cuisine category name.";
+            } else if (normalized.name.length > 60) {
+                errors.name = "Use 60 characters or fewer.";
+            } else if (/[,;\r\n]/.test(normalized.name)) {
+                errors.name = "Cuisine category names cannot contain commas, semicolons, or line breaks.";
+            } else if (!categoryKey(normalized.name)) {
+                errors.name = "Enter a cuisine category name containing letters or numbers.";
+            } else if (item?.seeded && normalized.name !== categoryName(item)) {
+                errors.name = "Built-in cuisine category names cannot be changed.";
+            } else if (registry.categories.some(category => (
+                String(category.id) !== String(item?.id || "")
+                && categoryKey(categoryName(category)) === categoryKey(normalized.name)
+            ))) {
+                errors.name = "A cuisine category with that name already exists.";
+            }
+
+            if (normalized.abbreviation && normalized.abbreviation.length < 2) {
+                errors.abbreviation = "Use at least 2 characters.";
+            } else if (normalized.abbreviation.length > 8) {
+                errors.abbreviation = "Use 8 characters or fewer.";
+            } else if (
+                normalized.abbreviation
+                && !/^[A-Z0-9]+$/.test(normalized.abbreviation)
+            ) {
+                errors.abbreviation = "Use letters and numbers only.";
+            } else if (normalized.abbreviation && registry.categories.some(category => (
+                String(category.id) !== String(item?.id || "")
+                && normalizeAbbreviation(category.abbreviation) === normalized.abbreviation
+            ))) {
+                errors.abbreviation = "A cuisine category with that abbreviation already exists.";
+            }
+            return errors;
+        };
+
+        const errorMessage = (errors, fallback = "") => {
+            const messages = [...new Set([
+                errors?.icon,
+                errors?.abbreviation,
+                errors?.name,
+                fallback,
+            ].filter(Boolean))];
+            return messages.join(" ");
+        };
+
+        const setCreateErrors = (errors = {}, fallback = "") => {
+            createValidationErrors = { ...errors };
+            createValidationFeedback = fallback;
+            const message = errorMessage(createValidationErrors, createValidationFeedback);
+            setAriaInvalid(createNameInput, Boolean(createValidationErrors.name));
+            setAriaInvalid(
+                createAbbreviationInput,
+                Boolean(createValidationErrors.abbreviation),
+            );
+            setAriaInvalid(createIconTrigger, Boolean(createValidationErrors.icon));
+            createError.textContent = message;
+            createError.hidden = !message;
+            createForm.classList.toggle("has-error", Boolean(message));
+        };
+
+        const clearCreateFieldError = field => {
+            const nextErrors = { ...createValidationErrors };
+            delete nextErrors[field];
+            setCreateErrors(nextErrors);
+        };
+
+        const rowControls = row => ({
+            icon: row.querySelector("[data-cuisine-category-master-row-icon-trigger]"),
+            abbreviation: row.querySelector(
+                "[data-cuisine-category-master-row-abbreviation]",
+            ),
+            name: row.querySelector("[data-cuisine-category-master-row-name]"),
+            save: row.querySelector("[data-cuisine-category-master-row-save]"),
+            delete: row.querySelector("[data-cuisine-category-master-row-delete]"),
+            error: row.querySelector("[data-cuisine-category-master-row-error]"),
+        });
+
+        const setRowErrors = (row, errors = {}, fallback = "") => {
+            const controls = rowControls(row);
+            const message = errorMessage(errors, fallback);
+            setAriaInvalid(controls.icon, Boolean(errors.icon));
+            setAriaInvalid(controls.abbreviation, Boolean(errors.abbreviation));
+            setAriaInvalid(controls.name, Boolean(errors.name));
+            controls.error.textContent = message;
+            controls.error.hidden = !message;
+            row.classList.toggle("has-error", Boolean(message));
+        };
+
+        const syncIconTrigger = (trigger, value, contextLabel = "this cuisine category") => {
+            if (!trigger) return;
+            const token = cleanText(value);
+            const item = renderIconVisual(
+                trigger.querySelector(".cuisine-category-icon-visual"),
+                token,
+            );
+            const label = trigger.querySelector(
+                "[data-cuisine-category-master-icon-label], "
+                + "[data-cuisine-category-master-row-icon-label]",
+            );
+            if (label) label.textContent = item.label;
+            trigger.dataset.iconValue = token;
+            trigger.title = item.label;
+            trigger.setAttribute("aria-label", `Choose icon for ${contextLabel}`);
+        };
+
+        const syncRowState = row => {
+            const item = categoryById(row.dataset.categoryId);
+            if (!item) return;
+            const draft = ensureRowDraft(item);
+            const controls = rowControls(row);
+            const normalized = normalizedDraft(draft);
+            const validationErrors = validateValues(normalized, item);
+            const errors = { ...draft.errors, ...validationErrors };
+            const dirty = draftIsDirty(draft);
+            const pending = Boolean(draft.saving || draft.deleting);
+            const dirtyChanged = dirty !== draft.wasDirty;
+            row.classList.toggle("is-dirty", dirty);
+            row.classList.toggle("is-saving", pending);
+            row.dataset.dirty = String(dirty);
+            row.setAttribute("aria-busy", String(pending));
+            controls.icon.disabled = pending;
+            controls.abbreviation.disabled = pending;
+            controls.name.disabled = pending;
+            controls.save.disabled = !dirty || Boolean(Object.keys(errors).length) || pending;
+            controls.save.textContent = draft.saving ? "Saving…" : "Save";
+            controls.delete?.toggleAttribute("disabled", pending);
+            if (controls.delete) controls.delete.textContent = draft.deleting ? "Deleting…" : "Delete";
+            draft.wasDirty = dirty;
+            if (dirtyChanged) {
+                setStatus(
+                    dirty
+                        ? `${categoryDisplayLabel(item)} has unsaved changes.`
+                        : `Changes to ${categoryDisplayLabel(item)} were reverted.`,
+                    "info",
+                );
+            }
+            row.dataset.cuisineCategoryMasterSearchValue = [
+                normalized.icon,
+                iconDescriptor(normalized.icon).label,
+                normalized.abbreviation,
+                normalized.name,
+            ].filter(Boolean).join(" ");
+            setRowErrors(row, errors, draft.feedback);
         };
 
         const createUsageCell = item => {
@@ -188,66 +372,134 @@
         };
 
         const createCategoryRow = item => {
+            const draft = ensureRowDraft(item);
+            const displayLabel = categoryDisplayLabel(item);
+            const errorId = `cuisineCategoryRowError-${String(item.id).replace(/[^a-zA-Z0-9_-]/g, "")}`;
             const row = document.createElement("div");
             row.className = "unit-master-row";
             row.setAttribute("role", "row");
             row.dataset.cuisineCategoryMasterRow = "";
             row.dataset.categoryId = item.id;
-            row.dataset.cuisineCategoryMasterSearchValue = [
-                item.icon,
-                iconDescriptor(item.icon).label,
-                item.abbreviation,
-                categoryName(item),
-            ].filter(Boolean).join(" ");
+            const iconField = document.createElement("div");
+            iconField.className = "cuisine-category-master-row-icon-field";
+            iconField.setAttribute("role", "cell");
+            iconField.dataset.mobileLabel = "Icon";
+            const icon = document.createElement("button");
+            icon.type = "button";
+            icon.className = "cuisine-category-master-icon-trigger cuisine-category-master-row-icon-trigger";
+            icon.setAttribute("role", "combobox");
+            icon.setAttribute("aria-haspopup", "listbox");
+            icon.setAttribute("aria-expanded", "false");
+            icon.setAttribute("aria-controls", "cuisineCategoryIconListbox");
+            icon.setAttribute("aria-describedby", errorId);
+            icon.dataset.cuisineCategoryMasterRowIconTrigger = "";
+            const iconPreview = document.createElement("span");
+            iconPreview.className = "cuisine-category-icon-visual";
+            iconPreview.dataset.cuisineCategoryMasterRowIconPreview = "";
+            iconPreview.setAttribute("aria-hidden", "true");
+            const iconLabel = document.createElement("span");
+            iconLabel.className = "sr-only";
+            iconLabel.dataset.cuisineCategoryMasterRowIconLabel = "";
+            const iconChevron = document.createElement("span");
+            iconChevron.className = "cuisine-category-master-icon-chevron";
+            iconChevron.setAttribute("aria-hidden", "true");
+            iconChevron.textContent = "⌄";
+            icon.append(iconPreview, iconLabel, iconChevron);
+            syncIconTrigger(icon, draft.icon, displayLabel);
+            iconField.appendChild(icon);
 
-            const icon = document.createElement("span");
-            icon.className = "cuisine-category-master-icon cuisine-category-icon-visual";
-            icon.setAttribute("role", "cell");
-            const iconItem = renderIconVisual(icon, item.icon);
-            icon.setAttribute(
-                "aria-label",
-                iconItem.kind === "none" ? "No icon" : `Icon: ${iconItem.label}`,
-            );
-
-            const abbreviation = document.createElement("strong");
+            const abbreviationField = document.createElement("label");
+            abbreviationField.className = "cuisine-category-master-row-abbreviation-field";
+            abbreviationField.setAttribute("role", "cell");
+            abbreviationField.dataset.mobileLabel = "Abbreviation";
+            const abbreviationLabel = document.createElement("span");
+            abbreviationLabel.className = "sr-only";
+            abbreviationLabel.textContent = `Abbreviation for ${displayLabel}`;
+            const abbreviation = document.createElement("input");
+            abbreviation.type = "text";
             abbreviation.className = "cuisine-category-master-abbreviation";
-            abbreviation.setAttribute("role", "cell");
-            abbreviation.textContent = item.abbreviation || "—";
+            abbreviation.maxLength = 8;
+            abbreviation.value = draft.abbreviation;
+            abbreviation.autocomplete = "off";
+            abbreviation.spellcheck = false;
+            abbreviation.dataset.cuisineCategoryMasterRowAbbreviation = "";
+            abbreviation.setAttribute("aria-describedby", errorId);
+            abbreviationField.append(abbreviationLabel, abbreviation);
 
-            const name = document.createElement("strong");
+            const nameField = document.createElement("label");
+            nameField.className = "cuisine-category-master-row-name-field";
+            nameField.setAttribute("role", "cell");
+            nameField.dataset.mobileLabel = "Cuisine Category Name";
+            const nameLabel = document.createElement("span");
+            nameLabel.className = "sr-only";
+            nameLabel.textContent = item.seeded
+                ? `Cuisine category name for ${displayLabel}; built-in names cannot be changed`
+                : `Cuisine category name for ${displayLabel}`;
+            const name = document.createElement("input");
+            name.type = "text";
             name.className = "cuisine-category-master-name";
-            name.setAttribute("role", "cell");
-            name.textContent = categoryName(item);
+            name.maxLength = 60;
+            name.value = draft.name;
+            name.autocomplete = "off";
+            name.required = true;
+            name.readOnly = Boolean(item.seeded);
+            name.dataset.cuisineCategoryMasterRowName = "";
+            name.setAttribute("aria-describedby", errorId);
+            if (item.seeded) {
+                name.setAttribute("aria-readonly", "true");
+                name.title = "Built-in cuisine category names cannot be changed.";
+            }
+            nameField.append(nameLabel, name);
 
             const identity = document.createElement("div");
             identity.className = "cuisine-category-master-identity";
             identity.setAttribute("role", "presentation");
-            identity.append(icon, abbreviation, name);
+            identity.append(iconField, abbreviationField, nameField);
 
             const sourceBadge = document.createElement("span");
             sourceBadge.className = `unit-master-source-badge${item.custom ? " user-created" : ""}`;
             sourceBadge.setAttribute("role", "cell");
             sourceBadge.textContent = item.custom ? "User-created" : "Built-in";
 
-            const edit = document.createElement("button");
-            edit.type = "button";
-            edit.className = "unit-master-edit-button";
-            edit.dataset.cuisineCategoryMasterEditButton = "";
-            edit.dataset.categoryId = item.id;
-            edit.textContent = "Edit";
-            edit.setAttribute("aria-label", `Edit ${categoryDisplayLabel(item)}`);
+            const save = document.createElement("button");
+            save.type = "button";
+            save.className = "unit-master-edit-button";
+            save.dataset.cuisineCategoryMasterRowSave = "";
+            save.dataset.categoryId = item.id;
+            save.textContent = draft.saving ? "Saving…" : "Save";
+            save.setAttribute("aria-label", `Save ${displayLabel}`);
 
             const actionCell = document.createElement("span");
-            actionCell.className = "unit-master-action-cell";
+            actionCell.className = "unit-master-action-cell cuisine-category-master-row-actions";
             actionCell.setAttribute("role", "cell");
-            actionCell.appendChild(edit);
+            actionCell.dataset.mobileLabel = "Action";
+            actionCell.appendChild(save);
+            if (item.custom) {
+                const deleteButton = document.createElement("button");
+                deleteButton.type = "button";
+                deleteButton.className = "danger cuisine-category-master-row-delete";
+                deleteButton.dataset.cuisineCategoryMasterRowDelete = "";
+                deleteButton.dataset.categoryId = item.id;
+                deleteButton.textContent = "Delete";
+                deleteButton.setAttribute("aria-label", `Delete ${displayLabel}`);
+                actionCell.appendChild(deleteButton);
+            }
+
+            const rowError = document.createElement("div");
+            rowError.id = errorId;
+            rowError.className = "unit-master-field-error cuisine-category-master-row-error";
+            rowError.dataset.cuisineCategoryMasterRowError = "";
+            rowError.setAttribute("role", "alert");
+            rowError.hidden = true;
 
             row.append(
                 identity,
                 createUsageCell(item),
                 sourceBadge,
                 actionCell,
+                rowError,
             );
+            syncRowState(row);
             return row;
         };
 
@@ -292,13 +544,31 @@
             applySearch();
         };
 
-        const updateRegistry = nextRegistry => {
+        const reconcileRowDrafts = (nextCategories, resetCategoryIds = []) => {
+            const resetIds = new Set(resetCategoryIds.map(String));
+            const nextIds = new Set(nextCategories.map(item => String(item.id)));
+            Array.from(rowDrafts.keys()).forEach(categoryId => {
+                if (!nextIds.has(categoryId)) rowDrafts.delete(categoryId);
+            });
+            nextCategories.forEach(item => {
+                const categoryId = String(item.id);
+                const existing = rowDrafts.get(categoryId);
+                if (!existing || resetIds.has(categoryId)) {
+                    rowDrafts.set(categoryId, freshRowDraft(item));
+                    return;
+                }
+                existing.baseline = categorySnapshot(item);
+            });
+        };
+
+        const updateRegistry = (nextRegistry, options = {}) => {
             registry = {
                 ...(nextRegistry || {}),
                 categories: Array.isArray(nextRegistry?.categories)
                     ? nextRegistry.categories
                     : [],
             };
+            reconcileRowDrafts(registry.categories, options.resetCategoryIds || []);
             source.textContent = JSON.stringify(registry);
             renderRegistry();
         };
@@ -387,20 +657,29 @@
             iconListbox.querySelectorAll("[data-cuisine-category-master-icon-option]"),
         );
 
+        const activeIconValue = () => {
+            if (activeIconTarget?.kind === "create") return createIconInput.value;
+            if (activeIconTarget?.kind === "row") {
+                const item = categoryById(activeIconTarget.categoryId);
+                return item ? ensureRowDraft(item).icon : "";
+            }
+            return "";
+        };
+
         const createIconOption = record => {
+            const selectedValue = activeIconValue();
             const option = document.createElement("button");
             option.type = "button";
             option.className = "cuisine-category-master-icon-option";
             option.dataset.cuisineCategoryMasterIconOption = record.token;
             option.setAttribute("role", "option");
-            option.setAttribute("aria-selected", String(record.token === iconInput.value));
+            option.setAttribute("aria-selected", String(record.token === selectedValue));
             option.tabIndex = -1;
-            option.classList.toggle("is-selected", record.token === iconInput.value);
+            option.classList.toggle("is-selected", record.token === selectedValue);
 
             const visual = iconVisuals?.create(record.token) || document.createElement("span");
             if (!iconVisuals?.create) renderIconVisual(visual, record.token);
             visual.classList.add("cuisine-category-master-icon-option-visual");
-
             const copy = document.createElement("span");
             copy.className = "cuisine-category-master-icon-option-copy";
             const label = document.createElement("strong");
@@ -411,17 +690,15 @@
                 detail.textContent = record.item.code;
                 copy.appendChild(detail);
             }
-
             const state = document.createElement("span");
             state.className = "cuisine-category-master-icon-option-state";
             state.setAttribute("aria-hidden", "true");
             state.textContent = suggestedIconToken
+                && activeIconTarget?.kind === "create"
                 && record.token === suggestedIconToken
-                && !iconChoiceExplicit
+                && !createIconChoiceExplicit
                 ? "Suggested"
-                : record.token === iconInput.value
-                    ? "✓"
-                    : "";
+                : record.token === selectedValue ? "✓" : "";
             option.append(visual, copy, state);
             return option;
         };
@@ -455,36 +732,51 @@
             iconEmpty.hidden = records.length > 0;
         };
 
-        const syncIconPicker = () => {
-            const item = renderIconVisual(iconPreview, iconInput.value);
-            iconLabel.textContent = item.label;
-            iconTrigger.title = item.label;
-            renderIconOptions();
-        };
-
-        const setIconSelection = (value, options = {}) => {
-            const token = ensureLegacyIconOption(value);
-            iconInput.value = token;
+        const setCreateIconSelection = (value, options = {}) => {
+            const token = iconVisuals?.normalizeToken(value) || cleanText(value);
+            createIconInput.value = token;
             if (options.explicit) {
-                iconChoiceExplicit = true;
+                createIconChoiceExplicit = true;
                 suggestedIconToken = "";
             }
-            setFieldError(iconTrigger, iconError, "");
-            syncIconPicker();
+            syncIconTrigger(createIconTrigger, token, "the new cuisine category");
+            if (options.clearError) clearCreateFieldError("icon");
+            if (activeIconTarget?.kind === "create") renderIconOptions();
+        };
+
+        const setActiveIconSelection = (value, options = {}) => {
+            const token = ensureLegacyIconOption(value);
+            iconInput.value = token;
+            if (activeIconTarget?.kind === "create") {
+                setCreateIconSelection(token, { ...options, clearError: true });
+                return;
+            }
+            if (activeIconTarget?.kind === "row") {
+                const item = categoryById(activeIconTarget.categoryId);
+                const row = root.querySelector(
+                    `[data-cuisine-category-master-row][data-category-id="${CSS.escape(String(activeIconTarget.categoryId))}"]`,
+                );
+                if (!item || !row) return;
+                const draft = ensureRowDraft(item);
+                draft.icon = token;
+                delete draft.errors.icon;
+                draft.feedback = "";
+                syncIconTrigger(rowControls(row).icon, token, normalizedDraft(draft).name);
+                syncRowState(row);
+                renderIconOptions();
+            }
         };
 
         const positionIconMenu = () => {
-            if (iconMenu.hidden) return;
-            const rect = iconTrigger.getBoundingClientRect();
+            const trigger = activeIconTarget?.trigger;
+            if (iconMenu.hidden || !trigger?.isConnected) return;
+            const rect = trigger.getBoundingClientRect();
             const gutter = 10;
             const width = Math.min(
                 Math.max(300, rect.width),
                 Math.max(240, window.innerWidth - gutter * 2),
             );
-            const left = Math.max(
-                gutter,
-                Math.min(rect.left, window.innerWidth - width - gutter),
-            );
+            const left = Math.max(gutter, Math.min(rect.left, window.innerWidth - width - gutter));
             const below = window.innerHeight - rect.bottom - gutter;
             const above = rect.top - gutter;
             const openAbove = below < 310 && above > below;
@@ -499,44 +791,56 @@
         };
 
         const closeIconPicker = (options = {}) => {
-            if (!iconMenu.hidden) {
-                iconMenu.hidden = true;
-                iconPicker.classList.remove("is-open");
-                iconTrigger.setAttribute("aria-expanded", "false");
-                ["width", "max-height", "left", "top", "bottom"].forEach(
-                    property => iconMenu.style.removeProperty(property),
-                );
-            }
+            const trigger = activeIconTarget?.trigger;
+            iconMenu.hidden = true;
+            iconPicker.classList.remove("is-open");
+            trigger?.classList.remove("is-open");
+            trigger?.setAttribute("aria-expanded", "false");
+            ["width", "max-height", "left", "top", "bottom"].forEach(
+                property => iconMenu.style.removeProperty(property),
+            );
             iconSearch.value = "";
-            renderIconOptions();
-            if (options.focusTrigger) iconTrigger.focus({ preventScroll: true });
+            activeIconTarget = null;
+            if (options.focusTrigger && trigger?.isConnected) {
+                trigger.focus({ preventScroll: true });
+            }
         };
 
-        const openIconPicker = (options = {}) => {
-            if (!iconMenu.hidden) {
-                if (options.focusOption) {
-                    const selected = iconListbox.querySelector('[role="option"][aria-selected="true"]');
-                    (selected || visibleIconOptions()[0])?.focus({ preventScroll: true });
-                }
-                return;
+        const openIconPicker = (target, options = {}) => {
+            if (!target?.trigger) return;
+            if (activeIconTarget?.trigger && activeIconTarget.trigger !== target.trigger) {
+                closeIconPicker();
             }
+            activeIconTarget = target;
+            iconInput.value = ensureLegacyIconOption(activeIconValue());
             iconSearch.value = "";
             renderIconOptions();
             iconMenu.hidden = false;
             iconPicker.classList.add("is-open");
-            iconTrigger.setAttribute("aria-expanded", "true");
+            target.trigger.classList.add("is-open");
+            target.trigger.setAttribute("aria-expanded", "true");
             positionIconMenu();
             const selected = iconListbox.querySelector('[role="option"][aria-selected="true"]');
             selected?.scrollIntoView({ block: "nearest" });
             if (options.focusOption) {
                 (selected || visibleIconOptions()[0])?.focus({ preventScroll: true });
+            } else {
+                iconSearch.focus({ preventScroll: true });
             }
         };
 
         const chooseIconOption = option => {
-            if (!option) return;
-            setIconSelection(option.dataset.cuisineCategoryMasterIconOption, { explicit: true });
+            if (!option || !activeIconTarget) return;
+            setActiveIconSelection(option.dataset.cuisineCategoryMasterIconOption, {
+                explicit: true,
+            });
             closeIconPicker({ focusTrigger: true });
+        };
+
+        const focusIconOption = option => {
+            if (!option) return;
+            option.focus({ preventScroll: true });
+            option.scrollIntoView({ block: "nearest", inline: "nearest" });
         };
 
         const moveIconOptionFocus = (current, key) => {
@@ -549,72 +853,25 @@
                     ? options.length - 1
                     : (Math.max(0, currentIndex) + (key === "ArrowDown" ? 1 : -1) + options.length)
                         % options.length;
-            options[nextIndex]?.focus({ preventScroll: true });
+            focusIconOption(options[nextIndex]);
         };
 
-        const suggestFlagFromAbbreviation = () => {
-            if (iconChoiceExplicit) return;
-            const code = cleanText(abbreviationInput.value).toLowerCase();
+        const suggestFlagFromCreateAbbreviation = () => {
+            if (createIconChoiceExplicit) return;
+            const code = cleanText(createAbbreviationInput.value).toLowerCase();
             const supportedCodes = new Set(iconVisuals?.supportedFlagCodes || []);
             const token = /^[a-z]{2}$/.test(code) && supportedCodes.has(code)
                 ? `flag:${code}`
                 : "";
             suggestedIconToken = token;
-            setIconSelection(token);
+            setCreateIconSelection(token, { clearError: true });
         };
 
         const enhanceIconPicker = () => {
             iconInput.tabIndex = -1;
             iconInput.setAttribute("aria-hidden", "true");
             iconPicker.classList.add("is-enhanced");
-            iconTrigger.hidden = false;
-            setIconSelection(iconInput.value);
-        };
-
-        const clearEditorErrors = () => {
-            setFieldError(iconTrigger, iconError, "");
-            setFieldError(abbreviationInput, abbreviationError, "");
-            setFieldError(nameInput, nameError, "");
-            setEditorFeedback("");
-        };
-
-        const closeEditor = () => {
-            closeIconPicker();
-            if (dialog.open) dialog.close();
-        };
-
-        const openEditor = (item = null, trigger = null) => {
-            editorCategoryId = String(item?.id || "");
-            returnFocus = trigger || document.activeElement;
-            closeIconPicker();
-            clearEditorErrors();
-            abbreviationInput.value = item?.abbreviation || "";
-            // Existing blank icons are intentional saved choices. Suggestions apply
-            // only while creating a new category before the user chooses an icon.
-            iconChoiceExplicit = Boolean(item);
-            suggestedIconToken = "";
-            setIconSelection(item?.icon || "");
-            if (!iconChoiceExplicit) suggestFlagFromAbbreviation();
-            nameInput.value = categoryName(item);
-            nameInput.disabled = Boolean(item?.seeded);
-            nameHelp.textContent = item?.seeded
-                ? "Built-in category names stay tied to stable cuisine labels. You can edit the icon and abbreviation."
-                : "Enter the full category name shown in the recipe editor. Renaming preserves recipe assignments.";
-            editorTitle.textContent = item
-                ? `Edit ${categoryDisplayLabel(item)}`
-                : "Add Cuisine Category";
-            editorKicker.textContent = item?.seeded ? "Built-in cuisine" : "Workspace cuisine";
-            saveButton.textContent = item ? "Save Changes" : "Add Cuisine Category";
-            deleteButton.hidden = !item?.custom;
-            deleteButton.style.display = item?.custom ? "" : "none";
-            deleteButton.dataset.categoryId = item?.id || "";
-            if (item?.custom && Number(item.recipe_count) > 0) {
-                deleteButton.title = `${categoryDisplayLabel(item)} is used by ${item.recipe_count} recipe${Number(item.recipe_count) === 1 ? "" : "s"}.`;
-            } else {
-                deleteButton.removeAttribute("title");
-            }
-            if (!dialog.open) dialog.showModal();
-            window.requestAnimationFrame(() => iconTrigger.focus({ preventScroll: true }));
+            setCreateIconSelection(createIconInput.value);
         };
 
         const requestJson = async (url, options = {}) => {
@@ -631,78 +888,186 @@
             return { response, data };
         };
 
-        const saveCategory = async event => {
+        const focusFirstInvalid = (container, fallback = null) => {
+            const target = container.querySelector('[aria-invalid="true"]') || fallback;
+            target?.focus({ preventScroll: true });
+        };
+
+        const setCreateSaving = saving => {
+            createForm.classList.toggle("is-saving", saving);
+            createForm.setAttribute("aria-busy", String(saving));
+            createNameInput.disabled = saving;
+            createAbbreviationInput.disabled = saving;
+            createIconInput.disabled = saving;
+            createIconTrigger.disabled = saving;
+            createSubmit.disabled = saving;
+            createSubmit.textContent = saving ? "Adding…" : "Add Cuisine Category";
+            if (saving) setStatus("Adding cuisine category…", "info");
+        };
+
+        const saveNewCategory = async event => {
             event.preventDefault();
-            clearEditorErrors();
-            const current = categoryById(editorCategoryId);
-            const icon = cleanText(iconInput.value);
-            const abbreviation = cleanText(abbreviationInput.value);
-            const name = current?.seeded ? categoryName(current) : cleanText(nameInput.value);
-            setFieldError(nameInput, nameError, name ? "" : "Enter a cuisine category name.");
-            const firstInvalidInput = form.querySelector('[aria-invalid="true"]');
-            if (firstInvalidInput) {
-                setEditorFeedback("Complete the required cuisine category fields.");
-                firstInvalidInput.focus();
+            const values = normalizedDraft({
+                icon: createIconInput.value,
+                abbreviation: createAbbreviationInput.value,
+                name: createNameInput.value,
+            });
+            createNameInput.value = values.name;
+            createAbbreviationInput.value = values.abbreviation;
+            const errors = validateValues(values);
+            setCreateErrors(errors);
+            if (Object.keys(errors).length) {
+                focusFirstInvalid(createForm, createNameInput);
                 return;
             }
-            const payload = {
-                icon,
-                abbreviation,
-                category_name: name,
-            };
-            saveButton.disabled = true;
-            saveButton.textContent = "Saving…";
+            closeIconPicker();
+            setCreateSaving(true);
             try {
-                const url = editorCategoryId
-                    ? root.dataset.updateUrlTemplate.replace(
-                        "__CATEGORY_ID__",
-                        encodeURIComponent(editorCategoryId),
-                    )
-                    : root.dataset.createUrl;
-                const { response, data } = await requestJson(url, {
-                    method: editorCategoryId ? "PATCH" : "POST",
-                    body: JSON.stringify(payload),
+                const { response, data } = await requestJson(root.dataset.createUrl, {
+                    method: "POST",
+                    body: JSON.stringify({
+                        icon: values.icon,
+                        abbreviation: values.abbreviation,
+                        category_name: values.name,
+                    }),
                 });
                 if (!response.ok || data.ok === false) {
-                    const errors = data.errors || {};
-                    setFieldError(iconTrigger, iconError, errors.icon || "");
-                    setFieldError(
-                        abbreviationInput,
-                        abbreviationError,
-                        errors.abbreviation || "",
+                    const failureMessage = data.error || "The cuisine category could not be added.";
+                    setCreateSaving(false);
+                    setCreateErrors(
+                        data.errors || {},
+                        failureMessage,
                     );
-                    setFieldError(nameInput, nameError, errors.name || "");
-                    setEditorFeedback(data.error || "The cuisine category could not be saved.");
-                    form.querySelector('[aria-invalid="true"]')?.focus();
+                    setStatus(failureMessage, "error");
+                    focusFirstInvalid(createForm, createNameInput);
                     return;
                 }
                 updateRegistry(data.registry);
-                setStatus(data.message || "Cuisine category saved.");
-                closeEditor();
+                createForm.reset();
+                createIconChoiceExplicit = false;
+                suggestedIconToken = "";
+                setCreateIconSelection("");
+                setCreateErrors();
+                setStatus(data.message || "Cuisine category added.");
+                window.requestAnimationFrame(() => createNameInput.focus({ preventScroll: true }));
             } catch (error) {
-                setEditorFeedback("The cuisine category could not be saved. Try again.");
-                console.error("Unable to save cuisine category.", error);
+                const failureMessage = "The cuisine category could not be added. Try again.";
+                setCreateSaving(false);
+                setCreateErrors({}, failureMessage);
+                setStatus(failureMessage, "error");
+                createNameInput.focus({ preventScroll: true });
+                console.error("Unable to add cuisine category.", error);
             } finally {
-                saveButton.disabled = false;
-                saveButton.textContent = editorCategoryId
-                    ? "Save Changes"
-                    : "Add Cuisine Category";
+                setCreateSaving(false);
             }
         };
 
-        const deleteCategory = async () => {
-            const item = categoryById(editorCategoryId);
-            if (!item?.custom) return;
-            if (Number(item.recipe_count) > 0) {
-                setEditorFeedback(
-                    `${categoryDisplayLabel(item)} is used by ${item.recipe_count} recipe${Number(item.recipe_count) === 1 ? "" : "s"}. Reassign or remove this cuisine category from those recipes before deleting it.`,
-                    "warning",
-                );
-                deleteButton.focus();
+        const captureRowDraft = (row, changedField = "") => {
+            const item = categoryById(row.dataset.categoryId);
+            if (!item) return null;
+            const draft = ensureRowDraft(item);
+            const controls = rowControls(row);
+            draft.icon = controls.icon.dataset.iconValue || "";
+            draft.abbreviation = controls.abbreviation.value;
+            draft.name = item.seeded ? categoryName(item) : controls.name.value;
+            if (changedField) {
+                delete draft.errors[changedField];
+                draft.feedback = "";
+            }
+            syncRowState(row);
+            return draft;
+        };
+
+        const saveCategoryRow = async row => {
+            const item = categoryById(row?.dataset.categoryId);
+            if (!item) return;
+            if (ensureRowDraft(item).deleting) return;
+            const draft = captureRowDraft(row);
+            const values = normalizedDraft(draft);
+            const errors = validateValues(values, item);
+            draft.errors = errors;
+            draft.feedback = "";
+            syncRowState(row);
+            if (Object.keys(errors).length) {
+                focusFirstInvalid(row, rowControls(row).abbreviation);
                 return;
             }
-            if (!window.confirm(`Delete custom cuisine category "${categoryDisplayLabel(item)}"?`)) return;
-            deleteButton.disabled = true;
+            if (!draftIsDirty(draft) || draft.saving) return;
+            draft.saving = true;
+            setStatus(`Saving ${categoryDisplayLabel(item)}…`, "info");
+            syncRowState(row);
+            closeIconPicker();
+            let saved = false;
+            try {
+                const url = root.dataset.updateUrlTemplate.replace(
+                    "__CATEGORY_ID__",
+                    encodeURIComponent(item.id),
+                );
+                const { response, data } = await requestJson(url, {
+                    method: "PATCH",
+                    body: JSON.stringify({
+                        icon: values.icon,
+                        abbreviation: values.abbreviation,
+                        category_name: item.seeded ? categoryName(item) : values.name,
+                    }),
+                });
+                if (!response.ok || data.ok === false) {
+                    const failureMessage = data.error || "The cuisine category could not be saved.";
+                    draft.saving = false;
+                    draft.errors = data.errors || {};
+                    draft.feedback = failureMessage;
+                    syncRowState(row);
+                    setStatus(failureMessage, "error");
+                    focusFirstInvalid(row, rowControls(row).abbreviation);
+                    return;
+                }
+                saved = true;
+                draft.saving = false;
+                updateRegistry(data.registry, { resetCategoryIds: [item.id] });
+                setStatus(data.message || "Cuisine category saved.");
+                window.requestAnimationFrame(() => {
+                    root.querySelector(
+                        `[data-cuisine-category-master-row][data-category-id="${CSS.escape(String(item.id))}"] [data-cuisine-category-master-row-abbreviation]`,
+                    )?.focus({ preventScroll: true });
+                });
+            } catch (error) {
+                const failureMessage = "The cuisine category could not be saved. Try again.";
+                draft.saving = false;
+                draft.feedback = failureMessage;
+                syncRowState(row);
+                setStatus(failureMessage, "error");
+                rowControls(row).abbreviation.focus({ preventScroll: true });
+                console.error("Unable to save cuisine category.", error);
+            } finally {
+                if (!saved) {
+                    draft.saving = false;
+                    syncRowState(row);
+                }
+            }
+        };
+
+        const deleteCategoryRow = async row => {
+            const item = categoryById(row?.dataset.categoryId);
+            if (!item?.custom) return;
+            const draft = ensureRowDraft(item);
+            if (draft.saving || draft.deleting) return;
+            const controls = rowControls(row);
+            if (Number(item.recipe_count) > 0) {
+                draft.errors = {};
+                draft.feedback = `${categoryDisplayLabel(item)} is used by ${item.recipe_count} recipe${Number(item.recipe_count) === 1 ? "" : "s"}. Reassign or remove this cuisine category from those recipes before deleting it.`;
+                syncRowState(row);
+                controls.delete.focus({ preventScroll: true });
+                return;
+            }
+            if (!window.confirm(`Delete custom cuisine category "${categoryDisplayLabel(item)}"?`)) {
+                return;
+            }
+            draft.errors = {};
+            draft.feedback = "";
+            draft.deleting = true;
+            setStatus(`Deleting ${categoryDisplayLabel(item)}…`, "info");
+            syncRowState(row);
+            if (activeIconTarget?.categoryId === String(item.id)) closeIconPicker();
             try {
                 const url = root.dataset.updateUrlTemplate.replace(
                     "__CATEGORY_ID__",
@@ -710,17 +1075,32 @@
                 );
                 const { response, data } = await requestJson(url, { method: "DELETE" });
                 if (!response.ok || data.ok === false) {
-                    setEditorFeedback(data.error || "The cuisine category could not be deleted.");
+                    const failureMessage = data.error || "The cuisine category could not be deleted.";
+                    draft.deleting = false;
+                    draft.errors = data.errors || {};
+                    draft.feedback = failureMessage;
+                    syncRowState(row);
+                    setStatus(failureMessage, "error");
+                    controls.delete.focus({ preventScroll: true });
                     return;
                 }
                 updateRegistry(data.registry);
                 setStatus(data.message || "Cuisine category deleted.");
-                closeEditor();
+                window.requestAnimationFrame(() => createNameInput.focus({ preventScroll: true }));
             } catch (error) {
-                setEditorFeedback("The cuisine category could not be deleted. Try again.");
+                const failureMessage = "The cuisine category could not be deleted. Try again.";
+                draft.deleting = false;
+                draft.errors = {};
+                draft.feedback = failureMessage;
+                syncRowState(row);
+                setStatus(failureMessage, "error");
+                controls.delete.focus({ preventScroll: true });
                 console.error("Unable to delete cuisine category.", error);
             } finally {
-                deleteButton.disabled = false;
+                if (row.isConnected && draft.deleting) {
+                    draft.deleting = false;
+                    syncRowState(row);
+                }
             }
         };
 
@@ -870,22 +1250,6 @@
             || localStorage.getItem(IMPORT_DISMISSED_KEY) === "true"
         );
 
-        iconTrigger.addEventListener("click", () => {
-            if (iconMenu.hidden) {
-                openIconPicker();
-            } else {
-                closeIconPicker({ focusTrigger: true });
-            }
-        });
-        iconTrigger.addEventListener("keydown", event => {
-            if (["ArrowDown", "ArrowUp"].includes(event.key)) {
-                event.preventDefault();
-                openIconPicker({ focusOption: true });
-            } else if (event.key === "Escape" && !iconMenu.hidden) {
-                event.preventDefault();
-                closeIconPicker({ focusTrigger: true });
-            }
-        });
         iconSearch.addEventListener("input", renderIconOptions);
         iconSearch.addEventListener("keydown", event => {
             if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
@@ -894,7 +1258,7 @@
                 const target = ["ArrowUp", "End"].includes(event.key)
                     ? options[options.length - 1]
                     : options[0];
-                target?.focus({ preventScroll: true });
+                focusIconOption(target);
             } else if (event.key === "Enter") {
                 const first = visibleIconOptions()[0];
                 if (first) {
@@ -924,27 +1288,105 @@
             // option click is delivered. Wait for that click to commit the manual
             // choice before deciding whether the picker actually lost focus.
             window.setTimeout(() => {
-                if (!iconPicker.contains(document.activeElement)) closeIconPicker();
+                if (
+                    !iconPicker.contains(document.activeElement)
+                    && document.activeElement !== activeIconTarget?.trigger
+                ) closeIconPicker();
             }, 0);
         });
-        abbreviationInput.addEventListener("input", suggestFlagFromAbbreviation);
+        createForm.addEventListener("submit", saveNewCategory);
+        createAbbreviationInput.addEventListener("input", () => {
+            clearCreateFieldError("abbreviation");
+            suggestFlagFromCreateAbbreviation();
+        });
+        createNameInput.addEventListener("input", () => clearCreateFieldError("name"));
+
+        root.addEventListener("input", event => {
+            const row = event.target.closest("[data-cuisine-category-master-row]");
+            if (!row) return;
+            if (event.target.matches("[data-cuisine-category-master-row-abbreviation]")) {
+                captureRowDraft(row, "abbreviation");
+            } else if (event.target.matches("[data-cuisine-category-master-row-name]")) {
+                captureRowDraft(row, "name");
+            }
+        });
+        root.addEventListener("focusout", event => {
+            if (!event.target.matches("[data-cuisine-category-master-row-abbreviation]")) return;
+            event.target.value = normalizeAbbreviation(event.target.value);
+            const row = event.target.closest("[data-cuisine-category-master-row]");
+            if (row) captureRowDraft(row, "abbreviation");
+        });
+
+        const pickerTargetForTrigger = trigger => {
+            if (trigger.matches("[data-cuisine-category-master-create-icon-trigger]")) {
+                return { kind: "create", trigger };
+            }
+            const row = trigger.closest("[data-cuisine-category-master-row]");
+            return row ? {
+                kind: "row",
+                categoryId: String(row.dataset.categoryId),
+                trigger,
+            } : null;
+        };
+
+        root.addEventListener("keydown", event => {
+            const trigger = event.target.closest(
+                "[data-cuisine-category-master-create-icon-trigger], "
+                + "[data-cuisine-category-master-row-icon-trigger]",
+            );
+            if (!trigger) return;
+            if (["ArrowDown", "ArrowUp"].includes(event.key)) {
+                event.preventDefault();
+                openIconPicker(pickerTargetForTrigger(trigger), { focusOption: true });
+            } else if (event.key === "Escape" && !iconMenu.hidden) {
+                event.preventDefault();
+                closeIconPicker({ focusTrigger: true });
+            }
+        });
+
         document.addEventListener("click", event => {
-            if (!iconMenu.hidden && !event.target.closest("[data-cuisine-category-master-icon-picker]")) {
+            const trigger = event.target.closest(
+                "[data-cuisine-category-master-create-icon-trigger], "
+                + "[data-cuisine-category-master-row-icon-trigger]",
+            );
+            if (
+                !iconMenu.hidden
+                && !event.target.closest("[data-cuisine-category-master-icon-picker]")
+                && !trigger
+            ) {
                 closeIconPicker();
             }
         });
         window.addEventListener("resize", () => closeIconPicker());
-        dialog.addEventListener("scroll", () => closeIconPicker(), { passive: true });
+        document.addEventListener("scroll", event => {
+            if (event.target instanceof Node && iconPicker.contains(event.target)) return;
+            closeIconPicker();
+        }, {
+            capture: true,
+            passive: true,
+        });
 
         root.addEventListener("click", event => {
-            const add = event.target.closest("[data-cuisine-category-master-add-button]");
-            if (add) {
-                openEditor(null, add);
+            const iconTrigger = event.target.closest(
+                "[data-cuisine-category-master-create-icon-trigger], "
+                + "[data-cuisine-category-master-row-icon-trigger]",
+            );
+            if (iconTrigger) {
+                if (!iconMenu.hidden && activeIconTarget?.trigger === iconTrigger) {
+                    closeIconPicker({ focusTrigger: true });
+                } else {
+                    openIconPicker(pickerTargetForTrigger(iconTrigger));
+                }
                 return;
             }
-            const edit = event.target.closest("[data-cuisine-category-master-edit-button]");
-            if (edit) {
-                openEditor(categoryById(edit.dataset.categoryId), edit);
+            const save = event.target.closest("[data-cuisine-category-master-row-save]");
+            if (save) {
+                saveCategoryRow(save.closest("[data-cuisine-category-master-row]"));
+                return;
+            }
+            const deleteButton = event.target.closest("[data-cuisine-category-master-row-delete]");
+            if (deleteButton) {
+                deleteCategoryRow(deleteButton.closest("[data-cuisine-category-master-row]"));
                 return;
             }
             const usage = event.target.closest("[data-cuisine-category-master-usage-button]");
@@ -953,15 +1395,6 @@
             }
         });
         search.addEventListener("input", applySearch);
-        form.addEventListener("submit", saveCategory);
-        deleteButton.addEventListener("click", deleteCategory);
-        root.querySelectorAll(
-            "[data-cuisine-category-master-close], [data-cuisine-category-master-cancel]",
-        ).forEach(button => button.addEventListener("click", closeEditor));
-        dialog.addEventListener("close", () => {
-            returnFocus?.focus({ preventScroll: true });
-            returnFocus = null;
-        });
         root.querySelectorAll("[data-cuisine-category-master-usage-close]").forEach(
             button => button.addEventListener("click", closeUsage),
         );

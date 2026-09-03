@@ -90,14 +90,71 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
              hidden></div>
 
         <section class="cuisine-category-master-create" aria-labelledby="addCuisineCategoryTitle">
-            <div>
+            <div class="cuisine-category-master-create-intro">
                 <span>Workspace setup</span>
                 <h2 id="addCuisineCategoryTitle">Add a Cuisine Category</h2>
-                <p>Open the editor to configure the icon, abbreviation, and category name.</p>
+                <p>Enter a category name and optional abbreviation, then choose the icon shown in the recipe editor.</p>
             </div>
-            <div class="cuisine-category-master-create-actions">
-                <button type="button" data-cuisine-category-master-add-button>Add Cuisine Category</button>
-            </div>
+            <form class="cuisine-category-master-create-form"
+                  data-cuisine-category-master-create-form
+                  novalidate>
+                <label class="unit-master-field cuisine-category-master-create-name-field">
+                    <span>Cuisine Category Name</span>
+                    <input type="text"
+                           maxlength="60"
+                           placeholder="For example, Mediterranean"
+                           autocomplete="off"
+                           required
+                           aria-describedby="cuisineCategoryCreateError"
+                           data-cuisine-category-master-name
+                           data-cuisine-category-master-create-name>
+                </label>
+                <label class="unit-master-field cuisine-category-master-create-abbreviation-field">
+                    <span>Abbreviation</span>
+                    <input type="text"
+                           maxlength="8"
+                           placeholder="For example, MED"
+                           autocomplete="off"
+                           spellcheck="false"
+                           aria-describedby="cuisineCategoryCreateError"
+                           data-cuisine-category-master-abbreviation
+                           data-cuisine-category-master-create-abbreviation>
+                </label>
+                <div class="unit-master-field cuisine-category-master-create-icon-field">
+                    <span id="cuisineCategoryCreateIconLabel">Icon</span>
+                    <input type="hidden"
+                           name="icon"
+                           value=""
+                           data-cuisine-category-master-create-icon>
+                    <button type="button"
+                            class="cuisine-category-master-icon-trigger cuisine-category-master-create-icon-trigger"
+                            role="combobox"
+                            aria-haspopup="listbox"
+                            aria-expanded="false"
+                            aria-controls="cuisineCategoryIconListbox"
+                            aria-labelledby="cuisineCategoryCreateIconLabel cuisineCategoryCreateIconSelectionLabel"
+                            aria-describedby="cuisineCategoryCreateError"
+                            data-cuisine-category-master-icon-trigger
+                            data-cuisine-category-master-create-icon-trigger>
+                        <span class="cuisine-category-icon-visual"
+                              data-cuisine-category-master-icon-preview
+                              data-cuisine-category-master-create-icon-preview
+                              aria-hidden="true">&mdash;</span>
+                        <span id="cuisineCategoryCreateIconSelectionLabel"
+                              data-cuisine-category-master-icon-label
+                              data-cuisine-category-master-create-icon-label>None</span>
+                        <span class="cuisine-category-master-icon-chevron" aria-hidden="true">&#8964;</span>
+                    </button>
+                </div>
+                <button type="submit"
+                        class="cuisine-category-master-create-submit"
+                        data-cuisine-category-master-create-submit>Add Cuisine Category</button>
+                <div id="cuisineCategoryCreateError"
+                     class="unit-master-field-error cuisine-category-master-create-error"
+                     role="alert"
+                     data-cuisine-category-master-create-error
+                     hidden></div>
+            </form>
         </section>
 
         <section class="unit-master-panel unit-master-catalog cuisine-category-master-list-section"
@@ -146,21 +203,68 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                      role="row"
                                      data-cuisine-category-master-row
                                      data-category-id="{{ category.id }}"
-                                     data-cuisine-category-master-search-value="{{ category.icon }} {{ category.abbreviation }} {{ category.category_name or category.canonical_name or category.name }}">
+                                     data-cuisine-category-master-search-value="{{ category.icon or '' }} {{ category.abbreviation or '' }} {{ category.category_name or category.canonical_name or category.name }}">
                                     <div class="cuisine-category-master-identity"
                                          role="presentation">
-                                        <span class="cuisine-category-master-icon cuisine-category-icon-visual"
-                                              role="cell"
-                                              data-cuisine-category-icon-visual
-                                              data-icon-token="{{ category.icon }}">
-                                            {{ cuisine_icon_fallback(category.icon) }}
-                                        </span>
-                                        <strong class="cuisine-category-master-abbreviation" role="cell">
-                                            {{ category.abbreviation or "—" }}
-                                        </strong>
-                                        <strong class="cuisine-category-master-name" role="cell">
-                                            {{ category.category_name or category.canonical_name or category.name }}
-                                        </strong>
+                                        <div class="cuisine-category-master-row-icon-field"
+                                             role="cell"
+                                             data-mobile-label="Icon">
+                                            <button type="button"
+                                                    class="cuisine-category-master-icon-trigger cuisine-category-master-row-icon-trigger"
+                                                    role="combobox"
+                                                    aria-haspopup="listbox"
+                                                    aria-expanded="false"
+                                                    aria-controls="cuisineCategoryIconListbox"
+                                                    aria-label="Choose icon for {{ category.category_name or category.canonical_name or category.name }}"
+                                                    aria-describedby="cuisineCategoryRowError{{ loop.index }}"
+                                                    data-icon-value="{{ category.icon or '' }}"
+                                                    data-cuisine-category-master-row-icon-trigger>
+                                                <span class="cuisine-category-icon-visual"
+                                                      data-cuisine-category-master-row-icon-preview
+                                                      data-icon-token="{{ category.icon or '' }}"
+                                                      aria-hidden="true">
+                                                    {{ cuisine_icon_fallback(category.icon) }}
+                                                </span>
+                                                <span class="sr-only" data-cuisine-category-master-row-icon-label>
+                                                    {{ category.icon or "None" }}
+                                                </span>
+                                                <span class="cuisine-category-master-icon-chevron" aria-hidden="true">&#8964;</span>
+                                            </button>
+                                        </div>
+                                        <label class="cuisine-category-master-row-abbreviation-field"
+                                               role="cell"
+                                               data-mobile-label="Abbreviation">
+                                            <span class="sr-only">Abbreviation for {{ category.category_name or category.canonical_name or category.name }}</span>
+                                            <input type="text"
+                                                   class="cuisine-category-master-abbreviation"
+                                                   maxlength="8"
+                                                   value="{{ category.abbreviation or '' }}"
+                                                   autocomplete="off"
+                                                   spellcheck="false"
+                                                   aria-describedby="cuisineCategoryRowError{{ loop.index }}"
+                                                   data-cuisine-category-master-row-abbreviation>
+                                        </label>
+                                        <label class="cuisine-category-master-row-name-field"
+                                               role="cell"
+                                               data-mobile-label="Cuisine Category Name">
+                                            <span class="sr-only">
+                                                Cuisine category name for {{ category.category_name or category.canonical_name or category.name }}{% if category.seeded %}; built-in names cannot be changed{% endif %}
+                                            </span>
+                                            <input type="text"
+                                                   class="cuisine-category-master-name"
+                                                   maxlength="60"
+                                                   value="{{ category.category_name or category.canonical_name or category.name }}"
+                                                   autocomplete="off"
+                                                   required
+                                                   aria-describedby="cuisineCategoryRowError{{ loop.index }}{% if category.seeded %} cuisineCategoryBuiltInNameHelp{{ loop.index }}{% endif %}"
+                                                   data-cuisine-category-master-row-name
+                                                   {% if category.seeded %}readonly aria-readonly="true" title="Built-in cuisine category names cannot be changed."{% endif %}>
+                                            {% if category.seeded %}
+                                                <span class="sr-only" id="cuisineCategoryBuiltInNameHelp{{ loop.index }}">
+                                                    Built-in cuisine category names cannot be changed.
+                                                </span>
+                                            {% endif %}
+                                        </label>
                                     </div>
                                     <div class="unit-master-usage" role="cell">
                                         {% if category.recipe_count %}
@@ -184,13 +288,28 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                     <span class="unit-master-source-badge{% if category.custom %} user-created{% endif %}" role="cell">
                                         {{ "User-created" if category.custom else "Built-in" }}
                                     </span>
-                                    <span class="unit-master-action-cell" role="cell">
+                                    <span class="unit-master-action-cell cuisine-category-master-row-actions"
+                                          role="cell"
+                                          data-mobile-label="Action">
                                         <button type="button"
                                                 class="unit-master-edit-button"
-                                                data-cuisine-category-master-edit-button
+                                                data-cuisine-category-master-row-save
                                                 data-category-id="{{ category.id }}"
-                                                aria-label="Edit {{ category.category_name or category.canonical_name or category.name }}">Edit</button>
+                                                aria-label="Save {{ category.category_name or category.canonical_name or category.name }}"
+                                                disabled>Save</button>
+                                        {% if category.custom %}
+                                            <button type="button"
+                                                    class="danger cuisine-category-master-row-delete"
+                                                    data-cuisine-category-master-row-delete
+                                                    data-category-id="{{ category.id }}"
+                                                    aria-label="Delete {{ category.category_name or category.canonical_name or category.name }}">Delete</button>
+                                        {% endif %}
                                     </span>
+                                    <div id="cuisineCategoryRowError{{ loop.index }}"
+                                         class="unit-master-field-error cuisine-category-master-row-error"
+                                         role="alert"
+                                         data-cuisine-category-master-row-error
+                                         hidden></div>
                                 </div>
                             {% endfor %}
                         </div>
@@ -202,152 +321,42 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
             </div>
         </section>
 
-        <dialog class="unit-master-dialog"
-                data-cuisine-category-master-dialog
-                aria-labelledby="cuisineCategoryEditorTitle">
-            <form method="dialog"
-                  class="unit-master-editor type-master-editor"
-                  data-cuisine-category-master-form
-                  novalidate>
-                <header>
-                    <div>
-                        <span data-cuisine-category-master-editor-kicker>Workspace cuisine</span>
-                        <h2 id="cuisineCategoryEditorTitle" data-cuisine-category-master-editor-title>Add Cuisine Category</h2>
-                        <p>Cuisine names are matched case-insensitively throughout the recipe editor.</p>
-                    </div>
-                    <button type="button"
-                            class="unit-master-dialog-close"
-                            data-cuisine-category-master-close
-                            aria-label="Close cuisine category editor">&times;</button>
-                </header>
-
-                <div class="type-master-editor-fields">
-                    <div class="cuisine-category-master-identity-fields">
-                        <div class="unit-master-field cuisine-category-master-icon-field">
-                            <span id="cuisineCategoryIconLabel">Icon</span>
-                            <div class="cuisine-category-master-icon-picker"
-                                 data-cuisine-category-master-icon-picker>
-                                <select name="icon"
-                                        aria-labelledby="cuisineCategoryIconLabel"
-                                        aria-describedby="cuisineCategoryIconHelp cuisineCategoryIconError"
-                                        data-cuisine-category-master-icon>
-                                    <option value="">None</option>
-                                    <optgroup label="Flags"
-                                              data-cuisine-category-master-flag-options></optgroup>
-                                    <optgroup label="Cuisine symbols">
-                                        {% for symbol, label in cuisine_symbol_options %}
-                                            <option value="symbol:{{ symbol }}"
-                                                    data-icon-kind="symbol"
-                                                    data-symbol-name="{{ symbol }}">{{ label }}</option>
-                                        {% endfor %}
-                                    </optgroup>
-                                </select>
-                                <button type="button"
-                                        class="cuisine-category-master-icon-trigger"
-                                        role="combobox"
-                                        aria-haspopup="listbox"
-                                        aria-expanded="false"
-                                        aria-controls="cuisineCategoryIconListbox"
-                                        aria-labelledby="cuisineCategoryIconLabel cuisineCategoryIconSelectionLabel"
-                                        aria-describedby="cuisineCategoryIconHelp cuisineCategoryIconError"
-                                        data-cuisine-category-master-icon-trigger
-                                        hidden>
-                                    <span class="cuisine-category-icon-visual"
-                                          data-cuisine-category-master-icon-preview
-                                          aria-hidden="true">&mdash;</span>
-                                    <span id="cuisineCategoryIconSelectionLabel"
-                                          data-cuisine-category-master-icon-label>None</span>
-                                    <span class="cuisine-category-master-icon-chevron" aria-hidden="true">&#8964;</span>
-                                </button>
-                                <div class="cuisine-category-master-icon-menu"
-                                     data-cuisine-category-master-icon-menu
-                                     hidden>
-                                    <label class="cuisine-category-master-icon-search">
-                                        <span>Search icons</span>
-                                        <input type="search"
-                                               placeholder="Search flags or symbols"
-                                               autocomplete="off"
-                                               aria-controls="cuisineCategoryIconListbox"
-                                               data-cuisine-category-master-icon-search>
-                                    </label>
-                                    <div id="cuisineCategoryIconListbox"
-                                         class="cuisine-category-master-icon-listbox"
-                                         role="listbox"
-                                         aria-label="Cuisine category icons"
-                                         data-cuisine-category-master-icon-listbox></div>
-                                    <p class="cuisine-category-master-icon-empty"
-                                       data-cuisine-category-master-icon-empty
-                                       hidden>No icons match that search.</p>
-                                </div>
-                            </div>
-                            <small class="unit-master-field-help"
-                                   id="cuisineCategoryIconHelp">
-                                Optional. Choose a local flag or cuisine symbol. A supported two-letter abbreviation suggests its flag until you choose an icon.
-                            </small>
-                            <small class="unit-master-field-error"
-                                   id="cuisineCategoryIconError"
-                                   data-cuisine-category-master-icon-error
-                                   hidden></small>
-                        </div>
-
-                        <label class="unit-master-field">
-                            <span>Cuisine category abbreviation</span>
-                            <input type="text"
-                                   maxlength="8"
-                                   placeholder="e.g. GB"
-                                   autocomplete="off"
-                                   spellcheck="false"
-                                   data-cuisine-category-master-abbreviation
-                                   aria-describedby="cuisineCategoryAbbreviationHelp cuisineCategoryAbbreviationError">
-                            <small class="unit-master-field-help"
-                                   id="cuisineCategoryAbbreviationHelp">
-                                Optional. Use 2–8 letters or numbers, such as GB.
-                            </small>
-                            <small class="unit-master-field-error"
-                                   id="cuisineCategoryAbbreviationError"
-                                   data-cuisine-category-master-abbreviation-error
-                                   hidden></small>
-                        </label>
-
-                        <label class="unit-master-field cuisine-category-master-name-field">
-                            <span>Cuisine category name</span>
-                            <input type="text"
-                                   maxlength="60"
-                                   placeholder="e.g. United Kingdom"
-                                   autocomplete="off"
-                                   required
-                                   data-cuisine-category-master-name
-                                   aria-describedby="cuisineCategoryNameHelp cuisineCategoryNameError">
-                            <small class="unit-master-field-help"
-                                   id="cuisineCategoryNameHelp"
-                                   data-cuisine-category-master-name-help>
-                                Enter the full category name shown in the recipe editor.
-                                Built-in names remain stable.
-                            </small>
-                            <small class="unit-master-field-error"
-                                   id="cuisineCategoryNameError"
-                                   data-cuisine-category-master-name-error
-                                   hidden></small>
-                        </label>
-                    </div>
-                </div>
-
-                <div class="unit-master-editor-feedback"
-                     role="alert"
-                     data-cuisine-category-master-editor-feedback
-                     hidden></div>
-                <footer>
-                    <button type="button"
-                            class="danger type-master-delete"
-                            data-cuisine-category-master-delete
-                            style="display: none;"
-                            hidden>Delete Cuisine Category</button>
-                    <span class="type-master-footer-spacer"></span>
-                    <button type="button" class="secondary" data-cuisine-category-master-cancel>Cancel</button>
-                    <button type="submit" data-cuisine-category-master-save>Add Cuisine Category</button>
-                </footer>
-            </form>
-        </dialog>
+        <div class="cuisine-category-master-icon-picker"
+             data-cuisine-category-master-icon-picker>
+            <select aria-label="Cuisine category icon options"
+                    data-cuisine-category-master-icon>
+                <option value="">None</option>
+                <optgroup label="Flags"
+                          data-cuisine-category-master-flag-options></optgroup>
+                <optgroup label="Cuisine symbols">
+                    {% for symbol, label in cuisine_symbol_options %}
+                        <option value="symbol:{{ symbol }}"
+                                data-icon-kind="symbol"
+                                data-symbol-name="{{ symbol }}">{{ label }}</option>
+                    {% endfor %}
+                </optgroup>
+            </select>
+            <div class="cuisine-category-master-icon-menu"
+                 data-cuisine-category-master-icon-menu
+                 hidden>
+                <label class="cuisine-category-master-icon-search">
+                    <span>Search icons</span>
+                    <input type="search"
+                           placeholder="Search flags or symbols"
+                           autocomplete="off"
+                           aria-controls="cuisineCategoryIconListbox"
+                           data-cuisine-category-master-icon-search>
+                </label>
+                <div id="cuisineCategoryIconListbox"
+                     class="cuisine-category-master-icon-listbox"
+                     role="listbox"
+                     aria-label="Cuisine category icons"
+                     data-cuisine-category-master-icon-listbox></div>
+                <p class="cuisine-category-master-icon-empty"
+                   data-cuisine-category-master-icon-empty
+                   hidden>No icons match that search.</p>
+            </div>
+        </div>
 
         <dialog id="cuisineCategoryMasterUsageDialog"
                 class="unit-master-usage-dialog"

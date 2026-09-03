@@ -9674,6 +9674,7 @@ def test_recipe_editor_ingredient_columns_can_be_reordered_resized_hidden_and_re
 
     assert 'const RECIPE_EDIT_INGREDIENT_COLUMN_STORAGE_KEY = "recipeEditIngredientColumnsV2";' in script
     assert 'const RECIPE_EDIT_INGREDIENT_COLUMN_ORDER = [' in script
+    assert 'const RECIPE_EDIT_INGREDIENT_DEFAULT_HIDDEN_COLUMNS = Object.freeze(["status"]);' in script
     for column in (
         "media", "ingredient", "status", "quantity", "unit",
         "size", "store", "type", "alternatives", "actions",
@@ -9729,7 +9730,8 @@ def test_recipe_editor_ingredient_columns_can_be_reordered_resized_hidden_and_re
     assert "state.layout" not in resize_update
     assert 'window.localStorage.setItem(' in interaction
     assert 'window.localStorage.removeItem(' in interaction
-    assert "const requestedHidden = Array.isArray(value?.hidden) ? value.hidden : [];" in interaction
+    assert "const requestedHidden = Array.isArray(value?.hidden)" in interaction
+    assert ": RECIPE_EDIT_INGREDIENT_DEFAULT_HIDDEN_COLUMNS;" in interaction
     assert "return { order, widths, hidden };" in interaction
     assert 'checkbox.type = "checkbox";' in interaction
     assert "checkbox.checked = !hidden.has(key);" in interaction
@@ -9750,6 +9752,13 @@ def test_recipe_editor_ingredient_columns_can_be_reordered_resized_hidden_and_re
         "applyRecipeEditIngredientColumnVisibility(recipeEditIngredientColumnLayout);"
     )
     assert 'tableScroll.setAttribute("aria-colcount", String(visibleOrder.length));' in interaction
+    reset = interaction[
+        interaction.index("function resetRecipeEditIngredientColumnLayout"):
+        interaction.index("function normalizeRecipeEditIngredientView")
+    ]
+    assert reset.index("clearRecipeEditIngredientColumnLayoutStyles();") < reset.index(
+        "recipeEditIngredientColumnLayout = defaultRecipeEditIngredientColumnLayout("
+    ) < reset.index("refreshRecipeEditIngredientColumnLayout();")
     assert 'autoFitColumns.textContent = "Auto-fit column widths";' in interaction
     assert 'resetColumns.textContent = "Restore default columns";' in interaction
     assert 'window.matchMedia("(min-width: 768px)")' in interaction
@@ -9779,6 +9788,157 @@ def test_recipe_editor_ingredient_columns_can_be_reordered_resized_hidden_and_re
     assert '[data-recipe-edit-ingredient-column-layout-enabled="true"]' in column_css
     mobile = column_css[column_css.index("@media (max-width: 767px)"):]
     assert "display: none !important;" in mobile
+
+
+def test_recipe_editor_status_column_defaults_hidden_without_overriding_saved_layouts():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    node = shutil.which("node")
+
+    if not node:
+        pytest.skip("Node.js is not available for the ingredient column default regression")
+
+    functions = "\n".join(
+        javascript_function_source(script, function_name)
+        for function_name in (
+            "recipeEditIngredientColumnStorageKey",
+            "clampRecipeEditIngredientColumnWidth",
+            "normalizeRecipeEditIngredientColumnLayout",
+            "defaultRecipeEditIngredientColumnLayout",
+            "loadRecipeEditIngredientColumnLayout",
+            "resetRecipeEditIngredientColumnLayout",
+        )
+    )
+    harness = r"""
+const RECIPE_EDIT_INGREDIENT_COLUMN_STORAGE_KEY = "recipeEditIngredientColumnsV2";
+const RECIPE_EDIT_INGREDIENT_COLUMN_ORDER = [
+    "media", "ingredient", "status", "quantity", "unit",
+    "size", "store", "type", "alternatives", "actions",
+];
+const RECIPE_EDIT_INGREDIENT_DEFAULT_HIDDEN_COLUMNS = Object.freeze(["status"]);
+const RECIPE_EDIT_INGREDIENT_COLUMNS = Object.fromEntries(
+    RECIPE_EDIT_INGREDIENT_COLUMN_ORDER.map(key => [key, {
+        minWidth: 40,
+        maxWidth: 400,
+        fallbackWidth: 100,
+    }]),
+);
+class MemoryStorage {
+    constructor() {
+        this.values = new Map();
+    }
+    getItem(key) {
+        return this.values.has(key) ? this.values.get(key) : null;
+    }
+    setItem(key, value) {
+        this.values.set(key, String(value));
+    }
+    removeItem(key) {
+        this.values.delete(key);
+    }
+}
+const document = { body: { dataset: { userId: "fresh-user" } } };
+const window = { localStorage: new MemoryStorage() };
+let recipeEditIngredientColumnMoveState = null;
+let recipeEditIngredientColumnResizeState = null;
+let recipeEditIngredientColumnLayout = null;
+const resetCalls = [];
+function finishRecipeEditIngredientColumnMove() {}
+function finishRecipeEditIngredientColumnResize() {}
+function clearRecipeEditIngredientColumnLayoutStyles() { resetCalls.push("clear"); }
+function captureRecipeEditIngredientColumnWidths() {
+    resetCalls.push("capture");
+    return widths;
+}
+function refreshRecipeEditIngredientColumnLayout() { resetCalls.push("refresh"); }
+function syncRecipeEditIngredientColumnVisibilityMenu() { resetCalls.push("sync"); }
+function closeRecipeEditRowMenus() { resetCalls.push("close"); }
+function setRecipeEditIngredientColumnStatus() { resetCalls.push("status"); }
+""" + functions + r"""
+
+const widths = Object.fromEntries(
+    RECIPE_EDIT_INGREDIENT_COLUMN_ORDER.map(key => [key, 120]),
+);
+const freshKey = recipeEditIngredientColumnStorageKey();
+const fresh = loadRecipeEditIngredientColumnLayout(widths);
+
+window.localStorage.setItem(freshKey, JSON.stringify({
+    order: RECIPE_EDIT_INGREDIENT_COLUMN_ORDER,
+    widths,
+    hidden: [],
+}));
+const savedVisible = loadRecipeEditIngredientColumnLayout(widths);
+
+window.localStorage.setItem(freshKey, JSON.stringify({
+    order: RECIPE_EDIT_INGREDIENT_COLUMN_ORDER,
+    widths,
+    hidden: ["status"],
+}));
+const savedHidden = loadRecipeEditIngredientColumnLayout(widths);
+
+document.body.dataset.userId = "second-user";
+const secondUser = loadRecipeEditIngredientColumnLayout(widths);
+const secondUserKey = recipeEditIngredientColumnStorageKey();
+
+window.localStorage.setItem(secondUserKey, "{broken-json");
+const malformed = loadRecipeEditIngredientColumnLayout(widths);
+
+window.localStorage.setItem(secondUserKey, JSON.stringify({
+    order: RECIPE_EDIT_INGREDIENT_COLUMN_ORDER,
+    widths,
+}));
+const missingHidden = loadRecipeEditIngredientColumnLayout(widths);
+
+document.body.dataset.userId = "reset-user";
+const resetKey = recipeEditIngredientColumnStorageKey();
+window.localStorage.setItem(resetKey, JSON.stringify({
+    order: RECIPE_EDIT_INGREDIENT_COLUMN_ORDER,
+    widths,
+    hidden: [],
+}));
+recipeEditIngredientColumnLayout = loadRecipeEditIngredientColumnLayout(widths);
+const resetResult = resetRecipeEditIngredientColumnLayout();
+const resetLayout = recipeEditIngredientColumnLayout;
+const resetStored = window.localStorage.getItem(resetKey);
+
+process.stdout.write(JSON.stringify({
+    freshKey,
+    secondUserKey,
+    fresh,
+    savedVisible,
+    savedHidden,
+    secondUser,
+    malformed,
+    missingHidden,
+    resetCalls,
+    resetLayout,
+    resetResult,
+    resetStored,
+}));
+"""
+
+    completed = subprocess.run(
+        [node, "-"],
+        input=harness,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    result = json.loads(completed.stdout)
+    assert result["freshKey"] == "recipeEditIngredientColumnsV2:fresh-user"
+    assert result["secondUserKey"] == "recipeEditIngredientColumnsV2:second-user"
+    assert result["fresh"]["hidden"] == ["status"]
+    assert result["savedVisible"]["hidden"] == []
+    assert result["savedHidden"]["hidden"] == ["status"]
+    assert result["secondUser"]["hidden"] == ["status"]
+    assert result["malformed"]["hidden"] == ["status"]
+    assert result["missingHidden"]["hidden"] == ["status"]
+    assert result["resetStored"] is None
+    assert result["resetResult"] is False
+    assert result["resetLayout"]["hidden"] == ["status"]
+    assert result["resetLayout"]["widths"]["ingredient"] == 120
+    assert result["resetCalls"] == ["clear", "capture", "refresh", "sync", "close", "status"]
 
 
 def test_recipe_editor_auto_fit_keeps_visible_columns_inside_the_table_width():

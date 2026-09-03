@@ -251,18 +251,55 @@ def test_cuisine_categories_page_renders_registry_management_ui(master_data_app)
     assert create_panel.select_one("h2#addCuisineCategoryTitle").get_text(
         " ", strip=True,
     ) == "Add a Cuisine Category"
-    create_actions = create_panel.find(
-        "div",
-        class_="cuisine-category-master-create-actions",
+    create_form = create_panel.find(
+        "form",
+        class_="cuisine-category-master-create-form",
         recursive=False,
     )
-    assert create_actions is not None
-    add_buttons = soup.select("[data-cuisine-category-master-add-button]")
-    assert len(add_buttons) == 1
-    assert create_actions.select("[data-cuisine-category-master-add-button]") == (
-        add_buttons
+    assert create_form is not None
+    assert create_form.has_attr("data-cuisine-category-master-create-form")
+    create_name = create_form.select_one(
+        "input[data-cuisine-category-master-create-name]"
     )
-    assert soup.select_one("[data-cuisine-category-master-dialog]") is not None
+    create_abbreviation = create_form.select_one(
+        "input[data-cuisine-category-master-create-abbreviation]"
+    )
+    create_icon = create_form.select_one(
+        "[data-cuisine-category-master-create-icon]"
+    )
+    create_icon_trigger = create_form.select_one(
+        "button[data-cuisine-category-master-create-icon-trigger]"
+    )
+    create_submit = create_form.select_one(
+        "button[data-cuisine-category-master-create-submit]"
+    )
+    create_error = create_form.select_one(
+        "[data-cuisine-category-master-create-error]"
+    )
+    assert create_name is not None and create_name.has_attr("required")
+    assert create_abbreviation is not None
+    assert create_icon is not None and create_icon.get("type") == "hidden"
+    assert create_submit is not None and create_submit.get("type") == "submit"
+    assert create_submit.get_text(" ", strip=True) == "Add Cuisine Category"
+    assert create_error is not None
+    assert create_error.get("role") == "alert"
+    assert create_error.has_attr("hidden")
+    assert create_icon_trigger is not None
+    assert create_icon_trigger.get("role") == "combobox"
+    assert create_icon_trigger.get("aria-haspopup") == "listbox"
+    assert create_icon_trigger.get("aria-expanded") == "false"
+    assert create_icon_trigger.get("aria-controls") == "cuisineCategoryIconListbox"
+    for described_control in (
+        create_name,
+        create_abbreviation,
+        create_icon_trigger,
+    ):
+        assert create_error["id"] in described_control["aria-describedby"].split()
+
+    assert not root.select("[data-cuisine-category-master-add-button]")
+    assert not root.select("[data-cuisine-category-master-edit-button]")
+    assert soup.select_one("[data-cuisine-category-master-dialog]") is None
+    assert soup.select_one("dialog.unit-master-dialog") is None
     assert soup.select_one("[data-cuisine-category-master-usage-dialog]") is not None
     assert [
         article.find("span").get_text(" ", strip=True)
@@ -334,13 +371,47 @@ def test_cuisine_categories_page_renders_registry_management_ui(master_data_app)
     )
     for preserved_hook in (
         "data-cuisine-category-master-rows",
-        "data-cuisine-category-master-edit-button",
         "data-cuisine-category-master-search-empty",
         "data-cuisine-category-master-status",
-        "data-cuisine-category-master-form",
-        "data-cuisine-category-master-save",
     ):
         assert root.select_one(f"[{preserved_hook}]") is not None
+    for row in rows:
+        assert row.get("role") == "row"
+        assert row.get("data-category-id")
+        row_error = row.select_one("[data-cuisine-category-master-row-error]")
+        row_icon = row.select_one(
+            "button[data-cuisine-category-master-row-icon-trigger]"
+        )
+        row_abbreviation = row.select_one(
+            "input[data-cuisine-category-master-row-abbreviation]"
+        )
+        row_name = row.select_one("input[data-cuisine-category-master-row-name]")
+        row_save = row.select_one("button[data-cuisine-category-master-row-save]")
+        assert row_error is not None and row_error.get("role") == "alert"
+        assert row_error.has_attr("hidden")
+        assert row_icon is not None
+        assert row_icon.get("role") == "combobox"
+        assert row_icon.get("aria-haspopup") == "listbox"
+        assert row_icon.get("aria-expanded") == "false"
+        assert row_icon.get("aria-controls") == "cuisineCategoryIconListbox"
+        assert row_abbreviation is not None
+        assert row_name is not None and row_name.has_attr("required")
+        assert row_save is not None
+        assert row_save.get_text(" ", strip=True) == "Save"
+        assert row_save.has_attr("disabled")
+        for described_control in (row_icon, row_abbreviation, row_name):
+            assert row_error["id"] in described_control[
+                "aria-describedby"
+            ].split()
+
+        source_badge = row.select_one(".unit-master-source-badge")
+        assert source_badge is not None and source_badge.get("role") == "cell"
+        if source_badge.get_text(strip=True) == "Built-in":
+            assert row_name.has_attr("readonly")
+            assert row_name.get("aria-readonly") == "true"
+            assert row.select_one(
+                "[data-cuisine-category-master-row-delete]"
+            ) is None
     header_identity = soup.select_one(
         ".cuisine-category-master-table > .unit-master-table-head > "
         ".cuisine-category-master-identity"
@@ -361,11 +432,21 @@ def test_cuisine_categories_page_renders_registry_management_ui(master_data_app)
     assert not soup.select(".cuisine-category-master-table .type-master-status-badge")
     assert soup.select_one("[data-cuisine-category-master-active]") is None
     assert soup.select_one("[data-cuisine-category-master-active-error]") is None
-    assert soup.select_one("[data-cuisine-category-master-icon]") is not None
-    assert soup.select_one(
-        "[data-cuisine-category-master-abbreviation]"
+    picker = soup.select("[data-cuisine-category-master-icon-picker]")
+    assert len(picker) == 1
+    assert picker[0].select_one("[data-cuisine-category-master-icon]") is not None
+    assert picker[0].select_one(
+        "[data-cuisine-category-master-icon-search]"
     ) is not None
-    assert soup.select_one("[data-cuisine-category-master-name]") is not None
+    assert picker[0].select_one(
+        "[data-cuisine-category-master-icon-listbox][role='listbox']"
+    ) is not None
+    assert not root.select("[draggable]")
+    assert not any(
+        attribute.startswith("data-store-section")
+        for element in root.find_all(True)
+        for attribute in element.attrs
+    )
     active_tab = soup.select_one("nav.master-data-tabs a.active")
     assert active_tab.get_text(strip=True) == "Cuisine Categories"
     assert urlsplit(active_tab["href"]).path == (
@@ -378,14 +459,54 @@ def test_cuisine_categories_page_renders_registry_management_ui(master_data_app)
     script = Path(
         "PushShoppingList/static/js/cuisine_categories.js"
     ).read_text(encoding="utf-8")
-    assert "const saveCategory = async event =>" in script
-    assert "const deleteCategory = async () =>" in script
+    assert "const saveNewCategory = async event =>" in script
+    assert "const saveCategoryRow = async row =>" in script
+    assert "const deleteCategoryRow = async row =>" in script
     assert "const openUsage = async (item, trigger) =>" in script
     assert 'body: JSON.stringify({ categories: importableNames })' in script
     assert '"__CATEGORY_ID__"' in script
+    assert "const rowDrafts = new Map();" in script
+    assert "const draftIsDirty = draft => !valuesMatch(" in script
+    assert 'row.classList.toggle("is-dirty", dirty);' in script
+    assert 'row.dataset.dirty = String(dirty);' in script
+    assert "const reconcileRowDrafts = (nextCategories, resetCategoryIds = []) =>" in script
+    assert "existing.baseline = categorySnapshot(item);" in script
+    reconcile_drafts = script.split(
+        "const reconcileRowDrafts = (nextCategories, resetCategoryIds = []) => {",
+        1,
+    )[1].split("\n        };", 1)[0]
+    assert "if (!existing || resetIds.has(categoryId))" in reconcile_drafts
+    assert "existing.icon =" not in reconcile_drafts
+    assert "existing.abbreviation =" not in reconcile_drafts
+    assert "existing.name =" not in reconcile_drafts
+    assert "const draft = ensureRowDraft(item);" in script
+    assert (
+        "updateRegistry(data.registry, { resetCategoryIds: [item.id] });"
+        in script
+    )
+    apply_search = script.split("const applySearch = () => {", 1)[1].split(
+        "\n        };", 1,
+    )[0]
+    assert "row.hidden = !matches;" in apply_search
+    assert "replaceChildren" not in apply_search
+    assert "renderRegistry" not in apply_search
+    assert 'method: "PATCH"' in script
+    assert 'if (!item?.custom) return;' in script
+    assert "if (Number(item.recipe_count) > 0)" in script
+    assert "window.confirm(`Delete custom cuisine category" in script
+    assert 'method: "DELETE"' in script
+    assert "trigger.focus({ preventScroll: true });" in script
+    assert "window.requestAnimationFrame(() => createNameInput.focus" in script
+    assert "const saveCategory = async event =>" not in script
+    assert "const deleteCategory = async () =>" not in script
+    assert "openEditor(" not in script
+    assert "[data-cuisine-category-master-add-button]" not in script
+    assert "[data-cuisine-category-master-edit-button]" not in script
+    assert "[data-cuisine-category-master-dialog]" not in script
     assert "activeInput" not in script
     assert "[data-cuisine-category-master-active]" not in script
     assert "type-master-status-badge" not in script
+    assert "data-store-section" not in script
     assert 'item.custom ? "User-created" : "Built-in"' in script
     assert (
         "countLabel.textContent = "
@@ -423,11 +544,23 @@ def test_cuisine_category_rows_share_unit_usage_and_action_contract(
 ):
     with master_data_app.test_client() as client:
         sign_in(client, "user-a")
+        created = client.post(
+            "/api/master-data/cuisine-categories",
+            json={
+                "icon": "symbol:bowl",
+                "abbreviation": "ITC",
+                "name": "Inline Test Cuisine",
+            },
+        )
+        assert created.status_code == 201
+        category_id = created.get_json()["category_id"]
         response = client.get("/admin/master-data/cuisine-categories")
 
     assert response.status_code == 200
     soup = BeautifulSoup(response.get_data(as_text=True), "html.parser")
-    row = soup.select_one("[data-cuisine-category-master-row]")
+    row = soup.select_one(
+        f'[data-cuisine-category-master-row][data-category-id="{category_id}"]'
+    )
     assert row is not None
     identity = row.find(
         "div",
@@ -442,8 +575,8 @@ def test_cuisine_category_rows_share_unit_usage_and_action_contract(
     ] == ["cell", "cell", "cell"]
     assert len(row.select("[role='cell']")) == 6
     category_name = row.select_one(
-        ".cuisine-category-master-name"
-    ).get_text(strip=True)
+        "input[data-cuisine-category-master-row-name]"
+    )["value"]
 
     templates_root = Path("PushShoppingList/templates")
     units_template = (templates_root / "units.html").read_text(encoding="utf-8")
@@ -484,14 +617,26 @@ def test_cuisine_category_rows_share_unit_usage_and_action_contract(
     )
     assert action_cell is not None
     assert action_cell.get("role") == "cell"
-    edit = action_cell.find(
+    save = action_cell.find(
         "button",
-        class_="unit-master-edit-button",
+        attrs={"data-cuisine-category-master-row-save": True},
         recursive=False,
     )
-    assert edit is not None
-    assert edit.get("class") == ["unit-master-edit-button"]
-    assert 'class="unit-master-edit-button"' in units_template
+    assert save is not None
+    assert save.get_text(" ", strip=True) == "Save"
+    assert save.has_attr("disabled")
+    assert action_cell.select_one(
+        "[data-cuisine-category-master-edit-button]"
+    ) is None
+    delete = action_cell.select_one(
+        "button[data-cuisine-category-master-row-delete]"
+    )
+    assert delete is not None
+    assert delete.get_text(" ", strip=True) == "Delete"
+    assert delete.get("data-category-id") == category_id
+    assert row.select_one(".unit-master-source-badge").get_text(strip=True) == (
+        "User-created"
+    )
 
     script = Path(
         "PushShoppingList/static/js/cuisine_categories.js"
@@ -508,26 +653,31 @@ def test_cuisine_category_rows_share_unit_usage_and_action_contract(
         "empty.title = `No recipes currently use ${categoryDisplayLabel(item)}`;"
         in script
     )
-    assert 'actionCell.className = "unit-master-action-cell";' in script
+    assert (
+        'actionCell.className = "unit-master-action-cell '
+        'cuisine-category-master-row-actions";'
+    ) in script
     assert 'actionCell.setAttribute("role", "cell");' in script
-    assert 'edit.className = "unit-master-edit-button";' in script
+    assert "const setCreateSaving = saving => {" in script
+    assert "createNameInput.disabled = saving;" in script
+    assert "createIconTrigger.disabled = saving;" in script
+    assert 'save.dataset.cuisineCategoryMasterRowSave = "";' in script
+    assert 'save.textContent = draft.saving ? "Saving…" : "Save";' in script
+    assert "const pending = Boolean(draft.saving || draft.deleting);" in script
+    assert "has unsaved changes." in script
+    assert "were reverted." in script
+    assert 'setStatus("Adding cuisine category…", "info");' in script
+    assert "draft.deleting = true;" in script
+    assert "if (item.custom) {" in script
+    assert 'deleteButton.dataset.cuisineCategoryMasterRowDelete = "";' in script
+    assert 'rowError.setAttribute("role", "alert");' in script
     assert 'identity.className = "cuisine-category-master-identity";' in script
     assert 'identity.setAttribute("role", "presentation");' in script
-    assert "identity.append(icon, abbreviation, name);" in script
+    assert "identity.append(iconField, abbreviationField, nameField);" in script
     assert "identity," in script
+    assert "cuisineCategoryMasterEditButton" not in script
 
     css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
-    cuisine_edit_rules = [
-        (match.group(1), match.group(2))
-        for match in re.finditer(r"([^{}]+)\{([^{}]*)\}", css)
-        if "[data-cuisine-category-master-page]" in match.group(1)
-        and ".unit-master-edit-button" in match.group(1)
-    ]
-    assert any(
-        "width: 100%;" in declarations
-        for _selectors, declarations in cuisine_edit_rules
-    )
-
     def block_from(source, marker, start=0):
         marker_start = source.index(marker, start)
         opening = source.index("{", marker_start)
@@ -549,56 +699,52 @@ def test_cuisine_category_rows_share_unit_usage_and_action_contract(
     assert unit_columns[-1] == "58px"
     assert "gap: 12px;" in unit_grid
 
-    cuisine_section = css.index("/* Cuisine Category master data:")
+    inline_section = css.index(
+        "/* Cuisine Category manager v3: direct create and per-row editing. */"
+    )
+    inline_css = css[inline_section:]
+    assert "[data-cuisine-category-master-create-form] {" in inline_css
+    assert "[data-cuisine-category-master-row].is-dirty" in inline_css
+    assert "[data-cuisine-category-master-row].is-saving" in inline_css
+    assert "[data-cuisine-category-master-row].has-error" in inline_css
+    assert "[data-cuisine-category-master-row-save]:disabled" in inline_css
+    assert "[data-cuisine-category-master-row-delete]" in inline_css
+    assert "[data-mobile-label]::before" in inline_css
+
     cuisine_desktop = block_from(
         css,
         "@media (min-width: 761px)",
-        cuisine_section,
+        inline_section,
     )
+    desktop_rows = block_from(
+        cuisine_desktop,
+        ".cuisine-category-master-table > .unit-master-table-head,",
+    )
+    assert "grid-template-columns:" in desktop_rows
+    assert "minmax(102px, .7fr)" in desktop_rows
+    assert "minmax(142px, 1.22fr)" in desktop_rows
     desktop_identity = block_from(
         cuisine_desktop,
-        ".cuisine-category-master-identity",
+        ".cuisine-category-master-table .cuisine-category-master-identity",
     )
-    assert "grid-column: 1 / span 2;" in desktop_identity
-    assert "grid-template-columns: 52px 96px minmax(0, 1fr);" in (
+    assert "grid-template-columns: 44px 96px minmax(0, 1fr);" in (
         desktop_identity
     )
-    assert "grid-column: 3;" in block_from(
-        cuisine_desktop,
-        ".cuisine-category-master-table .unit-master-usage",
-    )
 
-    mobile = block_from(css, "@media (max-width: 760px)", cuisine_section)
-    assert "display: contents;" in block_from(
+    mobile = block_from(css, "@media (max-width: 760px)", inline_section)
+    mobile_row = block_from(
         mobile,
-        ".cuisine-category-master-identity",
+        ".cuisine-category-master-table [data-cuisine-category-master-row]",
     )
-    mobile_usage = block_from(
+    assert "grid-template-columns: minmax(0, 1fr);" in mobile_row
+    mobile_identity = block_from(
         mobile,
-        ".cuisine-category-master-table .unit-master-usage",
+        ".cuisine-category-master-table\n"
+        "        [data-cuisine-category-master-row]\n"
+        "        .cuisine-category-master-identity",
     )
-    assert "grid-column: 2;" in mobile_usage
-    assert "grid-row: 3;" in mobile_usage
-    mobile_action = block_from(
-        mobile,
-        ".cuisine-category-master-table .unit-master-action-cell",
-    )
-    assert "grid-column: 3;" in mobile_action
-    assert "grid-row: 1 / span 2;" in mobile_action
-    assert "align-self: center;" in mobile_action
-    mobile_edit_rules = [
-        (match.group(1), match.group(2))
-        for match in re.finditer(r"([^{}]+)\{([^{}]*)\}", mobile)
-        if ".unit-master-edit-button" in match.group(1)
-    ]
-    assert mobile_edit_rules
-    assert all(
-        "[data-cuisine-category-master-page]" in selectors
-        for selectors, _declarations in mobile_edit_rules
-    )
-    assert any(
-        "width: auto;" in declarations
-        for _selectors, declarations in mobile_edit_rules
+    assert "grid-template-columns: 44px 96px minmax(0, 1fr);" in (
+        mobile_identity
     )
 
 
