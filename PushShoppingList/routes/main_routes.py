@@ -2445,7 +2445,10 @@ def create_master_data_store_section_route():
         result,
         success_prefix="Store Section created: {name}.",
     )
-    return redirect(build_canonical_master_data_url("store_sections"))
+    redirect_url = build_canonical_master_data_url("store_sections")
+    if result.get("ok") and request.form.get("return_to_created") == "1":
+        redirect_url = f"{redirect_url}#storeSectionMasterRow-{result['id']}"
+    return redirect(redirect_url)
 
 
 @main_bp.route("/admin/master-data/store-sections/<int:section_id>", methods=["POST"])

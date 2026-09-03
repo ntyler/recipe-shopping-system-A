@@ -69012,6 +69012,8 @@ body.is-resizing-store-section-master-column * {
 }
 
 .store-section-master-add-footer {
+    display: grid;
+    gap: 12px;
     padding: 12px 16px 16px;
 }
 

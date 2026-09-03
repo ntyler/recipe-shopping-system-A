@@ -48280,19 +48280,73 @@ function syncStoreSectionMasterIconPicker(picker, iconName) {
     });
 }
 
+function storeSectionMasterBottomViewportInset() {
+    const viewportHeight = window.innerHeight || document.documentElement?.clientHeight || 0;
+    const mobileNavigation = document.querySelector(".app-mobile-bottom-nav");
+    if (!mobileNavigation) return 0;
+    const style = window.getComputedStyle?.(mobileNavigation);
+    if (style?.display === "none" || style?.visibility === "hidden") return 0;
+    const rect = mobileNavigation.getBoundingClientRect();
+    if (rect.bottom <= 0 || rect.top >= viewportHeight) return 0;
+    return Math.max(0, viewportHeight - Math.max(0, rect.top));
+}
+
+function isStoreSectionMasterElementFullyVisible(element) {
+    if (!element?.getBoundingClientRect) return true;
+    const rect = element.getBoundingClientRect();
+    const viewportWidth = window.innerWidth || document.documentElement?.clientWidth || 0;
+    const viewportHeight = window.innerHeight || document.documentElement?.clientHeight || 0;
+    const visibleViewportBottom = viewportHeight - storeSectionMasterBottomViewportInset();
+    if (
+        rect.top < 0
+        || rect.left < 0
+        || (visibleViewportBottom && rect.bottom > visibleViewportBottom)
+        || (viewportWidth && rect.right > viewportWidth)
+    ) {
+        return false;
+    }
+
+    let ancestor = element.parentElement;
+    while (ancestor && ancestor !== document.body) {
+        const style = window.getComputedStyle?.(ancestor);
+        const clipsX = /(auto|scroll|hidden|clip)/.test(
+            `${style?.overflow || ""} ${style?.overflowX || ""}`,
+        );
+        const clipsY = /(auto|scroll|hidden|clip)/.test(
+            `${style?.overflow || ""} ${style?.overflowY || ""}`,
+        );
+        if (clipsX || clipsY) {
+            const ancestorRect = ancestor.getBoundingClientRect();
+            if (
+                (clipsX && (rect.left < ancestorRect.left || rect.right > ancestorRect.right))
+                || (clipsY && (rect.top < ancestorRect.top || rect.bottom > ancestorRect.bottom))
+            ) {
+                return false;
+            }
+        }
+        ancestor = ancestor.parentElement;
+    }
+    return true;
+}
+
 function initStoreSectionMasterAddShortcut(page, announce = () => {}) {
-    const createPanel = page?.querySelector("#storeSectionMasterCreatePanel");
-    const createNameInput = page?.querySelector("#storeSectionMasterCreateName");
+    const createPanel = page?.querySelector("#storeSectionMasterInlineCreatePanel");
+    const createNameInput = page?.querySelector("#storeSectionMasterInlineCreateName");
     const addShortcut = page?.querySelector("[data-store-section-master-add-shortcut]");
     if (!createPanel || !createNameInput || !addShortcut) return;
 
-    addShortcut.addEventListener("click", () => {
-        const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        createPanel.scrollIntoView({
-            behavior: reducedMotion ? "auto" : "smooth",
-            block: "center",
-        });
+    addShortcut.addEventListener("click", event => {
+        event.preventDefault();
+        createPanel.hidden = false;
+        addShortcut.setAttribute("aria-expanded", "true");
         createNameInput.focus({ preventScroll: true });
+        const bottomInset = storeSectionMasterBottomViewportInset();
+        createPanel.style.scrollMarginBottom = bottomInset
+            ? `${Math.ceil(bottomInset)}px`
+            : "";
+        if (!isStoreSectionMasterElementFullyVisible(createPanel)) {
+            createPanel.scrollIntoView({ block: "nearest", inline: "nearest" });
+        }
         announce("Add Store Section form focused.");
     });
 }

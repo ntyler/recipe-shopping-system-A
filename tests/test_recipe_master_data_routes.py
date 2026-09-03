@@ -2491,10 +2491,24 @@ def test_store_sections_page_manages_only_the_active_workspace(monkeypatch, tmp_
         add_shortcut = category.select_one(
             "button[data-store-section-master-add-shortcut]"
         )
+        inline_create = category.select_one(
+            "#storeSectionMasterInlineCreatePanel"
+        )
         assert add_shortcut is not None
+        assert inline_create is not None
         assert add_shortcut.get("type") == "button"
-        assert add_shortcut.get("aria-controls") == "storeSectionMasterCreatePanel"
+        assert add_shortcut.find_parent("form") is None
+        assert add_shortcut.get("aria-controls") == inline_create.get("id")
+        assert add_shortcut.get("aria-expanded") == "false"
         assert add_shortcut.get_text(" ", strip=True) == "Add Store Section"
+        assert inline_create.has_attr("hidden")
+        assert inline_create.find_next_sibling("button") is add_shortcut
+        assert inline_create.select_one(
+            '#storeSectionMasterInlineCreateName[name="display_name"]'
+        ) is not None
+        assert inline_create.select_one(
+            'input[name="return_to_created"][value="1"]'
+        ) is not None
         assert soup.select_one("#storeSectionMasterCreateName") is not None
         assert soup.select_one("[data-store-section-master-status-filter]") is None
         assert soup.select_one("[data-store-section-master-columns-trigger]") is None
@@ -2569,6 +2583,51 @@ def test_store_sections_page_manages_only_the_active_workspace(monkeypatch, tmp_
         other_workspace = client.get("/admin/master-data/store-sections")
         assert other_workspace.status_code == 200
         assert "Global Foods" not in other_workspace.get_data(as_text=True)
+
+
+def test_inline_store_section_create_returns_to_new_bottom_row_and_can_delete(
+    monkeypatch,
+    tmp_path,
+):
+    app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
+
+    with app.test_client() as client:
+        sign_in(client, "user-a")
+        response = client.post(
+            "/admin/master-data/store-sections",
+            data={
+                "display_name": "Inline Test Section",
+                "icon": "basket",
+                "return_to_created": "1",
+            },
+        )
+
+        assert response.status_code == 302
+        location = urlsplit(response.headers["Location"])
+        assert location.path == "/admin/master-data/store-sections"
+        assert location.fragment.startswith("storeSectionMasterRow-")
+
+        created_page = client.get(response.headers["Location"])
+        created_soup = BeautifulSoup(created_page.get_data(as_text=True), "html.parser")
+        created_row = created_soup.select_one(f"#{location.fragment}")
+        assert created_row is not None
+        assert created_row.get("data-store-section-name") == "inline test section"
+        assert created_row == created_soup.select(
+            ".store-section-master-list [data-store-section-master-row]"
+        )[-1]
+
+        section_id = int(location.fragment.rsplit("-", 1)[1])
+        deleted = client.post(
+            f"/admin/master-data/store-sections/{section_id}",
+            data={"action": "delete"},
+            headers={
+                "Accept": "application/json",
+                "X-Requested-With": "fetch",
+            },
+        )
+
+    assert deleted.status_code == 200
+    assert deleted.get_json()["deleted"] is True
 
 
 def test_builtin_store_section_edit_preserves_identity_and_routing(monkeypatch, tmp_path):
@@ -3182,7 +3241,7 @@ def test_store_section_icon_picker_matches_recipe_table_dropdown_chrome():
     assert "const menuWidth = Math.max(220, rect.width);" in script
 
 
-def test_store_section_manager_bottom_add_shortcut_targets_existing_create_form():
+def test_store_section_manager_bottom_add_shortcut_targets_inline_create_form():
     script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
     page = Path("PushShoppingList/templates/store_sections.html").read_text(
@@ -3190,28 +3249,48 @@ def test_store_section_manager_bottom_add_shortcut_targets_existing_create_form(
     )
 
     soup = BeautifulSoup(page, "html.parser")
-    create_panel = soup.select_one("#storeSectionMasterCreatePanel")
-    create_name = soup.select_one("#storeSectionMasterCreateName")
+    create_panel = soup.select_one("#storeSectionMasterInlineCreatePanel")
+    create_name = soup.select_one("#storeSectionMasterInlineCreateName")
     shortcut = soup.select_one("button[data-store-section-master-add-shortcut]")
     assert create_panel is not None
     assert create_name is not None
     assert shortcut is not None
+    assert shortcut.get("type") == "button"
+    assert shortcut.find_parent("form") is None
     assert shortcut.get("aria-controls") == create_panel.get("id")
     assert shortcut.find_parent("section", class_="store-section-master-category")
     assert shortcut.find_previous(class_="store-section-master-table") is not None
+    assert create_panel.has_attr("hidden")
+    assert create_panel.find_next_sibling("button") is shortcut
 
     assert "function initStoreSectionMasterAddShortcut(page, announce = () => {})" in script
-    assert 'page?.querySelector("#storeSectionMasterCreatePanel")' in script
-    assert 'page?.querySelector("#storeSectionMasterCreateName")' in script
+    assert 'page?.querySelector("#storeSectionMasterInlineCreatePanel")' in script
+    assert 'page?.querySelector("#storeSectionMasterInlineCreateName")' in script
     assert 'page?.querySelector("[data-store-section-master-add-shortcut]")' in script
-    assert 'window.matchMedia("(prefers-reduced-motion: reduce)").matches' in script
-    assert "createPanel.scrollIntoView({" in script
-    assert 'behavior: reducedMotion ? "auto" : "smooth"' in script
+    assert "event.preventDefault();" in script
+    assert "createPanel.hidden = false;" in script
+    assert 'addShortcut.setAttribute("aria-expanded", "true");' in script
     assert "createNameInput.focus({ preventScroll: true });" in script
+    assert 'createPanel.scrollIntoView({ block: "nearest", inline: "nearest" });' in script
+    shortcut_script = script[
+        script.index("function initStoreSectionMasterAddShortcut("):
+        script.index("function initStoreSectionMasterTable()")
+    ]
+    assert "#storeSectionMasterCreatePanel" not in shortcut_script
+    assert 'block: "center"' not in shortcut_script
+    assert "storeSectionMasterBottomViewportInset()" in shortcut_script
     assert "initStoreSectionMasterAddShortcut(page, announce);" in script
 
     assert ".store-section-master-add-footer {" in css
     assert ".store-section-master-add-shortcut {" in css
+    assert "display: grid;" in css.rsplit(
+        ".store-section-master-add-footer {",
+        1,
+    )[1].split("}", 1)[0]
+    assert "gap: 12px;" in css.rsplit(
+        ".store-section-master-add-footer {",
+        1,
+    )[1].split("}", 1)[0]
     assert "padding: 12px 16px 16px;" in css
     assert ".store-section-master-add-shortcut:hover {" in css
     assert ".store-section-master-add-shortcut:focus-visible {" in css
@@ -3225,14 +3304,14 @@ def test_store_section_manager_bottom_add_shortcut_targets_existing_create_form(
     assert "background: transparent;" in shortcut_rules
 
 
-def test_store_section_manager_bottom_add_shortcut_click_focuses_name_input():
+def test_store_section_manager_bottom_add_shortcut_preserves_scroll_and_focuses_inline_input():
     node = shutil.which("node")
     if not node:
         pytest.skip("Node.js is required for the Store Section shortcut interaction test")
 
     script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     helper = script[
-        script.index("function initStoreSectionMasterAddShortcut("):
+        script.index("function storeSectionMasterBottomViewportInset("):
         script.index("function initStoreSectionMasterTable()")
     ]
     harness = helper + r"""
@@ -3240,51 +3319,86 @@ const listeners = {};
 const scrollCalls = [];
 const announcements = [];
 const interactionOrder = [];
+const attributes = {};
 let focusOptions = null;
-let reducedMotion = false;
+let focusCount = 0;
+let preventDefaultCount = 0;
+let submitCount = 0;
+let panelRect = {top: 620, right: 760, bottom: 700, left: 220};
+const body = {};
+const scrollContainer = {
+    parentElement: body,
+    scrollTop: 920,
+    getBoundingClientRect() {
+        return {top: 120, right: 1100, bottom: 760, left: 180};
+    },
+};
 const createPanel = {
+    hidden: true,
+    parentElement: scrollContainer,
+    style: {},
+    getBoundingClientRect() { return panelRect; },
     scrollIntoView(options) {
         scrollCalls.push(options);
-        interactionOrder.push(`scroll:${options.behavior}`);
+        interactionOrder.push("scroll");
     },
 };
 const createNameInput = {
     focus(options) {
         focusOptions = options;
+        focusCount += 1;
         document.activeElement = createNameInput;
         interactionOrder.push("focus");
     },
 };
 const addShortcut = {
+    form: {requestSubmit() { submitCount += 1; }},
     addEventListener(type, callback) { listeners[type] = callback; },
+    setAttribute(name, value) { attributes[name] = value; },
 };
 const nodes = new Map([
-    ["#storeSectionMasterCreatePanel", createPanel],
-    ["#storeSectionMasterCreateName", createNameInput],
+    ["#storeSectionMasterInlineCreatePanel", createPanel],
+    ["#storeSectionMasterInlineCreateName", createNameInput],
     ["[data-store-section-master-add-shortcut]", addShortcut],
 ]);
 const page = {querySelector: selector => nodes.get(selector) || null};
-global.document = {activeElement: null};
+global.document = {
+    activeElement: null,
+    body,
+    documentElement: {clientWidth: 1200, clientHeight: 800},
+    querySelector: () => null,
+};
 global.window = {
-    matchMedia: () => ({matches: reducedMotion}),
+    innerWidth: 1200,
+    innerHeight: 800,
+    scrollY: 740,
+    getComputedStyle: () => ({overflow: "", overflowX: "visible", overflowY: "auto"}),
 };
 
 initStoreSectionMasterAddShortcut(page, message => {
     announcements.push(message);
     interactionOrder.push("announce");
 });
-listeners.click();
-const animatedScroll = scrollCalls.at(-1);
-reducedMotion = true;
-listeners.click();
-const reducedMotionScroll = scrollCalls.at(-1);
+const clickEvent = {preventDefault() { preventDefaultCount += 1; }};
+listeners.click(clickEvent);
+listeners.click(clickEvent);
+const scrollCallsWhileVisible = [...scrollCalls];
+panelRect = {top: 748, right: 760, bottom: 828, left: 220};
+listeners.click(clickEvent);
 
 console.log(JSON.stringify({
     registeredClick: typeof listeners.click === "function",
     focusedNameInput: document.activeElement === createNameInput,
+    panelHidden: createPanel.hidden,
+    ariaExpanded: attributes["aria-expanded"],
+    preventDefaultCount,
+    submitCount,
+    focusCount,
     focusOptions,
-    animatedScroll,
-    reducedMotionScroll,
+    scrollCallsWhileVisible,
+    scrollCalls,
+    windowScrollY: window.scrollY,
+    nestedScrollTop: scrollContainer.scrollTop,
     announcements,
     interactionOrder,
 }));
@@ -3301,19 +3415,28 @@ console.log(JSON.stringify({
     assert result == {
         "registeredClick": True,
         "focusedNameInput": True,
+        "panelHidden": False,
+        "ariaExpanded": "true",
+        "preventDefaultCount": 3,
+        "submitCount": 0,
+        "focusCount": 3,
         "focusOptions": {"preventScroll": True},
-        "animatedScroll": {"behavior": "smooth", "block": "center"},
-        "reducedMotionScroll": {"behavior": "auto", "block": "center"},
+        "scrollCallsWhileVisible": [],
+        "scrollCalls": [{"block": "nearest", "inline": "nearest"}],
+        "windowScrollY": 740,
+        "nestedScrollTop": 920,
         "announcements": [
+            "Add Store Section form focused.",
             "Add Store Section form focused.",
             "Add Store Section form focused.",
         ],
         "interactionOrder": [
-            "scroll:smooth",
             "focus",
             "announce",
-            "scroll:auto",
             "focus",
+            "announce",
+            "focus",
+            "scroll",
             "announce",
         ],
     }

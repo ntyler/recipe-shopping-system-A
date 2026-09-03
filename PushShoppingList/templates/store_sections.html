@@ -212,6 +212,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                     ) %}
                     <form method="POST"
                           action="{{ url_for('main_bp.update_master_data_store_section_route', section_id=section.id) }}"
+                          id="storeSectionMasterRow-{{ section.id }}"
                           role="row"
                           class="store-section-master-row"
                           data-store-section-master-row
@@ -434,9 +435,34 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                 </div>
             </div>
                 <div class="store-section-master-add-footer">
+                    <div id="storeSectionMasterInlineCreatePanel"
+                         data-store-section-master-inline-create
+                         hidden>
+                        <form method="POST"
+                              action="{{ master_data.create_url }}"
+                              class="store-section-master-create-form"
+                              aria-label="Add a Store Section">
+                            <input type="hidden" name="return_to_created" value="1">
+                            <label>
+                                <span>Name</span>
+                                <input type="text"
+                                       id="storeSectionMasterInlineCreateName"
+                                       name="display_name"
+                                       maxlength="80"
+                                       placeholder="For example, International Foods"
+                                       required>
+                            </label>
+                            <div class="store-section-master-icon-field">
+                                <span>Icon</span>
+                                {{ store_section_icon_picker("basket", "Icon for the new Store Section") }}
+                            </div>
+                            <button type="submit">Add Store Section</button>
+                        </form>
+                    </div>
                     <button type="button"
                             class="store-section-master-add-shortcut"
-                            aria-controls="storeSectionMasterCreatePanel"
+                            aria-controls="storeSectionMasterInlineCreatePanel"
+                            aria-expanded="false"
                             data-store-section-master-add-shortcut>
                         <span aria-hidden="true">{{ shell.svg_icon("plus") }}</span>
                         <span>Add Store Section</span>
