@@ -48280,6 +48280,23 @@ function syncStoreSectionMasterIconPicker(picker, iconName) {
     });
 }
 
+function initStoreSectionMasterAddShortcut(page, announce = () => {}) {
+    const createPanel = page?.querySelector("#storeSectionMasterCreatePanel");
+    const createNameInput = page?.querySelector("#storeSectionMasterCreateName");
+    const addShortcut = page?.querySelector("[data-store-section-master-add-shortcut]");
+    if (!createPanel || !createNameInput || !addShortcut) return;
+
+    addShortcut.addEventListener("click", () => {
+        const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        createPanel.scrollIntoView({
+            behavior: reducedMotion ? "auto" : "smooth",
+            block: "center",
+        });
+        createNameInput.focus({ preventScroll: true });
+        announce("Add Store Section form focused.");
+    });
+}
+
 function initStoreSectionMasterTable() {
     const page = document.querySelector(".store-section-master-page");
     if (!page) return;
@@ -48314,6 +48331,7 @@ function initStoreSectionMasterTable() {
     const announce = message => {
         if (liveRegion) liveRegion.textContent = message;
     };
+    initStoreSectionMasterAddShortcut(page, announce);
     const cellFor = (row, key) => row.querySelector(
         '[data-store-section-master-cell="' + key + '"]',
     );

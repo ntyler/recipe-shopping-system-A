@@ -129,7 +129,9 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
             </article>
         </div>
 
-        <section class="store-section-master-create" aria-labelledby="addStoreSectionTitle">
+        <section class="store-section-master-create"
+                 id="storeSectionMasterCreatePanel"
+                 aria-labelledby="addStoreSectionTitle">
             <div>
                 <span>Workspace setup</span>
                 <h2 id="addStoreSectionTitle">Add a Store Section</h2>
@@ -141,6 +143,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                 <label>
                     <span>Name</span>
                     <input type="text"
+                           id="storeSectionMasterCreateName"
                            name="display_name"
                            maxlength="80"
                            placeholder="For example, International Foods"
@@ -430,6 +433,15 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                     <span>Try a different search.</span>
                 </div>
             </div>
+                <div class="store-section-master-add-footer">
+                    <button type="button"
+                            class="store-section-master-add-shortcut"
+                            aria-controls="storeSectionMasterCreatePanel"
+                            data-store-section-master-add-shortcut>
+                        <span aria-hidden="true">{{ shell.svg_icon("plus") }}</span>
+                        <span>Add Store Section</span>
+                    </button>
+                </div>
             </section>
             </div>
         </section>

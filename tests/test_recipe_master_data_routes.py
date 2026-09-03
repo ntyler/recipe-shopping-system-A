@@ -1,9 +1,12 @@
 import json
+import shutil
+import subprocess
 from pathlib import Path
 from urllib.parse import parse_qsl
 from urllib.parse import urlsplit
 
 from bs4 import BeautifulSoup
+import pytest
 
 from PushShoppingList.app import create_app
 from PushShoppingList.routes import main_routes
@@ -2485,6 +2488,14 @@ def test_store_sections_page_manages_only_the_active_workspace(monkeypatch, tmp_
             header.get_text(" ", strip=True)
             for header in table.select('[role="columnheader"]')
         ] == ["Order", "Icon", "Display Name", "Used in", "Source", "Action"]
+        add_shortcut = category.select_one(
+            "button[data-store-section-master-add-shortcut]"
+        )
+        assert add_shortcut is not None
+        assert add_shortcut.get("type") == "button"
+        assert add_shortcut.get("aria-controls") == "storeSectionMasterCreatePanel"
+        assert add_shortcut.get_text(" ", strip=True) == "Add Store Section"
+        assert soup.select_one("#storeSectionMasterCreateName") is not None
         assert soup.select_one("[data-store-section-master-status-filter]") is None
         assert soup.select_one("[data-store-section-master-columns-trigger]") is None
         bakery_row = html.split('data-store-section-key="bakery"', 1)[1].split("</form>", 1)[0]
@@ -3169,6 +3180,143 @@ def test_store_section_icon_picker_matches_recipe_table_dropdown_chrome():
     )
     assert "grid-template-columns: 17px minmax(0, 1fr) 16px;" in css
     assert "const menuWidth = Math.max(220, rect.width);" in script
+
+
+def test_store_section_manager_bottom_add_shortcut_targets_existing_create_form():
+    script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    page = Path("PushShoppingList/templates/store_sections.html").read_text(
+        encoding="utf-8",
+    )
+
+    soup = BeautifulSoup(page, "html.parser")
+    create_panel = soup.select_one("#storeSectionMasterCreatePanel")
+    create_name = soup.select_one("#storeSectionMasterCreateName")
+    shortcut = soup.select_one("button[data-store-section-master-add-shortcut]")
+    assert create_panel is not None
+    assert create_name is not None
+    assert shortcut is not None
+    assert shortcut.get("aria-controls") == create_panel.get("id")
+    assert shortcut.find_parent("section", class_="store-section-master-category")
+    assert shortcut.find_previous(class_="store-section-master-table") is not None
+
+    assert "function initStoreSectionMasterAddShortcut(page, announce = () => {})" in script
+    assert 'page?.querySelector("#storeSectionMasterCreatePanel")' in script
+    assert 'page?.querySelector("#storeSectionMasterCreateName")' in script
+    assert 'page?.querySelector("[data-store-section-master-add-shortcut]")' in script
+    assert 'window.matchMedia("(prefers-reduced-motion: reduce)").matches' in script
+    assert "createPanel.scrollIntoView({" in script
+    assert 'behavior: reducedMotion ? "auto" : "smooth"' in script
+    assert "createNameInput.focus({ preventScroll: true });" in script
+    assert "initStoreSectionMasterAddShortcut(page, announce);" in script
+
+    assert ".store-section-master-add-footer {" in css
+    assert ".store-section-master-add-shortcut {" in css
+    assert "padding: 12px 16px 16px;" in css
+    assert ".store-section-master-add-shortcut:hover {" in css
+    assert ".store-section-master-add-shortcut:focus-visible {" in css
+    assert ".store-section-master-add-shortcut:is(:hover, :focus-visible)" not in css
+    shortcut_rules = css.rsplit(
+        ".store-section-master-page .store-section-master-add-shortcut {",
+        1,
+    )[1].split("}", 1)[0]
+    assert "width: 100%;" in shortcut_rules
+    assert "border: 1px dashed" in shortcut_rules
+    assert "background: transparent;" in shortcut_rules
+
+
+def test_store_section_manager_bottom_add_shortcut_click_focuses_name_input():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required for the Store Section shortcut interaction test")
+
+    script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    helper = script[
+        script.index("function initStoreSectionMasterAddShortcut("):
+        script.index("function initStoreSectionMasterTable()")
+    ]
+    harness = helper + r"""
+const listeners = {};
+const scrollCalls = [];
+const announcements = [];
+const interactionOrder = [];
+let focusOptions = null;
+let reducedMotion = false;
+const createPanel = {
+    scrollIntoView(options) {
+        scrollCalls.push(options);
+        interactionOrder.push(`scroll:${options.behavior}`);
+    },
+};
+const createNameInput = {
+    focus(options) {
+        focusOptions = options;
+        document.activeElement = createNameInput;
+        interactionOrder.push("focus");
+    },
+};
+const addShortcut = {
+    addEventListener(type, callback) { listeners[type] = callback; },
+};
+const nodes = new Map([
+    ["#storeSectionMasterCreatePanel", createPanel],
+    ["#storeSectionMasterCreateName", createNameInput],
+    ["[data-store-section-master-add-shortcut]", addShortcut],
+]);
+const page = {querySelector: selector => nodes.get(selector) || null};
+global.document = {activeElement: null};
+global.window = {
+    matchMedia: () => ({matches: reducedMotion}),
+};
+
+initStoreSectionMasterAddShortcut(page, message => {
+    announcements.push(message);
+    interactionOrder.push("announce");
+});
+listeners.click();
+const animatedScroll = scrollCalls.at(-1);
+reducedMotion = true;
+listeners.click();
+const reducedMotionScroll = scrollCalls.at(-1);
+
+console.log(JSON.stringify({
+    registeredClick: typeof listeners.click === "function",
+    focusedNameInput: document.activeElement === createNameInput,
+    focusOptions,
+    animatedScroll,
+    reducedMotionScroll,
+    announcements,
+    interactionOrder,
+}));
+"""
+    completed = subprocess.run(
+        [node, "-e", harness],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    result = json.loads(completed.stdout)
+
+    assert result == {
+        "registeredClick": True,
+        "focusedNameInput": True,
+        "focusOptions": {"preventScroll": True},
+        "animatedScroll": {"behavior": "smooth", "block": "center"},
+        "reducedMotionScroll": {"behavior": "auto", "block": "center"},
+        "announcements": [
+            "Add Store Section form focused.",
+            "Add Store Section form focused.",
+        ],
+        "interactionOrder": [
+            "scroll:smooth",
+            "focus",
+            "announce",
+            "scroll:auto",
+            "focus",
+            "announce",
+        ],
+    }
 
 
 def test_store_section_order_column_uses_step_badges_without_duplicate_icons():

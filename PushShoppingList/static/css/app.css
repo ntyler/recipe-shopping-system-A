@@ -69011,6 +69011,43 @@ body.is-resizing-store-section-master-column * {
     overflow: visible;
 }
 
+.store-section-master-add-footer {
+    padding: 12px 16px 16px;
+}
+
+.store-section-master-page .store-section-master-add-shortcut {
+    display: flex;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 40px;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border: 1px dashed color-mix(in srgb, var(--app-primary) 38%, var(--app-border));
+    border-radius: 7px;
+    background: transparent;
+    color: var(--app-primary-hover);
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 780;
+}
+
+.store-section-master-page .store-section-master-add-shortcut:hover {
+    border-color: color-mix(in srgb, var(--app-primary) 72%, var(--app-border));
+    background: color-mix(in srgb, var(--app-primary-soft) 12%, transparent);
+}
+
+.store-section-master-page .store-section-master-add-shortcut:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--app-primary) 72%, white);
+    outline-offset: 2px;
+}
+
+.store-section-master-add-shortcut :is(.app-icon-svg, svg) {
+    width: 16px;
+    height: 16px;
+}
+
 .store-section-master-columns,
 .store-section-master-status-filter,
 .store-section-master-column-move,
