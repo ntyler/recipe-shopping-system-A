@@ -3261,10 +3261,13 @@ def test_store_section_manager_uses_compact_registry_and_preserves_interactions(
     assert ".store-section-master-stats {" in css
     assert "grid-template-columns: repeat(3, minmax(0, 1fr));" in css
     store_heading_alignment_rules = css.rsplit(
-        ".store-section-master-page .master-data-header h1,\n"
-        ".store-section-master-page .store-section-master-create h2 {",
+        ".store-section-master-page .master-data-header h1,",
         1,
     )[1].split("}", 1)[0]
+    assert (
+        ".store-section-master-page .store-section-master-create h2,"
+        in store_heading_alignment_rules
+    )
     assert "text-align: left;" in store_heading_alignment_rules
     for layout_property in (
         "display:",
@@ -3277,16 +3280,19 @@ def test_store_section_manager_uses_compact_registry_and_preserves_interactions(
         "flex-",
     ):
         assert layout_property not in store_heading_alignment_rules
-    assert ".store-section-master-category-list {" in css
+    assert ".store-section-master-category-list," in css
     assert ".store-section-master-category {" in css
     store_header_rules = css.rsplit(
         ".store-section-master-category .store-section-master-table-head {",
         1,
     )[1].split("}", 1)[0]
+    assert "position: sticky;" in store_header_rules
+    assert "z-index: 20;" in store_header_rules
+    assert "top: 0;" in store_header_rules
     assert "min-height: 0;" in store_header_rules
     assert "padding: 10px 14px;" in store_header_rules
     assert "border-bottom: 1px solid var(--app-border);" in store_header_rules
-    assert "background: transparent;" in store_header_rules
+    assert "background: var(--app-surface);" in store_header_rules
     assert "color: var(--app-muted);" in store_header_rules
     assert "font-size: 12px;" in store_header_rules
     assert "font-weight: 850;" in store_header_rules

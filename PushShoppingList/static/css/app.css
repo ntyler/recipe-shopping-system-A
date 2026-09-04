@@ -68981,12 +68981,15 @@ body.is-resizing-store-section-master-column * {
 }
 
 .store-section-master-category .store-section-master-table-head {
+    position: sticky;
+    z-index: 20;
+    top: 0;
     min-height: 0;
     padding: 10px 14px;
     border-bottom: 1px solid var(--app-border);
     border-start-start-radius: 8px;
     border-start-end-radius: 8px;
-    background: transparent;
+    background: var(--app-surface);
     color: var(--app-muted);
     font-size: 12px;
     font-weight: 850;
