@@ -2478,6 +2478,9 @@ def test_store_sections_page_manages_only_the_active_workspace(monkeypatch, tmp_
         assert soup.select_one("#storeSectionOrderTitle").get_text(
             " ", strip=True
         ) == "Store Section Registry"
+        assert soup.select_one("#storeSectionsTitle").get_text(
+            "", strip=True
+        ) == f"Store Sections ({rendered_section_count})"
         assert soup.select_one(
             "[data-store-section-master-visible-count]"
         ).get_text(" ", strip=True) == (
@@ -3239,7 +3242,7 @@ def test_store_section_manager_uses_compact_registry_and_preserves_interactions(
     assert not draft_row.has_attr("data-store-section-master-row")
 
     assert "Add Store Section" in page
-    assert "store-section-master-title-count" in page
+    assert "store-section-master-title-count" not in page
     assert "data-store-section-master-count" in page
     assert "master ingredients" in page
     assert "recipe references" in page
@@ -3322,7 +3325,7 @@ def test_store_section_manager_uses_compact_registry_and_preserves_interactions(
     assert '"archive"' not in store_section_table_script
     assert '"restore"' not in store_section_table_script
 
-    assert ".store-section-master-title-count {" in css
+    assert ".store-section-master-title-count {" not in css
     assert ".store-section-master-header-summary {" in css
     assert ".store-section-master-header-actions {" in css
     assert ".store-section-master-header-add {" in css

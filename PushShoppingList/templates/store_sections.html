@@ -89,15 +89,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
         <header class="master-data-header">
             <div>
                 <a class="master-data-home-link" href="{{ url_for('main_bp.index') }}#userAccountSection">Account</a>
-                <h1 id="storeSectionsTitle">
-                    Store Sections
-                    <span class="store-section-master-title-count">
-                        <span data-store-section-master-count>
-                            {{ master_data.section_count|default(master_data.sections|length, true) }}
-                        </span>
-                        <span class="sr-only"> total</span>
-                    </span>
-                </h1>
+                <h1 id="storeSectionsTitle">Store Sections (<span data-store-section-master-count>{{ master_data.section_count|default(master_data.sections|length, true) }}</span>)</h1>
                 <p>Manage the names, icons, and shopping order used by this workspace.</p>
                 <div class="store-section-master-header-summary"
                      aria-label="Workspace usage summary">

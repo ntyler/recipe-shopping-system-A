@@ -66489,24 +66489,6 @@ body.recipe-edit-standalone-page :is(
     flex: 1 1 auto;
 }
 
-.store-section-master-title-count {
-    display: inline-flex;
-    min-width: 28px;
-    min-height: 24px;
-    align-items: center;
-    justify-content: center;
-    margin-left: 6px;
-    padding: 0 8px;
-    border: 1px solid color-mix(in srgb, var(--app-primary) 52%, var(--app-border));
-    border-radius: 999px;
-    background: var(--app-primary-soft);
-    color: var(--app-primary-hover);
-    font-size: 13px;
-    font-weight: 850;
-    line-height: 1;
-    vertical-align: .22em;
-}
-
 .store-section-master-header-summary {
     display: flex;
     align-items: center;
