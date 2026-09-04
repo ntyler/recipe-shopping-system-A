@@ -89,19 +89,42 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
         <header class="master-data-header">
             <div>
                 <a class="master-data-home-link" href="{{ url_for('main_bp.index') }}#userAccountSection">Account</a>
-                <h1 id="storeSectionsTitle">Store Sections</h1>
-                <p>Manage the names, icons, and shopping order used by this workspace.</p>
-            </div>
-            <nav class="master-data-tabs" aria-label="Master data">
-                <a href="{{ master_data.ingredient_url }}">Ingredients</a>
-                <a href="{{ master_data.equipment_url }}">Equipment</a>
-                <a href="{{ master_data.units_url }}">Units</a>
-                <a href="{{ master_data.types_url }}">Types</a>
-                <a href="{{ master_data.cuisine_category_url }}">Cuisine Categories</a>
-                <a href="{{ master_data.store_section_url }}" class="active" aria-current="page">
+                <h1 id="storeSectionsTitle">
                     Store Sections
-                </a>
-            </nav>
+                    <span class="store-section-master-title-count">
+                        <span data-store-section-master-count>
+                            {{ master_data.section_count|default(master_data.sections|length, true) }}
+                        </span>
+                        <span class="sr-only"> total</span>
+                    </span>
+                </h1>
+                <p>Manage the names, icons, and shopping order used by this workspace.</p>
+                <div class="store-section-master-header-summary"
+                     aria-label="Workspace usage summary">
+                    <span><strong>{{ master_data.ingredient_count }}</strong> master ingredients</span>
+                    <span><strong>{{ master_data.recipe_reference_count }}</strong> recipe references</span>
+                </div>
+            </div>
+            <div class="store-section-master-header-actions">
+                <nav class="master-data-tabs" aria-label="Master data">
+                    <a href="{{ master_data.ingredient_url }}">Ingredients</a>
+                    <a href="{{ master_data.equipment_url }}">Equipment</a>
+                    <a href="{{ master_data.units_url }}">Units</a>
+                    <a href="{{ master_data.types_url }}">Types</a>
+                    <a href="{{ master_data.cuisine_category_url }}">Cuisine Categories</a>
+                    <a href="{{ master_data.store_section_url }}" class="active" aria-current="page">
+                        Store Sections
+                    </a>
+                </nav>
+                <button type="button"
+                        class="store-section-master-add-toggle store-section-master-header-add"
+                        aria-controls="storeSectionMasterInlineCreatePanel"
+                        aria-expanded="false"
+                        data-store-section-master-add-shortcut>
+                    {{ shell.svg_icon("plus") }}
+                    <span>Add Store Section</span>
+                </button>
+            </div>
         </header>
 
         {% if master_data.messages %}
@@ -111,51 +134,6 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                 {% endfor %}
             </div>
         {% endif %}
-
-        <div class="store-section-master-stats" aria-label="Store Section summary">
-            <article>
-                <span>Store sections</span>
-                <strong data-store-section-master-count>
-                    {{ master_data.section_count|default(master_data.sections|length, true) }}
-                </strong>
-            </article>
-            <article>
-                <span>Master ingredients</span>
-                <strong>{{ master_data.ingredient_count }}</strong>
-            </article>
-            <article>
-                <span>Recipe references</span>
-                <strong>{{ master_data.recipe_reference_count }}</strong>
-            </article>
-        </div>
-
-        <section class="store-section-master-create"
-                 id="storeSectionMasterCreatePanel"
-                 aria-labelledby="addStoreSectionTitle">
-            <div>
-                <span>Workspace setup</span>
-                <h2 id="addStoreSectionTitle">Add a Store Section</h2>
-                <p>New sections are added to the end of the current store order.</p>
-            </div>
-            <form method="POST"
-                  action="{{ master_data.create_url }}"
-                  class="store-section-master-create-form">
-                <label>
-                    <span>Name</span>
-                    <input type="text"
-                           id="storeSectionMasterCreateName"
-                           name="display_name"
-                           maxlength="80"
-                           placeholder="For example, International Foods"
-                           required>
-                </label>
-                <div class="store-section-master-icon-field">
-                    <span>Icon</span>
-                    {{ store_section_icon_picker("basket", "Icon for the new Store Section") }}
-                </div>
-                <button type="submit">Add Store Section</button>
-            </form>
-        </section>
 
         <section class="store-section-master-list-section" aria-labelledby="storeSectionOrderTitle">
             <header class="store-section-master-table-toolbar">

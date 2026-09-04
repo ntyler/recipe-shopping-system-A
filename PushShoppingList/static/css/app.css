@@ -66485,6 +66485,76 @@ body.recipe-edit-standalone-page :is(
     max-width: 100%;
 }
 
+.store-section-master-page .master-data-header > :first-child {
+    flex: 1 1 auto;
+}
+
+.store-section-master-title-count {
+    display: inline-flex;
+    min-width: 28px;
+    min-height: 24px;
+    align-items: center;
+    justify-content: center;
+    margin-left: 6px;
+    padding: 0 8px;
+    border: 1px solid color-mix(in srgb, var(--app-primary) 52%, var(--app-border));
+    border-radius: 999px;
+    background: var(--app-primary-soft);
+    color: var(--app-primary-hover);
+    font-size: 13px;
+    font-weight: 850;
+    line-height: 1;
+    vertical-align: .22em;
+}
+
+.store-section-master-header-summary {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    margin-top: 9px;
+    color: var(--app-muted);
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.store-section-master-header-summary > span {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 4px;
+}
+
+.store-section-master-header-summary > span + span::before {
+    content: "";
+    width: 3px;
+    height: 3px;
+    margin-right: 4px;
+    border-radius: 50%;
+    background: var(--app-border-strong);
+}
+
+.store-section-master-header-summary strong {
+    color: var(--app-text-strong);
+    font-size: inherit;
+}
+
+.store-section-master-header-actions {
+    display: grid;
+    min-width: 0;
+    justify-items: end;
+    gap: 12px;
+}
+
+.store-section-master-header-actions .master-data-tabs {
+    min-width: 0;
+}
+
+.store-section-master-page .store-section-master-header-add {
+    width: max-content;
+    max-width: 100%;
+    justify-self: end;
+}
+
 .store-section-master-page .master-data-header h1,
 .store-section-master-page .store-section-master-create h2,
 .cuisine-category-master-page .master-data-header h1,
@@ -66970,6 +67040,16 @@ body.recipe-edit-standalone-page :is(
 }
 
 @media (max-width: 759px) {
+    .store-section-master-header-actions {
+        width: 100%;
+        justify-items: stretch;
+    }
+
+    .store-section-master-page .store-section-master-header-add {
+        width: 100%;
+        justify-self: stretch;
+    }
+
     .store-section-master-stats,
     .store-section-master-create-form {
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -68966,10 +69046,6 @@ body.is-resizing-store-section-master-column * {
 }
 
 /* Store Section manager v4: Cuisine-style half-width registry card with a fixed compact table. */
-.store-section-master-stats {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
 .store-section-master-category-list,
 .cuisine-category-master-category-list {
     min-width: 0;

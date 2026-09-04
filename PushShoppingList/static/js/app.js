@@ -48332,22 +48332,28 @@ function isStoreSectionMasterElementFullyVisible(element) {
 function initStoreSectionMasterAddShortcut(page, announce = () => {}) {
     const createPanel = page?.querySelector("#storeSectionMasterInlineCreatePanel");
     const createNameInput = page?.querySelector("#storeSectionMasterInlineCreateName");
-    const addShortcut = page?.querySelector("[data-store-section-master-add-shortcut]");
-    if (!createPanel || !createNameInput || !addShortcut) return;
+    const addShortcuts = [
+        ...(page?.querySelectorAll("[data-store-section-master-add-shortcut]") || []),
+    ];
+    if (!createPanel || !createNameInput || !addShortcuts.length) return;
 
-    addShortcut.addEventListener("click", event => {
-        event.preventDefault();
-        createPanel.hidden = false;
-        addShortcut.setAttribute("aria-expanded", "true");
-        createNameInput.focus({ preventScroll: true });
-        const bottomInset = storeSectionMasterBottomViewportInset();
-        createPanel.style.scrollMarginBottom = bottomInset
-            ? `${Math.ceil(bottomInset)}px`
-            : "";
-        if (!isStoreSectionMasterElementFullyVisible(createPanel)) {
-            createPanel.scrollIntoView({ block: "nearest", inline: "nearest" });
-        }
-        announce("Add Store Section form focused.");
+    addShortcuts.forEach(addShortcut => {
+        addShortcut.addEventListener("click", event => {
+            event.preventDefault();
+            createPanel.hidden = false;
+            addShortcuts.forEach(button => {
+                button.setAttribute("aria-expanded", "true");
+            });
+            createNameInput.focus({ preventScroll: true });
+            const bottomInset = storeSectionMasterBottomViewportInset();
+            createPanel.style.scrollMarginBottom = bottomInset
+                ? `${Math.ceil(bottomInset)}px`
+                : "";
+            if (!isStoreSectionMasterElementFullyVisible(createPanel)) {
+                createPanel.scrollIntoView({ block: "nearest", inline: "nearest" });
+            }
+            announce("Add Store Section form focused.");
+        });
     });
 }
 
@@ -48366,9 +48372,9 @@ function initStoreSectionMasterTable() {
     const inlineCreate = page.querySelector(
         "[data-store-section-master-inline-create]",
     );
-    const addShortcut = page.querySelector(
-        "[data-store-section-master-add-shortcut]",
-    );
+    const addShortcuts = [
+        ...page.querySelectorAll("[data-store-section-master-add-shortcut]"),
+    ];
     if (!table || !tableHead || !list) return;
 
     let draggedRow = null;
@@ -48894,7 +48900,9 @@ function initStoreSectionMasterTable() {
                 "basket",
             );
             inlineCreate.hidden = true;
-            addShortcut?.setAttribute("aria-expanded", "false");
+            addShortcuts.forEach(button => {
+                button.setAttribute("aria-expanded", "false");
+            });
             if (search) search.value = "";
             if (sectionCount) {
                 const current = Number.parseInt(sectionCount.textContent, 10) || 0;
@@ -48914,7 +48922,9 @@ function initStoreSectionMasterTable() {
         } catch (error) {
             if (created) {
                 inlineCreate.hidden = true;
-                addShortcut?.setAttribute("aria-expanded", "false");
+                addShortcuts.forEach(button => {
+                    button.setAttribute("aria-expanded", "false");
+                });
                 announce(
                     (nameInput?.value || "Store Section")
                     + " was created, but the row could not be displayed. Reload to update the list.",
