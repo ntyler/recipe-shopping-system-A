@@ -129,16 +129,18 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
 
         <section class="store-section-master-list-section" aria-labelledby="storeSectionOrderTitle">
             <header class="store-section-master-table-toolbar">
-                <div>
-                    <span>Shopping order</span>
+                <div class="store-section-master-registry-copy">
+                    <span>Workspace registry</span>
                     <h2 id="storeSectionOrderTitle">Store Section Registry</h2>
                     <p>Change display names, icons, and order for this workspace. Built-in identity and automatic routing stay protected; custom sections are assigned manually.</p>
+                    <strong class="store-section-master-visible-count"
+                            aria-live="polite"
+                            data-store-section-master-visible-count>
+                        Showing {{ master_data.sections|length }} of {{ master_data.sections|length }} Store Sections.
+                    </strong>
                 </div>
-                <div class="store-section-master-table-actions">
-                    <span class="store-section-master-visible-count"
-                          data-store-section-master-visible-count>
-                        Showing {{ master_data.sections|length }} of {{ master_data.sections|length }} Store Sections
-                    </span>
+            </header>
+            <div class="store-section-master-table-actions store-section-master-filter-toolbar">
                     <label class="store-section-master-search">
                         <span class="store-section-master-search-label">Search</span>
                         <span class="store-section-master-search-control">
@@ -152,8 +154,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                    data-store-section-master-search>
                         </span>
                     </label>
-                </div>
-            </header>
+            </div>
 
             <p class="sr-only"
                role="status"

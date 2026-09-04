@@ -2478,15 +2478,22 @@ def test_store_sections_page_manages_only_the_active_workspace(monkeypatch, tmp_
         assert soup.select_one("#storeSectionOrderTitle").get_text(
             " ", strip=True
         ) == "Store Section Registry"
+        registry_copy = soup.select_one(".store-section-master-registry-copy")
+        assert registry_copy.select_one(":scope > span").get_text(
+            " ", strip=True
+        ) == "Workspace registry"
         assert soup.select_one("#storeSectionsTitle").get_text(
             "", strip=True
         ) == f"Store Sections ({rendered_section_count})"
-        assert soup.select_one(
+        result_count = soup.select_one(
             "[data-store-section-master-visible-count]"
-        ).get_text(" ", strip=True) == (
-            f"Showing {rendered_section_count} of {rendered_section_count} "
-            "Store Sections"
         )
+        assert result_count.get_text(" ", strip=True) == (
+            f"Showing {rendered_section_count} of {rendered_section_count} "
+            "Store Sections."
+        )
+        assert result_count.name == "strong"
+        assert result_count.find_parent("header") is not None
         search_label = soup.select_one(".store-section-master-search")
         assert search_label.select_one(
             ".store-section-master-search-label"
@@ -2494,6 +2501,10 @@ def test_store_sections_page_manages_only_the_active_workspace(monkeypatch, tmp_
         assert search_label.select_one(
             "input[data-store-section-master-search]"
         ).get("placeholder") == "Store Section name"
+        assert search_label.find_parent(
+            class_="store-section-master-filter-toolbar"
+        ) is not None
+        assert search_label.find_parent("header") is None
         inline_create = soup.select_one("#storeSectionMasterInlineCreatePanel")
         add_shortcuts = soup.select(
             "button[data-store-section-master-add-shortcut]"
@@ -3320,7 +3331,7 @@ def test_store_section_manager_uses_compact_registry_and_preserves_interactions(
     assert "row.remove()" in script
     assert "applyFilters()" in store_section_table_script
     assert 'visibleCount.textContent = "Showing "' in store_section_table_script
-    assert '+ " Store Sections";' in store_section_table_script
+    assert '+ " Store Sections.";' in store_section_table_script
     assert "window.location.reload()" not in store_section_table_script
     assert '"archive"' not in store_section_table_script
     assert '"restore"' not in store_section_table_script
@@ -3331,6 +3342,8 @@ def test_store_section_manager_uses_compact_registry_and_preserves_interactions(
     assert ".store-section-master-header-add {" in css
     assert ".store-section-master-search-label {" in css
     assert ".store-section-master-search-control {" in css
+    assert ".store-section-master-registry-copy {" in css
+    assert ".store-section-master-filter-toolbar {" in css
     store_heading_alignment_rules = css.rsplit(
         ".store-section-master-page .master-data-header h1,",
         1,

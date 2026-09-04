@@ -69532,6 +69532,75 @@ body.is-resizing-store-section-master-column * {
     }
 }
 
+/* Match the Store Section registry heading and filter rhythm to Equipment. */
+.store-section-master-list-section > .store-section-master-table-toolbar {
+    display: block;
+    padding: 16px 16px 10px;
+    border-bottom: 0;
+}
+
+.store-section-master-registry-copy {
+    max-width: 900px;
+}
+
+.store-section-master-registry-copy > .store-section-master-visible-count {
+    display: block;
+    width: max-content;
+    max-width: 100%;
+    margin-top: 8px;
+    color: var(--app-text);
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1.4;
+    text-align: left;
+    white-space: normal;
+}
+
+.store-section-master-list-section > .store-section-master-filter-toolbar {
+    display: grid;
+    width: auto;
+    grid-template-columns: minmax(240px, 400px);
+    align-items: end;
+    justify-content: start;
+    margin: 0 16px;
+    padding: 12px;
+    border: 0;
+    border-radius: 8px;
+    background: var(--app-surface-soft);
+}
+
+.store-section-master-filter-toolbar .store-section-master-search {
+    width: 100%;
+    min-width: 0;
+    flex: none;
+}
+
+.store-section-master-filter-toolbar .store-section-master-search-label {
+    color: var(--app-muted);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+.store-section-master-page
+    .store-section-master-filter-toolbar
+    .store-section-master-search-control > input {
+    min-height: 38px;
+    background: var(--app-surface);
+}
+
+@media (max-width: 759px) {
+    .store-section-master-list-section > .store-section-master-filter-toolbar {
+        grid-template-columns: minmax(0, 1fr);
+        margin-inline: 10px;
+    }
+
+    .store-section-master-filter-toolbar .store-section-master-search {
+        grid-column: 1;
+    }
+}
+
 /* Cuisine Category manager v2: Store Section-style composition deltas. */
 .cuisine-category-master-create,
 .cuisine-category-master-list-section {

@@ -48706,7 +48706,7 @@ function initStoreSectionMasterTable() {
                 + count
                 + " of "
                 + currentRows.length
-                + " Store Sections";
+                + " Store Sections.";
         }
         if (filterEmpty) {
             filterEmpty.hidden = count > 0 || currentRows.length === 0;
