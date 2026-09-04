@@ -3288,7 +3288,10 @@ def test_store_section_manager_uses_compact_registry_and_preserves_interactions(
     )[1].split("}", 1)[0]
     assert "position: sticky;" in store_header_rules
     assert "z-index: 20;" in store_header_rules
-    assert "top: 0;" in store_header_rules
+    assert (
+        "top: calc(-1 * var(--app-content-padding-block-start));"
+        in store_header_rules
+    )
     assert "min-height: 0;" in store_header_rules
     assert "padding: 10px 14px;" in store_header_rules
     assert "border-bottom: 1px solid var(--app-border);" in store_header_rules

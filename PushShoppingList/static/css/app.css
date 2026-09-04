@@ -32830,13 +32830,14 @@ img[data-deferred-src] {
 }
 
 .app-content {
+    --app-content-padding-block-start: 28px;
     width: 100%;
     max-width: none;
     height: 100%;
     min-width: 0;
     min-height: 0;
     margin: 0;
-    padding: 28px var(--app-page-padding-inline) 72px;
+    padding: var(--app-content-padding-block-start) var(--app-page-padding-inline) 72px;
     overflow-x: hidden;
     overflow-y: auto;
     overscroll-behavior: contain;
@@ -36215,8 +36216,9 @@ img[data-deferred-src] {
     }
 
     .app-content {
+        --app-content-padding-block-start: 16px;
         width: 100%;
-        padding: 16px var(--app-page-padding-inline) 92px;
+        padding: var(--app-content-padding-block-start) var(--app-page-padding-inline) 92px;
     }
 
     .app-shell-body .app-content [id],
@@ -68983,7 +68985,7 @@ body.is-resizing-store-section-master-column * {
 .store-section-master-category .store-section-master-table-head {
     position: sticky;
     z-index: 20;
-    top: 0;
+    top: calc(-1 * var(--app-content-padding-block-start));
     min-height: 0;
     padding: 10px 14px;
     border-bottom: 1px solid var(--app-border);
