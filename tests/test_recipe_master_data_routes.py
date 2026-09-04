@@ -3441,6 +3441,24 @@ def test_store_section_manager_uses_readable_full_width_registry_and_preserves_i
         ".store-section-master-row .store-section-master-type > span {",
         1,
     )[1].split("}", 1)[0]
+    display_name_rules = css.rsplit(
+        ".store-section-master-row .store-section-master-identity input {",
+        1,
+    )[1].split("}", 1)[0]
+    assert "color: var(--app-text-strong);" in display_name_rules
+    assert "font-size: 13px;" in display_name_rules
+    assert "font-weight: 700;" in display_name_rules
+    usage_rules = css.rsplit(
+        ".store-section-master-page .store-section-master-usage-button {",
+        1,
+    )[1].split("}", 1)[0]
+    assert "font-size: 11px;" in usage_rules
+    assert "font-weight: 700;" in usage_rules
+    disabled_usage_rules = css.rsplit(
+        ".store-section-master-row .store-section-master-usage-button:disabled {",
+        1,
+    )[1].split("}", 1)[0]
+    assert "opacity: .68;" in disabled_usage_rules
     assert "font-size: 11px;" in css.rsplit(
         ".store-section-master-row .store-section-master-actions > button {",
         1,
