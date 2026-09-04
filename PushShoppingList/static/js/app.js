@@ -48834,7 +48834,6 @@ function initStoreSectionMasterTable() {
             controller?.commit();
             saved = true;
             announce((result.display_name || "Store Section") + " saved.");
-            nameInput?.focus({ preventScroll: true });
         } catch (error) {
             announce(error.message || "Store Section could not be saved.");
             if (submitter) submitter.title = error.message || originalTitle;
@@ -48911,8 +48910,6 @@ function initStoreSectionMasterTable() {
             }
             applyResponsiveLayout();
             applyFilters();
-            savedRow.querySelector('input[name="display_name"]')
-                ?.focus({ preventScroll: true });
             announce((result.display_name || "Store Section") + " created.");
         } catch (error) {
             if (created) {

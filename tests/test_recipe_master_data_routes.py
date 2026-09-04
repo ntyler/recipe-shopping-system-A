@@ -3439,7 +3439,9 @@ def test_store_section_manager_bottom_add_shortcut_targets_inline_create_form():
     assert "list.insertBefore(savedRow, inlineCreate);" in inline_save_helper
     assert "updateRowOrderControls();" in inline_save_helper
     assert "inlineCreate.hidden = true;" in inline_save_helper
-    assert "focus({ preventScroll: true })" in inline_save_helper
+    inline_save_success = inline_save_helper.split("} catch (error) {", 1)[0]
+    assert "focus({ preventScroll: true })" not in inline_save_success
+    assert "nameInput?.focus({ preventScroll: true });" in inline_save_helper
     assert "window.location" not in inline_save_helper
     assert "location.reload" not in inline_save_helper
     assert "location.hash" not in inline_save_helper
@@ -3450,6 +3452,14 @@ def test_store_section_manager_bottom_add_shortcut_targets_inline_create_form():
     ]
     assert "event.preventDefault();" in persisted_save_handler
     assert "await saveStoreSectionMasterRow(row, submitter);" in persisted_save_handler
+
+    persisted_save_helper = table_script[
+        table_script.index("const saveStoreSectionMasterRow = async"):
+        table_script.index("const saveInlineStoreSectionMasterRow = async")
+    ]
+    persisted_save_success = persisted_save_helper.split("} catch (error) {", 1)[0]
+    assert "focus({ preventScroll: true })" not in persisted_save_success
+    assert "nameInput?.focus({ preventScroll: true });" in persisted_save_helper
 
     assert ".store-section-master-add-footer {" in css
     assert ".store-section-master-add-shortcut {" in css
