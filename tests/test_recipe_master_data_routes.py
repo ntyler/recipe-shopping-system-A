@@ -2558,6 +2558,17 @@ def test_store_sections_page_manages_only_the_active_workspace(monkeypatch, tmp_
         assert inline_create.select_one(
             '.store-section-master-actions > button[type="submit"]'
         ).get_text(" ", strip=True) == "Save"
+        cancel_buttons = inline_create.select(
+            'button[type="button"][data-store-section-master-create-cancel]'
+        )
+        assert len(cancel_buttons) == 2
+        assert inline_create.select_one(
+            ".store-section-master-actions "
+            "> button[data-store-section-master-create-cancel]"
+        ).get_text(" ", strip=True) == "Cancel"
+        assert inline_create.select_one(
+            ".store-section-master-mobile-cancel"
+        ).get("aria-label") == "Cancel new Store Section"
         assert inline_create.select_one(
             '#storeSectionMasterInlineCreateName[name="display_name"]'
         ) is not None
@@ -3435,6 +3446,17 @@ def test_store_section_manager_add_shortcuts_target_single_inline_create_form():
     assert create_panel.select_one(
         '.store-section-master-actions > button[type="submit"]'
     ).get_text(" ", strip=True) == "Save"
+    cancel_buttons = create_panel.select(
+        'button[type="button"][data-store-section-master-create-cancel]'
+    )
+    assert len(cancel_buttons) == 2
+    assert create_panel.select_one(
+        ".store-section-master-actions "
+        "> button[data-store-section-master-create-cancel]"
+    ).get_text(" ", strip=True) == "Cancel"
+    assert create_panel.select_one(
+        ".store-section-master-mobile-cancel"
+    ).get("aria-label") == "Cancel new Store Section"
 
     assert "function initStoreSectionMasterAddShortcut(page, announce = () => {})" in script
     assert 'page?.querySelector("#storeSectionMasterInlineCreatePanel")' in script
@@ -3484,6 +3506,21 @@ def test_store_section_manager_add_shortcuts_target_single_inline_create_form():
     assert "location.reload" not in inline_save_helper
     assert "location.hash" not in inline_save_helper
 
+    inline_cancel_helper = table_script[
+        table_script.index("const cancelInlineStoreSectionMasterRow = () => {"):
+        table_script.index('list.addEventListener("submit"')
+    ]
+    assert "inlineCreate.reset();" in inline_cancel_helper
+    assert 'inlineCreate.style.scrollMarginBottom = "";' in inline_cancel_helper
+    assert "inlineCreate.hidden = true;" in inline_cancel_helper
+    assert 'button.setAttribute("aria-expanded", "false");' in inline_cancel_helper
+    assert "bottomAddShortcut?.focus({ preventScroll: true });" in inline_cancel_helper
+    assert 'announce("New Store Section discarded.");' in inline_cancel_helper
+    assert "fetch(" not in inline_cancel_helper
+    assert "requestSubmit" not in inline_cancel_helper
+    assert 'list.addEventListener("click"' in inline_cancel_helper
+    assert '"[data-store-section-master-create-cancel]"' in inline_cancel_helper
+
     persisted_save_handler = table_script[
         table_script.index('if (action === "save") {'):
         table_script.index('if (action !== "delete") return;')
@@ -3508,6 +3545,7 @@ def test_store_section_manager_add_shortcuts_target_single_inline_create_form():
     )[1].split("}", 1)[0]
     assert "overflow-anchor: none;" in add_footer_rules
     assert ".store-section-master-create-row" in css
+    assert ".store-section-master-mobile-cancel" in css
     assert ".store-section-master-add-shortcut:hover {" in css
     assert ".store-section-master-add-shortcut:focus-visible {" in css
     assert ".store-section-master-add-shortcut:is(:hover, :focus-visible)" not in css

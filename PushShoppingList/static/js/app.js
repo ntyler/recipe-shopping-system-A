@@ -48945,6 +48945,35 @@ function initStoreSectionMasterTable() {
         }
     };
 
+    const cancelInlineStoreSectionMasterRow = () => {
+        if (
+            !inlineCreate
+            || inlineCreate.dataset.storeSectionMasterActionPending === "true"
+        ) return;
+        inlineCreate.reset();
+        syncStoreSectionMasterIconPicker(
+            inlineCreate.querySelector("[data-store-section-master-icon-picker]"),
+            "basket",
+        );
+        inlineCreate.hidden = true;
+        inlineCreate.style.scrollMarginBottom = "";
+        addShortcuts.forEach(button => {
+            button.setAttribute("aria-expanded", "false");
+        });
+        const bottomAddShortcut = addShortcuts[addShortcuts.length - 1];
+        bottomAddShortcut?.focus({ preventScroll: true });
+        announce("New Store Section discarded.");
+    };
+
+    list.addEventListener("click", event => {
+        const cancelButton = event.target.closest(
+            "[data-store-section-master-create-cancel]",
+        );
+        if (!cancelButton || !inlineCreate?.contains(cancelButton)) return;
+        event.preventDefault();
+        cancelInlineStoreSectionMasterRow();
+    });
+
     list.addEventListener("submit", async event => {
         const submitter = event.submitter;
         const action = String(submitter?.value || "").trim().toLowerCase();

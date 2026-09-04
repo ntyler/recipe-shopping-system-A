@@ -67618,6 +67618,10 @@ body.recipe-edit-standalone-page :is(
     display: none;
 }
 
+.store-section-master-page .store-section-master-mobile-cancel {
+    display: none;
+}
+
 .store-section-master-mobile-details-toggle,
 .store-section-master-mobile-details {
     display: none;
@@ -68990,7 +68994,30 @@ body.is-resizing-store-section-master-column * {
         display: none;
     }
 
-    .store-section-master-mobile-save > svg {
+    .store-section-master-page .store-section-master-mobile-cancel {
+        display: grid;
+        grid-column: 4;
+        grid-row: 1;
+        width: 44px;
+        min-height: 44px;
+        place-items: center;
+        justify-self: end;
+        padding: 0;
+        border-color: transparent;
+        background: transparent;
+        color: var(--app-muted);
+    }
+
+    .store-section-master-page
+        .store-section-master-mobile-cancel:is(:hover, :focus-visible) {
+        border-color: var(--app-border);
+        outline: 0;
+        background: var(--app-surface-soft);
+        color: var(--app-text-strong);
+    }
+
+    .store-section-master-mobile-save > svg,
+    .store-section-master-mobile-cancel > svg {
         width: 15px;
         height: 15px;
         fill: none;

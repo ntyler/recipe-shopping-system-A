@@ -483,6 +483,17 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                             </button>
                         </div>
 
+                        <button type="button"
+                                class="store-section-master-mobile-cancel"
+                                aria-label="Cancel new Store Section"
+                                title="Cancel new Store Section"
+                                data-store-section-master-create-cancel>
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="m6 6 12 12"></path>
+                                <path d="m18 6-12 12"></path>
+                            </svg>
+                        </button>
+
                         <div class="store-section-master-usage"
                              role="cell"
                              aria-colindex="4"
@@ -518,6 +529,10 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                              data-mobile-label="Action"
                              data-store-section-master-cell="actions">
                             <button type="submit">Save</button>
+                            <button type="button"
+                                    data-store-section-master-create-cancel>
+                                Cancel
+                            </button>
                         </div>
                     </form>
                 </div>
