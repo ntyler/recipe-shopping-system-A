@@ -69012,9 +69012,28 @@ body.is-resizing-store-section-master-column * {
 }
 
 .store-section-master-add-footer {
-    display: grid;
-    gap: 12px;
     padding: 12px 16px 16px;
+    overflow-anchor: none;
+}
+
+.store-section-master-create-row
+    .store-section-master-order
+    > button:not(.store-section-master-drag-handle) {
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+.store-section-master-create-row
+    .store-section-master-actions
+    > button:first-child {
+    border-color: var(--app-primary);
+    background: var(--app-primary-soft);
+    color: var(--app-primary-hover);
+}
+
+.store-section-master-create-row
+    .store-section-master-mobile-save {
+    background: var(--app-primary-soft);
 }
 
 .store-section-master-page .store-section-master-add-shortcut {

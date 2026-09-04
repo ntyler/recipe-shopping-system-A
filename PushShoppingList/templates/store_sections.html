@@ -424,6 +424,124 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                 {% else %}
                     <div class="master-data-empty-state">No Store Sections are configured.</div>
                 {% endfor %}
+                    <form method="POST"
+                          action="{{ master_data.create_url }}"
+                          id="storeSectionMasterInlineCreatePanel"
+                          role="row"
+                          class="store-section-master-row store-section-master-create-row"
+                          aria-label="Add a Store Section"
+                          data-store-section-master-inline-create
+                          hidden>
+                        <input type="hidden" name="return_to_created" value="1">
+
+                        <div class="store-section-master-order-cell"
+                             role="cell"
+                             aria-colindex="1"
+                             data-store-section-master-cell="order">
+                            <div class="store-section-master-order">
+                                <button type="button"
+                                        class="store-section-master-drag-handle"
+                                        aria-label="New Store Section cannot be reordered until it is saved"
+                                        disabled>
+                                    <svg viewBox="0 0 16 20" aria-hidden="true">
+                                        <circle cx="5" cy="4" r="1.4"></circle>
+                                        <circle cx="11" cy="4" r="1.4"></circle>
+                                        <circle cx="5" cy="10" r="1.4"></circle>
+                                        <circle cx="11" cy="10" r="1.4"></circle>
+                                        <circle cx="5" cy="16" r="1.4"></circle>
+                                        <circle cx="11" cy="16" r="1.4"></circle>
+                                    </svg>
+                                </button>
+                                <button type="button" aria-hidden="true" tabindex="-1" disabled>
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M12 19V5"></path>
+                                        <path d="m6 11 6-6 6 6"></path>
+                                    </svg>
+                                </button>
+                                <span class="store-section-master-order-step"
+                                      aria-label="Step {{ master_data.sections|length + 1 }}">
+                                    {{ master_data.sections|length + 1 }}
+                                </span>
+                                <button type="button" aria-hidden="true" tabindex="-1" disabled>
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M12 5v14"></path>
+                                        <path d="m6 13 6 6 6-6"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="store-section-master-icon-field"
+                             role="cell"
+                             aria-colindex="2"
+                             data-store-section-master-cell="icon">
+                            {{ store_section_icon_picker("basket", "Icon for the new Store Section") }}
+                        </div>
+
+                        <div class="store-section-master-identity"
+                             role="cell"
+                             aria-colindex="3"
+                             data-store-section-master-cell="section">
+                            <label>
+                                <input type="text"
+                                       id="storeSectionMasterInlineCreateName"
+                                       name="display_name"
+                                       aria-label="Display name for the new Store Section"
+                                       maxlength="80"
+                                       placeholder="New Store Section"
+                                       required>
+                                <span class="store-section-master-mobile-kind">
+                                    <span class="is-custom">User-created</span>
+                                </span>
+                            </label>
+                            <button type="submit"
+                                    class="store-section-master-mobile-save"
+                                    aria-label="Save new Store Section"
+                                    title="Save Store Section">
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="m5 12 4 4L19 6"></path>
+                                </svg>
+                                <span>Save</span>
+                            </button>
+                        </div>
+
+                        <div class="store-section-master-usage"
+                             role="cell"
+                             aria-colindex="4"
+                             data-mobile-label="Used in"
+                             data-store-section-master-cell="usage">
+                            <button type="button"
+                                    class="store-section-master-usage-button"
+                                    aria-label="0 master ingredients in the new Store Section"
+                                    disabled>
+                                <strong>0</strong>
+                                <span>ingredients</span>
+                            </button>
+                            <button type="button"
+                                    class="store-section-master-usage-button"
+                                    aria-label="0 recipe references in the new Store Section"
+                                    disabled>
+                                <strong>0</strong>
+                                <span>recipe refs</span>
+                            </button>
+                        </div>
+
+                        <div class="store-section-master-type"
+                             role="cell"
+                             aria-colindex="5"
+                             data-mobile-label="Source"
+                             data-store-section-master-cell="source">
+                            <span class="is-custom">User-created</span>
+                        </div>
+
+                        <div class="store-section-master-actions"
+                             role="cell"
+                             aria-colindex="6"
+                             data-mobile-label="Action"
+                             data-store-section-master-cell="actions">
+                            <button type="submit">Save</button>
+                        </div>
+                    </form>
                 </div>
 
                 <div class="store-section-master-filter-empty"
@@ -435,30 +553,6 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                 </div>
             </div>
                 <div class="store-section-master-add-footer">
-                    <div id="storeSectionMasterInlineCreatePanel"
-                         data-store-section-master-inline-create
-                         hidden>
-                        <form method="POST"
-                              action="{{ master_data.create_url }}"
-                              class="store-section-master-create-form"
-                              aria-label="Add a Store Section">
-                            <input type="hidden" name="return_to_created" value="1">
-                            <label>
-                                <span>Name</span>
-                                <input type="text"
-                                       id="storeSectionMasterInlineCreateName"
-                                       name="display_name"
-                                       maxlength="80"
-                                       placeholder="For example, International Foods"
-                                       required>
-                            </label>
-                            <div class="store-section-master-icon-field">
-                                <span>Icon</span>
-                                {{ store_section_icon_picker("basket", "Icon for the new Store Section") }}
-                            </div>
-                            <button type="submit">Add Store Section</button>
-                        </form>
-                    </div>
                     <button type="button"
                             class="store-section-master-add-shortcut"
                             aria-controls="storeSectionMasterInlineCreatePanel"

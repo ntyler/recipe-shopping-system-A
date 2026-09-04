@@ -2441,6 +2441,11 @@ def create_master_data_store_section_route():
         request.form.get("icon"),
         user_id=active_user_id(),
     )
+    if (
+        request.headers.get("X-Requested-With") == "fetch"
+        or request.accept_mimetypes.best == "application/json"
+    ):
+        return jsonify(result), int(result.get("status") or 200)
     set_store_section_master_data_message(
         result,
         success_prefix="Store Section created: {name}.",

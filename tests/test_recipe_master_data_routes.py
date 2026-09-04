@@ -2502,7 +2502,41 @@ def test_store_sections_page_manages_only_the_active_workspace(monkeypatch, tmp_
         assert add_shortcut.get("aria-expanded") == "false"
         assert add_shortcut.get_text(" ", strip=True) == "Add Store Section"
         assert inline_create.has_attr("hidden")
-        assert inline_create.find_next_sibling("button") is add_shortcut
+        assert inline_create.name == "form"
+        assert {
+            "store-section-master-row",
+            "store-section-master-create-row",
+        }.issubset(inline_create.get("class", []))
+        assert inline_create.find_parent(
+            "div",
+            class_="store-section-master-list",
+        ) is not None
+        assert inline_create.find_next_sibling() is None
+        assert not inline_create.has_attr("data-store-section-master-row")
+        assert [
+            cell.get("data-store-section-master-cell")
+            for cell in inline_create.select("[data-store-section-master-cell]")
+        ] == ["order", "icon", "section", "usage", "source", "actions"]
+        inline_order = inline_create.select_one(
+            ".store-section-master-order-step"
+        )
+        section_count = len(
+            master_data.ingredient_store_section_details(
+                "user-a",
+                include_inactive=True,
+            )
+        )
+        assert inline_order.get_text(" ", strip=True) == str(section_count + 1)
+        assert inline_create.select_one(
+            ".store-section-master-type > .is-custom"
+        ).get_text(" ", strip=True) == "User-created"
+        assert [
+            button.get_text(" ", strip=True)
+            for button in inline_create.select(".store-section-master-usage-button")
+        ] == ["0 ingredients", "0 recipe refs"]
+        assert inline_create.select_one(
+            '.store-section-master-actions > button[type="submit"]'
+        ).get_text(" ", strip=True) == "Save"
         assert inline_create.select_one(
             '#storeSectionMasterInlineCreateName[name="display_name"]'
         ) is not None
@@ -2624,6 +2658,77 @@ def test_inline_store_section_create_returns_to_new_bottom_row_and_can_delete(
                 "Accept": "application/json",
                 "X-Requested-With": "fetch",
             },
+        )
+
+    assert deleted.status_code == 200
+    assert deleted.get_json()["deleted"] is True
+
+
+def test_store_section_fetch_create_and_save_return_json_without_redirecting(
+    monkeypatch,
+    tmp_path,
+):
+    app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
+    fetch_headers = {
+        "Accept": "application/json",
+        "X-Requested-With": "fetch",
+    }
+
+    with app.test_client() as client:
+        sign_in(client, "user-a")
+        created = client.post(
+            "/admin/master-data/store-sections",
+            data={
+                "display_name": "Silent Save Test Section",
+                "icon": "basket",
+                "return_to_created": "1",
+            },
+            headers=fetch_headers,
+        )
+
+        assert created.status_code == 201
+        assert "Location" not in created.headers
+        created_result = created.get_json()
+        assert created_result["ok"] is True
+        assert created_result["display_name"] == "Silent Save Test Section"
+        section_id = int(created_result["id"])
+        with client.session_transaction() as session:
+            assert "recipe_master_data_messages" not in session
+
+        saved = client.post(
+            f"/admin/master-data/store-sections/{section_id}",
+            data={
+                "action": "save",
+                "display_name": "Silent Save Test Section Updated",
+                "icon": "heart",
+            },
+            headers=fetch_headers,
+        )
+
+        assert saved.status_code == 200
+        assert "Location" not in saved.headers
+        assert saved.get_json() == {
+            "changed": True,
+            "display_name": "Silent Save Test Section Updated",
+            "ok": True,
+            "status": 200,
+        }
+
+        refreshed_page = client.get("/admin/master-data/store-sections")
+        refreshed_soup = BeautifulSoup(
+            refreshed_page.get_data(as_text=True),
+            "html.parser",
+        )
+        saved_row = refreshed_soup.select_one(f"#storeSectionMasterRow-{section_id}")
+        assert saved_row is not None
+        assert saved_row.get("data-store-section-name") == (
+            "silent save test section updated"
+        )
+
+        deleted = client.post(
+            f"/admin/master-data/store-sections/{section_id}",
+            data={"action": "delete"},
+            headers=fetch_headers,
         )
 
     assert deleted.status_code == 200
@@ -3063,10 +3168,20 @@ def test_store_section_manager_uses_compact_registry_and_preserves_interactions(
         ("source", "Source", "5"),
         ("actions", "Action", "6"),
     ]
+    expected_cells = ["order", "icon", "section", "usage", "source", "actions"]
+    saved_row = table.select_one("[data-store-section-master-row]")
+    draft_row = table.select_one("#storeSectionMasterInlineCreatePanel")
+    assert saved_row is not None
+    assert draft_row is not None
     assert [
         cell.get("data-store-section-master-cell")
-        for cell in table.select("[data-store-section-master-cell]")
-    ] == ["order", "icon", "section", "usage", "source", "actions"]
+        for cell in saved_row.select("[data-store-section-master-cell]")
+    ] == expected_cells
+    assert [
+        cell.get("data-store-section-master-cell")
+        for cell in draft_row.select("[data-store-section-master-cell]")
+    ] == expected_cells
+    assert not draft_row.has_attr("data-store-section-master-row")
 
     assert "Add Store Section" in page
     assert "Store sections" in page
@@ -3261,7 +3376,27 @@ def test_store_section_manager_bottom_add_shortcut_targets_inline_create_form():
     assert shortcut.find_parent("section", class_="store-section-master-category")
     assert shortcut.find_previous(class_="store-section-master-table") is not None
     assert create_panel.has_attr("hidden")
-    assert create_panel.find_next_sibling("button") is shortcut
+    assert create_panel.name == "form"
+    assert {
+        "store-section-master-row",
+        "store-section-master-create-row",
+    }.issubset(create_panel.get("class", []))
+    assert create_panel.find_parent(
+        "div",
+        class_="store-section-master-list",
+    ) is not None
+    assert create_panel.find_next_sibling() is None
+    assert not create_panel.has_attr("data-store-section-master-row")
+    assert [
+        cell.get("data-store-section-master-cell")
+        for cell in create_panel.select("[data-store-section-master-cell]")
+    ] == ["order", "icon", "section", "usage", "source", "actions"]
+    assert create_panel.select_one(
+        ".store-section-master-type > .is-custom"
+    ).get_text(" ", strip=True) == "User-created"
+    assert create_panel.select_one(
+        '.store-section-master-actions > button[type="submit"]'
+    ).get_text(" ", strip=True) == "Save"
 
     assert "function initStoreSectionMasterAddShortcut(page, announce = () => {})" in script
     assert 'page?.querySelector("#storeSectionMasterInlineCreatePanel")' in script
@@ -3281,17 +3416,50 @@ def test_store_section_manager_bottom_add_shortcut_targets_inline_create_form():
     assert "storeSectionMasterBottomViewportInset()" in shortcut_script
     assert "initStoreSectionMasterAddShortcut(page, announce);" in script
 
+    table_script = script[
+        script.index("function initStoreSectionMasterTable()"):
+        script.index("function initStoreSectionMasterUsageDialog()")
+    ]
+    inline_submit_handler = table_script[
+        table_script.index('if (event.target === inlineCreate) {'):
+        table_script.index('if (["move_up", "move_down"].includes(action))')
+    ]
+    assert "event.preventDefault();" in inline_submit_handler
+    assert "await saveInlineStoreSectionMasterRow(submitter);" in inline_submit_handler
+    assert "window.location" not in inline_submit_handler
+    assert "location.reload" not in inline_submit_handler
+    assert "requestSubmit" not in inline_submit_handler
+
+    inline_save_helper = table_script[
+        table_script.index("const saveInlineStoreSectionMasterRow = async"):
+        table_script.index('list.addEventListener("submit"')
+    ]
+    assert 'Accept: "application/json"' in inline_save_helper
+    assert '"X-Requested-With": "fetch"' in inline_save_helper
+    assert "list.insertBefore(savedRow, inlineCreate);" in inline_save_helper
+    assert "updateRowOrderControls();" in inline_save_helper
+    assert "inlineCreate.hidden = true;" in inline_save_helper
+    assert "focus({ preventScroll: true })" in inline_save_helper
+    assert "window.location" not in inline_save_helper
+    assert "location.reload" not in inline_save_helper
+    assert "location.hash" not in inline_save_helper
+
+    persisted_save_handler = table_script[
+        table_script.index('if (action === "save") {'):
+        table_script.index('if (action !== "delete") return;')
+    ]
+    assert "event.preventDefault();" in persisted_save_handler
+    assert "await saveStoreSectionMasterRow(row, submitter);" in persisted_save_handler
+
     assert ".store-section-master-add-footer {" in css
     assert ".store-section-master-add-shortcut {" in css
-    assert "display: grid;" in css.rsplit(
-        ".store-section-master-add-footer {",
-        1,
-    )[1].split("}", 1)[0]
-    assert "gap: 12px;" in css.rsplit(
-        ".store-section-master-add-footer {",
-        1,
-    )[1].split("}", 1)[0]
     assert "padding: 12px 16px 16px;" in css
+    add_footer_rules = css.rsplit(
+        ".store-section-master-add-footer {",
+        1,
+    )[1].split("}", 1)[0]
+    assert "overflow-anchor: none;" in add_footer_rules
+    assert ".store-section-master-create-row" in css
     assert ".store-section-master-add-shortcut:hover {" in css
     assert ".store-section-master-add-shortcut:focus-visible {" in css
     assert ".store-section-master-add-shortcut:is(:hover, :focus-visible)" not in css

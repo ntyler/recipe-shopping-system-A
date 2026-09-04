@@ -48363,6 +48363,12 @@ function initStoreSectionMasterTable() {
     const filterEmpty = page.querySelector("[data-store-section-master-filter-empty]");
     const liveRegion = page.querySelector("[data-store-section-master-live-region]");
     const sectionCount = page.querySelector("[data-store-section-master-count]");
+    const inlineCreate = page.querySelector(
+        "[data-store-section-master-inline-create]",
+    );
+    const addShortcut = page.querySelector(
+        "[data-store-section-master-add-shortcut]",
+    );
     if (!table || !tableHead || !list) return;
 
     let draggedRow = null;
@@ -48697,7 +48703,9 @@ function initStoreSectionMasterTable() {
         }
         updateRowOrderControls();
     };
-    rows().forEach(row => {
+    const rowEditingControllers = new WeakMap();
+    const bindRowEditing = row => {
+        if (!row || rowEditingControllers.has(row)) return;
         const nameInput = row.querySelector('input[name="display_name"]');
         const iconSelect = row.querySelector(
             "[data-store-section-master-icon-select]",
@@ -48708,8 +48716,8 @@ function initStoreSectionMasterTable() {
         const saveButtons = [
             ...row.querySelectorAll('button[name="action"][value="save"]'),
         ];
-        const initialName = String(nameInput?.value || "");
-        const initialIcon = String(iconSelect?.value || "");
+        let initialName = String(nameInput?.value || "");
+        let initialIcon = String(iconSelect?.value || "");
         const updateRowDirtyState = () => {
             const nameIsDirty = String(nameInput?.value || "") !== initialName;
             const iconIsDirty = String(iconSelect?.value || "") !== initialIcon;
@@ -48747,11 +48755,197 @@ function initStoreSectionMasterTable() {
             if (saveButton) row.requestSubmit(saveButton);
         });
         iconSelect?.addEventListener("change", updateRowDirtyState);
+        rowEditingControllers.set(row, {
+            commit() {
+                initialName = String(nameInput?.value || "");
+                initialIcon = String(iconSelect?.value || "");
+                updateRowDirtyState();
+            },
+            refresh: updateRowDirtyState,
+        });
         updateRowDirtyState();
-    });
+    };
+    rows().forEach(bindRowEditing);
+
+    const fetchStoreSectionMasterRow = async sectionId => {
+        const pageUrl = new URL(window.location.href);
+        pageUrl.hash = "";
+        const response = await fetch(pageUrl.toString(), {
+            cache: "no-store",
+            credentials: "same-origin",
+            headers: {
+                Accept: "text/html",
+                "X-Requested-With": "fetch",
+            },
+        });
+        if (!response.ok) {
+            throw new Error("The saved Store Section could not be displayed.");
+        }
+        const html = await response.text();
+        const parsedPage = new DOMParser().parseFromString(html, "text/html");
+        const savedRow = parsedPage.getElementById(
+            `storeSectionMasterRow-${sectionId}`,
+        );
+        if (!savedRow) {
+            throw new Error("The saved Store Section could not be displayed.");
+        }
+        return document.importNode(savedRow, true);
+    };
+
+    const saveStoreSectionMasterRow = async (row, submitter) => {
+        if (!row || row.dataset.storeSectionMasterActionPending === "true") return;
+        const controller = rowEditingControllers.get(row);
+        const nameInput = row.querySelector('input[name="display_name"]');
+        const saveButtons = [
+            ...row.querySelectorAll('button[name="action"][value="save"]'),
+        ];
+        const originalLabel = submitter?.textContent || "Save";
+        const originalTitle = submitter?.title || "";
+        row.dataset.storeSectionMasterActionPending = "true";
+        row.setAttribute("aria-busy", "true");
+        saveButtons.forEach(button => {
+            button.disabled = true;
+        });
+        if (submitter) submitter.textContent = "Saving…";
+
+        let saved = false;
+        try {
+            const body = new URLSearchParams(new FormData(row));
+            body.set("action", "save");
+            const response = await fetch(row.getAttribute("action"), {
+                method: "POST",
+                body,
+                credentials: "same-origin",
+                headers: {
+                    Accept: "application/json",
+                    "X-Requested-With": "fetch",
+                },
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok || result.ok === false) {
+                throw new Error(result.error || "Store Section could not be saved.");
+            }
+            if (nameInput && result.display_name) {
+                nameInput.value = result.display_name;
+                row.dataset.storeSectionName = String(result.display_name)
+                    .trim()
+                    .toLocaleLowerCase();
+            }
+            controller?.commit();
+            saved = true;
+            announce((result.display_name || "Store Section") + " saved.");
+            nameInput?.focus({ preventScroll: true });
+        } catch (error) {
+            announce(error.message || "Store Section could not be saved.");
+            if (submitter) submitter.title = error.message || originalTitle;
+            nameInput?.focus({ preventScroll: true });
+        } finally {
+            delete row.dataset.storeSectionMasterActionPending;
+            row.removeAttribute("aria-busy");
+            if (submitter) submitter.textContent = originalLabel;
+            if (saved && submitter) submitter.title = originalTitle;
+            if (!saved) controller?.refresh();
+        }
+    };
+
+    const saveInlineStoreSectionMasterRow = async submitter => {
+        if (
+            !inlineCreate
+            || inlineCreate.dataset.storeSectionMasterActionPending === "true"
+        ) return;
+        const nameInput = inlineCreate.querySelector('input[name="display_name"]');
+        const submitButtons = [
+            ...inlineCreate.querySelectorAll('button[type="submit"]'),
+        ];
+        const originalLabel = submitter?.textContent || "Save";
+        const originalTitle = submitter?.title || "";
+        inlineCreate.dataset.storeSectionMasterActionPending = "true";
+        inlineCreate.setAttribute("aria-busy", "true");
+        submitButtons.forEach(button => {
+            button.disabled = true;
+        });
+        if (submitter) submitter.textContent = "Saving…";
+
+        let created = false;
+        try {
+            const response = await fetch(inlineCreate.getAttribute("action"), {
+                method: "POST",
+                body: new URLSearchParams(new FormData(inlineCreate)),
+                credentials: "same-origin",
+                headers: {
+                    Accept: "application/json",
+                    "X-Requested-With": "fetch",
+                },
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok || result.ok === false) {
+                throw new Error(result.error || "Store Section could not be created.");
+            }
+            created = true;
+
+            const savedRow = await fetchStoreSectionMasterRow(result.id);
+            list.insertBefore(savedRow, inlineCreate);
+            initStoreSectionMasterIconPickers();
+            bindRowEditing(savedRow);
+            updateRowOrderControls();
+
+            inlineCreate.reset();
+            syncStoreSectionMasterIconPicker(
+                inlineCreate.querySelector("[data-store-section-master-icon-picker]"),
+                "basket",
+            );
+            inlineCreate.hidden = true;
+            addShortcut?.setAttribute("aria-expanded", "false");
+            if (search) search.value = "";
+            if (sectionCount) {
+                const current = Number.parseInt(sectionCount.textContent, 10) || 0;
+                sectionCount.textContent = String(current + 1);
+            }
+            const draftOrder = inlineCreate.querySelector(
+                ".store-section-master-order-step",
+            );
+            if (draftOrder) {
+                const nextPosition = rows().length + 1;
+                draftOrder.textContent = String(nextPosition);
+                draftOrder.setAttribute("aria-label", "Step " + nextPosition);
+            }
+            applyResponsiveLayout();
+            applyFilters();
+            savedRow.querySelector('input[name="display_name"]')
+                ?.focus({ preventScroll: true });
+            announce((result.display_name || "Store Section") + " created.");
+        } catch (error) {
+            if (created) {
+                inlineCreate.hidden = true;
+                addShortcut?.setAttribute("aria-expanded", "false");
+                announce(
+                    (nameInput?.value || "Store Section")
+                    + " was created, but the row could not be displayed. Reload to update the list.",
+                );
+            } else {
+                announce(error.message || "Store Section could not be created.");
+                if (submitter) submitter.title = error.message || originalTitle;
+                nameInput?.focus({ preventScroll: true });
+            }
+        } finally {
+            delete inlineCreate.dataset.storeSectionMasterActionPending;
+            inlineCreate.removeAttribute("aria-busy");
+            submitButtons.forEach(button => {
+                button.disabled = false;
+            });
+            if (submitter) submitter.textContent = originalLabel;
+            if (created && submitter) submitter.title = originalTitle;
+        }
+    };
+
     list.addEventListener("submit", async event => {
         const submitter = event.submitter;
         const action = String(submitter?.value || "").trim().toLowerCase();
+        if (event.target === inlineCreate) {
+            event.preventDefault();
+            await saveInlineStoreSectionMasterRow(submitter);
+            return;
+        }
         if (["move_up", "move_down"].includes(action)) {
             event.preventDefault();
             const row = submitter?.closest("[data-store-section-master-row]");
@@ -48763,6 +48957,12 @@ function initStoreSectionMasterTable() {
             ) return;
             const direction = action === "move_up" ? -1 : 1;
             await moveRowByOrderControl(row, direction, submitter);
+            return;
+        }
+        if (action === "save") {
+            event.preventDefault();
+            const row = submitter?.closest("[data-store-section-master-row]");
+            await saveStoreSectionMasterRow(row, submitter);
             return;
         }
         if (action !== "delete") return;
