@@ -3199,7 +3199,7 @@ def test_store_section_delete_is_custom_only_and_requires_no_usage(
     assert produce["id"] in remaining_ids
 
 
-def test_store_section_manager_uses_compact_registry_and_preserves_interactions():
+def test_store_section_manager_uses_readable_full_width_registry_and_preserves_interactions():
     script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     store_section_table_script = script.split(
         "function initStoreSectionMasterTable()",
@@ -3424,14 +3424,29 @@ def test_store_section_manager_uses_compact_registry_and_preserves_interactions(
     assert "text-align: left;" in store_header_cell_rules
     assert "text-transform: inherit;" in store_header_cell_rules
     assert (
-        "grid-template-columns: 116px 46px minmax(180px, 1fr) "
-        "104px 92px 112px;"
+        ".store-section-master-category-list {\n"
+        "    grid-template-columns: minmax(0, 1fr);\n"
+        "}"
     ) in css
-    assert "@media (min-width: 1641px) and (max-width: 1850px)" in css
+    assert (
+        "grid-template-columns: 116px 54px minmax(220px, 1fr) "
+        "150px 128px 160px;"
+    ) in css
     assert (
         "grid-template-columns: 96px 42px minmax(130px, 1fr) "
-        "82px 82px 108px;"
+        "100px 100px 120px;"
     ) in css
+    assert "@media (min-width: 1641px) and (max-width: 1850px)" not in css
+    assert "font-size: 11px;" in css.rsplit(
+        ".store-section-master-row .store-section-master-type > span {",
+        1,
+    )[1].split("}", 1)[0]
+    assert "font-size: 11px;" in css.rsplit(
+        ".store-section-master-row .store-section-master-actions > button {",
+        1,
+    )[1].split("}", 1)[0]
+    assert 'button[value="save"]:disabled {' in css
+    assert "opacity: .68;" in css
     assert "@media (max-width: 1640px)" in css
     assert ".store-section-master-columns," in css
     assert ".store-section-master-column-resize," in css

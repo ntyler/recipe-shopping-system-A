@@ -69076,11 +69076,15 @@ body.is-resizing-store-section-master-column * {
     }
 }
 
-/* Store Section manager v4: Cuisine-style half-width registry card with a fixed compact table. */
+/* Store Section manager v4: full-width registry with a fixed, readable table. */
 .store-section-master-category-list,
 .cuisine-category-master-category-list {
     min-width: 0;
     margin: 16px 14px 14px;
+}
+
+.store-section-master-category-list {
+    grid-template-columns: minmax(0, 1fr);
 }
 
 .store-section-master-category {
@@ -69208,7 +69212,7 @@ body.is-resizing-store-section-master-column * {
         width: 100%;
         min-width: 0;
         max-width: 100%;
-        grid-template-columns: 116px 46px minmax(180px, 1fr) 104px 92px 112px;
+        grid-template-columns: 116px 54px minmax(220px, 1fr) 150px 128px 160px;
         column-gap: 12px;
     }
 
@@ -69283,29 +69287,20 @@ body.is-resizing-store-section-master-column * {
         grid-auto-columns: auto;
         grid-auto-flow: row;
     }
-}
 
-/* Keep the last two-column desktop band inside its half-width card. */
-@media (min-width: 1641px) and (max-width: 1850px) {
-    .store-section-master-table-head,
-    .store-section-master-row {
-        grid-template-columns: 96px 42px minmax(130px, 1fr) 82px 82px 108px;
-        column-gap: 8px;
-        padding-inline: 10px;
+    .store-section-master-row .store-section-master-type > span {
+        min-height: 26px;
+        font-size: 11px;
     }
 
-    .store-section-master-order {
-        grid-template-columns: 22px 18px 30px 18px;
-        gap: 2px;
+    .store-section-master-row .store-section-master-actions > button {
+        font-size: 11px;
     }
 
-    .store-section-master-order-step {
-        width: 28px;
-        height: 28px;
-    }
-
-    .store-section-master-order button {
-        width: 20px;
+    .store-section-master-row
+        .store-section-master-actions
+        > button[value="save"]:disabled {
+        opacity: .68;
     }
 }
 
@@ -69319,7 +69314,7 @@ body.is-resizing-store-section-master-column * {
 @media (min-width: 760px) and (max-width: 1180px) {
     .store-section-master-table-head,
     .store-section-master-row {
-        grid-template-columns: 96px 42px minmax(130px, 1fr) 90px 82px 100px;
+        grid-template-columns: 96px 42px minmax(130px, 1fr) 100px 100px 120px;
         column-gap: 8px;
         padding-inline: 10px;
     }
