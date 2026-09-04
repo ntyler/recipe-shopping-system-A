@@ -48186,6 +48186,7 @@ function storeSectionMasterIconLabel(iconName) {
 function renderStoreSectionMasterIconVisual(visual, iconName) {
     if (!visual) return;
     const normalizedIcon = String(iconName || "basket").trim().toLowerCase() || "basket";
+    visual.classList.remove("store-section-master-filter-all-icon");
     [...visual.classList]
         .filter(className => className.startsWith("is-"))
         .forEach(className => visual.classList.remove(className));
@@ -48264,17 +48265,35 @@ function syncStoreSectionMasterIconPicker(picker, iconName) {
         "[data-store-section-master-icon-trigger] [data-store-section-master-icon-visual]",
     );
     const label = picker.querySelector("[data-store-section-master-icon-label]");
-    const normalizedIcon = String(iconName || select?.value || "basket")
-        .trim()
-        .toLowerCase() || "basket";
+    const allowsAllIcons = picker.hasAttribute(
+        "data-store-section-master-icon-filter-picker",
+    );
+    const requestedIcon = iconName === undefined || iconName === null
+        ? select?.value
+        : iconName;
+    const normalizedIcon = String(requestedIcon || "").trim().toLowerCase();
+    const selectedIcon = normalizedIcon || (allowsAllIcons ? "" : "basket");
     if (select) {
-        select.value = normalizedIcon;
+        select.value = selectedIcon;
         select.dispatchEvent(new Event("change", { bubbles: true }));
     }
-    renderStoreSectionMasterIconVisual(triggerVisual, normalizedIcon);
-    if (label) label.textContent = storeSectionMasterIconLabel(normalizedIcon);
+    if (allowsAllIcons && !selectedIcon) {
+        if (triggerVisual) {
+            [...triggerVisual.classList]
+                .filter(className => className.startsWith("is-"))
+                .forEach(className => triggerVisual.classList.remove(className));
+            triggerVisual.classList.remove("recipe-edit-store-section-icon");
+            triggerVisual.classList.add("store-section-master-filter-all-icon");
+            triggerVisual.dataset.icon = "";
+            triggerVisual.innerHTML = triggerVisual.storeSectionMasterAllIconsMarkup || "";
+        }
+        if (label) label.textContent = "All icons";
+    } else {
+        renderStoreSectionMasterIconVisual(triggerVisual, selectedIcon);
+        if (label) label.textContent = storeSectionMasterIconLabel(selectedIcon);
+    }
     picker.querySelectorAll("[data-store-section-master-icon-option]").forEach(option => {
-        const selected = option.dataset.storeSectionMasterIconOption === normalizedIcon;
+        const selected = option.dataset.storeSectionMasterIconOption === selectedIcon;
         option.classList.toggle("is-selected", selected);
         option.setAttribute("aria-selected", String(selected));
     });
@@ -48365,6 +48384,7 @@ function initStoreSectionMasterTable() {
     const tableHead = table?.querySelector(".store-section-master-table-head");
     const list = table?.querySelector(".store-section-master-list");
     const search = page.querySelector("[data-store-section-master-search]");
+    const iconFilter = page.querySelector("[data-store-section-master-icon-filter]");
     const visibleCount = page.querySelector("[data-store-section-master-visible-count]");
     const filterEmpty = page.querySelector("[data-store-section-master-filter-empty]");
     const liveRegion = page.querySelector("[data-store-section-master-live-region]");
@@ -48691,12 +48711,18 @@ function initStoreSectionMasterTable() {
 
     const applyFilters = () => {
         const query = String(search?.value || "").trim().toLocaleLowerCase();
+        const selectedIcon = String(iconFilter?.value || "")
+            .trim()
+            .toLocaleLowerCase();
         const currentRows = rows();
         let count = 0;
         currentRows.forEach(row => {
             const name = String(row.dataset.storeSectionName || "");
             const key = String(row.dataset.storeSectionKey || "");
-            const visible = !query || (name + " " + key).includes(query);
+            const icon = String(row.dataset.storeSectionIcon || "");
+            const matchesName = !query || (name + " " + key).includes(query);
+            const matchesIcon = !selectedIcon || icon === selectedIcon;
+            const visible = matchesName && matchesIcon;
             row.hidden = !visible;
             if (!visible) setMobileDetailsExpanded(row, false);
             if (visible) count += 1;
@@ -48764,7 +48790,13 @@ function initStoreSectionMasterTable() {
             ) || row.querySelector('button[name="action"][value="save"]');
             if (saveButton) row.requestSubmit(saveButton);
         });
-        iconSelect?.addEventListener("change", updateRowDirtyState);
+        iconSelect?.addEventListener("change", () => {
+            row.dataset.storeSectionIcon = String(iconSelect.value || "")
+                .trim()
+                .toLocaleLowerCase();
+            applyFilters();
+            updateRowDirtyState();
+        });
         rowEditingControllers.set(row, {
             commit() {
                 initialName = String(nameInput?.value || "");
@@ -48908,6 +48940,11 @@ function initStoreSectionMasterTable() {
                 button.setAttribute("aria-expanded", "false");
             });
             if (search) search.value = "";
+            if (iconFilter) iconFilter.value = "";
+            syncStoreSectionMasterIconPicker(
+                iconFilter?.closest("[data-store-section-master-icon-picker]"),
+                "",
+            );
             if (sectionCount) {
                 const current = Number.parseInt(sectionCount.textContent, 10) || 0;
                 sectionCount.textContent = String(current + 1);
@@ -49065,6 +49102,7 @@ function initStoreSectionMasterTable() {
     });
 
     search?.addEventListener("input", applyFilters);
+    iconFilter?.addEventListener("change", applyFilters);
     window.addEventListener("resize", applyResponsiveLayout);
     applyResponsiveLayout();
     updateRowOrderControls();
@@ -49444,6 +49482,10 @@ function initStoreSectionMasterIconPickers() {
     const pickers = [...document.querySelectorAll("[data-store-section-master-icon-picker]")];
     if (!pickers.length) return;
     document.querySelectorAll("[data-store-section-master-icon-visual]").forEach(visual => {
+        if (
+            visual.closest("[data-store-section-master-icon-filter-picker]")
+            && !visual.dataset.icon
+        ) return;
         renderStoreSectionMasterIconVisual(visual, visual.dataset.icon);
     });
     pickers.forEach((picker, index) => {
@@ -49451,6 +49493,15 @@ function initStoreSectionMasterIconPickers() {
         const trigger = picker.querySelector("[data-store-section-master-icon-trigger]");
         const menu = picker.querySelector("[data-store-section-master-icon-menu]");
         if (!select || !trigger || !menu) return;
+        const triggerVisual = trigger.querySelector(
+            "[data-store-section-master-icon-visual]",
+        );
+        if (
+            picker.hasAttribute("data-store-section-master-icon-filter-picker")
+            && triggerVisual
+        ) {
+            triggerVisual.storeSectionMasterAllIconsMarkup = triggerVisual.innerHTML;
+        }
         menu.id = menu.id || `storeSectionMasterIconMenu${index + 1}`;
         trigger.setAttribute("aria-controls", menu.id);
         select.tabIndex = -1;

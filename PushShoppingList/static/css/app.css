@@ -69555,9 +69555,10 @@ body.is-resizing-store-section-master-column * {
 .store-section-master-list-section > .store-section-master-filter-toolbar {
     display: grid;
     width: auto;
-    grid-template-columns: minmax(240px, 400px);
+    grid-template-columns: minmax(240px, 400px) minmax(160px, 240px);
     align-items: end;
     justify-content: start;
+    gap: 10px;
     margin: 0 16px;
     padding: 12px;
     border: 0;
@@ -69569,6 +69570,36 @@ body.is-resizing-store-section-master-column * {
     width: 100%;
     min-width: 0;
     flex: none;
+}
+
+.store-section-master-filter-field {
+    display: grid;
+    min-width: 0;
+    gap: 5px;
+}
+
+.store-section-master-filter-icon-picker,
+.store-section-master-filter-icon-picker > .store-section-master-icon-trigger {
+    width: 100%;
+}
+
+.store-section-master-filter-all-icon {
+    display: inline-flex;
+    width: 16px;
+    height: 16px;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 16px;
+}
+
+.store-section-master-filter-all-icon :is(.app-icon-svg, svg) {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.8;
 }
 
 .store-section-master-filter-toolbar .store-section-master-search-label {
@@ -69593,6 +69624,10 @@ body.is-resizing-store-section-master-column * {
     }
 
     .store-section-master-filter-toolbar .store-section-master-search {
+        grid-column: 1;
+    }
+
+    .store-section-master-filter-toolbar .store-section-master-icon-filter-field {
         grid-column: 1;
     }
 }

@@ -139,19 +139,86 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                 </div>
             </header>
             <div class="store-section-master-table-actions store-section-master-filter-toolbar">
-                    <label class="store-section-master-search">
-                        <span class="store-section-master-search-label">Search</span>
-                        <span class="store-section-master-search-control">
-                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                                <circle cx="11" cy="11" r="6.5"></circle>
-                                <path d="m16 16 4 4"></path>
-                            </svg>
-                            <input type="search"
-                                   placeholder="Store Section name"
-                                   autocomplete="off"
-                                   data-store-section-master-search>
-                        </span>
-                    </label>
+                <label class="store-section-master-search">
+                    <span class="store-section-master-search-label">Search</span>
+                    <span class="store-section-master-search-control">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <circle cx="11" cy="11" r="6.5"></circle>
+                            <path d="m16 16 4 4"></path>
+                        </svg>
+                        <input type="search"
+                               placeholder="Store Section name"
+                               autocomplete="off"
+                               data-store-section-master-search>
+                    </span>
+                </label>
+                <div class="store-section-master-filter-field store-section-master-icon-filter-field">
+                    <span id="storeSectionMasterIconFilterLabel"
+                          class="store-section-master-search-label">Icon</span>
+                    <div class="store-section-master-icon-picker store-section-master-filter-icon-picker"
+                         data-store-section-master-icon-picker
+                         data-store-section-master-icon-filter-picker>
+                        <select aria-label="Icon"
+                                data-store-section-master-icon-select
+                                data-store-section-master-icon-filter>
+                            <option value="" selected>All icons</option>
+                            {% for icon in master_data.icon_options %}
+                                <option value="{{ icon }}">{{ icon|replace("_", " ")|title }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="button"
+                                class="store-section-master-icon-trigger"
+                                role="combobox"
+                                aria-label="Filter by icon"
+                                aria-haspopup="listbox"
+                                aria-expanded="false"
+                                data-store-section-master-icon-trigger
+                                hidden>
+                            <span class="store-section-master-filter-all-icon"
+                                  data-store-section-master-icon-visual
+                                  data-icon=""
+                                  aria-hidden="true">{{ shell.svg_icon("filter") }}</span>
+                            <span data-store-section-master-icon-label>All icons</span>
+                            <span class="store-section-master-icon-chevron" aria-hidden="true">
+                                {{ shell.svg_icon("chevron-down") }}
+                            </span>
+                        </button>
+                        <div class="store-section-master-icon-menu"
+                             role="listbox"
+                             aria-label="Filter by icon"
+                             data-store-section-master-icon-menu
+                             hidden>
+                            <button type="button"
+                                    role="option"
+                                    aria-selected="true"
+                                    class="store-section-master-icon-option is-selected"
+                                    data-store-section-master-icon-option="">
+                                <span class="store-section-master-filter-all-icon"
+                                      aria-hidden="true">{{ shell.svg_icon("filter") }}</span>
+                                <span>All icons</span>
+                                <span class="store-section-master-icon-check" aria-hidden="true">
+                                    {{ shell.svg_icon("check") }}
+                                </span>
+                            </button>
+                            {% for icon in master_data.icon_options %}
+                                <button type="button"
+                                        role="option"
+                                        aria-selected="false"
+                                        class="store-section-master-icon-option"
+                                        data-store-section-master-icon-option="{{ icon }}">
+                                    <span class="recipe-edit-store-section-icon is-{{ icon }}"
+                                          data-store-section-master-icon-visual
+                                          data-icon="{{ icon }}"
+                                          aria-hidden="true">{{ icon_glyphs.get(icon, icon_glyphs["basket"]) }}</span>
+                                    <span>{{ icon|replace("_", " ")|title }}</span>
+                                    <span class="store-section-master-icon-check" aria-hidden="true">
+                                        {{ shell.svg_icon("check") }}
+                                    </span>
+                                </button>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <p class="sr-only"
@@ -190,6 +257,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                           data-store-section-id="{{ section.id }}"
                           data-store-section-name="{{ section.display_name|lower }}"
                           data-store-section-key="{{ section.section_key|lower }}"
+                          data-store-section-icon="{{ section.icon|lower }}"
                           data-store-section-is-built-in="{{ 'true' if section.is_builtin else 'false' }}">
                         <div class="store-section-master-order-cell"
                              role="cell"

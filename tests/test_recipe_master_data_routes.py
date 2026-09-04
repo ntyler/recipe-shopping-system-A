@@ -2504,6 +2504,21 @@ def test_store_sections_page_manages_only_the_active_workspace(monkeypatch, tmp_
             class_="store-section-master-filter-toolbar"
         ) is not None
         assert search_label.find_parent("header") is None
+        icon_filter = soup.select_one("[data-store-section-master-icon-filter]")
+        assert icon_filter.get("aria-label") == "Icon"
+        assert [option.get("value") for option in icon_filter.select("option")] == [
+            "",
+            *master_data.INGREDIENT_STORE_SECTION_ICON_OPTIONS,
+        ]
+        assert icon_filter.select_one('option[value=""]').get_text(
+            " ", strip=True
+        ) == "All icons"
+        rendered_rows = soup.select("[data-store-section-master-row]")
+        assert all(
+            row.get("data-store-section-icon")
+            in master_data.INGREDIENT_STORE_SECTION_ICON_OPTIONS
+            for row in rendered_rows
+        )
         inline_create = soup.select_one("#storeSectionMasterInlineCreatePanel")
         add_shortcuts = soup.select(
             "button[data-store-section-master-add-shortcut]"
@@ -3273,6 +3288,10 @@ def test_store_section_manager_uses_compact_registry_and_preserves_interactions(
     assert 'value="restore"' not in page
 
     assert "data-store-section-master-search" in page
+    assert "data-store-section-master-icon-filter" in page
+    assert "data-store-section-master-icon-filter-picker" in page
+    assert "All icons" in page
+    assert 'data-store-section-icon="{{ section.icon|lower }}"' in page
     assert "Store Section Registry" in page
     assert 'id="storeSectionOrderTitle" class="sr-only"' in page
     assert "Workspace registry" not in page
@@ -3332,6 +3351,14 @@ def test_store_section_manager_uses_compact_registry_and_preserves_interactions(
     assert 'if (action !== "delete") return;' in script
     assert "row.remove()" in script
     assert "applyFilters()" in store_section_table_script
+    assert 'const iconFilter = page.querySelector("[data-store-section-master-icon-filter]");' in store_section_table_script
+    assert "const matchesName = !query" in store_section_table_script
+    assert "const matchesIcon = !selectedIcon || icon === selectedIcon;" in store_section_table_script
+    assert "const visible = matchesName && matchesIcon;" in store_section_table_script
+    assert 'iconFilter?.addEventListener("change", applyFilters);' in store_section_table_script
+    assert "row.dataset.storeSectionIcon" in store_section_table_script
+    assert "storeSectionMasterAllIconsMarkup" in script
+    assert 'label.textContent = "All icons";' in script
     assert 'visibleCount.textContent = "Showing "' in store_section_table_script
     assert '+ " Store Sections.";' in store_section_table_script
     assert "window.location.reload()" not in store_section_table_script
@@ -3346,6 +3373,8 @@ def test_store_section_manager_uses_compact_registry_and_preserves_interactions(
     assert ".store-section-master-search-control {" in css
     assert ".store-section-master-registry-copy > .store-section-master-visible-count {" in css
     assert ".store-section-master-filter-toolbar {" in css
+    assert ".store-section-master-filter-field {" in css
+    assert ".store-section-master-filter-all-icon {" in css
     store_heading_alignment_rules = css.rsplit(
         ".store-section-master-page .master-data-header h1,",
         1,
