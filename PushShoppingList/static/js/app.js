@@ -48702,7 +48702,11 @@ function initStoreSectionMasterTable() {
             if (visible) count += 1;
         });
         if (visibleCount) {
-            visibleCount.textContent = count + " of " + currentRows.length + " shown";
+            visibleCount.textContent = "Showing "
+                + count
+                + " of "
+                + currentRows.length
+                + " Store Sections";
         }
         if (filterEmpty) {
             filterEmpty.hidden = count > 0 || currentRows.length === 0;

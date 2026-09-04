@@ -2466,8 +2466,31 @@ def test_store_sections_page_manages_only_the_active_workspace(monkeypatch, tmp_
         assert 'id="storeSectionMobileDetails-' in html
         assert "Change display names, icons, and order for this workspace." in html
         assert "Built-in identity and automatic routing stay protected" in html
+        assert "Store Section Registry" in html
         assert ">Display Name</div>" in html
         soup = BeautifulSoup(html, "html.parser")
+        rendered_section_count = len(
+            master_data.ingredient_store_section_details(
+                "user-a",
+                include_inactive=True,
+            )
+        )
+        assert soup.select_one("#storeSectionOrderTitle").get_text(
+            " ", strip=True
+        ) == "Store Section Registry"
+        assert soup.select_one(
+            "[data-store-section-master-visible-count]"
+        ).get_text(" ", strip=True) == (
+            f"Showing {rendered_section_count} of {rendered_section_count} "
+            "Store Sections"
+        )
+        search_label = soup.select_one(".store-section-master-search")
+        assert search_label.select_one(
+            ".store-section-master-search-label"
+        ).get_text(" ", strip=True) == "Search"
+        assert search_label.select_one(
+            "input[data-store-section-master-search]"
+        ).get("placeholder") == "Store Section name"
         inline_create = soup.select_one("#storeSectionMasterInlineCreatePanel")
         add_shortcuts = soup.select(
             "button[data-store-section-master-add-shortcut]"
@@ -3237,6 +3260,9 @@ def test_store_section_manager_uses_compact_registry_and_preserves_interactions(
     assert 'value="restore"' not in page
 
     assert "data-store-section-master-search" in page
+    assert "Store Section Registry" in page
+    assert "store-section-master-search-label" in page
+    assert 'placeholder="Store Section name"' in page
     assert "data-store-section-master-mobile-save" in page
     assert "data-store-section-master-mobile-details-toggle" in page
     assert "data-store-section-master-mobile-details" in page
@@ -3290,6 +3316,8 @@ def test_store_section_manager_uses_compact_registry_and_preserves_interactions(
     assert 'if (action !== "delete") return;' in script
     assert "row.remove()" in script
     assert "applyFilters()" in store_section_table_script
+    assert 'visibleCount.textContent = "Showing "' in store_section_table_script
+    assert '+ " Store Sections";' in store_section_table_script
     assert "window.location.reload()" not in store_section_table_script
     assert '"archive"' not in store_section_table_script
     assert '"restore"' not in store_section_table_script
@@ -3298,6 +3326,8 @@ def test_store_section_manager_uses_compact_registry_and_preserves_interactions(
     assert ".store-section-master-header-summary {" in css
     assert ".store-section-master-header-actions {" in css
     assert ".store-section-master-header-add {" in css
+    assert ".store-section-master-search-label {" in css
+    assert ".store-section-master-search-control {" in css
     store_heading_alignment_rules = css.rsplit(
         ".store-section-master-page .master-data-header h1,",
         1,

@@ -67125,14 +67125,30 @@ body.recipe-edit-standalone-page :is(
 }
 
 .store-section-master-search {
-    position: relative;
-    display: flex;
+    display: grid;
     width: 190px;
     min-width: 150px;
+    flex: 0 0 190px;
+    gap: 5px;
+}
+
+.store-section-master-search-label {
+    color: var(--app-muted);
+    font-size: 9px;
+    font-weight: 850;
+    letter-spacing: .045em;
+    line-height: 1;
+    text-transform: uppercase;
+}
+
+.store-section-master-search-control {
+    position: relative;
+    display: flex;
+    min-width: 0;
     align-items: center;
 }
 
-.store-section-master-search > svg {
+.store-section-master-search-control > svg {
     position: absolute;
     left: 10px;
     z-index: 1;
@@ -67145,7 +67161,7 @@ body.recipe-edit-standalone-page :is(
     pointer-events: none;
 }
 
-.store-section-master-page .store-section-master-search > input {
+.store-section-master-page .store-section-master-search-control > input {
     min-height: 36px;
     padding-left: 32px;
 }
@@ -67221,6 +67237,12 @@ body.recipe-edit-standalone-page :is(
     margin-left: auto;
     color: var(--app-primary-hover);
     font-weight: 800;
+}
+
+.store-section-master-table-actions > .store-section-master-visible-count {
+    font-size: 11px;
+    letter-spacing: 0;
+    text-transform: none;
 }
 
 .store-section-master-list-section > .store-section-master-create {

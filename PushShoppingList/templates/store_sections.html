@@ -139,24 +139,26 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
             <header class="store-section-master-table-toolbar">
                 <div>
                     <span>Shopping order</span>
-                    <h2 id="storeSectionOrderTitle">Store Section order</h2>
+                    <h2 id="storeSectionOrderTitle">Store Section Registry</h2>
                     <p>Change display names, icons, and order for this workspace. Built-in identity and automatic routing stay protected; custom sections are assigned manually.</p>
                 </div>
                 <div class="store-section-master-table-actions">
                     <span class="store-section-master-visible-count"
                           data-store-section-master-visible-count>
-                        {{ master_data.sections|length }} of {{ master_data.sections|length }} shown
+                        Showing {{ master_data.sections|length }} of {{ master_data.sections|length }} Store Sections
                     </span>
                     <label class="store-section-master-search">
-                        <span class="sr-only">Search Store Sections</span>
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <circle cx="11" cy="11" r="6.5"></circle>
-                            <path d="m16 16 4 4"></path>
-                        </svg>
-                        <input type="search"
-                               placeholder="Search sections"
-                               autocomplete="off"
-                               data-store-section-master-search>
+                        <span class="store-section-master-search-label">Search</span>
+                        <span class="store-section-master-search-control">
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <circle cx="11" cy="11" r="6.5"></circle>
+                                <path d="m16 16 4 4"></path>
+                            </svg>
+                            <input type="search"
+                                   placeholder="Store Section name"
+                                   autocomplete="off"
+                                   data-store-section-master-search>
+                        </span>
                     </label>
                 </div>
             </header>
