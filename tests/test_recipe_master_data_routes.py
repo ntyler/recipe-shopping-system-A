@@ -2464,8 +2464,8 @@ def test_store_sections_page_manages_only_the_active_workspace(monkeypatch, tmp_
         assert details_count == toggle_count
         assert 'aria-controls="storeSectionMobileDetails-' in html
         assert 'id="storeSectionMobileDetails-' in html
-        assert "Change display names, icons, and order for this workspace." in html
-        assert "Built-in identity and automatic routing stay protected" in html
+        assert "Change display names, icons, and order for this workspace." not in html
+        assert "Built-in identity and automatic routing stay protected" not in html
         assert "Store Section Registry" in html
         assert ">Display Name</div>" in html
         soup = BeautifulSoup(html, "html.parser")
@@ -2475,13 +2475,12 @@ def test_store_sections_page_manages_only_the_active_workspace(monkeypatch, tmp_
                 include_inactive=True,
             )
         )
-        assert soup.select_one("#storeSectionOrderTitle").get_text(
-            " ", strip=True
-        ) == "Store Section Registry"
+        registry_title = soup.select_one("#storeSectionOrderTitle")
+        assert registry_title.get_text(" ", strip=True) == "Store Section Registry"
+        assert "sr-only" in registry_title.get("class", [])
         registry_copy = soup.select_one(".store-section-master-registry-copy")
-        assert registry_copy.select_one(":scope > span").get_text(
-            " ", strip=True
-        ) == "Workspace registry"
+        assert registry_copy.select_one(":scope > span") is None
+        assert "Workspace registry" not in registry_copy.get_text(" ", strip=True)
         assert soup.select_one("#storeSectionsTitle").get_text(
             "", strip=True
         ) == f"Store Sections ({rendered_section_count})"
@@ -3275,6 +3274,9 @@ def test_store_section_manager_uses_compact_registry_and_preserves_interactions(
 
     assert "data-store-section-master-search" in page
     assert "Store Section Registry" in page
+    assert 'id="storeSectionOrderTitle" class="sr-only"' in page
+    assert "Workspace registry" not in page
+    assert "Change display names, icons, and order for this workspace." not in page
     assert "store-section-master-search-label" in page
     assert 'placeholder="Store Section name"' in page
     assert "data-store-section-master-mobile-save" in page
@@ -3342,7 +3344,7 @@ def test_store_section_manager_uses_compact_registry_and_preserves_interactions(
     assert ".store-section-master-header-add {" in css
     assert ".store-section-master-search-label {" in css
     assert ".store-section-master-search-control {" in css
-    assert ".store-section-master-registry-copy {" in css
+    assert ".store-section-master-registry-copy > .store-section-master-visible-count {" in css
     assert ".store-section-master-filter-toolbar {" in css
     store_heading_alignment_rules = css.rsplit(
         ".store-section-master-page .master-data-header h1,",

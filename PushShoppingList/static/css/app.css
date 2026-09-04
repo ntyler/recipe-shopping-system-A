@@ -69532,22 +69532,18 @@ body.is-resizing-store-section-master-column * {
     }
 }
 
-/* Match the Store Section registry heading and filter rhythm to Equipment. */
+/* Keep the Store Section registry summary and search compact. */
 .store-section-master-list-section > .store-section-master-table-toolbar {
     display: block;
-    padding: 16px 16px 10px;
+    padding: 16px 16px 8px;
     border-bottom: 0;
-}
-
-.store-section-master-registry-copy {
-    max-width: 900px;
 }
 
 .store-section-master-registry-copy > .store-section-master-visible-count {
     display: block;
     width: max-content;
     max-width: 100%;
-    margin-top: 8px;
+    margin: 0;
     color: var(--app-text);
     font-size: 12px;
     font-weight: 800;
