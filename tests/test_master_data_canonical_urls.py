@@ -238,25 +238,16 @@ def test_cuisine_categories_page_renders_registry_management_ui(master_data_app)
     assert root["data-create-url"] == "/api/master-data/cuisine-categories"
     assert "__CATEGORY_ID__" in root["data-update-url-template"]
     assert root["data-import-url"] == "/api/master-data/cuisine-categories/import-local"
-    assert soup.select_one("h1#cuisineCategoriesTitle").get_text(strip=True) == (
-        "Cuisine Categories"
+    heading = soup.select_one("h1#cuisineCategoriesTitle")
+    heading_count = heading.select_one("[data-cuisine-category-master-total-count]")
+    assert heading.get_text(" ", strip=True) == (
+        f"Cuisine Categories ( {heading_count.get_text(strip=True)} )"
     )
-    create_panel = root.find(
-        "section",
-        class_="cuisine-category-master-create",
-        recursive=False,
-    )
-    assert create_panel is not None
-    assert create_panel.get("aria-labelledby") == "addCuisineCategoryTitle"
-    assert create_panel.select_one("h2#addCuisineCategoryTitle").get_text(
-        " ", strip=True,
-    ) == "Add a Cuisine Category"
-    create_form = create_panel.find(
-        "form",
-        class_="cuisine-category-master-create-form",
-        recursive=False,
-    )
+    create_form = root.select_one("form[data-cuisine-category-master-create-form]")
     assert create_form is not None
+    assert create_form["id"] == "cuisineCategoryMasterInlineCreatePanel"
+    assert create_form.get("role") == "row"
+    assert create_form.has_attr("hidden")
     assert create_form.has_attr("data-cuisine-category-master-create-form")
     create_name = create_form.select_one(
         "input[data-cuisine-category-master-create-name]"
@@ -280,7 +271,7 @@ def test_cuisine_categories_page_renders_registry_management_ui(master_data_app)
     assert create_abbreviation is not None
     assert create_icon is not None and create_icon.get("type") == "hidden"
     assert create_submit is not None and create_submit.get("type") == "submit"
-    assert create_submit.get_text(" ", strip=True) == "Add Cuisine Category"
+    assert create_submit.get_text(" ", strip=True) == "Save"
     assert create_error is not None
     assert create_error.get("role") == "alert"
     assert create_error.has_attr("hidden")
@@ -296,15 +287,29 @@ def test_cuisine_categories_page_renders_registry_management_ui(master_data_app)
     ):
         assert create_error["id"] in described_control["aria-describedby"].split()
 
+    add_shortcuts = root.select("button[data-cuisine-category-master-add-shortcut]")
+    assert len(add_shortcuts) == 2
+    assert {button.get("type") for button in add_shortcuts} == {"button"}
+    assert {button.get("aria-expanded") for button in add_shortcuts} == {"false"}
+    assert {
+        button.get("aria-controls") for button in add_shortcuts
+    } == {"cuisineCategoryMasterInlineCreatePanel"}
     assert not root.select("[data-cuisine-category-master-add-button]")
     assert not root.select("[data-cuisine-category-master-edit-button]")
     assert soup.select_one("[data-cuisine-category-master-dialog]") is None
     assert soup.select_one("dialog.unit-master-dialog") is None
     assert soup.select_one("[data-cuisine-category-master-usage-dialog]") is not None
+    assert not root.select(".unit-master-stats")
+    summary = root.select_one(".cuisine-category-master-header-summary")
+    assert summary is not None
     assert [
-        article.find("span").get_text(" ", strip=True)
-        for article in soup.select(".unit-master-stats > article")
-    ] == ["System-seeded", "User-created", "In use"]
+        span.get_text(" ", strip=True)
+        for span in summary.find_all("span", recursive=False)
+    ] == [
+        f"{soup.select_one('[data-cuisine-category-master-seeded-count]').get_text(strip=True)} system-seeded",
+        f"{soup.select_one('[data-cuisine-category-master-custom-count]').get_text(strip=True)} user-created",
+        f"{soup.select_one('[data-cuisine-category-master-used-count]').get_text(strip=True)} in use",
+    ]
     assert soup.select_one(
         "[data-cuisine-category-master-active-count]"
     ) is None
@@ -320,7 +325,7 @@ def test_cuisine_categories_page_renders_registry_management_ui(master_data_app)
         recursive=False,
     )
     assert registry_toolbar is not None
-    registry_actions = registry_toolbar.find(
+    registry_actions = registry_panel.find(
         "div",
         class_="cuisine-category-master-table-actions",
         recursive=False,
@@ -329,7 +334,10 @@ def test_cuisine_categories_page_renders_registry_management_ui(master_data_app)
     assert registry_actions.select_one(
         "[data-cuisine-category-master-search]"
     ) is not None
-    visible_count = registry_actions.select_one(
+    assert registry_actions.select_one(
+        "[data-cuisine-category-master-icon-filter]"
+    ) is not None
+    visible_count = registry_toolbar.select_one(
         "[data-cuisine-category-master-count-label]"
     )
     assert visible_count is not None
@@ -347,6 +355,7 @@ def test_cuisine_categories_page_renders_registry_management_ui(master_data_app)
     cuisine_category = cuisine_category_children[0]
     assert cuisine_category.name == "section"
     assert "unit-master-category" in cuisine_category.get("class", [])
+    assert "cuisine-category-master-category" in cuisine_category.get("class", [])
     assert cuisine_category.has_attr(
         "data-cuisine-category-master-category"
     )
@@ -367,7 +376,7 @@ def test_cuisine_categories_page_renders_registry_management_ui(master_data_app)
     rows = soup.select("[data-cuisine-category-master-row]")
     assert rows
     assert visible_count.get_text(" ", strip=True) == (
-        f"{len(rows)} of {len(rows)} shown"
+        f"Showing {len(rows)} of {len(rows)} Cuisine Categories."
     )
     for preserved_hook in (
         "data-cuisine-category-master-rows",
@@ -496,7 +505,10 @@ def test_cuisine_categories_page_renders_registry_management_ui(master_data_app)
     assert "window.confirm(`Delete custom cuisine category" in script
     assert 'method: "DELETE"' in script
     assert "trigger.focus({ preventScroll: true });" in script
-    assert "window.requestAnimationFrame(() => createNameInput.focus" in script
+    assert "const setCreatePanelExpanded = (expanded, options = {}) =>" in script
+    assert "createNameInput.focus({ preventScroll: true });" in script
+    assert 'createForm.scrollIntoView({ block: "nearest", inline: "nearest" });' in script
+    assert "setCreatePanelExpanded(false, { announce: false });" in script
     assert "const saveCategory = async event =>" not in script
     assert "const deleteCategory = async () =>" not in script
     assert "openEditor(" not in script
@@ -510,7 +522,7 @@ def test_cuisine_categories_page_renders_registry_management_ui(master_data_app)
     assert 'item.custom ? "User-created" : "Built-in"' in script
     assert (
         "countLabel.textContent = "
-        "`${visible} of ${registry.categories.length} shown`;"
+        "(\n                `Showing ${visible} of ${registry.categories.length} Cuisine Categories.`\n            );"
     ) in script
 
     css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")

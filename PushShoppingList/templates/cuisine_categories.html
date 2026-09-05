@@ -44,33 +44,34 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
         <header class="master-data-header">
             <div>
                 <a class="master-data-home-link" href="{{ url_for('main_bp.index') }}#userAccountSection">Account</a>
-                <h1 id="cuisineCategoriesTitle">Cuisine Categories</h1>
+                <h1 id="cuisineCategoriesTitle">Cuisine Categories (<span data-cuisine-category-master-total-count>{{ master_data.categories|length }}</span>)</h1>
                 <p>Manage the cuisine categories available across this workspace.</p>
+                <div class="cuisine-category-master-header-summary"
+                     aria-label="Cuisine category summary">
+                    <span><strong data-cuisine-category-master-seeded-count>{{ master_data.seeded_count }}</strong> system-seeded</span>
+                    <span><strong data-cuisine-category-master-custom-count>{{ master_data.custom_count }}</strong> user-created</span>
+                    <span><strong data-cuisine-category-master-used-count>{{ master_data.used_count }}</strong> in use</span>
+                </div>
             </div>
-            <nav class="master-data-tabs" aria-label="Master data">
-                <a href="{{ master_data.ingredient_url }}">Ingredients</a>
-                <a href="{{ master_data.equipment_url }}">Equipment</a>
-                <a href="{{ master_data.units_url }}">Units</a>
-                <a href="{{ master_data.types_url }}">Types</a>
-                <a href="{{ master_data.cuisine_category_url }}" class="active" aria-current="page">Cuisine Categories</a>
-                <a href="{{ master_data.store_section_url }}">Store Sections</a>
-            </nav>
+            <div class="cuisine-category-master-header-actions">
+                <nav class="master-data-tabs" aria-label="Master data">
+                    <a href="{{ master_data.ingredient_url }}">Ingredients</a>
+                    <a href="{{ master_data.equipment_url }}">Equipment</a>
+                    <a href="{{ master_data.units_url }}">Units</a>
+                    <a href="{{ master_data.types_url }}">Types</a>
+                    <a href="{{ master_data.cuisine_category_url }}" class="active" aria-current="page">Cuisine Categories</a>
+                    <a href="{{ master_data.store_section_url }}">Store Sections</a>
+                </nav>
+                <button type="button"
+                        class="cuisine-category-master-add-toggle cuisine-category-master-header-add"
+                        aria-controls="cuisineCategoryMasterInlineCreatePanel"
+                        aria-expanded="false"
+                        data-cuisine-category-master-add-shortcut>
+                    {{ shell.svg_icon("plus") }}
+                    <span>Add Cuisine Category</span>
+                </button>
+            </div>
         </header>
-
-        <div class="unit-master-stats" aria-label="Cuisine category summary">
-            <article>
-                <span>System-seeded</span>
-                <strong data-cuisine-category-master-seeded-count>{{ master_data.seeded_count }}</strong>
-            </article>
-            <article>
-                <span>User-created</span>
-                <strong data-cuisine-category-master-custom-count>{{ master_data.custom_count }}</strong>
-            </article>
-            <article>
-                <span>In use</span>
-                <strong data-cuisine-category-master-used-count>{{ master_data.used_count }}</strong>
-            </article>
-        </div>
 
         <section class="unit-master-import" data-cuisine-category-master-import hidden>
             <div>
@@ -89,99 +90,43 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
              data-cuisine-category-master-status
              hidden></div>
 
-        <section class="cuisine-category-master-create" aria-labelledby="addCuisineCategoryTitle">
-            <div class="cuisine-category-master-create-intro">
-                <span>Workspace setup</span>
-                <h2 id="addCuisineCategoryTitle">Add a Cuisine Category</h2>
-                <p>Enter a category name and optional abbreviation, then choose the icon shown in the recipe editor.</p>
-            </div>
-            <form class="cuisine-category-master-create-form"
-                  data-cuisine-category-master-create-form
-                  novalidate>
-                <label class="unit-master-field cuisine-category-master-create-name-field">
-                    <span>Cuisine Category Name</span>
-                    <input type="text"
-                           maxlength="60"
-                           placeholder="For example, Mediterranean"
-                           autocomplete="off"
-                           required
-                           aria-describedby="cuisineCategoryCreateError"
-                           data-cuisine-category-master-name
-                           data-cuisine-category-master-create-name>
-                </label>
-                <label class="unit-master-field cuisine-category-master-create-abbreviation-field">
-                    <span>Abbreviation</span>
-                    <input type="text"
-                           maxlength="8"
-                           placeholder="For example, MED"
-                           autocomplete="off"
-                           spellcheck="false"
-                           aria-describedby="cuisineCategoryCreateError"
-                           data-cuisine-category-master-abbreviation
-                           data-cuisine-category-master-create-abbreviation>
-                </label>
-                <div class="unit-master-field cuisine-category-master-create-icon-field">
-                    <span id="cuisineCategoryCreateIconLabel">Icon</span>
-                    <input type="hidden"
-                           name="icon"
-                           value=""
-                           data-cuisine-category-master-create-icon>
-                    <button type="button"
-                            class="cuisine-category-master-icon-trigger cuisine-category-master-create-icon-trigger"
-                            role="combobox"
-                            aria-haspopup="listbox"
-                            aria-expanded="false"
-                            aria-controls="cuisineCategoryIconListbox"
-                            aria-labelledby="cuisineCategoryCreateIconLabel cuisineCategoryCreateIconSelectionLabel"
-                            aria-describedby="cuisineCategoryCreateError"
-                            data-cuisine-category-master-icon-trigger
-                            data-cuisine-category-master-create-icon-trigger>
-                        <span class="cuisine-category-icon-visual"
-                              data-cuisine-category-master-icon-preview
-                              data-cuisine-category-master-create-icon-preview
-                              aria-hidden="true">&mdash;</span>
-                        <span id="cuisineCategoryCreateIconSelectionLabel"
-                              data-cuisine-category-master-icon-label
-                              data-cuisine-category-master-create-icon-label>None</span>
-                        <span class="cuisine-category-master-icon-chevron" aria-hidden="true">&#8964;</span>
-                    </button>
-                </div>
-                <button type="submit"
-                        class="cuisine-category-master-create-submit"
-                        data-cuisine-category-master-create-submit>Add Cuisine Category</button>
-                <div id="cuisineCategoryCreateError"
-                     class="unit-master-field-error cuisine-category-master-create-error"
-                     role="alert"
-                     data-cuisine-category-master-create-error
-                     hidden></div>
-            </form>
-        </section>
-
         <section class="unit-master-panel unit-master-catalog cuisine-category-master-list-section"
                  aria-labelledby="cuisineCategoryRegistryTitle">
             <header class="cuisine-category-master-table-toolbar">
-                <div>
-                    <span>Workspace registry</span>
-                    <h2 id="cuisineCategoryRegistryTitle">Cuisine Category Registry</h2>
-                    <p>Built-in cuisines keep consistent labels; custom cuisines can be renamed or safely deleted.</p>
-                </div>
-                <div class="cuisine-category-master-table-actions">
-                    <span class="cuisine-category-master-visible-count"
-                          data-cuisine-category-master-count-label>
-                        {{ master_data.categories | length }} of {{ master_data.categories | length }} shown
-                    </span>
-                    <label class="unit-master-search">
-                        <span class="sr-only">Search cuisine categories</span>
-                        <input type="search"
-                               placeholder="Icon, abbreviation, or name"
-                               autocomplete="off"
-                               data-cuisine-category-master-search>
-                    </label>
+                <div class="cuisine-category-master-registry-copy">
+                    <h2 id="cuisineCategoryRegistryTitle" class="sr-only">Cuisine Category Registry</h2>
+                    <strong class="cuisine-category-master-visible-count"
+                            aria-live="polite"
+                            data-cuisine-category-master-count-label>
+                        Showing {{ master_data.categories | length }} of {{ master_data.categories | length }} Cuisine Categories.
+                    </strong>
                 </div>
             </header>
+            <div class="cuisine-category-master-table-actions cuisine-category-master-filter-toolbar">
+                <label class="unit-master-search cuisine-category-master-search">
+                    <span class="cuisine-category-master-search-label">Search</span>
+                    <span class="cuisine-category-master-search-control">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <circle cx="11" cy="11" r="6.5"></circle>
+                            <path d="m16 16 4 4"></path>
+                        </svg>
+                        <input type="search"
+                               placeholder="Cuisine Category name or abbreviation"
+                               autocomplete="off"
+                               data-cuisine-category-master-search>
+                    </span>
+                </label>
+                <label class="unit-master-field cuisine-category-master-filter-field">
+                    <span class="cuisine-category-master-search-label">Icon</span>
+                    <select aria-label="Filter by icon"
+                            data-cuisine-category-master-icon-filter>
+                        <option value="">All icons</option>
+                    </select>
+                </label>
+            </div>
 
             <div class="unit-master-category-list cuisine-category-master-category-list">
-                <section class="unit-master-category type-master-category"
+                <section class="unit-master-category type-master-category cuisine-category-master-category"
                          data-cuisine-category-master-category
                          aria-labelledby="allCuisineCategoriesTitle">
                     <h3 class="sr-only" id="allCuisineCategoriesTitle">Cuisine categories</h3>
@@ -203,6 +148,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                      role="row"
                                      data-cuisine-category-master-row
                                      data-category-id="{{ category.id }}"
+                                     data-cuisine-category-master-icon-value="{{ category.icon or '' }}"
                                      data-cuisine-category-master-search-value="{{ category.icon or '' }} {{ category.abbreviation or '' }} {{ category.category_name or category.canonical_name or category.name }}">
                                     <div class="cuisine-category-master-identity"
                                          role="presentation">
@@ -313,6 +259,104 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                 </div>
                             {% endfor %}
                         </div>
+
+                        <form id="cuisineCategoryMasterInlineCreatePanel"
+                              class="unit-master-row cuisine-category-master-create-row"
+                              role="row"
+                              aria-label="Add a Cuisine Category"
+                              data-cuisine-category-master-create-form
+                              novalidate
+                              hidden>
+                            <div class="cuisine-category-master-identity"
+                                 role="presentation">
+                                <div class="cuisine-category-master-row-icon-field"
+                                     role="cell"
+                                     data-mobile-label="Icon">
+                                    <span class="sr-only" id="cuisineCategoryCreateIconLabel">Icon</span>
+                                    <input type="hidden"
+                                           name="icon"
+                                           value=""
+                                           data-cuisine-category-master-create-icon>
+                                    <button type="button"
+                                            class="cuisine-category-master-icon-trigger cuisine-category-master-row-icon-trigger cuisine-category-master-create-icon-trigger"
+                                            role="combobox"
+                                            aria-haspopup="listbox"
+                                            aria-expanded="false"
+                                            aria-controls="cuisineCategoryIconListbox"
+                                            aria-labelledby="cuisineCategoryCreateIconLabel cuisineCategoryCreateIconSelectionLabel"
+                                            aria-describedby="cuisineCategoryCreateError"
+                                            data-cuisine-category-master-icon-trigger
+                                            data-cuisine-category-master-create-icon-trigger>
+                                        <span class="cuisine-category-icon-visual"
+                                              data-cuisine-category-master-icon-preview
+                                              data-cuisine-category-master-create-icon-preview
+                                              aria-hidden="true">&mdash;</span>
+                                        <span id="cuisineCategoryCreateIconSelectionLabel"
+                                              class="sr-only"
+                                              data-cuisine-category-master-icon-label
+                                              data-cuisine-category-master-create-icon-label>None</span>
+                                        <span class="cuisine-category-master-icon-chevron" aria-hidden="true">&#8964;</span>
+                                    </button>
+                                </div>
+                                <label class="cuisine-category-master-row-abbreviation-field"
+                                       role="cell"
+                                       data-mobile-label="Abbreviation">
+                                    <span class="sr-only">Abbreviation for the new Cuisine Category</span>
+                                    <input type="text"
+                                           class="cuisine-category-master-abbreviation"
+                                           maxlength="8"
+                                           placeholder="MED"
+                                           autocomplete="off"
+                                           spellcheck="false"
+                                           aria-describedby="cuisineCategoryCreateError"
+                                           data-cuisine-category-master-abbreviation
+                                           data-cuisine-category-master-create-abbreviation>
+                                </label>
+                                <label class="cuisine-category-master-row-name-field"
+                                       role="cell"
+                                       data-mobile-label="Cuisine Category Name">
+                                    <span class="sr-only">Cuisine Category Name</span>
+                                    <input type="text"
+                                           class="cuisine-category-master-name"
+                                           maxlength="60"
+                                           placeholder="New Cuisine Category"
+                                           autocomplete="off"
+                                           required
+                                           aria-describedby="cuisineCategoryCreateError"
+                                           data-cuisine-category-master-name
+                                           data-cuisine-category-master-create-name>
+                                </label>
+                            </div>
+                            <div class="unit-master-usage" role="cell">
+                                <span class="unit-master-usage-empty"
+                                      aria-label="No recipes use the new Cuisine Category">0</span>
+                            </div>
+                            <span class="unit-master-source-badge user-created" role="cell">User-created</span>
+                            <span class="unit-master-action-cell cuisine-category-master-row-actions"
+                                  role="cell"
+                                  data-mobile-label="Action">
+                                <button type="submit"
+                                        class="cuisine-category-master-create-submit"
+                                        data-cuisine-category-master-create-submit>Save</button>
+                                <button type="button"
+                                        data-cuisine-category-master-create-cancel>Cancel</button>
+                            </span>
+                            <div id="cuisineCategoryCreateError"
+                                 class="unit-master-field-error cuisine-category-master-create-error"
+                                 role="alert"
+                                 data-cuisine-category-master-create-error
+                                 hidden></div>
+                        </form>
+                    </div>
+                    <div class="cuisine-category-master-add-footer">
+                        <button type="button"
+                                class="cuisine-category-master-add-shortcut"
+                                aria-controls="cuisineCategoryMasterInlineCreatePanel"
+                                aria-expanded="false"
+                                data-cuisine-category-master-add-shortcut>
+                            <span aria-hidden="true">{{ shell.svg_icon("plus") }}</span>
+                            <span>Add Cuisine Category</span>
+                        </button>
                     </div>
                 </section>
             </div>

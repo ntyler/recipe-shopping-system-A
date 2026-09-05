@@ -66476,6 +66476,382 @@ body.recipe-edit-standalone-page :is(
     }
 }
 
+/* Cuisine Category manager v4: Store Section-style compact registry. */
+.cuisine-category-master-page .master-data-header > :first-child {
+    flex: 1 1 auto;
+}
+
+.cuisine-category-master-header-summary {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    margin-top: 8px;
+    color: var(--app-muted);
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.cuisine-category-master-header-summary > span {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 4px;
+}
+
+.cuisine-category-master-header-summary > span + span::before {
+    width: 3px;
+    height: 3px;
+    margin-right: 4px;
+    border-radius: 50%;
+    background: var(--app-border-strong);
+    content: "";
+}
+
+.cuisine-category-master-header-summary strong {
+    color: var(--app-text-strong);
+    font-size: inherit;
+}
+
+.cuisine-category-master-header-actions {
+    display: grid;
+    min-width: 0;
+    justify-items: end;
+    gap: 12px;
+}
+
+.cuisine-category-master-header-actions .master-data-tabs {
+    min-width: 0;
+}
+
+.cuisine-category-master-page .cuisine-category-master-header-add {
+    width: max-content;
+    max-width: 100%;
+    justify-self: end;
+}
+
+.cuisine-category-master-page .cuisine-category-master-add-toggle {
+    display: inline-flex;
+    min-height: 36px;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-color: var(--app-primary);
+    background: var(--app-primary-soft);
+    color: var(--app-primary-hover);
+    font-size: 11px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.cuisine-category-master-add-toggle :is(.app-icon-svg, svg),
+.cuisine-category-master-add-shortcut :is(.app-icon-svg, svg) {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-width: 1.8;
+}
+
+.cuisine-category-master-list-section > .cuisine-category-master-table-toolbar {
+    display: block;
+    padding: 16px 16px 8px;
+    border-bottom: 0;
+}
+
+.cuisine-category-master-registry-copy > .cuisine-category-master-visible-count {
+    display: block;
+    width: max-content;
+    max-width: 100%;
+    margin: 0;
+    color: var(--app-text);
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1.4;
+    text-align: left;
+    white-space: normal;
+}
+
+.cuisine-category-master-list-section > .cuisine-category-master-filter-toolbar {
+    display: grid;
+    width: auto;
+    grid-template-columns: minmax(240px, 400px) minmax(160px, 240px);
+    align-items: end;
+    justify-content: start;
+    gap: 10px;
+    margin: 0 16px;
+    padding: 12px;
+    border: 0;
+    border-radius: 8px;
+    background: var(--app-surface-soft);
+}
+
+.cuisine-category-master-filter-toolbar .unit-master-search,
+.cuisine-category-master-filter-field {
+    display: grid;
+    width: 100%;
+    min-width: 0;
+    gap: 5px;
+}
+
+.cuisine-category-master-search-control {
+    position: relative;
+    display: block;
+    min-width: 0;
+}
+
+.cuisine-category-master-search-control > svg {
+    position: absolute;
+    z-index: 1;
+    top: 50%;
+    left: 11px;
+    width: 15px;
+    height: 15px;
+    transform: translateY(-50%);
+    fill: none;
+    stroke: var(--app-muted);
+    stroke-linecap: round;
+    stroke-width: 1.8;
+    pointer-events: none;
+}
+
+.cuisine-category-master-filter-toolbar .cuisine-category-master-search-label {
+    color: var(--app-muted);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+.cuisine-category-master-page
+    .cuisine-category-master-filter-toolbar
+    .cuisine-category-master-search-control > input {
+    width: 100%;
+    min-height: 38px;
+    padding-left: 32px;
+    background: var(--app-surface);
+}
+
+.cuisine-category-master-page
+    .cuisine-category-master-filter-toolbar
+    [data-cuisine-category-master-icon-filter] {
+    width: 100%;
+    min-height: 38px;
+    background: var(--app-surface);
+}
+
+.cuisine-category-master-category-list,
+.cuisine-category-master-category,
+.cuisine-category-master-table {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.cuisine-category-master-category-list {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 16px;
+}
+
+.cuisine-category-master-category {
+    overflow: visible;
+}
+
+.cuisine-category-master-table > .unit-master-table-head {
+    position: sticky;
+    z-index: 20;
+    top: calc(-1 * var(--app-content-padding-block-start));
+    background: var(--app-surface);
+}
+
+.cuisine-category-master-create-row[hidden] {
+    display: none !important;
+}
+
+.cuisine-category-master-create-row {
+    position: relative;
+    background: color-mix(in srgb, var(--app-primary-soft) 24%, transparent);
+    box-shadow: inset 3px 0 0 var(--app-primary);
+}
+
+.cuisine-category-master-create-row
+    :is(
+        [data-cuisine-category-master-create-abbreviation],
+        [data-cuisine-category-master-create-name]
+    ) {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    min-height: 38px;
+    padding: 6px 7px;
+    border: 1px solid var(--app-border-strong);
+    border-radius: 6px;
+    background: var(--app-bg-soft);
+    color: var(--app-text-strong);
+    font-size: 12px;
+    font-weight: 750;
+}
+
+.cuisine-category-master-create-row .unit-master-action-cell > button {
+    min-width: 0;
+    min-height: 36px;
+    flex: 1 1 0;
+    padding: 5px 6px;
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+.cuisine-category-master-create-row
+    [data-cuisine-category-master-create-submit] {
+    border-color: var(--app-primary);
+    background: var(--app-primary-soft);
+    color: var(--app-primary-hover);
+}
+
+.cuisine-category-master-add-footer {
+    padding: 0 12px 12px;
+}
+
+.cuisine-category-master-page .cuisine-category-master-add-shortcut {
+    display: flex;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 40px;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border: 1px dashed color-mix(in srgb, var(--app-primary) 62%, var(--app-border));
+    border-radius: 7px;
+    background: transparent;
+    color: var(--app-primary-hover);
+    font-size: 11px;
+    font-weight: 780;
+}
+
+.cuisine-category-master-page .cuisine-category-master-add-shortcut:hover {
+    border-color: color-mix(in srgb, var(--app-primary) 72%, var(--app-border));
+    background: color-mix(in srgb, var(--app-primary-soft) 12%, transparent);
+}
+
+@media (min-width: 761px) {
+    .cuisine-category-master-table > .unit-master-table-head,
+    .cuisine-category-master-table [data-cuisine-category-master-row],
+    .cuisine-category-master-table > .cuisine-category-master-create-row {
+        box-sizing: border-box;
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+        grid-template-columns:
+            minmax(102px, .7fr)
+            minmax(142px, 1.22fr)
+            minmax(72px, .5fr)
+            96px
+            118px;
+        column-gap: 8px;
+        padding-inline: 14px;
+    }
+
+    .cuisine-category-master-table .cuisine-category-master-identity {
+        grid-template-columns: 54px 104px minmax(220px, 1fr);
+        gap: 10px;
+    }
+
+    .cuisine-category-master-table [data-cuisine-category-master-row],
+    .cuisine-category-master-table > .cuisine-category-master-create-row {
+        min-height: 68px;
+        padding-block: 9px;
+    }
+
+    .cuisine-category-master-table .unit-master-usage,
+    .cuisine-category-master-table .unit-master-source-badge,
+    .cuisine-category-master-table .unit-master-action-cell {
+        min-width: 0;
+    }
+
+    .cuisine-category-master-table .unit-master-usage-button,
+    .cuisine-category-master-table .unit-master-usage-empty,
+    .cuisine-category-master-table .unit-master-source-badge,
+    .cuisine-category-master-table .unit-master-action-cell > button {
+        font-size: 11px;
+    }
+
+    .cuisine-category-master-page
+        [data-cuisine-category-master-row-save]:disabled {
+        opacity: .68;
+    }
+}
+
+@media (max-width: 759px) {
+    .cuisine-category-master-header-actions {
+        width: 100%;
+        justify-items: stretch;
+    }
+
+    .cuisine-category-master-page .cuisine-category-master-header-add {
+        width: 100%;
+        justify-self: stretch;
+    }
+
+    .cuisine-category-master-list-section > .cuisine-category-master-filter-toolbar {
+        grid-template-columns: minmax(0, 1fr);
+        margin-inline: 10px;
+    }
+
+    .cuisine-category-master-filter-toolbar .unit-master-search,
+    .cuisine-category-master-filter-field {
+        grid-column: 1;
+    }
+
+    .cuisine-category-master-category-list {
+        padding: 12px 10px;
+    }
+
+    .cuisine-category-master-table > .cuisine-category-master-create-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        align-items: stretch;
+        gap: 10px;
+        min-width: 0;
+        padding: 12px;
+    }
+
+    .cuisine-category-master-create-row .cuisine-category-master-identity {
+        display: grid;
+        grid-template-columns: 44px 96px minmax(0, 1fr);
+        align-items: end;
+        gap: 8px;
+        min-width: 0;
+    }
+
+    .cuisine-category-master-create-row
+        .cuisine-category-master-identity > [data-mobile-label]::before {
+        display: block;
+        margin-bottom: 4px;
+        overflow: hidden;
+        color: var(--app-muted);
+        content: attr(data-mobile-label);
+        font-size: 8px;
+        font-weight: 850;
+        letter-spacing: .035em;
+        line-height: 1.2;
+        text-overflow: ellipsis;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .cuisine-category-master-create-row
+        :is(.unit-master-usage, .unit-master-source-badge) {
+        display: none;
+    }
+
+    .cuisine-category-master-create-row .unit-master-action-cell {
+        display: flex;
+        width: 100%;
+    }
+}
+
 /* Store Section master data: workspace-scoped names, icons, order, and availability. */
 .store-section-master-page,
 .cuisine-category-master-page {
@@ -70191,6 +70567,37 @@ body.is-resizing-store-section-master-column * {
             [data-cuisine-category-master-row-icon-trigger]
         ) {
         transition: none;
+    }
+}
+
+/* Keep the compact Cuisine Category filters aligned like Store Sections. */
+.cuisine-category-master-list-section {
+    overflow: visible;
+}
+
+.cuisine-category-master-category .unit-master-table-head {
+    position: sticky;
+    z-index: 20;
+    top: calc(-1 * var(--app-content-padding-block-start));
+    background: var(--app-surface);
+}
+
+.cuisine-category-master-list-section > .cuisine-category-master-filter-toolbar {
+    grid-template-columns: minmax(240px, 400px) minmax(160px, 240px);
+    justify-content: start;
+}
+
+.cuisine-category-master-page
+    .cuisine-category-master-filter-toolbar
+    .unit-master-search {
+    width: 100%;
+    min-width: 0;
+    flex: none;
+}
+
+@media (max-width: 759px) {
+    .cuisine-category-master-list-section > .cuisine-category-master-filter-toolbar {
+        grid-template-columns: minmax(0, 1fr);
     }
 }
 

@@ -67,8 +67,10 @@
         const source = document.getElementById("cuisineCategoryConfig");
         const status = root.querySelector("[data-cuisine-category-master-status]");
         const search = root.querySelector("[data-cuisine-category-master-search]");
+        const iconFilter = root.querySelector("[data-cuisine-category-master-icon-filter]");
         const rows = root.querySelector("[data-cuisine-category-master-rows]");
         const countLabel = root.querySelector("[data-cuisine-category-master-count-label]");
+        const totalCount = root.querySelector("[data-cuisine-category-master-total-count]");
         const searchEmpty = root.querySelector("[data-cuisine-category-master-search-empty]");
         const createForm = root.querySelector("[data-cuisine-category-master-create-form]");
         const createNameInput = root.querySelector("[data-cuisine-category-master-create-name]");
@@ -94,6 +96,9 @@
         const usageContext = root.querySelector("[data-cuisine-category-master-usage-context]");
         const usageSummary = root.querySelector("[data-cuisine-category-master-usage-summary]");
         const usageResults = root.querySelector("[data-cuisine-category-master-usage-results]");
+        const addShortcuts = Array.from(
+            root.querySelectorAll("[data-cuisine-category-master-add-shortcut]"),
+        );
 
         const categoryById = categoryId => (
             registry.categories.find(item => String(item.id) === String(categoryId)) || null
@@ -332,6 +337,7 @@
                 normalized.abbreviation,
                 normalized.name,
             ].filter(Boolean).join(" ");
+            row.dataset.cuisineCategoryMasterIconValue = normalized.icon;
             setRowErrors(row, errors, draft.feedback);
         };
 
@@ -380,6 +386,7 @@
             row.setAttribute("role", "row");
             row.dataset.cuisineCategoryMasterRow = "";
             row.dataset.categoryId = item.id;
+            row.dataset.cuisineCategoryMasterIconValue = cleanText(item.icon);
             const iconField = document.createElement("div");
             iconField.className = "cuisine-category-master-row-icon-field";
             iconField.setAttribute("role", "cell");
@@ -504,6 +511,7 @@
         };
 
         const renderStats = () => {
+            if (totalCount) totalCount.textContent = String(registry.categories.length);
             root.querySelector("[data-cuisine-category-master-seeded-count]").textContent = String(
                 registry.categories.filter(item => item.seeded).length,
             );
@@ -518,12 +526,13 @@
         const applySearch = () => {
             const rawQuery = cleanText(search.value).toLocaleLowerCase();
             const semanticQuery = categoryKey(rawQuery);
+            const selectedIcon = cleanText(iconFilter?.value);
             let visible = 0;
             root.querySelectorAll("[data-cuisine-category-master-row]").forEach(row => {
                 const searchValue = cleanText(
                     row.dataset.cuisineCategoryMasterSearchValue,
                 );
-                const matches = (
+                const matchesSearch = (
                     !rawQuery
                     || searchValue.toLocaleLowerCase().includes(rawQuery)
                     || (
@@ -531,16 +540,25 @@
                         && categoryKey(searchValue).includes(semanticQuery)
                     )
                 );
+                const rowIcon = cleanText(row.dataset.cuisineCategoryMasterIconValue);
+                const matchesIcon = (
+                    !selectedIcon
+                    || (selectedIcon === "__none__" ? !rowIcon : rowIcon === selectedIcon)
+                );
+                const matches = matchesSearch && matchesIcon;
                 row.hidden = !matches;
                 if (matches) visible += 1;
             });
-            countLabel.textContent = `${visible} of ${registry.categories.length} shown`;
+            countLabel.textContent = (
+                `Showing ${visible} of ${registry.categories.length} Cuisine Categories.`
+            );
             searchEmpty.hidden = visible > 0;
         };
 
         const renderRegistry = () => {
             rows.replaceChildren(...registry.categories.map(createCategoryRow));
             renderStats();
+            syncIconFilterOptions();
             applySearch();
         };
 
@@ -635,6 +653,36 @@
                 item,
             };
         });
+
+        const syncIconFilterOptions = () => {
+            if (!iconFilter) return;
+            const previousValue = iconFilter.value;
+            const allOption = document.createElement("option");
+            allOption.value = "";
+            allOption.textContent = "All icons";
+            const nextOptions = [allOption];
+            if (registry.categories.some(item => !cleanText(item.icon))) {
+                const noneOption = document.createElement("option");
+                noneOption.value = "__none__";
+                noneOption.textContent = "No icon";
+                nextOptions.push(noneOption);
+            }
+            const usedIcons = Array.from(new Set(
+                registry.categories.map(item => cleanText(item.icon)).filter(Boolean),
+            )).sort((left, right) => (
+                iconDescriptor(left).label.localeCompare(iconDescriptor(right).label)
+            ));
+            usedIcons.forEach(token => {
+                const option = document.createElement("option");
+                option.value = token;
+                option.textContent = iconDescriptor(token).label;
+                nextOptions.push(option);
+            });
+            iconFilter.replaceChildren(...nextOptions);
+            iconFilter.value = nextOptions.some(option => option.value === previousValue)
+                ? previousValue
+                : "";
+        };
 
         const ensureLegacyIconOption = value => {
             iconInput.querySelectorAll("option[data-cuisine-category-custom-icon]")
@@ -893,6 +941,67 @@
             target?.focus({ preventScroll: true });
         };
 
+        const bottomViewportInset = () => {
+            const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+            const mobileNavigation = document.querySelector(".app-mobile-bottom-nav");
+            if (!mobileNavigation) return 0;
+            const style = window.getComputedStyle(mobileNavigation);
+            if (style.display === "none" || style.visibility === "hidden") return 0;
+            const rect = mobileNavigation.getBoundingClientRect();
+            if (rect.bottom <= 0 || rect.top >= viewportHeight) return 0;
+            return Math.max(0, viewportHeight - Math.max(0, rect.top));
+        };
+
+        const createPanelIsFullyVisible = () => {
+            const panelRect = createForm.getBoundingClientRect();
+            const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+            const visibleBottom = viewportHeight - bottomViewportInset();
+            const content = root.closest("#appContent") || root.closest(".app-content");
+            const contentRect = content?.getBoundingClientRect();
+            const visibleTop = Math.max(0, contentRect?.top || 0);
+            const clippedBottom = Math.min(visibleBottom, contentRect?.bottom || visibleBottom);
+            return panelRect.top >= visibleTop && panelRect.bottom <= clippedBottom;
+        };
+
+        const setCreatePanelExpanded = (expanded, options = {}) => {
+            createForm.hidden = !expanded;
+            addShortcuts.forEach(button => {
+                button.setAttribute("aria-expanded", String(expanded));
+            });
+            if (!expanded) {
+                createForm.style.scrollMarginBottom = "";
+                closeIconPicker();
+                return;
+            }
+            createNameInput.focus({ preventScroll: true });
+            const bottomInset = bottomViewportInset();
+            createForm.style.scrollMarginBottom = bottomInset
+                ? `${Math.ceil(bottomInset)}px`
+                : "";
+            if (!createPanelIsFullyVisible()) {
+                createForm.scrollIntoView({ block: "nearest", inline: "nearest" });
+            }
+            if (options.announce !== false) {
+                setStatus("Add Cuisine Category form focused.", "info");
+            }
+        };
+
+        const resetCreateDraft = () => {
+            createForm.reset();
+            createIconChoiceExplicit = false;
+            suggestedIconToken = "";
+            setCreateIconSelection("");
+            setCreateErrors();
+        };
+
+        const cancelCreate = () => {
+            if (createForm.classList.contains("is-saving")) return;
+            resetCreateDraft();
+            setCreatePanelExpanded(false, { announce: false });
+            addShortcuts.at(-1)?.focus({ preventScroll: true });
+            setStatus("New Cuisine Category discarded.", "info");
+        };
+
         const setCreateSaving = saving => {
             createForm.classList.toggle("is-saving", saving);
             createForm.setAttribute("aria-busy", String(saving));
@@ -901,7 +1010,7 @@
             createIconInput.disabled = saving;
             createIconTrigger.disabled = saving;
             createSubmit.disabled = saving;
-            createSubmit.textContent = saving ? "Adding…" : "Add Cuisine Category";
+            createSubmit.textContent = saving ? "Saving…" : "Save";
             if (saving) setStatus("Adding cuisine category…", "info");
         };
 
@@ -943,13 +1052,10 @@
                     return;
                 }
                 updateRegistry(data.registry);
-                createForm.reset();
-                createIconChoiceExplicit = false;
-                suggestedIconToken = "";
-                setCreateIconSelection("");
-                setCreateErrors();
+                resetCreateDraft();
+                setCreatePanelExpanded(false, { announce: false });
+                addShortcuts.at(-1)?.focus({ preventScroll: true });
                 setStatus(data.message || "Cuisine category added.");
-                window.requestAnimationFrame(() => createNameInput.focus({ preventScroll: true }));
             } catch (error) {
                 const failureMessage = "The cuisine category could not be added. Try again.";
                 setCreateSaving(false);
@@ -1025,11 +1131,6 @@
                 draft.saving = false;
                 updateRegistry(data.registry, { resetCategoryIds: [item.id] });
                 setStatus(data.message || "Cuisine category saved.");
-                window.requestAnimationFrame(() => {
-                    root.querySelector(
-                        `[data-cuisine-category-master-row][data-category-id="${CSS.escape(String(item.id))}"] [data-cuisine-category-master-row-abbreviation]`,
-                    )?.focus({ preventScroll: true });
-                });
             } catch (error) {
                 const failureMessage = "The cuisine category could not be saved. Try again.";
                 draft.saving = false;
@@ -1086,7 +1187,7 @@
                 }
                 updateRegistry(data.registry);
                 setStatus(data.message || "Cuisine category deleted.");
-                window.requestAnimationFrame(() => createNameInput.focus({ preventScroll: true }));
+                addShortcuts.at(-1)?.focus({ preventScroll: true });
             } catch (error) {
                 const failureMessage = "The cuisine category could not be deleted. Try again.";
                 draft.deleting = false;
@@ -1294,6 +1395,18 @@
                 ) closeIconPicker();
             }, 0);
         });
+        addShortcuts.forEach(button => {
+            button.addEventListener("click", event => {
+                event.preventDefault();
+                setCreatePanelExpanded(true);
+            });
+        });
+        root.querySelectorAll("[data-cuisine-category-master-create-cancel]").forEach(
+            button => button.addEventListener("click", event => {
+                event.preventDefault();
+                cancelCreate();
+            }),
+        );
         createForm.addEventListener("submit", saveNewCategory);
         createAbbreviationInput.addEventListener("input", () => {
             clearCreateFieldError("abbreviation");
@@ -1395,6 +1508,7 @@
             }
         });
         search.addEventListener("input", applySearch);
+        iconFilter?.addEventListener("change", applySearch);
         root.querySelectorAll("[data-cuisine-category-master-usage-close]").forEach(
             button => button.addEventListener("click", closeUsage),
         );
