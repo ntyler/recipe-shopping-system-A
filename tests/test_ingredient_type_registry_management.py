@@ -83,7 +83,7 @@ def create_type(client, name):
     return response.get_json()
 
 
-def test_types_page_matches_master_data_navigation_and_exposes_editors(
+def test_types_page_matches_compact_registry_and_exposes_inline_editors(
     ingredient_type_app,
 ):
     with ingredient_type_app.test_client() as client:
@@ -94,8 +94,19 @@ def test_types_page_matches_master_data_navigation_and_exposes_editors(
     soup = BeautifulSoup(response.get_data(as_text=True), "html.parser")
     assert soup.title.get_text(strip=True) == "Types"
     assert soup.select_one("[data-type-master-page]") is not None
-    assert soup.select_one("h1#typesTitle").get_text(strip=True) == "Types"
-    assert soup.select_one("[data-type-master-add-button]").get_text(strip=True) == "Add Type"
+    assert soup.select_one("h1#typesTitle").get_text(" ", strip=True) == "Types ( 6 )"
+    assert soup.select_one("[data-type-master-total-count]").get_text(strip=True) == "6"
+    add_buttons = soup.select("button[data-type-master-add-button]")
+    assert len(add_buttons) == 2
+    assert all(button.get("type") == "button" for button in add_buttons)
+    assert all(button.get_text(" ", strip=True) == "Add Type" for button in add_buttons)
+    assert all(button.get("aria-controls") == "typeMasterInlineCreatePanel" for button in add_buttons)
+    assert soup.select_one(".unit-master-stats") is None
+    assert soup.select_one(".type-master-header-summary") is not None
+    assert soup.select_one(".type-master-filter-toolbar [data-type-master-search]") is not None
+    assert soup.select_one(".type-master-list-section > header .type-master-visible-count").get_text(
+        " ", strip=True
+    ) == "Showing 6 of 6 Types."
     type_category_list = soup.select_one(
         ".unit-master-catalog > .unit-master-category-list.type-master-category-list"
     )
@@ -107,11 +118,10 @@ def test_types_page_matches_master_data_navigation_and_exposes_editors(
     )
     assert len(type_categories) == 1
     assert type_categories[0].has_attr("data-type-master-category")
-    summary_labels = [
-        label.get_text(strip=True)
-        for label in soup.select(".unit-master-stats article > span")
-    ]
-    assert "Active" not in summary_labels
+    summary_text = soup.select_one(".type-master-header-summary").get_text(" ", strip=True)
+    assert "system-seeded" in summary_text
+    assert "user-created" in summary_text
+    assert "in use" in summary_text
     assert soup.select_one("[data-type-master-active-count]") is None
     assert [
         header.get_text(strip=True)
@@ -121,28 +131,38 @@ def test_types_page_matches_master_data_navigation_and_exposes_editors(
     assert soup.select_one("[data-type-master-active]") is None
     assert soup.select_one("[data-type-master-active-error]") is None
     assert soup.select_one(".type-master-availability") is None
-    assert soup.select_one("dialog[data-type-master-dialog]") is not None
+    assert soup.select_one("dialog[data-type-master-dialog]") is None
+    inline_create = soup.select_one("form[data-type-master-create-form]")
+    assert inline_create is not None
+    assert inline_create.has_attr("hidden")
+    assert inline_create.select_one("[data-type-master-create-name]") is not None
+    assert inline_create.select_one("button[type='submit'][data-type-master-create-submit]") is not None
+    assert inline_create.select_one("button[type='button'][data-type-master-create-cancel]") is not None
     assert soup.select_one("dialog[data-type-master-usage-dialog]") is not None
     assert len(soup.select("[data-type-master-row]")) == 6
     assert {
         row.select_one(".unit-master-source-badge").get_text(strip=True)
         for row in soup.select("[data-type-master-row]")
     } == {"Built-in"}
-    seeded_edit_buttons = soup.select("[data-type-master-edit-button]")
-    assert len(seeded_edit_buttons) == 6
+    seeded_save_buttons = soup.select("[data-type-master-row-save]")
+    assert len(seeded_save_buttons) == 6
     assert {
         button["data-type-id"]
-        for button in seeded_edit_buttons
+        for button in seeded_save_buttons
     } == {"main", "optional", "garnish", "topping", "sauce", "substitute"}
+    assert all(button.has_attr("disabled") for button in seeded_save_buttons)
+    assert len(soup.select("[data-type-master-row-name]")) == 6
     assert soup.select(".type-master-action-unavailable") == []
-    assert soup.select_one("[data-type-master-delete][hidden]") is not None
+    assert soup.select("[data-type-master-row-delete]") == []
     static_root = Path(__file__).resolve().parents[1] / "PushShoppingList" / "static"
     css = (static_root / "css" / "app.css").read_text(encoding="utf-8")
     assert ".unit-master-page button[hidden]," in css
     script = (static_root / "js" / "types.js").read_text(encoding="utf-8")
-    assert "nameInput.disabled = Boolean(item?.seeded);" not in script
-    assert "current?.seeded ? current.name : cleanText(nameInput.value)" not in script
-    assert "name: cleanText(nameInput.value)" in script
+    assert 'event.preventDefault();\n                setCreateExpanded(true);' in script
+    assert 'createName.focus({ preventScroll: true });' in script
+    assert 'createForm.scrollIntoView({ block: "nearest", inline: "nearest" });' in script
+    assert 'method: "PATCH"' in script
+    assert 'body: JSON.stringify({ name })' in script
     assert 'item.custom ? "User-created" : "Built-in"' in script
     active_tab = soup.select_one("nav.master-data-tabs a.active")
     assert active_tab.get_text(strip=True) == "Types"
@@ -194,11 +214,7 @@ def test_types_and_cuisine_share_used_in_anchor_and_responsive_layout():
             tracks.append("".join("".join(current).split()))
         return tracks
 
-    unit_tracks = grid_tracks(block_from(
-        css,
-        ".unit-master-table-head,",
-    ))
-    type_section = css.index("/* Type master data:")
+    type_section = css.index("/* Type manager v2:")
     type_desktop = block_from(
         css,
         "@media (min-width: 761px)",
@@ -214,9 +230,9 @@ def test_types_and_cuisine_share_used_in_anchor_and_responsive_layout():
         if any(".type-master-table" in selector for selector in selectors):
             type_desktop_rules.append((selectors, match.group(2)))
 
-    assert len(type_desktop_rules) == 5
-    for selectors, _declarations in type_desktop_rules:
-        assert len(selectors) == 2
+    assert len(type_desktop_rules) == 6
+    for rule_index, (selectors, _declarations) in enumerate(type_desktop_rules):
+        assert len(selectors) == (3 if rule_index == 0 else 2)
         assert all(
             selector.startswith("[data-type-master-page] ")
             for selector in selectors
@@ -229,15 +245,6 @@ def test_types_and_cuisine_share_used_in_anchor_and_responsive_layout():
             not selector.startswith(".type-master-page ")
             for selector in selectors
         )
-    assert re.search(
-        r"(?m)^\s*\.type-master-page\s+\.type-master-table",
-        type_desktop,
-    ) is None
-    assert re.search(
-        r"(?m)^\s*\.type-master-table[^\n,{]*:nth-child\(",
-        css,
-    ) is None
-
     type_grid_rules = [
         declarations
         for _selectors, declarations in type_desktop_rules
@@ -246,19 +253,17 @@ def test_types_and_cuisine_share_used_in_anchor_and_responsive_layout():
     assert len(type_grid_rules) == 1
     type_tracks = grid_tracks(type_grid_rules[0])
 
-    assert unit_tracks == [
-        "minmax(105px,.7fr)",
-        "minmax(145px,1.22fr)",
-        "minmax(76px,.5fr)",
-        "108px",
-        "58px",
+    assert type_tracks == [
+        "minmax(280px,1fr)",
+        "160px",
+        "128px",
+        "180px",
     ]
-    assert type_tracks == unit_tracks
     for child, expected_column in (
-        (1, "1 / span 2"),
-        (2, "3"),
-        (3, "4"),
-        (4, "5"),
+        (1, "1"),
+        (2, "2"),
+        (3, "3"),
+        (4, "4"),
     ):
         mappings = [
             (selectors, declarations)
@@ -271,11 +276,18 @@ def test_types_and_cuisine_share_used_in_anchor_and_responsive_layout():
         assert len(mappings) == 1
         assert f"grid-column: {expected_column};" in mappings[0][1]
 
-    type_full_width = block_from(css, "@media (max-width: 1640px)")
-    assert grid_tracks(block_from(
-        type_full_width,
-        ".type-master-category-list",
-    )) == ["minmax(0,1fr)"]
+    assert "grid-template-columns: minmax(0, 1fr);" in block_from(
+        css,
+        ".type-master-category-list {",
+        type_section,
+    )
+    sticky_header = block_from(
+        css,
+        ".type-master-registry-category .unit-master-table-head",
+        type_section,
+    )
+    assert "position: sticky;" in sticky_header
+    assert "top: calc(-1 * var(--app-content-padding-block-start));" in sticky_header
 
     cuisine_section = css.index("/* Cuisine Category master data:")
     cuisine_desktop = block_from(
@@ -421,9 +433,9 @@ def test_types_used_in_and_action_match_unit_row_markup(
         / "js"
         / "types.js"
     ).read_text(encoding="utf-8")
-    assert 'action.className = "unit-master-action-cell";' in script
+    assert 'action.className = "unit-master-action-cell type-master-row-actions";' in script
     assert 'action.setAttribute("role", "cell");' in script
-    assert "row.append(name, createUsageCell(item), sourceBadge, action);" in script
+    assert "row.append(nameField, createUsageCell(item), sourceBadge, action, error);" in script
     assert 'button.title = `Show recipes using ${item.name}`;' in script
     assert 'empty.title = `No recipes currently use ${item.name}`;' in script
 

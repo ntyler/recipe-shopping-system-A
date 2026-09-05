@@ -22,33 +22,33 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
         <header class="master-data-header">
             <div>
                 <a class="master-data-home-link" href="{{ url_for('main_bp.index') }}#userAccountSection">Account</a>
-                <h1 id="typesTitle">Types</h1>
+                <h1 id="typesTitle">Types (<span data-type-master-total-count>{{ master_data.types|length }}</span>)</h1>
                 <p>Manage the ingredient roles available across this workspace.</p>
+                <div class="type-master-header-summary" aria-label="Type summary">
+                    <span><strong data-type-master-seeded-count>{{ master_data.seeded_count }}</strong> system-seeded</span>
+                    <span><strong data-type-master-custom-count>{{ master_data.custom_count }}</strong> user-created</span>
+                    <span><strong data-type-master-used-count>{{ master_data.used_count }}</strong> in use</span>
+                </div>
             </div>
-            <nav class="master-data-tabs" aria-label="Master data">
-                <a href="{{ master_data.ingredient_url }}">Ingredients</a>
-                <a href="{{ master_data.equipment_url }}">Equipment</a>
-                <a href="{{ master_data.units_url }}">Units</a>
-                <a href="{{ master_data.types_url }}" class="active" aria-current="page">Types</a>
-                <a href="{{ master_data.cuisine_category_url }}">Cuisine Categories</a>
-                <a href="{{ master_data.store_section_url }}">Store Sections</a>
-            </nav>
+            <div class="type-master-header-actions">
+                <nav class="master-data-tabs" aria-label="Master data">
+                    <a href="{{ master_data.ingredient_url }}">Ingredients</a>
+                    <a href="{{ master_data.equipment_url }}">Equipment</a>
+                    <a href="{{ master_data.units_url }}">Units</a>
+                    <a href="{{ master_data.types_url }}" class="active" aria-current="page">Types</a>
+                    <a href="{{ master_data.cuisine_category_url }}">Cuisine Categories</a>
+                    <a href="{{ master_data.store_section_url }}">Store Sections</a>
+                </nav>
+                <button type="button"
+                        class="type-master-add-shortcut type-master-header-add"
+                        aria-controls="typeMasterInlineCreatePanel"
+                        aria-expanded="false"
+                        data-type-master-add-button>
+                    {{ shell.svg_icon("plus") }}
+                    <span>Add Type</span>
+                </button>
+            </div>
         </header>
-
-        <div class="unit-master-stats" aria-label="Type summary">
-            <article>
-                <span>System-seeded</span>
-                <strong data-type-master-seeded-count>{{ master_data.seeded_count }}</strong>
-            </article>
-            <article>
-                <span>User-created</span>
-                <strong data-type-master-custom-count>{{ master_data.custom_count }}</strong>
-            </article>
-            <article>
-                <span>In use</span>
-                <strong data-type-master-used-count>{{ master_data.used_count }}</strong>
-            </article>
-        </div>
 
         <section class="unit-master-import" data-type-master-import hidden>
             <div>
@@ -63,33 +63,36 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
 
         <div class="unit-master-status" role="status" aria-live="polite" data-type-master-status hidden></div>
 
-        <section class="unit-master-panel unit-master-catalog" aria-labelledby="typeRegistryTitle">
-            <header>
-                <div>
-                    <span>Workspace registry</span>
-                    <h2 id="typeRegistryTitle">Type Registry</h2>
-                    <p>System-seeded IDs preserve recipe behavior; display names can be edited, and unused custom roles can be deleted.</p>
-                </div>
-                <div class="unit-master-toolbar">
-                    <label class="unit-master-search">
-                        <span>Search types</span>
+        <section class="unit-master-panel unit-master-catalog type-master-list-section" aria-labelledby="typeRegistryTitle">
+            <header class="type-master-table-toolbar">
+                <h2 id="typeRegistryTitle" class="sr-only">Type Registry</h2>
+                <strong class="type-master-visible-count"
+                        aria-live="polite"
+                        data-type-master-count-label>
+                    Showing {{ master_data.types | length }} of {{ master_data.types | length }} Types.
+                </strong>
+            </header>
+            <div class="type-master-filter-toolbar">
+                <label class="unit-master-search type-master-search">
+                    <span class="type-master-search-label">Search</span>
+                    <span class="type-master-search-control">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <circle cx="11" cy="11" r="6.5"></circle>
+                            <path d="m16 16 4 4"></path>
+                        </svg>
                         <input type="search"
                                placeholder="Type name"
                                autocomplete="off"
                                data-type-master-search>
-                    </label>
-                    <button type="button" data-type-master-add-button>Add Type</button>
-                </div>
-            </header>
+                    </span>
+                </label>
+            </div>
 
             <div class="unit-master-category-list type-master-category-list">
-                <section class="unit-master-category type-master-category"
+                <section class="unit-master-category type-master-category type-master-registry-category"
                          data-type-master-category
                          aria-labelledby="allTypesTitle">
-                    <header>
-                        <h3 id="allTypesTitle">Ingredient roles</h3>
-                        <span data-type-master-count-label>{{ master_data.types | length }} types</span>
-                    </header>
+                    <h3 class="sr-only" id="allTypesTitle">Ingredient roles</h3>
                     <div class="unit-master-table type-master-table" role="table" aria-label="Ingredient types">
                         <div class="unit-master-table-head" role="row">
                             <span role="columnheader">Type name</span>
@@ -104,7 +107,16 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                      data-type-master-row
                                      data-type-id="{{ type.id }}"
                                      data-type-master-search-value="{{ type.name }}">
-                                    <strong role="cell">{{ type.name }}</strong>
+                                    <label class="type-master-row-name-field" role="cell" data-mobile-label="Type name">
+                                        <span class="sr-only">Type name for {{ type.name }}</span>
+                                        <input type="text"
+                                               maxlength="40"
+                                               value="{{ type.name }}"
+                                               autocomplete="off"
+                                               required
+                                               aria-describedby="typeMasterRowError{{ loop.index }}"
+                                               data-type-master-row-name>
+                                    </label>
                                     <div class="unit-master-usage" role="cell">
                                         {% if type.recipe_count %}
                                             <button type="button"
@@ -127,16 +139,75 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                     <span class="unit-master-source-badge{% if type.custom %} user-created{% endif %}" role="cell">
                                         {{ "User-created" if type.custom else "Built-in" }}
                                     </span>
-                                    <span class="unit-master-action-cell" role="cell">
+                                    <span class="unit-master-action-cell type-master-row-actions"
+                                          role="cell"
+                                          data-mobile-label="Action">
                                         <button type="button"
                                                 class="unit-master-edit-button"
-                                                data-type-master-edit-button
+                                                data-type-master-row-save
                                                 data-type-id="{{ type.id }}"
-                                                aria-label="Edit {{ type.name }}">Edit</button>
+                                                aria-label="Save {{ type.name }}"
+                                                disabled>Save</button>
+                                        {% if type.custom %}
+                                            <button type="button"
+                                                    class="danger type-master-row-delete"
+                                                    data-type-master-row-delete
+                                                    data-type-id="{{ type.id }}"
+                                                    aria-label="Delete {{ type.name }}">Delete</button>
+                                        {% endif %}
                                     </span>
+                                    <div id="typeMasterRowError{{ loop.index }}"
+                                         class="unit-master-field-error type-master-row-error"
+                                         role="alert"
+                                         data-type-master-row-error
+                                         hidden></div>
                                 </div>
                             {% endfor %}
                         </div>
+
+                        <form id="typeMasterInlineCreatePanel"
+                              class="unit-master-row type-master-create-row"
+                              role="row"
+                              aria-label="Add a Type"
+                              data-type-master-create-form
+                              novalidate
+                              hidden>
+                            <label class="type-master-row-name-field" role="cell" data-mobile-label="Type name">
+                                <span class="sr-only">New Type name</span>
+                                <input type="text"
+                                       maxlength="40"
+                                       placeholder="New Type"
+                                       autocomplete="off"
+                                       required
+                                       aria-describedby="typeMasterCreateError"
+                                       data-type-master-create-name>
+                            </label>
+                            <div class="unit-master-usage" role="cell">
+                                <span class="unit-master-usage-empty" aria-label="No recipes use the new Type">0</span>
+                            </div>
+                            <span class="unit-master-source-badge user-created" role="cell">User-created</span>
+                            <span class="unit-master-action-cell type-master-row-actions"
+                                  role="cell"
+                                  data-mobile-label="Action">
+                                <button type="submit" data-type-master-create-submit>Save</button>
+                                <button type="button" data-type-master-create-cancel>Cancel</button>
+                            </span>
+                            <div id="typeMasterCreateError"
+                                 class="unit-master-field-error type-master-create-error"
+                                 role="alert"
+                                 data-type-master-create-error
+                                 hidden></div>
+                        </form>
+                    </div>
+                    <div class="type-master-add-footer">
+                        <button type="button"
+                                class="type-master-add-shortcut"
+                                aria-controls="typeMasterInlineCreatePanel"
+                                aria-expanded="false"
+                                data-type-master-add-button>
+                            <span aria-hidden="true">{{ shell.svg_icon("plus") }}</span>
+                            <span>Add Type</span>
+                        </button>
                     </div>
                 </section>
             </div>
@@ -144,43 +215,6 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                 No types match that search.
             </div>
         </section>
-
-        <dialog class="unit-master-dialog" data-type-master-dialog aria-labelledby="typeEditorTitle">
-            <form method="dialog" class="unit-master-editor type-master-editor" data-type-master-form novalidate>
-                <header>
-                    <div>
-                        <span data-type-master-editor-kicker>Workspace type</span>
-                        <h2 id="typeEditorTitle" data-type-master-editor-title>Add Type</h2>
-                        <p>Type names are matched case-insensitively throughout the recipe editor.</p>
-                    </div>
-                    <button type="button" class="unit-master-dialog-close" data-type-master-close aria-label="Close type editor">&times;</button>
-                </header>
-
-                <div class="type-master-editor-fields">
-                    <label class="unit-master-field">
-                        <span>Type name</span>
-                        <input type="text"
-                               maxlength="40"
-                               autocomplete="off"
-                               data-type-master-name
-                               aria-describedby="typeNameHelp typeNameError">
-                        <small class="unit-master-field-help" id="typeNameHelp" data-type-master-name-help>
-                            Display names can be edited. System-seeded IDs and recipe behavior remain stable.
-                        </small>
-                        <small class="unit-master-field-error" id="typeNameError" data-type-master-name-error hidden></small>
-                    </label>
-
-                </div>
-
-                <div class="unit-master-editor-feedback" role="alert" data-type-master-editor-feedback hidden></div>
-                <footer>
-                    <button type="button" class="danger type-master-delete" data-type-master-delete hidden>Delete Type</button>
-                    <span class="type-master-footer-spacer"></span>
-                    <button type="button" class="secondary" data-type-master-cancel>Cancel</button>
-                    <button type="submit" data-type-master-save>Add Type</button>
-                </footer>
-            </form>
-        </dialog>
 
         <dialog id="typeMasterUsageDialog"
                 class="unit-master-usage-dialog"

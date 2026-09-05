@@ -48,10 +48,9 @@
         if (!root) return;
 
         let registry = parseRegistry();
-        let editorTypeId = "";
-        let returnFocus = null;
         let usageReturnFocus = null;
         let usageRequestToken = 0;
+        const drafts = new Map();
 
         const source = document.getElementById("ingredientTypeConfig");
         const status = root.querySelector("[data-type-master-status]");
@@ -59,16 +58,11 @@
         const rows = root.querySelector("[data-type-master-rows]");
         const countLabel = root.querySelector("[data-type-master-count-label]");
         const searchEmpty = root.querySelector("[data-type-master-search-empty]");
-        const dialog = root.querySelector("[data-type-master-dialog]");
-        const form = root.querySelector("[data-type-master-form]");
-        const nameInput = root.querySelector("[data-type-master-name]");
-        const nameHelp = root.querySelector("[data-type-master-name-help]");
-        const nameError = root.querySelector("[data-type-master-name-error]");
-        const editorTitle = root.querySelector("[data-type-master-editor-title]");
-        const editorKicker = root.querySelector("[data-type-master-editor-kicker]");
-        const editorFeedback = root.querySelector("[data-type-master-editor-feedback]");
-        const saveButton = root.querySelector("[data-type-master-save]");
-        const deleteButton = root.querySelector("[data-type-master-delete]");
+        const createForm = root.querySelector("[data-type-master-create-form]");
+        const createName = root.querySelector("[data-type-master-create-name]");
+        const createSubmit = root.querySelector("[data-type-master-create-submit]");
+        const createError = root.querySelector("[data-type-master-create-error]");
+        const addButtons = Array.from(root.querySelectorAll("[data-type-master-add-button]"));
         const importPanel = root.querySelector("[data-type-master-import]");
         const importButton = root.querySelector("[data-type-master-import-button]");
         const usageDialog = root.querySelector("[data-type-master-usage-dialog]");
@@ -77,7 +71,9 @@
         const usageSummary = root.querySelector("[data-type-master-usage-summary]");
         const usageResults = root.querySelector("[data-type-master-usage-results]");
 
-        const typeById = typeId => registry.types.find(item => String(item.id) === String(typeId)) || null;
+        const typeById = typeId => registry.types.find(
+            item => String(item.id) === String(typeId),
+        ) || null;
 
         const setStatus = (message, type = "success") => {
             status.textContent = String(message || "");
@@ -85,17 +81,18 @@
             status.hidden = !status.textContent;
         };
 
-        const setFieldError = (input, output, message) => {
-            const text = String(message || "");
-            output.textContent = text;
-            output.hidden = !text;
-            input.toggleAttribute("aria-invalid", Boolean(text));
-        };
-
-        const setEditorFeedback = (message, type = "error") => {
-            editorFeedback.textContent = String(message || "");
-            editorFeedback.dataset.status = type;
-            editorFeedback.hidden = !editorFeedback.textContent;
+        const requestJson = async (url, options = {}) => {
+            const response = await fetch(url, {
+                ...options,
+                headers: {
+                    Accept: "application/json",
+                    "Content-Type": "application/json",
+                    "X-Requested-With": "fetch",
+                    ...(options.headers || {}),
+                },
+            });
+            const data = await response.json().catch(() => ({}));
+            return { response, data };
         };
 
         const createUsageCell = item => {
@@ -133,7 +130,55 @@
             return usage;
         };
 
-        const createTypeRow = item => {
+        const ensureDraft = item => {
+            const id = String(item.id);
+            if (!drafts.has(id)) {
+                drafts.set(id, {
+                    originalName: item.name,
+                    name: item.name,
+                    saving: false,
+                    deleting: false,
+                    errors: {},
+                    feedback: "",
+                });
+            }
+            return drafts.get(id);
+        };
+
+        const draftIsDirty = draft => cleanText(draft.name) !== cleanText(draft.originalName);
+
+        const rowControls = row => ({
+            name: row.querySelector("[data-type-master-row-name]"),
+            save: row.querySelector("[data-type-master-row-save]"),
+            delete: row.querySelector("[data-type-master-row-delete]"),
+            error: row.querySelector("[data-type-master-row-error]"),
+        });
+
+        const syncRowState = row => {
+            const item = typeById(row?.dataset.typeId);
+            if (!item) return;
+            const draft = ensureDraft(item);
+            const controls = rowControls(row);
+            const message = draft.errors.name || draft.feedback || "";
+            const dirty = draftIsDirty(draft);
+            row.classList.toggle("is-dirty", dirty);
+            row.classList.toggle("is-saving", draft.saving);
+            row.classList.toggle("has-error", Boolean(message));
+            row.setAttribute("aria-busy", String(draft.saving || draft.deleting));
+            controls.name.toggleAttribute("aria-invalid", Boolean(message));
+            controls.name.disabled = draft.saving || draft.deleting;
+            controls.save.disabled = !dirty || draft.saving || draft.deleting;
+            controls.save.textContent = draft.saving ? "Saving…" : "Save";
+            if (controls.delete) {
+                controls.delete.disabled = draft.saving || draft.deleting;
+                controls.delete.textContent = draft.deleting ? "Deleting…" : "Delete";
+            }
+            controls.error.textContent = message;
+            controls.error.hidden = !message;
+        };
+
+        const createTypeRow = (item, index) => {
+            const draft = ensureDraft(item);
             const row = document.createElement("div");
             row.className = "unit-master-row";
             row.setAttribute("role", "row");
@@ -141,9 +186,22 @@
             row.dataset.typeId = item.id;
             row.dataset.typeMasterSearchValue = item.name;
 
-            const name = document.createElement("strong");
-            name.setAttribute("role", "cell");
-            name.textContent = item.name;
+            const nameField = document.createElement("label");
+            nameField.className = "type-master-row-name-field";
+            nameField.setAttribute("role", "cell");
+            nameField.dataset.mobileLabel = "Type name";
+            const nameLabel = document.createElement("span");
+            nameLabel.className = "sr-only";
+            nameLabel.textContent = `Type name for ${item.name}`;
+            const name = document.createElement("input");
+            name.type = "text";
+            name.maxLength = 40;
+            name.autocomplete = "off";
+            name.required = true;
+            name.value = draft.name;
+            name.dataset.typeMasterRowName = "";
+            name.setAttribute("aria-describedby", `typeMasterRowError${index}`);
+            nameField.append(nameLabel, name);
 
             const sourceBadge = document.createElement("span");
             sourceBadge.className = `unit-master-source-badge${item.custom ? " user-created" : ""}`;
@@ -151,22 +209,42 @@
             sourceBadge.textContent = item.custom ? "User-created" : "Built-in";
 
             const action = document.createElement("span");
-            action.className = "unit-master-action-cell";
+            action.className = "unit-master-action-cell type-master-row-actions";
             action.setAttribute("role", "cell");
-            const edit = document.createElement("button");
-            edit.type = "button";
-            edit.className = "unit-master-edit-button";
-            edit.dataset.typeMasterEditButton = "";
-            edit.dataset.typeId = item.id;
-            edit.textContent = "Edit";
-            edit.setAttribute("aria-label", `Edit ${item.name}`);
-            action.appendChild(edit);
+            action.dataset.mobileLabel = "Action";
+            const save = document.createElement("button");
+            save.type = "button";
+            save.className = "unit-master-edit-button";
+            save.dataset.typeMasterRowSave = "";
+            save.dataset.typeId = item.id;
+            save.textContent = "Save";
+            save.setAttribute("aria-label", `Save ${item.name}`);
+            action.appendChild(save);
+            if (item.custom) {
+                const deleteButton = document.createElement("button");
+                deleteButton.type = "button";
+                deleteButton.className = "danger type-master-row-delete";
+                deleteButton.dataset.typeMasterRowDelete = "";
+                deleteButton.dataset.typeId = item.id;
+                deleteButton.textContent = "Delete";
+                deleteButton.setAttribute("aria-label", `Delete ${item.name}`);
+                action.appendChild(deleteButton);
+            }
 
-            row.append(name, createUsageCell(item), sourceBadge, action);
+            const error = document.createElement("div");
+            error.id = `typeMasterRowError${index}`;
+            error.className = "unit-master-field-error type-master-row-error";
+            error.setAttribute("role", "alert");
+            error.dataset.typeMasterRowError = "";
+            error.hidden = true;
+
+            row.append(nameField, createUsageCell(item), sourceBadge, action, error);
+            syncRowState(row);
             return row;
         };
 
         const renderStats = () => {
+            root.querySelector("[data-type-master-total-count]").textContent = String(registry.types.length);
             root.querySelector("[data-type-master-seeded-count]").textContent = String(
                 registry.types.filter(item => item.seeded).length,
             );
@@ -182,21 +260,29 @@
             const query = typeKey(search.value);
             let visible = 0;
             root.querySelectorAll("[data-type-master-row]").forEach(row => {
-                const matches = !query || typeKey(row.dataset.typeMasterSearchValue).includes(query);
+                const name = row.querySelector("[data-type-master-row-name]")?.value
+                    || row.dataset.typeMasterSearchValue;
+                const matches = !query || typeKey(name).includes(query);
                 row.hidden = !matches;
                 if (matches) visible += 1;
             });
-            countLabel.textContent = `${visible} type${visible === 1 ? "" : "s"}`;
+            const total = registry.types.length;
+            countLabel.textContent = `Showing ${visible} of ${total} Type${total === 1 ? "" : "s"}.`;
             searchEmpty.hidden = visible > 0;
         };
 
         const renderRegistry = () => {
+            const liveIds = new Set(registry.types.map(item => String(item.id)));
+            Array.from(drafts.keys()).forEach(id => {
+                if (!liveIds.has(id)) drafts.delete(id);
+            });
             rows.replaceChildren(...registry.types.map(createTypeRow));
             renderStats();
             applySearch();
         };
 
-        const updateRegistry = nextRegistry => {
+        const updateRegistry = (nextRegistry, options = {}) => {
+            (options.resetTypeIds || []).forEach(id => drafts.delete(String(id)));
             registry = {
                 types: Array.isArray(nextRegistry?.types) ? nextRegistry.types : [],
             };
@@ -204,101 +290,98 @@
             renderRegistry();
         };
 
-        const clearEditorErrors = () => {
-            setFieldError(nameInput, nameError, "");
-            setEditorFeedback("");
+        const validateName = (name, item = null) => {
+            if (!name) return "Enter a type name.";
+            if (name.length > 40) return "Use 40 characters or fewer.";
+            const duplicate = registry.types.some(candidate => (
+                String(candidate.id) !== String(item?.id || "")
+                && typeKey(candidate.name) === typeKey(name)
+            ));
+            return duplicate ? "A type with this name already exists." : "";
         };
 
-        const closeEditor = () => {
-            if (dialog.open) dialog.close();
+        const captureRowDraft = row => {
+            const item = typeById(row?.dataset.typeId);
+            if (!item) return null;
+            const draft = ensureDraft(item);
+            draft.name = rowControls(row).name.value;
+            draft.errors = {};
+            draft.feedback = "";
+            row.dataset.typeMasterSearchValue = draft.name;
+            syncRowState(row);
+            applySearch();
+            return draft;
         };
 
-        const openEditor = (item = null, trigger = null) => {
-            editorTypeId = String(item?.id || "");
-            returnFocus = trigger || document.activeElement;
-            clearEditorErrors();
-            nameInput.value = item?.name || "";
-            nameInput.disabled = false;
-            nameHelp.textContent = item?.seeded
-                ? "You can change this display name; its system-seeded ID and recipe behavior remain stable."
-                : "Custom type names can be changed without losing their recipe assignments.";
-            editorTitle.textContent = item ? `Edit ${item.name}` : "Add Type";
-            editorKicker.textContent = item?.seeded
-                ? "System-seeded type"
-                : (item ? "User-created type" : "New workspace type");
-            saveButton.textContent = item ? "Save Changes" : "Add Type";
-            deleteButton.hidden = !item?.custom;
-            deleteButton.dataset.typeId = item?.id || "";
-            if (item?.custom && Number(item.recipe_count) > 0) {
-                deleteButton.title = `${item.name} is used by ${item.recipe_count} recipe${Number(item.recipe_count) === 1 ? "" : "s"}.`;
-            } else {
-                deleteButton.removeAttribute("title");
+        const saveTypeRow = async row => {
+            const item = typeById(row?.dataset.typeId);
+            if (!item) return;
+            const draft = captureRowDraft(row);
+            const name = cleanText(draft.name);
+            const nameError = validateName(name, item);
+            draft.name = name;
+            draft.errors = nameError ? { name: nameError } : {};
+            syncRowState(row);
+            if (nameError) {
+                rowControls(row).name.focus({ preventScroll: true });
+                return;
             }
-            if (!dialog.open) dialog.showModal();
-            window.requestAnimationFrame(() => nameInput.focus());
-        };
-
-        const requestJson = async (url, options = {}) => {
-            const response = await fetch(url, {
-                ...options,
-                headers: {
-                    Accept: "application/json",
-                    "Content-Type": "application/json",
-                    "X-Requested-With": "fetch",
-                    ...(options.headers || {}),
-                },
-            });
-            const data = await response.json().catch(() => ({}));
-            return { response, data };
-        };
-
-        const saveType = async event => {
-            event.preventDefault();
-            clearEditorErrors();
-            const payload = {
-                name: cleanText(nameInput.value),
-            };
-            saveButton.disabled = true;
-            saveButton.textContent = "Saving…";
+            if (!draftIsDirty(draft) || draft.saving) return;
+            draft.saving = true;
+            setStatus(`Saving ${item.name}…`, "info");
+            syncRowState(row);
+            let saved = false;
             try {
-                const url = editorTypeId
-                    ? root.dataset.updateUrlTemplate.replace("__TYPE_ID__", encodeURIComponent(editorTypeId))
-                    : root.dataset.createUrl;
+                const url = root.dataset.updateUrlTemplate.replace(
+                    "__TYPE_ID__",
+                    encodeURIComponent(item.id),
+                );
                 const { response, data } = await requestJson(url, {
-                    method: editorTypeId ? "PATCH" : "POST",
-                    body: JSON.stringify(payload),
+                    method: "PATCH",
+                    body: JSON.stringify({ name }),
                 });
                 if (!response.ok || data.ok === false) {
-                    const errors = data.errors || {};
-                    setFieldError(nameInput, nameError, errors.name || "");
-                    setEditorFeedback(data.error || "The type could not be saved.");
+                    draft.saving = false;
+                    draft.errors = data.errors || {};
+                    draft.feedback = data.error || "The type could not be saved.";
+                    syncRowState(row);
+                    setStatus(draft.feedback, "error");
+                    if (draft.errors.name) rowControls(row).name.focus({ preventScroll: true });
                     return;
                 }
-                updateRegistry(data.registry);
+                saved = true;
+                draft.saving = false;
+                updateRegistry(data.registry, { resetTypeIds: [item.id] });
                 setStatus(data.message || "Type saved.");
-                closeEditor();
             } catch (error) {
-                setEditorFeedback("The type could not be saved. Try again.");
+                draft.saving = false;
+                draft.feedback = "The type could not be saved. Try again.";
+                syncRowState(row);
+                setStatus(draft.feedback, "error");
                 console.error("Unable to save ingredient type.", error);
             } finally {
-                saveButton.disabled = false;
-                saveButton.textContent = editorTypeId ? "Save Changes" : "Add Type";
+                if (!saved && row.isConnected) syncRowState(row);
             }
         };
 
-        const deleteType = async () => {
-            const item = typeById(editorTypeId);
+        const deleteTypeRow = async row => {
+            const item = typeById(row?.dataset.typeId);
             if (!item?.custom) return;
+            const draft = ensureDraft(item);
+            const controls = rowControls(row);
+            if (draft.saving || draft.deleting) return;
             if (Number(item.recipe_count) > 0) {
-                setEditorFeedback(
-                    `${item.name} is used by ${item.recipe_count} recipe${Number(item.recipe_count) === 1 ? "" : "s"}. Reassign or remove this type from those recipes before deleting it.`,
-                    "warning",
-                );
-                deleteButton.focus();
+                draft.feedback = `${item.name} is used by ${item.recipe_count} recipe${Number(item.recipe_count) === 1 ? "" : "s"}. Reassign or remove this type from those recipes before deleting it.`;
+                syncRowState(row);
+                controls.delete.focus({ preventScroll: true });
                 return;
             }
             if (!window.confirm(`Delete custom type "${item.name}"?`)) return;
-            deleteButton.disabled = true;
+            draft.deleting = true;
+            draft.errors = {};
+            draft.feedback = "";
+            setStatus(`Deleting ${item.name}…`, "info");
+            syncRowState(row);
             try {
                 const url = root.dataset.updateUrlTemplate.replace(
                     "__TYPE_ID__",
@@ -306,17 +389,131 @@
                 );
                 const { response, data } = await requestJson(url, { method: "DELETE" });
                 if (!response.ok || data.ok === false) {
-                    setEditorFeedback(data.error || "The type could not be deleted.");
+                    draft.deleting = false;
+                    draft.errors = data.errors || {};
+                    draft.feedback = data.error || "The type could not be deleted.";
+                    syncRowState(row);
+                    setStatus(draft.feedback, "error");
+                    controls.delete.focus({ preventScroll: true });
                     return;
                 }
                 updateRegistry(data.registry);
                 setStatus(data.message || "Type deleted.");
-                closeEditor();
+                addButtons.at(-1)?.focus({ preventScroll: true });
             } catch (error) {
-                setEditorFeedback("The type could not be deleted. Try again.");
+                draft.deleting = false;
+                draft.feedback = "The type could not be deleted. Try again.";
+                syncRowState(row);
+                setStatus(draft.feedback, "error");
+                controls.delete.focus({ preventScroll: true });
                 console.error("Unable to delete ingredient type.", error);
+            }
+        };
+
+        const bottomViewportInset = () => {
+            const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+            const mobileNavigation = document.querySelector(".app-mobile-bottom-nav");
+            if (!mobileNavigation) return 0;
+            const style = window.getComputedStyle(mobileNavigation);
+            if (style.display === "none" || style.visibility === "hidden") return 0;
+            const rect = mobileNavigation.getBoundingClientRect();
+            if (rect.bottom <= 0 || rect.top >= viewportHeight) return 0;
+            return Math.max(0, viewportHeight - Math.max(0, rect.top));
+        };
+
+        const createPanelIsFullyVisible = () => {
+            const rect = createForm.getBoundingClientRect();
+            const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+            const visibleBottom = viewportHeight - bottomViewportInset();
+            const content = root.closest("#appContent") || root.closest(".app-content");
+            const contentRect = content?.getBoundingClientRect();
+            const visibleTop = Math.max(0, contentRect?.top || 0);
+            const clippedBottom = Math.min(visibleBottom, contentRect?.bottom || visibleBottom);
+            return rect.top >= visibleTop && rect.bottom <= clippedBottom;
+        };
+
+        const setCreateExpanded = expanded => {
+            createForm.hidden = !expanded;
+            addButtons.forEach(button => button.setAttribute("aria-expanded", String(expanded)));
+            if (!expanded) {
+                createForm.style.scrollMarginBottom = "";
+                return;
+            }
+            createName.focus({ preventScroll: true });
+            const bottomInset = bottomViewportInset();
+            createForm.style.scrollMarginBottom = bottomInset ? `${Math.ceil(bottomInset)}px` : "";
+            if (!createPanelIsFullyVisible()) {
+                createForm.scrollIntoView({ block: "nearest", inline: "nearest" });
+            }
+            setStatus("Add Type form focused.", "info");
+        };
+
+        const setCreateError = message => {
+            const text = String(message || "");
+            createError.textContent = text;
+            createError.hidden = !text;
+            createName.toggleAttribute("aria-invalid", Boolean(text));
+            createForm.classList.toggle("has-error", Boolean(text));
+        };
+
+        const setCreateSaving = saving => {
+            createForm.classList.toggle("is-saving", saving);
+            createForm.setAttribute("aria-busy", String(saving));
+            createName.disabled = saving;
+            createSubmit.disabled = saving;
+            createSubmit.textContent = saving ? "Saving…" : "Save";
+        };
+
+        const resetCreate = () => {
+            createForm.reset();
+            setCreateError("");
+        };
+
+        const cancelCreate = () => {
+            if (createForm.classList.contains("is-saving")) return;
+            resetCreate();
+            setCreateExpanded(false);
+            addButtons.at(-1)?.focus({ preventScroll: true });
+            setStatus("New Type discarded.", "info");
+        };
+
+        const saveNewType = async event => {
+            event.preventDefault();
+            const name = cleanText(createName.value);
+            createName.value = name;
+            const errorMessage = validateName(name);
+            setCreateError(errorMessage);
+            if (errorMessage) {
+                createName.focus({ preventScroll: true });
+                return;
+            }
+            setCreateSaving(true);
+            setStatus("Adding type…", "info");
+            try {
+                const { response, data } = await requestJson(root.dataset.createUrl, {
+                    method: "POST",
+                    body: JSON.stringify({ name }),
+                });
+                if (!response.ok || data.ok === false) {
+                    const failureMessage = data.errors?.name || data.error || "The type could not be added.";
+                    setCreateError(failureMessage);
+                    setStatus(data.error || failureMessage, "error");
+                    createName.focus({ preventScroll: true });
+                    return;
+                }
+                updateRegistry(data.registry);
+                resetCreate();
+                setCreateExpanded(false);
+                addButtons.at(-1)?.focus({ preventScroll: true });
+                setStatus(data.message || "Type added.");
+            } catch (error) {
+                const failureMessage = "The type could not be added. Try again.";
+                setCreateError(failureMessage);
+                setStatus(failureMessage, "error");
+                createName.focus({ preventScroll: true });
+                console.error("Unable to add ingredient type.", error);
             } finally {
-                deleteButton.disabled = false;
+                setCreateSaving(false);
             }
         };
 
@@ -340,7 +537,6 @@
                 visual.rel = "noopener noreferrer";
                 visual.setAttribute("aria-label", `Open ${recipeTitle}`);
             }
-
             const fallback = document.createElement("span");
             fallback.className = "unit-master-usage-recipe-fallback";
             fallback.setAttribute("aria-hidden", "true");
@@ -350,7 +546,6 @@
                 visual.appendChild(fallback);
                 return visual;
             }
-
             visual.classList.add("has-image");
             const image = document.createElement("img");
             image.src = imageUrl;
@@ -387,45 +582,40 @@
             references.forEach(reference => {
                 const card = document.createElement("article");
                 card.className = "unit-master-usage-recipe";
-                const visual = createUsageRecipeVisual(reference);
+                const recipeTitle = reference.recipe_title || reference.recipe_id || "Recipe";
                 const header = document.createElement("header");
                 const heading = document.createElement("h3");
-                const recipeTitle = reference.recipe_title || reference.recipe_id || "Recipe";
                 if (reference.edit_url) {
-                    const link = document.createElement("a");
-                    link.href = reference.edit_url;
-                    link.target = "_blank";
-                    link.rel = "noopener noreferrer";
-                    link.textContent = recipeTitle;
-                    heading.appendChild(link);
+                    const titleLink = document.createElement("a");
+                    titleLink.href = reference.edit_url;
+                    titleLink.target = "_blank";
+                    titleLink.rel = "noopener noreferrer";
+                    titleLink.textContent = recipeTitle;
+                    heading.appendChild(titleLink);
                 } else {
                     heading.textContent = recipeTitle;
                 }
                 header.appendChild(heading);
                 if (reference.edit_url) {
-                    const link = document.createElement("a");
-                    link.href = reference.edit_url;
-                    link.target = "_blank";
-                    link.rel = "noopener noreferrer";
-                    link.textContent = "Open Recipe";
-                    header.appendChild(link);
+                    const openLink = document.createElement("a");
+                    openLink.href = reference.edit_url;
+                    openLink.target = "_blank";
+                    openLink.rel = "noopener noreferrer";
+                    openLink.textContent = "Open Recipe";
+                    header.appendChild(openLink);
                 }
-                card.append(visual, header);
+                card.append(createUsageRecipeVisual(reference), header);
                 const matches = document.createElement("ul");
                 (reference.matches || []).forEach(match => {
                     const listItem = document.createElement("li");
                     const line = document.createElement("strong");
                     line.textContent = match.ingredient_line || match.ingredient_name || "Ingredient line";
                     listItem.appendChild(line);
-                    if (match.context) {
+                    if (match.context || match.kind === "option") {
                         const context = document.createElement("span");
                         context.textContent = match.kind === "option"
-                            ? `Recipe option: ${match.context}`
+                            ? `Recipe option${match.context ? `: ${match.context}` : ""}`
                             : match.context;
-                        listItem.appendChild(context);
-                    } else if (match.kind === "option") {
-                        const context = document.createElement("span");
-                        context.textContent = "Recipe option";
                         listItem.appendChild(context);
                     }
                     matches.appendChild(listItem);
@@ -442,6 +632,7 @@
         };
 
         const openUsage = async (item, trigger) => {
+            if (!item) return;
             usageReturnFocus = trigger || document.activeElement;
             usageTitle.textContent = `Recipes using ${item.name}`;
             usageContext.textContent = `Review every ingredient line assigned to ${item.name}.`;
@@ -474,35 +665,58 @@
         const importableNames = legacyNames.filter(name => !workspaceKeys.has(typeKey(name)));
         importPanel.hidden = !importableNames.length || localStorage.getItem(IMPORT_DISMISSED_KEY) === "true";
 
+        addButtons.forEach(button => {
+            button.addEventListener("click", event => {
+                event.preventDefault();
+                setCreateExpanded(true);
+            });
+        });
+        root.querySelector("[data-type-master-create-cancel]").addEventListener("click", event => {
+            event.preventDefault();
+            cancelCreate();
+        });
+        createForm.addEventListener("submit", saveNewType);
+        createName.addEventListener("input", () => setCreateError(""));
+        search.addEventListener("input", applySearch);
+
+        root.addEventListener("input", event => {
+            if (!event.target.matches("[data-type-master-row-name]")) return;
+            captureRowDraft(event.target.closest("[data-type-master-row]"));
+        });
+        root.addEventListener("keydown", event => {
+            if (!event.target.matches("[data-type-master-row-name]")) return;
+            const row = event.target.closest("[data-type-master-row]");
+            if (event.key === "Enter") {
+                event.preventDefault();
+                saveTypeRow(row);
+            } else if (event.key === "Escape") {
+                const item = typeById(row?.dataset.typeId);
+                if (!item) return;
+                drafts.delete(String(item.id));
+                const draft = ensureDraft(item);
+                rowControls(row).name.value = draft.name;
+                syncRowState(row);
+                applySearch();
+            }
+        });
         root.addEventListener("click", event => {
-            const add = event.target.closest("[data-type-master-add-button]");
-            if (add) {
-                openEditor(null, add);
+            const save = event.target.closest("[data-type-master-row-save]");
+            if (save) {
+                saveTypeRow(save.closest("[data-type-master-row]"));
                 return;
             }
-            const edit = event.target.closest("[data-type-master-edit-button]");
-            if (edit) {
-                openEditor(typeById(edit.dataset.typeId), edit);
+            const deleteButton = event.target.closest("[data-type-master-row-delete]");
+            if (deleteButton) {
+                deleteTypeRow(deleteButton.closest("[data-type-master-row]"));
                 return;
             }
             const usage = event.target.closest("[data-type-master-usage-button]");
-            if (usage) {
-                openUsage(typeById(usage.dataset.typeId), usage);
-            }
+            if (usage) openUsage(typeById(usage.dataset.typeId), usage);
         });
-        search.addEventListener("input", applySearch);
-        form.addEventListener("submit", saveType);
-        deleteButton.addEventListener("click", deleteType);
-        root.querySelectorAll("[data-type-master-close], [data-type-master-cancel]").forEach(button => {
-            button.addEventListener("click", closeEditor);
-        });
-        dialog.addEventListener("close", () => {
-            returnFocus?.focus({ preventScroll: true });
-            returnFocus = null;
-        });
-        root.querySelectorAll("[data-type-master-usage-close]").forEach(button => {
-            button.addEventListener("click", closeUsage);
-        });
+
+        root.querySelectorAll("[data-type-master-usage-close]").forEach(
+            button => button.addEventListener("click", closeUsage),
+        );
         usageDialog.addEventListener("close", () => {
             usageReturnFocus?.focus({ preventScroll: true });
             usageReturnFocus = null;
