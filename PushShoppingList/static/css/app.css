@@ -66744,12 +66744,12 @@ body.recipe-edit-standalone-page :is(
         min-width: 0;
         max-width: 100%;
         grid-template-columns:
-            minmax(102px, .7fr)
-            minmax(142px, 1.22fr)
-            minmax(72px, .5fr)
-            96px
-            118px;
-        column-gap: 8px;
+            minmax(120px, .7fr)
+            minmax(220px, 1.22fr)
+            150px
+            128px
+            160px;
+        column-gap: 12px;
         padding-inline: 14px;
     }
 
@@ -70233,12 +70233,13 @@ body.is-resizing-store-section-master-column * {
     .cuisine-category-master-table > .unit-master-table-head,
     .cuisine-category-master-table [data-cuisine-category-master-row] {
         grid-template-columns:
-            minmax(102px, .7fr)
-            minmax(142px, 1.22fr)
-            minmax(72px, .5fr)
-            96px
-            118px;
-        gap: 8px;
+            minmax(120px, .7fr)
+            minmax(220px, 1.22fr)
+            150px
+            128px
+            160px;
+        column-gap: 12px;
+        row-gap: 8px;
     }
 
     .cuisine-category-master-table .cuisine-category-master-identity {
@@ -70382,19 +70383,92 @@ body.is-resizing-store-section-master-column * {
 }
 
 .cuisine-category-master-table .unit-master-source-badge {
+    width: max-content;
     max-width: 100%;
     box-sizing: border-box;
-    padding-inline: 6px;
-    font-size: 10px;
+    min-height: 26px;
+    align-items: center;
+    justify-self: start;
+    padding-inline: 7px;
+    font-size: 11px;
     white-space: nowrap;
 }
 
-.cuisine-category-master-table .unit-master-action-cell {
+.cuisine-category-master-table .unit-master-usage {
     display: flex;
     min-width: 0;
     align-items: center;
-    justify-content: stretch;
-    gap: 4px;
+    justify-content: flex-start;
+}
+
+.cuisine-category-master-page
+    .cuisine-category-master-table
+    .unit-master-usage-button {
+    display: flex;
+    width: max-content;
+    max-width: 100%;
+    min-height: 22px !important;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 3px;
+    margin-left: -4px;
+    padding: 2px 4px !important;
+    border-color: transparent !important;
+    background: transparent !important;
+    color: var(--app-muted) !important;
+    font-size: 11px;
+    font-weight: 700;
+    text-align: left;
+}
+
+.cuisine-category-master-page
+    .cuisine-category-master-table
+    .unit-master-usage-button
+    > :is(strong, span) {
+    color: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    line-height: inherit;
+}
+
+.cuisine-category-master-page
+    .cuisine-category-master-table
+    .unit-master-usage-button
+    > strong {
+    color: var(--app-text-strong);
+}
+
+.cuisine-category-master-page
+    .cuisine-category-master-table
+    .unit-master-usage-button:is(:hover, :focus-visible) {
+    border-color: color-mix(in srgb, var(--app-primary) 42%, var(--app-border)) !important;
+    background: var(--app-primary-soft) !important;
+    color: var(--app-primary-hover) !important;
+}
+
+.cuisine-category-master-page
+    .cuisine-category-master-table
+    .unit-master-usage-button:is(:hover, :focus-visible)
+    > strong {
+    color: var(--app-primary-hover);
+}
+
+.cuisine-category-master-table .unit-master-usage-empty {
+    width: max-content;
+    min-width: 0;
+    min-height: 22px;
+    justify-content: flex-start;
+    margin-left: -4px;
+    padding: 2px 4px;
+    font-size: 11px;
+}
+
+.cuisine-category-master-table .unit-master-action-cell {
+    display: grid;
+    min-width: 0;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: center;
+    gap: 5px;
 }
 
 .cuisine-category-master-page
@@ -70407,7 +70481,7 @@ body.is-resizing-store-section-master-column * {
     min-height: 36px;
     flex: 1 1 0;
     padding: 5px 6px;
-    font-size: 10px;
+    font-size: 11px;
     white-space: nowrap;
 }
 
@@ -70417,7 +70491,7 @@ body.is-resizing-store-section-master-column * {
     background: transparent;
     color: var(--app-muted);
     cursor: not-allowed;
-    opacity: .46;
+    opacity: .68;
 }
 
 .cuisine-category-master-page
@@ -70444,6 +70518,21 @@ body.is-resizing-store-section-master-column * {
     .cuisine-category-master-create {
         grid-template-columns: minmax(0, 1fr);
         align-items: stretch;
+    }
+}
+
+@media (min-width: 761px) and (max-width: 1180px) {
+    .cuisine-category-master-table > .unit-master-table-head,
+    .cuisine-category-master-table [data-cuisine-category-master-row],
+    .cuisine-category-master-table > .cuisine-category-master-create-row {
+        grid-template-columns:
+            minmax(90px, .6fr)
+            minmax(150px, 1fr)
+            100px
+            100px
+            120px;
+        column-gap: 8px;
+        padding-inline: 10px;
     }
 }
 

@@ -734,8 +734,12 @@ def test_cuisine_category_rows_share_unit_usage_and_action_contract(
         ".cuisine-category-master-table > .unit-master-table-head,",
     )
     assert "grid-template-columns:" in desktop_rows
-    assert "minmax(102px, .7fr)" in desktop_rows
-    assert "minmax(142px, 1.22fr)" in desktop_rows
+    assert "minmax(120px, .7fr)" in desktop_rows
+    assert "minmax(220px, 1.22fr)" in desktop_rows
+    assert "150px" in desktop_rows
+    assert "128px" in desktop_rows
+    assert "160px" in desktop_rows
+    assert "column-gap: 12px;" in desktop_rows
     desktop_identity = block_from(
         cuisine_desktop,
         ".cuisine-category-master-table .cuisine-category-master-identity",
@@ -743,6 +747,34 @@ def test_cuisine_category_rows_share_unit_usage_and_action_contract(
     assert "grid-template-columns: 44px 96px minmax(0, 1fr);" in (
         desktop_identity
     )
+
+    usage_button = block_from(
+        inline_css,
+        ".cuisine-category-master-page\n"
+        "    .cuisine-category-master-table\n"
+        "    .unit-master-usage-button",
+    )
+    assert "min-height: 22px !important;" in usage_button
+    assert "border-color: transparent !important;" in usage_button
+    assert "background: transparent !important;" in usage_button
+    assert "font-size: 11px;" in usage_button
+
+    source_badge = block_from(
+        inline_css,
+        ".cuisine-category-master-table .unit-master-source-badge",
+    )
+    assert "width: max-content;" in source_badge
+    assert "min-height: 26px;" in source_badge
+    assert "justify-self: start;" in source_badge
+    assert "font-size: 11px;" in source_badge
+
+    action_cell = block_from(
+        inline_css,
+        ".cuisine-category-master-table .unit-master-action-cell",
+    )
+    assert "display: grid;" in action_cell
+    assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in action_cell
+    assert "gap: 5px;" in action_cell
 
     mobile = block_from(css, "@media (max-width: 760px)", inline_section)
     mobile_row = block_from(
