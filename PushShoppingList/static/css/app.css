@@ -70208,25 +70208,17 @@ body.is-resizing-store-section-master-column * {
 
 [data-cuisine-category-master-row] {
     position: relative;
-    transition: background-color 140ms ease, box-shadow 140ms ease, opacity 140ms ease;
+    background: transparent;
+    transition: opacity 140ms ease;
 }
 
-[data-cuisine-category-master-row]:is(:hover, :focus-within) {
-    background: color-mix(in srgb, var(--app-surface) 70%, transparent);
-}
-
-[data-cuisine-category-master-row].is-dirty {
-    background: color-mix(in srgb, var(--app-primary-soft) 34%, transparent);
-    box-shadow: inset 3px 0 0 var(--app-primary);
+/* Match Store Sections: only the hovered row receives a background treatment. */
+[data-cuisine-category-master-row]:hover {
+    background: color-mix(in srgb, var(--app-surface-soft) 66%, transparent);
 }
 
 [data-cuisine-category-master-row].is-saving {
     opacity: .7;
-}
-
-[data-cuisine-category-master-row].has-error {
-    background: color-mix(in srgb, var(--app-danger) 5%, transparent);
-    box-shadow: inset 3px 0 0 var(--app-danger);
 }
 
 [data-cuisine-category-master-row-error] {
@@ -70280,13 +70272,13 @@ body.is-resizing-store-section-master-column * {
     min-width: 0;
     height: 38px;
     min-height: 38px;
-    padding: 6px 7px;
+    padding: 7px 10px;
     border: 1px solid transparent;
-    border-radius: 6px;
+    border-radius: 7px;
     background: transparent;
     color: var(--app-text-strong);
-    font-size: 12px;
-    font-weight: 750;
+    font-size: 13px;
+    font-weight: 700;
     transition:
         border-color 140ms ease,
         background-color 140ms ease,
@@ -70323,21 +70315,20 @@ body.is-resizing-store-section-master-column * {
 
 .cuisine-category-master-table
     [data-cuisine-category-master-row-name][readonly] {
-    background: color-mix(in srgb, var(--app-bg-soft) 58%, transparent);
-    color: color-mix(in srgb, var(--app-text-strong) 78%, var(--app-muted));
     cursor: not-allowed;
 }
 
 .cuisine-category-master-table
     [data-cuisine-category-master-row-icon-trigger] {
-    width: 44px;
-    min-width: 44px;
+    width: 38px;
+    min-width: 38px;
     height: 38px;
     min-height: 38px;
-    grid-template-columns: minmax(0, 1fr) 9px;
-    gap: 1px;
+    grid-template-columns: 1fr;
+    gap: 0;
     place-items: center;
-    padding: 3px;
+    justify-self: center;
+    padding: 0;
     border-color: transparent;
     background: transparent;
     transition:
@@ -70363,13 +70354,17 @@ body.is-resizing-store-section-master-column * {
 .cuisine-category-master-table
     [data-cuisine-category-master-row-icon-trigger]
     > .cuisine-category-master-icon-chevron {
-    width: 9px;
-    min-width: 0;
-    opacity: .42;
+    display: none;
 }
 
 .cuisine-category-master-table
-    [data-cuisine-category-master-row-icon-trigger]:is(:hover, :focus-visible),
+    [data-cuisine-category-master-row-icon-trigger]:hover {
+    border-color: var(--app-border-strong);
+    background: var(--app-bg-soft);
+}
+
+.cuisine-category-master-table
+    [data-cuisine-category-master-row-icon-trigger]:focus-visible,
 .cuisine-category-master-table
     [data-cuisine-category-master-row-icon-trigger][aria-expanded="true"] {
     border-color: var(--app-primary-hover);
@@ -70379,12 +70374,14 @@ body.is-resizing-store-section-master-column * {
 }
 
 .cuisine-category-master-table
-    [data-cuisine-category-master-row-icon-trigger]:is(:hover, :focus-visible)
-    > .cuisine-category-master-icon-chevron,
-.cuisine-category-master-table
-    [data-cuisine-category-master-row-icon-trigger][aria-expanded="true"]
-    > .cuisine-category-master-icon-chevron {
-    opacity: 1;
+    :is(
+        [data-cuisine-category-master-row-abbreviation],
+        [data-cuisine-category-master-row-name],
+        [data-cuisine-category-master-row-icon-trigger]
+    ).is-dirty:not([aria-invalid="true"]) {
+    border-color: color-mix(in srgb, var(--app-primary) 78%, var(--app-border));
+    background: color-mix(in srgb, var(--app-primary-soft) 62%, var(--app-bg-soft));
+    box-shadow: inset 3px 0 0 var(--app-primary);
 }
 
 .cuisine-category-master-table .unit-master-source-badge {

@@ -754,9 +754,15 @@ def test_cuisine_category_rows_share_unit_usage_and_action_contract(
 
     inline_css = css[inline_section:]
     assert "[data-cuisine-category-master-create-form] {" in inline_css
-    assert "[data-cuisine-category-master-row].is-dirty" in inline_css
+    assert '.is-dirty:not([aria-invalid="true"])' in inline_css
     assert "[data-cuisine-category-master-row].is-saving" in inline_css
-    assert "[data-cuisine-category-master-row].has-error" in inline_css
+    assert ')[aria-invalid="true"]' in inline_css
+    assert block_from(css, "[data-cuisine-category-master-row]:hover {").strip() == (
+        block_from(css, ".store-section-master-row:hover {").strip()
+    )
+    assert "background: transparent;" in block_from(
+        css, "[data-cuisine-category-master-row] {"
+    )
     assert "[data-cuisine-category-master-row-save]:disabled" in inline_css
     assert "[data-cuisine-category-master-row-delete]" in inline_css
     assert "[data-mobile-label]::before" in inline_css

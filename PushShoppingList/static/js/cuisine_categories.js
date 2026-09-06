@@ -318,6 +318,9 @@
             const dirtyChanged = dirty !== draft.wasDirty;
             row.classList.toggle("is-dirty", dirty);
             row.classList.toggle("is-saving", pending);
+            ["icon", "abbreviation", "name"].forEach(field => {
+                controls[field].classList.toggle("is-dirty", normalized[field] !== draft.baseline[field]);
+            });
             row.dataset.dirty = String(dirty);
             row.setAttribute("aria-busy", String(pending));
             controls.icon.disabled = pending;
