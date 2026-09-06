@@ -65942,10 +65942,6 @@ body.recipe-edit-standalone-page :is(
     margin-top: 0;
 }
 
-[data-type-master-page] .unit-master-action-cell > .unit-master-edit-button {
-    width: 100%;
-}
-
 @media (max-width: 1640px) {
     .type-master-category-list {
         grid-template-columns: minmax(0, 1fr);
@@ -66655,7 +66651,8 @@ body.recipe-edit-standalone-page :is(
     padding: 0;
 }
 
-.cuisine-category-master-category {
+.cuisine-category-master-category,
+.master-data-registry-category {
     /* Use the shared .unit-master-category border and radius, clipping its
        contents without creating a scroll container around the sticky header. */
     overflow: clip;
@@ -67049,7 +67046,9 @@ body.recipe-edit-standalone-page :is(
 
 .store-section-master-page button,
 .cuisine-category-master-page .cuisine-category-master-row-actions
-    > [data-cuisine-category-master-row-save] {
+    > [data-cuisine-category-master-row-save],
+.type-master-page .master-data-registry-table .type-master-row-actions
+    > [data-type-master-row-save] {
     min-height: 38px;
     margin: 0;
     padding: 7px 12px;
@@ -67076,7 +67075,9 @@ body.recipe-edit-standalone-page :is(
 
 .store-section-master-page button:disabled,
 .cuisine-category-master-page .cuisine-category-master-row-actions
-    > [data-cuisine-category-master-row-save]:disabled {
+    > [data-cuisine-category-master-row-save]:disabled,
+.type-master-page .master-data-registry-table .type-master-row-actions
+    > [data-type-master-row-save]:disabled {
     opacity: .42;
     cursor: not-allowed;
 }
@@ -67365,7 +67366,8 @@ body.recipe-edit-standalone-page :is(
 
 /* Shared Action slots keep Save in the first slot, even without Delete. */
 .store-section-master-actions,
-.cuisine-category-master-table .cuisine-category-master-row-actions {
+.cuisine-category-master-table .cuisine-category-master-row-actions,
+.master-data-registry-table .type-master-row-actions {
     display: grid;
     grid-template-columns: repeat(2, minmax(68px, 1fr));
     gap: 6px;
@@ -67951,7 +67953,9 @@ body.recipe-edit-standalone-page :is(
 
 .store-section-master-row .store-section-master-actions > button,
 .cuisine-category-master-page .cuisine-category-master-row-actions
-    > [data-cuisine-category-master-row-save] {
+    > [data-cuisine-category-master-row-save],
+.type-master-page .master-data-registry-table .type-master-row-actions
+    > [data-type-master-row-save] {
     display: block;
     min-width: 0;
     padding-inline: 6px;
@@ -67965,7 +67969,9 @@ body.recipe-edit-standalone-page :is(
         .store-section-master-mobile-save
     ),
 .cuisine-category-master-page [data-cuisine-category-master-row]
-    .cuisine-category-master-row-actions > [data-cuisine-category-master-row-save] {
+    .cuisine-category-master-row-actions > [data-cuisine-category-master-row-save],
+.type-master-page .master-data-registry-table .type-master-row-actions
+    > [data-type-master-row-save] {
     border-color: transparent;
     background: transparent;
     color: var(--app-muted);
@@ -67982,7 +67988,9 @@ body.recipe-edit-standalone-page :is(
         .store-section-master-mobile-save
     ):disabled,
 .cuisine-category-master-page [data-cuisine-category-master-row]
-    .cuisine-category-master-row-actions > [data-cuisine-category-master-row-save]:disabled {
+    .cuisine-category-master-row-actions > [data-cuisine-category-master-row-save]:disabled,
+.type-master-page .master-data-registry-table .type-master-row-actions
+    > [data-type-master-row-save]:disabled {
     border-color: transparent;
     background: transparent;
     color: var(--app-muted);
@@ -67995,7 +68003,9 @@ body.recipe-edit-standalone-page :is(
         .store-section-master-mobile-save
     ),
 .cuisine-category-master-page [data-cuisine-category-master-row].is-dirty
-    .cuisine-category-master-row-actions > [data-cuisine-category-master-row-save]:not(:disabled) {
+    .cuisine-category-master-row-actions > [data-cuisine-category-master-row-save]:not(:disabled),
+.type-master-page .master-data-registry-table [data-type-master-row].is-dirty
+    .type-master-row-actions > [data-type-master-row-save]:not(:disabled) {
     border-color: var(--app-primary);
     background: var(--app-primary-soft);
     color: var(--app-primary-hover);
@@ -69477,6 +69487,7 @@ body.is-resizing-store-section-master-column * {
     overflow: visible;
 }
 
+.master-data-registry-category .unit-master-table-head,
 .cuisine-category-master-category .unit-master-table-head,
 .store-section-master-category .store-section-master-table-head {
     position: sticky;
@@ -69683,7 +69694,8 @@ body.is-resizing-store-section-master-column * {
     }
 
     .store-section-master-row .store-section-master-actions,
-    .cuisine-category-master-table .cuisine-category-master-row-actions {
+    .cuisine-category-master-table .cuisine-category-master-row-actions,
+    .master-data-registry-table .type-master-row-actions {
         grid-template-columns: repeat(2, minmax(0, 1fr));
         grid-auto-columns: auto;
         grid-auto-flow: row;
@@ -69694,12 +69706,16 @@ body.is-resizing-store-section-master-column * {
         font-size: 11px;
     }
 
+    .type-master-page .master-data-registry-table .type-master-row-actions
+        > [data-type-master-row-save],
     .cuisine-category-master-page .cuisine-category-master-row-actions
         > [data-cuisine-category-master-row-save],
     .store-section-master-row .store-section-master-actions > button {
         font-size: 11px;
     }
 
+    .type-master-page .master-data-registry-table .type-master-row-actions
+        > [data-type-master-row-save]:disabled,
     .cuisine-category-master-page [data-cuisine-category-master-row]
         .cuisine-category-master-row-actions > [data-cuisine-category-master-row-save]:disabled,
     .store-section-master-row
@@ -70216,12 +70232,14 @@ body.is-resizing-store-section-master-column * {
     :is(
         [data-cuisine-category-master-create-icon-trigger],
         [data-cuisine-category-master-row-icon-trigger]
-    )[aria-invalid="true"] {
+    )[aria-invalid="true"],
+.master-data-registry-table [data-type-master-row-name][aria-invalid="true"] {
     border-color: var(--app-danger);
     background: color-mix(in srgb, var(--app-danger) 7%, var(--app-surface-soft));
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-danger) 16%, transparent);
 }
 
+[data-type-master-row],
 [data-cuisine-category-master-row] {
     position: relative;
     background: transparent;
@@ -70229,10 +70247,12 @@ body.is-resizing-store-section-master-column * {
 }
 
 /* Match Store Sections: only the hovered row receives a background treatment. */
+[data-type-master-row]:hover,
 [data-cuisine-category-master-row]:hover {
     background: color-mix(in srgb, var(--app-surface-soft) 66%, transparent);
 }
 
+[data-type-master-row].is-saving,
 [data-cuisine-category-master-row].is-saving {
     opacity: .7;
 }
@@ -70282,7 +70302,8 @@ body.is-resizing-store-section-master-column * {
     :is(
         [data-cuisine-category-master-row-abbreviation],
         [data-cuisine-category-master-row-name]
-    ) {
+    ),
+.master-data-registry-table [data-type-master-row-name] {
     box-sizing: border-box;
     width: 100%;
     min-width: 0;
@@ -70313,7 +70334,8 @@ body.is-resizing-store-section-master-column * {
     :is(
         [data-cuisine-category-master-row-abbreviation],
         [data-cuisine-category-master-row-name]
-    ):hover {
+    ):hover,
+.master-data-registry-table [data-type-master-row-name]:hover {
     border-color: var(--app-border-strong);
     background: var(--app-bg-soft);
 }
@@ -70322,7 +70344,8 @@ body.is-resizing-store-section-master-column * {
     :is(
         [data-cuisine-category-master-row-abbreviation],
         [data-cuisine-category-master-row-name]
-    ):focus-visible {
+    ):focus-visible,
+.master-data-registry-table [data-type-master-row-name]:focus-visible {
     border-color: var(--app-primary-hover);
     outline: 0;
     background: var(--app-surface);
@@ -70394,13 +70417,15 @@ body.is-resizing-store-section-master-column * {
         [data-cuisine-category-master-row-abbreviation],
         [data-cuisine-category-master-row-name],
         [data-cuisine-category-master-row-icon-trigger]
-    ).is-dirty:not([aria-invalid="true"]) {
+    ).is-dirty:not([aria-invalid="true"]),
+.master-data-registry-table [data-type-master-row-name].is-dirty:not([aria-invalid="true"]) {
     border-color: color-mix(in srgb, var(--app-primary) 78%, var(--app-border));
     background: color-mix(in srgb, var(--app-primary-soft) 62%, var(--app-bg-soft));
     box-shadow: inset 3px 0 0 var(--app-primary);
 }
 
-.cuisine-category-master-table .unit-master-source-badge {
+.cuisine-category-master-table .unit-master-source-badge,
+.master-data-registry-table .unit-master-source-badge {
     width: max-content;
     max-width: 100%;
     box-sizing: border-box;
@@ -70412,7 +70437,8 @@ body.is-resizing-store-section-master-column * {
     white-space: nowrap;
 }
 
-.cuisine-category-master-table .unit-master-usage {
+.cuisine-category-master-table .unit-master-usage,
+.master-data-registry-table .unit-master-usage {
     display: flex;
     min-width: 0;
     align-items: center;
@@ -70421,6 +70447,9 @@ body.is-resizing-store-section-master-column * {
 
 .cuisine-category-master-page
     .cuisine-category-master-table
+    .unit-master-usage-button,
+.type-master-page
+    .master-data-registry-table
     .unit-master-usage-button {
     display: flex;
     width: max-content;
@@ -70442,6 +70471,10 @@ body.is-resizing-store-section-master-column * {
 .cuisine-category-master-page
     .cuisine-category-master-table
     .unit-master-usage-button
+    > :is(strong, span),
+.type-master-page
+    .master-data-registry-table
+    .unit-master-usage-button
     > :is(strong, span) {
     color: inherit;
     font-size: inherit;
@@ -70452,12 +70485,19 @@ body.is-resizing-store-section-master-column * {
 .cuisine-category-master-page
     .cuisine-category-master-table
     .unit-master-usage-button
+    > strong,
+.type-master-page
+    .master-data-registry-table
+    .unit-master-usage-button
     > strong {
     color: var(--app-text-strong);
 }
 
 .cuisine-category-master-page
     .cuisine-category-master-table
+    .unit-master-usage-button:is(:hover, :focus-visible),
+.type-master-page
+    .master-data-registry-table
     .unit-master-usage-button:is(:hover, :focus-visible) {
     border-color: color-mix(in srgb, var(--app-primary) 42%, var(--app-border)) !important;
     background: var(--app-primary-soft) !important;
@@ -70467,11 +70507,16 @@ body.is-resizing-store-section-master-column * {
 .cuisine-category-master-page
     .cuisine-category-master-table
     .unit-master-usage-button:is(:hover, :focus-visible)
+    > strong,
+.type-master-page
+    .master-data-registry-table
+    .unit-master-usage-button:is(:hover, :focus-visible)
     > strong {
     color: var(--app-primary-hover);
 }
 
-.cuisine-category-master-table .unit-master-usage-empty {
+.cuisine-category-master-table .unit-master-usage-empty,
+.master-data-registry-table .unit-master-usage-empty {
     width: max-content;
     min-width: 0;
     min-height: 22px;
@@ -70481,7 +70526,8 @@ body.is-resizing-store-section-master-column * {
     font-size: 11px;
 }
 
-.cuisine-category-master-table .unit-master-action-cell {
+.cuisine-category-master-table .unit-master-action-cell,
+.master-data-registry-table .unit-master-action-cell {
     min-width: 0;
     align-items: center;
 }
@@ -70857,12 +70903,10 @@ body.is-resizing-store-section-master-column * {
 }
 
 .type-master-category-list {
+    width: auto;
     grid-template-columns: minmax(0, 1fr);
-    padding: 16px;
-}
-
-.type-master-registry-category {
-    overflow: visible;
+    margin: 16px 14px 14px;
+    padding: 0;
 }
 
 .type-master-registry-category .unit-master-table-head {
@@ -70878,7 +70922,6 @@ body.is-resizing-store-section-master-column * {
     align-items: center;
 }
 
-.type-master-table [data-type-master-row-name],
 .type-master-table [data-type-master-create-name] {
     box-sizing: border-box;
     width: 100%;
@@ -70893,37 +70936,6 @@ body.is-resizing-store-section-master-column * {
     font-size: 12px;
     font-weight: 750;
     transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
-}
-
-.type-master-table [data-type-master-row-name]:is(:hover, :focus-visible) {
-    border-color: var(--app-primary-hover);
-    outline: 0;
-    background: var(--app-surface);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-primary-hover) 22%, transparent);
-}
-
-[data-type-master-row] {
-    position: relative;
-    transition: background-color 140ms ease, box-shadow 140ms ease, opacity 140ms ease;
-}
-
-[data-type-master-row]:is(:hover, :focus-within) {
-    background: color-mix(in srgb, var(--app-surface) 70%, transparent);
-}
-
-[data-type-master-row].is-dirty {
-    background: color-mix(in srgb, var(--app-primary-soft) 34%, transparent);
-    box-shadow: inset 3px 0 0 var(--app-primary);
-}
-
-[data-type-master-row].is-saving {
-    opacity: .7;
-}
-
-[data-type-master-row].has-error,
-.type-master-create-row.has-error {
-    background: color-mix(in srgb, var(--app-danger) 5%, transparent);
-    box-shadow: inset 3px 0 0 var(--app-danger);
 }
 
 .type-master-row-error,
@@ -70942,14 +70954,6 @@ body.is-resizing-store-section-master-column * {
     line-height: 1.35;
 }
 
-.type-master-table .type-master-row-actions {
-    display: flex;
-    min-width: 0;
-    align-items: center;
-    justify-content: stretch;
-    gap: 5px;
-}
-
 .type-master-page .type-master-row-actions > button {
     min-width: 0;
     min-height: 36px;
@@ -70957,20 +70961,6 @@ body.is-resizing-store-section-master-column * {
     padding: 5px 7px;
     font-size: 10px;
     white-space: nowrap;
-}
-
-.type-master-page [data-type-master-row-save]:disabled {
-    border-color: transparent;
-    background: transparent;
-    color: var(--app-muted);
-    cursor: not-allowed;
-    opacity: .46;
-}
-
-.type-master-page [data-type-master-row].is-dirty [data-type-master-row-save]:not(:disabled) {
-    border-color: var(--app-primary);
-    background: var(--app-primary-soft);
-    color: var(--app-primary-hover);
 }
 
 .type-master-page [data-type-master-row-delete] {
@@ -71001,7 +70991,8 @@ body.is-resizing-store-section-master-column * {
 }
 
 .type-master-add-footer {
-    padding: 0 12px 12px;
+    padding: 12px 16px 16px;
+    overflow-anchor: none;
 }
 
 .type-master-page .type-master-add-footer .type-master-add-shortcut {
@@ -71023,7 +71014,8 @@ body.is-resizing-store-section-master-column * {
         width: 100%;
         min-width: 0;
         max-width: 100%;
-        grid-template-columns: minmax(280px, 1fr) 160px 128px 180px;
+        grid-template-columns: minmax(0, 1fr) 150px 128px 160px;
+        row-gap: 8px;
         column-gap: 12px;
         padding-inline: 14px;
     }
@@ -71055,7 +71047,17 @@ body.is-resizing-store-section-master-column * {
     }
 }
 
-@media (max-width: 759px) {
+@media (min-width: 761px) and (max-width: 1180px) {
+    [data-type-master-page] .type-master-table > .unit-master-table-head,
+    [data-type-master-page] .type-master-table [data-type-master-row],
+    [data-type-master-page] .type-master-table > .type-master-create-row {
+        grid-template-columns: minmax(0, 1fr) 100px 100px 120px;
+        column-gap: 8px;
+        padding-inline: 10px;
+    }
+}
+
+@media (max-width: 760px) {
     .type-master-header-actions {
         width: 100%;
         justify-items: stretch;
@@ -71072,7 +71074,8 @@ body.is-resizing-store-section-master-column * {
     }
 
     .type-master-category-list {
-        padding: 12px 10px;
+        margin: 12px 10px;
+        padding: 0;
     }
 
     .type-master-table > .unit-master-table-head {
@@ -71127,7 +71130,9 @@ body.is-resizing-store-section-master-column * {
         grid-column: 1 / -1;
     }
 
-    .type-master-page .type-master-row-actions > button {
+    .type-master-page .type-master-row-actions > button,
+    .type-master-page .master-data-registry-table .type-master-row-actions
+        > [data-type-master-row-save] {
         min-height: 40px;
     }
 }

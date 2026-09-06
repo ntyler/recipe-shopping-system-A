@@ -763,7 +763,7 @@ def test_cuisine_category_rows_share_unit_usage_and_action_contract(
     assert "background: transparent;" in block_from(
         css, "[data-cuisine-category-master-row] {"
     )
-    assert "[data-cuisine-category-master-row-save]:disabled" in inline_css
+    assert "[data-cuisine-category-master-row-save]:disabled" in css
     assert "[data-cuisine-category-master-row-delete]" in inline_css
     assert "[data-mobile-label]::before" in inline_css
 
@@ -812,12 +812,12 @@ def test_cuisine_category_rows_share_unit_usage_and_action_contract(
     assert "font-size: 11px;" in source_badge
 
     action_cell = block_from(
-        inline_css,
-        ".cuisine-category-master-table .unit-master-action-cell",
+        css,
+        ".cuisine-category-master-table .cuisine-category-master-row-actions",
     )
     assert "display: grid;" in action_cell
-    assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in action_cell
-    assert "gap: 5px;" in action_cell
+    assert "grid-template-columns: repeat(2, minmax(68px, 1fr));" in action_cell
+    assert "gap: 6px;" in action_cell
 
     action_header = block_from(
         inline_css,
@@ -825,11 +825,7 @@ def test_cuisine_category_rows_share_unit_usage_and_action_contract(
     )
     assert "text-align: center;" in action_header
 
-    lone_save = block_from(
-        inline_css,
-        "> [data-cuisine-category-master-row-save]:only-child",
-    )
-    assert "grid-column: 1 / -1;" in lone_save
+    assert "> [data-cuisine-category-master-row-save]:only-child" not in css
 
     mobile = block_from(css, "@media (max-width: 760px)", inline_section)
     mobile_row = block_from(

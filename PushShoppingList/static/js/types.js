@@ -165,7 +165,8 @@
             row.classList.toggle("is-saving", draft.saving);
             row.classList.toggle("has-error", Boolean(message));
             row.setAttribute("aria-busy", String(draft.saving || draft.deleting));
-            controls.name.toggleAttribute("aria-invalid", Boolean(message));
+            controls.name.setAttribute("aria-invalid", String(Boolean(message)));
+            controls.name.classList.toggle("is-dirty", dirty);
             controls.name.disabled = draft.saving || draft.deleting;
             controls.save.disabled = !dirty || draft.saving || draft.deleting;
             controls.save.textContent = draft.saving ? "Saving…" : "Save";
@@ -214,7 +215,6 @@
             action.dataset.mobileLabel = "Action";
             const save = document.createElement("button");
             save.type = "button";
-            save.className = "unit-master-edit-button";
             save.dataset.typeMasterRowSave = "";
             save.dataset.typeId = item.id;
             save.textContent = "Save";
@@ -748,7 +748,10 @@
             importPanel.hidden = true;
         });
 
-        renderRegistry();
+        // Keep the server-rendered controls in place through initialization.
+        rows.querySelectorAll("[data-type-master-row]").forEach(syncRowState);
+        renderStats();
+        applySearch();
     }
 
     if (document.readyState === "loading") {

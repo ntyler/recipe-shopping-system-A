@@ -254,10 +254,10 @@ def test_types_and_cuisine_share_used_in_anchor_and_responsive_layout():
     type_tracks = grid_tracks(type_grid_rules[0])
 
     assert type_tracks == [
-        "minmax(280px,1fr)",
-        "160px",
+        "minmax(0,1fr)",
+        "150px",
         "128px",
-        "180px",
+        "160px",
     ]
     for child, expected_column in (
         (1, "1"),
@@ -348,7 +348,7 @@ def test_types_and_cuisine_share_used_in_anchor_and_responsive_layout():
     assert "grid-row: 1;" in mobile_action
 
 
-def test_types_used_in_and_action_match_unit_row_markup(
+def test_types_reuse_usage_markup_and_cuisine_save_control(
     ingredient_type_app,
 ):
     recipe_url = "https://example.test/recipes/shared-master-data-row-contract"
@@ -420,12 +420,12 @@ def test_types_used_in_and_action_match_unit_row_markup(
     assert type_action_cell.get("role") == "cell"
     type_action = type_action_cell.find(
         "button",
-        class_="unit-master-edit-button",
+        attrs={"data-type-master-row-save": True},
         recursive=False,
     )
     assert type_action is not None
-    assert type_action.get("class") == ["unit-master-edit-button"]
-    assert 'class="unit-master-edit-button"' in units_template
+    assert "unit-master-edit-button" not in type_action.get("class", [])
+    assert types_soup.select_one(".master-data-registry-category .master-data-registry-table")
 
     static_root = Path(__file__).resolve().parents[1] / "PushShoppingList" / "static"
     script = (
@@ -446,15 +446,15 @@ def test_types_used_in_and_action_match_unit_row_markup(
         / "css"
         / "app.css"
     ).read_text(encoding="utf-8")
-    type_edit_rules = [
+    shared_action_rules = [
         (match.group(1), match.group(2))
         for match in re.finditer(r"([^{}]+)\{([^{}]*)\}", css)
-        if "[data-type-master-page]" in match.group(1)
-        and ".unit-master-edit-button" in match.group(1)
+        if ".master-data-registry-table .type-master-row-actions" in match.group(1)
+        and ".cuisine-category-master-row-actions" in match.group(1)
     ]
     assert any(
-        "width: 100%;" in declarations
-        for _selectors, declarations in type_edit_rules
+        "grid-template-columns: repeat(2, minmax(0, 1fr));" in declarations
+        for _selectors, declarations in shared_action_rules
     )
 
 
