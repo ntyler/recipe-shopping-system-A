@@ -89,9 +89,10 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                     </span>
                 </label>
             </div>
+            <p id="unitMasterOrderHelp" class="sr-only">Drag units within their category, or focus a drag handle and use Arrow Up, Arrow Down, Home, or End. Order saves automatically. Clear the search to reorder.</p>
             <div class="unit-master-category-list" data-unit-master-category-list>
                 {% for category in master_data.categories %}
-                    <section class="unit-master-category"
+                    <section class="unit-master-category master-data-registry-category"
                              data-unit-master-category
                              data-category="{{ category.key }}"
                              aria-labelledby="unitCategory-{{ category.key }}">
@@ -99,8 +100,9 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                             <h3 id="unitCategory-{{ category.key }}">{{ category.label }}</h3>
                             <span data-unit-master-category-count-label>{{ category.units | length }} units</span>
                         </header>
-                        <div class="unit-master-table" role="table" aria-label="{{ category.label }} units">
+                        <div class="unit-master-table master-data-registry-table" role="table" aria-colcount="6" aria-label="{{ category.label }} units">
                             <div class="unit-master-table-head" role="row">
+                                <span role="columnheader">Order</span>
                                 <span role="columnheader">Canonical name</span>
                                 <span role="columnheader">Accepted aliases</span>
                                 <span role="columnheader">Used in</span>
@@ -114,15 +116,39 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                          data-unit-master-row
                                          data-unit-id="{{ unit.id }}"
                                          data-unit-master-search-value="{{ unit.name }} {{ unit.aliases | join(' ') }}">
-                                        <strong role="cell">{{ unit.name }}</strong>
-                                        <div class="unit-master-aliases" role="cell">
+                                        <div class="store-section-master-order-cell unit-master-order-cell" role="cell" aria-colindex="1" data-mobile-label="Order">
+                                            <div class="store-section-master-order">
+                                                <button type="button" class="store-section-master-drag-handle"
+                                                        data-unit-master-drag-handle draggable="true" aria-disabled="false"
+                                                        aria-keyshortcuts="ArrowUp ArrowDown Home End"
+                                                        aria-describedby="unitMasterOrderHelp"
+                                                        aria-label="Reorder {{ unit.name }}" title="Drag to reorder {{ unit.name }}">
+                                                    <svg viewBox="0 0 16 20" aria-hidden="true">
+                                                        <circle cx="5" cy="4" r="1.4"></circle><circle cx="11" cy="4" r="1.4"></circle>
+                                                        <circle cx="5" cy="10" r="1.4"></circle><circle cx="11" cy="10" r="1.4"></circle>
+                                                        <circle cx="5" cy="16" r="1.4"></circle><circle cx="11" cy="16" r="1.4"></circle>
+                                                    </svg>
+                                                </button>
+                                                <button type="button" value="move_up" data-unit-master-order-action="up"
+                                                        aria-label="Move {{ unit.name }} up" title="Move {{ unit.name }} up" {% if loop.first %}disabled{% endif %}>
+                                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"></path><path d="m6 11 6-6 6 6"></path></svg>
+                                                </button>
+                                                <span class="store-section-master-order-step" data-unit-master-order-number aria-label="Step {{ loop.index }}">{{ loop.index }}</span>
+                                                <button type="button" value="move_down" data-unit-master-order-action="down"
+                                                        aria-label="Move {{ unit.name }} down" title="Move {{ unit.name }} down" {% if loop.last %}disabled{% endif %}>
+                                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"></path><path d="m6 13 6 6 6-6"></path></svg>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <strong role="cell" data-mobile-label="Canonical name">{{ unit.name }}</strong>
+                                        <div class="unit-master-aliases" role="cell" data-mobile-label="Accepted aliases">
                                             {% for alias in unit.aliases %}
                                                 <code>{{ alias }}</code>
                                             {% else %}
                                                 <span>Canonical name only</span>
                                             {% endfor %}
                                         </div>
-                                        <div class="unit-master-usage" role="cell">
+                                        <div class="unit-master-usage" role="cell" data-mobile-label="Used in">
                                             {% if unit.recipe_count %}
                                                 <button type="button"
                                                         class="unit-master-usage-button"
@@ -144,11 +170,13 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                         <span class="unit-master-source-badge{% if not unit.seeded %} user-created{% endif %}" role="cell">
                                             {{ "Built-in" if unit.seeded else "User-created" }}
                                         </span>
-                                        <button type="button"
-                                                class="unit-master-edit-button"
-                                                data-unit-master-edit-button
-                                                data-unit-id="{{ unit.id }}"
-                                                aria-label="Edit {{ unit.name }}">Edit</button>
+                                        <div class="unit-master-action-cell" role="cell">
+                                            <button type="button"
+                                                    class="unit-master-edit-button"
+                                                    data-unit-master-edit-button
+                                                    data-unit-id="{{ unit.id }}"
+                                                    aria-label="Edit {{ unit.name }}">Edit</button>
+                                        </div>
                                     </div>
                                 {% endfor %}
                             </div>

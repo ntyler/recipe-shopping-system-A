@@ -548,9 +548,10 @@ def test_units_page_renders_clickable_recipe_counts_and_usage_dialog(
     soup = BeautifulSoup(response.get_data(as_text=True), "html.parser")
     headers = [
         header.get_text(" ", strip=True)
-        for header in soup.select(".unit-master-table-head [role='columnheader']")[:5]
+        for header in soup.select(".unit-master-table-head [role='columnheader']")[:6]
     ]
     assert headers == [
+        "Order",
         "Canonical name",
         "Accepted aliases",
         "Used in",

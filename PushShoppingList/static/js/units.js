@@ -65,6 +65,11 @@
         let suggestionRequestToken = 0;
         let usageRequestToken = 0;
         let usageReturnFocus = null;
+        let orderPending = false;
+        let mutationPending = false;
+        let draggedRow = null;
+        let rowDropTarget = null;
+        let rowDropAfter = false;
 
         const source = document.getElementById("ingredientUnitConfig");
         const status = root.querySelector("[data-unit-master-status]");
@@ -97,7 +102,8 @@
         const usageSummary = root.querySelector("[data-unit-master-usage-summary]");
         const usageResults = root.querySelector("[data-unit-master-usage-results]");
 
-        const setStatus = (message, type = "success") => {
+        const setStatus = (message, type = "success", announceOnly = false) => {
+            status.classList.toggle("sr-only", announceOnly);
             status.textContent = String(message || "");
             status.dataset.status = type;
             status.hidden = !status.textContent;
@@ -223,6 +229,7 @@
             const usage = document.createElement("div");
             usage.className = "unit-master-usage";
             usage.setAttribute("role", "cell");
+            usage.dataset.mobileLabel = "Used in";
             const recipeCount = Math.max(0, Number(unit.recipe_count) || 0);
             if (!recipeCount) {
                 const empty = document.createElement("span");
@@ -255,7 +262,73 @@
             return usage;
         };
 
-        const createUnitRow = unit => {
+        const createOrderCell = (item, position) => {
+            const label = item.name;
+            const cell = document.createElement("div");
+            cell.className = "store-section-master-order-cell unit-master-order-cell";
+            cell.setAttribute("role", "cell");
+            cell.setAttribute("aria-colindex", "1");
+            cell.dataset.mobileLabel = "Order";
+
+            const order = document.createElement("div");
+            order.className = "store-section-master-order";
+
+            const handle = document.createElement("button");
+            handle.type = "button";
+            handle.className = "store-section-master-drag-handle";
+            handle.dataset.unitMasterDragHandle = "";
+            handle.setAttribute("aria-label", `Drag ${label} to reorder`);
+            handle.title = `Drag to reorder ${label}`;
+            handle.setAttribute("aria-describedby", "unitMasterOrderHelp");
+            handle.setAttribute("aria-keyshortcuts", "ArrowUp ArrowDown Home End");
+            handle.innerHTML = [
+                '<svg viewBox="0 0 16 20" aria-hidden="true">',
+                '<circle cx="5" cy="4" r="1.4"></circle>',
+                '<circle cx="11" cy="4" r="1.4"></circle>',
+                '<circle cx="5" cy="10" r="1.4"></circle>',
+                '<circle cx="11" cy="10" r="1.4"></circle>',
+                '<circle cx="5" cy="16" r="1.4"></circle>',
+                '<circle cx="11" cy="16" r="1.4"></circle>',
+                "</svg>",
+            ].join("");
+
+            const up = document.createElement("button");
+            up.type = "button";
+            up.value = "move_up";
+            up.dataset.unitMasterOrderAction = "up";
+            up.setAttribute("aria-label", `Move ${label} up`);
+            up.innerHTML = [
+                '<svg viewBox="0 0 24 24" aria-hidden="true">',
+                '<path d="M12 19V5"></path>',
+                '<path d="m6 11 6-6 6 6"></path>',
+                "</svg>",
+            ].join("");
+
+            const number = document.createElement("span");
+            number.className = "store-section-master-order-step";
+            number.dataset.unitMasterOrderNumber = "";
+            number.textContent = String(position);
+            number.setAttribute("aria-label", `Step ${position}`);
+
+            const down = document.createElement("button");
+            down.type = "button";
+            down.value = "move_down";
+            down.dataset.unitMasterOrderAction = "down";
+            down.setAttribute("aria-label", `Move ${label} down`);
+            down.innerHTML = [
+                '<svg viewBox="0 0 24 24" aria-hidden="true">',
+                '<path d="M12 5v14"></path>',
+                '<path d="m6 13 6 6 6-6"></path>',
+                "</svg>",
+            ].join("");
+
+            order.append(handle, up, number, down);
+            cell.appendChild(order);
+            return cell;
+        };
+
+
+        const createUnitRow = (unit, index) => {
             const row = document.createElement("div");
             row.className = "unit-master-row";
             row.setAttribute("role", "row");
@@ -265,10 +338,12 @@
 
             const name = document.createElement("strong");
             name.setAttribute("role", "cell");
+            name.dataset.mobileLabel = "Canonical name";
             name.textContent = unit.name;
             const aliases = document.createElement("div");
             aliases.className = "unit-master-aliases";
             aliases.setAttribute("role", "cell");
+            aliases.dataset.mobileLabel = "Accepted aliases";
             if (unit.aliases?.length) {
                 unit.aliases.forEach(alias => {
                     const code = document.createElement("code");
@@ -292,7 +367,11 @@
             edit.dataset.unitId = unit.id;
             edit.textContent = "Edit";
             edit.setAttribute("aria-label", `Edit ${unit.name}`);
-            row.append(name, aliases, usage, sourceBadge, edit);
+            const action = document.createElement("div");
+            action.className = "unit-master-action-cell";
+            action.setAttribute("role", "cell");
+            action.appendChild(edit);
+            row.append(createOrderCell(unit, index + 1), name, aliases, usage, sourceBadge, action);
             return row;
         };
 
@@ -312,6 +391,81 @@
             });
             searchEmpty.hidden = visibleCount > 0;
             countLabel.textContent = `Showing ${visibleCount} of ${registry.units.length} Unit${registry.units.length === 1 ? "" : "s"}.`;
+            syncOrderControls();
+        };
+
+        const categoryRows = container => Array.from(container.querySelectorAll("[data-unit-master-row]"));
+        const reorderIsBlocked = () => orderPending || mutationPending || Boolean(unitKey(search.value));
+        const syncOrderControls = () => {
+            const blocked = reorderIsBlocked();
+            root.querySelectorAll("[data-unit-master-category-rows]").forEach(container => {
+                const rows = categoryRows(container);
+                rows.forEach((row, index) => {
+                    const number = row.querySelector("[data-unit-master-order-number]");
+                    number.textContent = String(index + 1);
+                    number.setAttribute("aria-label", `Step ${index + 1}`);
+                    const handle = row.querySelector("[data-unit-master-drag-handle]");
+                    handle.draggable = !blocked;
+                    handle.setAttribute("aria-disabled", String(blocked));
+                    row.querySelector('[data-unit-master-order-action="up"]').disabled = blocked || index === 0;
+                    row.querySelector('[data-unit-master-order-action="down"]').disabled = blocked || index === rows.length - 1;
+                    row.querySelector("[data-unit-master-edit-button]").disabled = orderPending || mutationPending;
+                });
+            });
+            addButtons.forEach(button => { button.disabled = orderPending || mutationPending; });
+            importButton.disabled = orderPending || mutationPending;
+            saveButton.disabled = orderPending || mutationPending || aiSuggestionPending;
+        };
+        const placeRows = (container, rows) => {
+            rows.forEach(row => {
+                container.appendChild(row);
+                // Keep an open editor and its unsaved aliases with the unit.
+                if (!form.hidden && editorUnitId === row.dataset.unitId) container.appendChild(form);
+            });
+        };
+        const moveRowTo = async (row, targetIndex, trigger) => {
+            if (!row || reorderIsBlocked()) return;
+            const container = row.closest("[data-unit-master-category-rows]");
+            const previous = categoryRows(container);
+            const current = previous.indexOf(row);
+            const target = Math.max(0, Math.min(previous.length - 1, targetIndex));
+            if (current === target) return;
+            const ordered = [...previous];
+            ordered.splice(target, 0, ordered.splice(current, 1)[0]);
+            orderPending = true;
+            placeRows(container, ordered);
+            syncOrderControls();
+            // Announce without inserting a banner above the table during a drag.
+            setStatus("Saving unit order…", "info", true);
+            try {
+                const response = await fetch(root.dataset.updateUrlTemplate.replace("__UNIT_ID__", encodeURIComponent(row.dataset.unitId)), {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json", "X-Requested-With": "fetch" },
+                    body: JSON.stringify({ action: "move_to", position: target + 1 }),
+                });
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok || !result.ok) throw new Error(result.error || "The unit order could not be saved.");
+                registry = result.registry;
+                source.textContent = JSON.stringify(registry);
+                const category = container.closest("[data-unit-master-category]").dataset.category;
+                const byId = new Map(previous.map(item => [item.dataset.unitId, item]));
+                const saved = registry.units.filter(unit => unit.category === category);
+                placeRows(container, saved.map((unit, index) => byId.get(String(unit.id)) || createUnitRow(unit, index)));
+                setStatus(result.message || "Unit order saved.", "success", true);
+            } catch (error) {
+                placeRows(container, previous);
+                status.classList.remove("sr-only");
+                setStatus(error.message || "The unit order could not be saved. Try again.", "error");
+            } finally {
+                orderPending = false;
+                applySearch();
+                const focusTarget = trigger?.disabled ? row.querySelector("[data-unit-master-drag-handle]") : trigger;
+                focusTarget?.focus({ preventScroll: true });
+            }
+        };
+        const clearRowDropState = () => {
+            categoryRows(categoryList).forEach(row => row.classList.remove("is-row-drop-before", "is-row-drop-after", "is-row-dragging"));
+            rowDropTarget = null;
         };
 
         const parkEditor = () => {
@@ -543,6 +697,7 @@
         };
 
         const openEditor = (unit = null, trigger = null) => {
+            if (orderPending || mutationPending) return;
             suggestionRequestToken += 1;
             returnFocus = trigger || document.activeElement;
             editorUnitId = unit ? String(unit.id) : "";
@@ -572,6 +727,7 @@
         };
 
         const closeEditor = ({ restoreFocus = true } = {}) => {
+            if (mutationPending) return;
             suggestionRequestToken += 1;
             form.hidden = true;
             form.classList.remove("is-editing");
@@ -659,6 +815,7 @@
 
         const saveUnit = async event => {
             event.preventDefault();
+            if (orderPending || mutationPending || aiSuggestionPending) return;
             if (aliasInput.value && !addPendingAlias()) return;
             clearErrors();
             const payload = {
@@ -669,6 +826,8 @@
             const url = editorUnitId
                 ? root.dataset.updateUrlTemplate.replace("__UNIT_ID__", encodeURIComponent(editorUnitId))
                 : root.dataset.createUrl;
+            mutationPending = true;
+            syncOrderControls();
             saveButton.disabled = true;
             saveButton.textContent = "Saving…";
             try {
@@ -682,6 +841,7 @@
                     applyServerErrors(result);
                     return;
                 }
+                mutationPending = false;
                 closeEditor({ restoreFocus: false });
                 updateRegistry(result.registry);
                 setStatus(result.message || "Unit saved.");
@@ -689,6 +849,8 @@
                 setEditorFeedback("The unit could not be saved. Check your connection and try again.");
                 console.error("Unable to save unit.", error);
             } finally {
+                mutationPending = false;
+                syncOrderControls();
                 saveButton.disabled = false;
                 saveButton.textContent = saveButtonLabel;
             }
@@ -698,6 +860,13 @@
             button.addEventListener("click", event => openEditor(null, event.currentTarget));
         });
         categoryList.addEventListener("click", event => {
+            const action = event.target.closest("[data-unit-master-order-action]");
+            if (action) {
+                const row = action.closest("[data-unit-master-row]");
+                const rows = categoryRows(row.parentElement);
+                moveRowTo(row, rows.indexOf(row) + (action.dataset.unitMasterOrderAction === "up" ? -1 : 1), action);
+                return;
+            }
             const usageButton = event.target.closest("[data-unit-master-usage-button]");
             if (usageButton) {
                 openUsage(unitById(usageButton.dataset.unitId), usageButton);
@@ -706,6 +875,56 @@
             const button = event.target.closest("[data-unit-master-edit-button]");
             if (!button) return;
             openEditor(unitById(button.dataset.unitId), button);
+        });
+        categoryList.addEventListener("keydown", event => {
+            const handle = event.target.closest("[data-unit-master-drag-handle]");
+            if (!handle || !["ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) return;
+            event.preventDefault();
+            const row = handle.closest("[data-unit-master-row]");
+            const rows = categoryRows(row.parentElement);
+            const target = event.key === "Home" ? 0 : event.key === "End" ? rows.length - 1
+                : rows.indexOf(row) + (event.key === "ArrowUp" ? -1 : 1);
+            moveRowTo(row, target, handle);
+        });
+        categoryList.addEventListener("dragstart", event => {
+            const handle = event.target.closest("[data-unit-master-drag-handle]");
+            if (!handle || reorderIsBlocked()) { event.preventDefault(); return; }
+            draggedRow = handle.closest("[data-unit-master-row]");
+            draggedRow.classList.add("is-row-dragging");
+            event.dataTransfer.effectAllowed = "move";
+            event.dataTransfer.setData("text/plain", draggedRow.dataset.unitId);
+        });
+        categoryList.addEventListener("dragover", event => {
+            if (!draggedRow) return;
+            event.preventDefault();
+            clearRowDropState();
+            const target = event.target.closest("[data-unit-master-row]");
+            if (reorderIsBlocked() || !target || target === draggedRow || target.parentElement !== draggedRow.parentElement) {
+                event.dataTransfer.dropEffect = "none";
+                return;
+            }
+            event.dataTransfer.dropEffect = "move";
+            draggedRow.classList.add("is-row-dragging");
+            const rect = target.getBoundingClientRect();
+            rowDropAfter = event.clientY > rect.top + rect.height / 2;
+            rowDropTarget = target;
+            target.classList.add(rowDropAfter ? "is-row-drop-after" : "is-row-drop-before");
+        });
+        categoryList.addEventListener("drop", event => {
+            if (!draggedRow) return;
+            event.preventDefault();
+            if (!rowDropTarget || reorderIsBlocked()) return;
+            const moving = draggedRow;
+            const rows = categoryRows(moving.parentElement);
+            let target = rows.indexOf(rowDropTarget) + (rowDropAfter ? 1 : 0);
+            if (rows.indexOf(moving) < target) target -= 1;
+            clearRowDropState();
+            draggedRow = null;
+            moveRowTo(moving, target, moving.querySelector("[data-unit-master-drag-handle]"));
+        });
+        categoryList.addEventListener("dragend", () => {
+            clearRowDropState();
+            draggedRow = null;
         });
         aliasAddButton.addEventListener("click", addPendingAlias);
         suggestButton.addEventListener("click", suggestUnitDetails);
@@ -742,6 +961,9 @@
         const importDismissed = sessionStorage.getItem(IMPORT_DISMISSED_KEY) === "true";
         importPanel.hidden = !browserUnits.length || importDismissed;
         importButton.addEventListener("click", async () => {
+            if (orderPending || mutationPending) return;
+            mutationPending = true;
+            syncOrderControls();
             importButton.disabled = true;
             importButton.textContent = "Importing…";
             try {
@@ -760,6 +982,8 @@
                 setStatus("Browser units could not be imported. Try again.", "error");
                 console.error("Unable to import browser units.", error);
             } finally {
+                mutationPending = false;
+                syncOrderControls();
                 importButton.disabled = false;
                 importButton.textContent = "Import units";
             }
@@ -769,7 +993,9 @@
             importPanel.hidden = true;
         });
 
-        renderRegistry();
+        // Keep the finished server-rendered rows and controls through startup.
+        renderStats();
+        applySearch();
     }
 
     if (document.readyState === "loading") {

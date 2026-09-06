@@ -1812,11 +1812,15 @@ def master_data_units_api_route():
 @main_bp.route("/api/master-data/units/<unit_id>", methods=["PUT", "PATCH"])
 def master_data_unit_api_route(unit_id):
     workspace_user_id = recipe_master_data.scoped_recipe_user_id()
-    result = recipe_master_data.save_workspace_unit(
-        request.get_json(silent=True) or {},
-        unit_id=unit_id,
-        user_id=workspace_user_id,
-    )
+    payload = request.get_json(silent=True) or {}
+    if isinstance(payload, dict) and payload.get("action") == "move_to":
+        result = recipe_master_data.move_workspace_unit(
+            unit_id, payload.get("position"), user_id=workspace_user_id,
+        )
+    else:
+        result = recipe_master_data.save_workspace_unit(
+            payload, unit_id=unit_id, user_id=workspace_user_id,
+        )
     if result.get("ok"):
         result["registry"] = recipe_master_data.workspace_unit_registry_with_usage(
             workspace_user_id

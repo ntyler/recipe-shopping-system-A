@@ -1061,6 +1061,51 @@ def migrate_ingredient_type_order(connection):
     return changed
 
 
+def migrate_workspace_unit_order(connection):
+    """Repair invalid category positions without changing valid existing order.
+
+    The caller owns the transaction. Take the write lock before reading so
+    category appends and reorders also serialize across application processes.
+    """
+    if not connection.in_transaction:
+        connection.execute("BEGIN IMMEDIATE")
+    if not recipe_master_table_exists(connection, "workspace_units"):
+        return 0
+    if "sort_order" not in recipe_master_column_names(connection, "workspace_units"):
+        connection.execute(
+            "ALTER TABLE workspace_units ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0"
+        )
+    groups = connection.execute(
+        """
+        SELECT user_id, category FROM workspace_units GROUP BY user_id, category
+        HAVING COUNT(DISTINCT sort_order) <> COUNT(*) OR MIN(sort_order) < 0
+            OR SUM(typeof(sort_order) <> 'integer') > 0
+        """
+    ).fetchall()
+    seeds = {unit["id"]: unit["sort_order"] for unit in canonical_unit_options()}
+    changed = 0
+    for group in groups:
+        rows = connection.execute(
+            "SELECT id, sort_order, created_at, normalized_name FROM workspace_units "
+            "WHERE user_id = ? AND category = ?", (group["user_id"], group["category"]),
+        ).fetchall()
+        rows = sorted(rows, key=lambda row: (
+            row["sort_order"] if isinstance(row["sort_order"], int) and row["sort_order"] >= 0 else float("inf"),
+            seeds.get(row["id"], len(seeds)),
+            row["created_at"], row["normalized_name"], row["id"],
+        ))
+        updates = [
+            (index, group["user_id"], row["id"])
+            for index, row in enumerate(rows)
+            if not isinstance(row["sort_order"], int) or row["sort_order"] != index
+        ]
+        connection.executemany(
+            "UPDATE workspace_units SET sort_order = ? WHERE user_id = ? AND id = ?", updates,
+        )
+        changed += len(updates)
+    return changed
+
+
 def ensure_recipe_master_schema(connection=None):
     if connection is None:
         with recipe_master_connection():
@@ -1103,6 +1148,7 @@ def ensure_recipe_master_schema(connection=None):
         )
         """
     )
+    migrate_workspace_unit_order(connection)
     connection.execute(
         """
         CREATE TABLE IF NOT EXISTS workspace_unit_aliases (
@@ -2145,6 +2191,7 @@ def _seed_workspace_unit_registry(connection, user_id):
         """,
         (user_id, UNIT_REGISTRY_SEED_VERSION, timestamp),
     )
+    migrate_workspace_unit_order(connection)
     return True
 
 
@@ -2386,6 +2433,48 @@ def _workspace_unit_alias_keys(connection, user_id, unit_id):
     }
 
 
+def move_workspace_unit(unit_id, position, user_id=None):
+    """Atomically move a unit to a one-based position in its own category."""
+    user_id = str(user_id or scoped_recipe_user_id()).strip()
+    unit_id = str(unit_id or "").strip()
+    if isinstance(position, bool) or not isinstance(position, (int, str)) or not re.fullmatch(
+        r"[+-]?\d+", str(position).strip()
+    ):
+        return {"ok": False, "status": 400, "error": "A valid unit position is required."}
+    with recipe_master_connection(user_id=user_id) as connection:
+        _seed_workspace_unit_registry(connection, user_id)
+        unit = connection.execute(
+            "SELECT category FROM workspace_units WHERE user_id = ? AND id = ?",
+            (user_id, unit_id),
+        ).fetchone()
+        if not unit:
+            return {"ok": False, "status": 404, "error": "Unit not found."}
+        category = unit["category"]
+        ordered_ids = [row["id"] for row in connection.execute(
+            "SELECT id FROM workspace_units WHERE user_id = ? AND category = ? "
+            "ORDER BY sort_order, normalized_name, id", (user_id, category),
+        )]
+        current = ordered_ids.index(unit_id)
+        target = max(0, min(len(ordered_ids) - 1, int(position) - 1))
+        changed = current != target
+        if changed:
+            ordered_ids.insert(target, ordered_ids.pop(current))
+            timestamp = utc_now_iso()
+            connection.executemany(
+                "UPDATE workspace_units SET sort_order = ?, updated_at = ? "
+                "WHERE user_id = ? AND category = ? AND id = ?",
+                [(index, timestamp, user_id, category, item_id) for index, item_id in enumerate(ordered_ids)],
+            )
+    from PushShoppingList.services.ingredient_unit_service import clear_unit_registry_cache
+
+    clear_unit_registry_cache()
+    return {
+        "ok": True, "changed": changed, "unit_id": unit_id,
+        "category": category, "position": target + 1,
+        "message": f"Unit moved to position {target + 1}.",
+    }
+
+
 def save_workspace_unit(values, unit_id="", user_id=None):
     """Create or edit one scoped unit in a duplicate-safe transaction."""
     user_id = str(user_id or scoped_recipe_user_id()).strip()
@@ -2455,10 +2544,16 @@ def save_workspace_unit(values, unit_id="", user_id=None):
         previous_keys = {unit_registry_key(previous_name)} if previous_name else set()
         if existing:
             previous_keys.update(_workspace_unit_alias_keys(connection, user_id, unit_id))
+            sort_order = existing["sort_order"]
+            if existing["category"] != validated["category"]:
+                sort_order = connection.execute(
+                    "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM workspace_units "
+                    "WHERE user_id = ? AND category = ?", (user_id, validated["category"]),
+                ).fetchone()[0]
             connection.execute(
                 """
                 UPDATE workspace_units
-                   SET name = ?, normalized_name = ?, category = ?, updated_at = ?
+                   SET name = ?, normalized_name = ?, category = ?, updated_at = ?, sort_order = ?
                  WHERE user_id = ? AND id = ?
                 """,
                 (
@@ -2466,6 +2561,7 @@ def save_workspace_unit(values, unit_id="", user_id=None):
                     validated["canonical_key"],
                     validated["category"],
                     timestamp,
+                    sort_order,
                     user_id,
                     unit_id,
                 ),
@@ -2473,8 +2569,9 @@ def save_workspace_unit(values, unit_id="", user_id=None):
         else:
             unit_id = f"custom_{uuid.uuid4().hex}"
             sort_order = int(connection.execute(
-                "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM workspace_units WHERE user_id = ?",
-                (user_id,),
+                "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM workspace_units "
+                "WHERE user_id = ? AND category = ?",
+                (user_id, validated["category"]),
             ).fetchone()[0])
             connection.execute(
                 """
