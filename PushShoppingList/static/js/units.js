@@ -71,8 +71,10 @@
         const search = root.querySelector("[data-unit-master-search]");
         const searchEmpty = root.querySelector("[data-unit-master-search-empty]");
         const categoryList = root.querySelector("[data-unit-master-category-list]");
-        const dialog = root.querySelector("[data-unit-master-dialog]");
         const form = root.querySelector("[data-unit-master-form]");
+        const editorHome = root.querySelector("[data-unit-master-editor-home]");
+        const addButtons = Array.from(root.querySelectorAll("[data-unit-master-add-button]"));
+        const countLabel = root.querySelector("[data-unit-master-count-label]");
         const nameInput = root.querySelector("[data-unit-master-name]");
         const categorySelect = root.querySelector("[data-unit-master-category-select]");
         const aliasInput = root.querySelector("[data-unit-master-alias-input]");
@@ -116,7 +118,7 @@
 
         const setAiPending = pending => {
             aiSuggestionPending = Boolean(pending);
-            dialog.toggleAttribute("aria-busy", aiSuggestionPending);
+            form.toggleAttribute("aria-busy", aiSuggestionPending);
             suggestButton.disabled = aiSuggestionPending;
             suggestButtonLabel.textContent = aiSuggestionPending ? "Suggesting…" : "Suggest details";
             saveButton.disabled = aiSuggestionPending;
@@ -202,6 +204,7 @@
         };
 
         const renderStats = () => {
+            root.querySelector("[data-unit-master-total-count]").textContent = String(registry.units.length);
             root.querySelector("[data-unit-master-seeded-count]").textContent = String(
                 registry.units.filter(unit => unit.seeded).length,
             );
@@ -308,9 +311,17 @@
                 visibleCount += categoryCount;
             });
             searchEmpty.hidden = visibleCount > 0;
+            countLabel.textContent = `Showing ${visibleCount} of ${registry.units.length} Unit${registry.units.length === 1 ? "" : "s"}.`;
+        };
+
+        const parkEditor = () => {
+            if (form.parentElement !== editorHome.parentElement || form.nextElementSibling !== editorHome) {
+                editorHome.before(form);
+            }
         };
 
         const renderRegistry = () => {
+            parkEditor();
             root.querySelectorAll("[data-unit-master-category]").forEach(category => {
                 const rows = category.querySelector("[data-unit-master-category-rows]");
                 const units = registry.units.filter(unit => unit.category === category.dataset.category);
@@ -519,6 +530,18 @@
             }
         };
 
+        const focusEditorName = () => {
+            try {
+                nameInput.focus({ preventScroll: true });
+            } catch (_error) {
+                nameInput.focus();
+            }
+            const rect = nameInput.getBoundingClientRect();
+            if (rect.top < 0 || rect.bottom > window.innerHeight) {
+                nameInput.scrollIntoView({ block: "nearest", inline: "nearest" });
+            }
+        };
+
         const openEditor = (unit = null, trigger = null) => {
             suggestionRequestToken += 1;
             returnFocus = trigger || document.activeElement;
@@ -534,16 +557,34 @@
             setAiPending(false);
             clearErrors();
             renderAliasChips();
-            dialog.showModal();
-            requestAnimationFrame(() => nameInput.focus());
+            const row = unit
+                ? root.querySelector(`[data-unit-master-row][data-unit-id="${CSS.escape(String(unit.id))}"]`)
+                : null;
+            if (row) {
+                row.insertAdjacentElement("afterend", form);
+            } else {
+                editorHome.before(form);
+            }
+            form.hidden = false;
+            form.classList.toggle("is-editing", Boolean(unit));
+            addButtons.forEach(button => button.setAttribute("aria-expanded", "true"));
+            requestAnimationFrame(focusEditorName);
         };
 
-        const closeEditor = () => {
+        const closeEditor = ({ restoreFocus = true } = {}) => {
             suggestionRequestToken += 1;
-            if (dialog.open) dialog.close();
-            if (returnFocus && typeof returnFocus.focus === "function") {
-                returnFocus.focus();
+            form.hidden = true;
+            form.classList.remove("is-editing");
+            parkEditor();
+            addButtons.forEach(button => button.setAttribute("aria-expanded", "false"));
+            if (restoreFocus && returnFocus?.isConnected && typeof returnFocus.focus === "function") {
+                try {
+                    returnFocus.focus({ preventScroll: true });
+                } catch (_error) {
+                    returnFocus.focus();
+                }
             }
+            returnFocus = null;
         };
 
         const applyServerErrors = payload => {
@@ -585,7 +626,7 @@
                     body: JSON.stringify(payload),
                 });
                 const result = await response.json().catch(() => ({}));
-                if (requestToken !== suggestionRequestToken || !dialog.open) return;
+                if (requestToken !== suggestionRequestToken || form.hidden) return;
                 if (!response.ok || !result.ok) {
                     setAiPending(false);
                     applyServerErrors(result);
@@ -641,8 +682,8 @@
                     applyServerErrors(result);
                     return;
                 }
+                closeEditor({ restoreFocus: false });
                 updateRegistry(result.registry);
-                closeEditor();
                 setStatus(result.message || "Unit saved.");
             } catch (error) {
                 setEditorFeedback("The unit could not be saved. Check your connection and try again.");
@@ -653,7 +694,9 @@
             }
         };
 
-        root.querySelector("[data-unit-master-add-button]").addEventListener("click", event => openEditor(null, event.currentTarget));
+        addButtons.forEach(button => {
+            button.addEventListener("click", event => openEditor(null, event.currentTarget));
+        });
         categoryList.addEventListener("click", event => {
             const usageButton = event.target.closest("[data-unit-master-usage-button]");
             if (usageButton) {
@@ -672,9 +715,9 @@
                 addPendingAlias();
             }
         });
-        root.querySelector("[data-unit-master-close]").addEventListener("click", closeEditor);
         root.querySelector("[data-unit-master-cancel]").addEventListener("click", closeEditor);
-        dialog.addEventListener("cancel", event => {
+        form.addEventListener("keydown", event => {
+            if (event.key !== "Escape") return;
             event.preventDefault();
             closeEditor();
         });

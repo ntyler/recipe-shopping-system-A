@@ -71057,6 +71057,372 @@ body.is-resizing-store-section-master-column * {
     }
 }
 
+/* Unit manager v2: compact, full-width registry with inline details. */
+.unit-master-page--registry-v2 .master-data-header > :first-child {
+    flex: 1 1 auto;
+}
+
+.unit-master-page--registry-v2 .master-data-header h1 {
+    text-align: left;
+}
+
+.unit-master-header-summary {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    margin-top: 8px;
+    color: var(--app-muted);
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.unit-master-header-summary > span {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 4px;
+}
+
+.unit-master-header-summary > span + span::before {
+    width: 3px;
+    height: 3px;
+    margin-right: 4px;
+    border-radius: 50%;
+    background: var(--app-border-strong);
+    content: "";
+}
+
+.unit-master-header-summary strong {
+    color: var(--app-text-strong);
+    font-size: inherit;
+}
+
+.unit-master-header-actions {
+    display: grid;
+    min-width: 0;
+    justify-items: end;
+    gap: 12px;
+}
+
+.unit-master-header-actions .master-data-tabs {
+    min-width: 0;
+}
+
+.unit-master-page--registry-v2 .unit-master-header-add {
+    width: max-content;
+    max-width: 100%;
+    justify-self: end;
+}
+
+.unit-master-page--registry-v2 .unit-master-add-shortcut {
+    display: inline-flex;
+    min-height: 36px;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-color: var(--app-primary);
+    background: var(--app-primary-soft);
+    color: var(--app-primary-hover);
+    font-size: 11px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.unit-master-page--registry-v2 .unit-master-add-shortcut :is(.app-icon-svg, svg) {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-width: 1.8;
+}
+
+.unit-master-page--registry-v2 .unit-master-list-section {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    padding: 0;
+    overflow: visible;
+}
+
+.unit-master-page--registry-v2 .unit-master-list-section > .unit-master-table-toolbar {
+    display: block;
+    padding: 16px 16px 8px;
+    border-bottom: 0;
+}
+
+.unit-master-page--registry-v2 .unit-master-visible-count {
+    display: block;
+    width: max-content;
+    max-width: 100%;
+    color: var(--app-text);
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1.4;
+    white-space: normal;
+}
+
+.unit-master-page--registry-v2 .unit-master-filter-toolbar {
+    display: grid;
+    width: auto;
+    grid-template-columns: minmax(240px, 400px);
+    align-items: end;
+    justify-content: start;
+    gap: 10px;
+    margin: 0 16px;
+    padding: 12px;
+    border-radius: 8px;
+    background: var(--app-surface-soft);
+}
+
+.unit-master-page--registry-v2 .unit-master-search {
+    display: grid;
+    width: 100%;
+    min-width: 0;
+    flex: none;
+    gap: 5px;
+}
+
+.unit-master-page--registry-v2 .unit-master-search-label {
+    color: var(--app-muted);
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.unit-master-page--registry-v2 .unit-master-search-control {
+    position: relative;
+    display: block;
+    min-width: 0;
+}
+
+.unit-master-page--registry-v2 .unit-master-search-control > svg {
+    position: absolute;
+    z-index: 1;
+    top: 50%;
+    left: 11px;
+    width: 15px;
+    height: 15px;
+    transform: translateY(-50%);
+    fill: none;
+    stroke: var(--app-muted);
+    stroke-linecap: round;
+    stroke-width: 1.8;
+    pointer-events: none;
+}
+
+.unit-master-page--registry-v2 .unit-master-search-control > input {
+    width: 100%;
+    min-height: 38px;
+    padding-left: 32px;
+    background: var(--app-surface);
+}
+
+.unit-master-page--registry-v2 .unit-master-category-list {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+    margin-top: 0;
+    padding: 16px;
+}
+
+.unit-master-page--registry-v2 .unit-master-category,
+.unit-master-page--registry-v2 .unit-master-table {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.unit-master-page--registry-v2 .unit-master-category {
+    overflow: visible;
+}
+
+.unit-master-page--registry-v2 .unit-master-category > header {
+    padding: 11px 14px;
+}
+
+.unit-master-page--registry-v2 .unit-master-category h3 {
+    margin: 0;
+    font-size: 14px;
+}
+
+.unit-master-page--registry-v2 .unit-master-category .unit-master-table-head {
+    position: sticky;
+    z-index: 20;
+    top: calc(-1 * var(--app-content-padding-block-start));
+    background: var(--app-surface);
+}
+
+.unit-master-page--registry-v2 .unit-master-table-head,
+.unit-master-page--registry-v2 .unit-master-row {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    grid-template-columns:
+        minmax(140px, 1.05fr)
+        minmax(220px, 1.75fr)
+        minmax(90px, .6fr)
+        minmax(95px, .65fr)
+        minmax(76px, .55fr);
+    column-gap: 14px;
+    padding-inline: 14px;
+}
+
+.unit-master-page--registry-v2 .unit-master-row {
+    min-height: 66px;
+}
+
+.unit-master-page--registry-v2 .unit-master-row > strong {
+    color: var(--app-text-strong);
+    font-size: 13px;
+}
+
+.unit-master-page--registry-v2 .unit-master-source-badge {
+    justify-self: start;
+    white-space: nowrap;
+}
+
+.unit-master-page--registry-v2 .unit-master-edit-button {
+    width: 100%;
+}
+
+.unit-master-page--registry-v2 .unit-master-inline-editor[hidden] {
+    display: none !important;
+}
+
+.unit-master-page--registry-v2 .unit-master-inline-editor {
+    position: relative;
+    margin: 0 16px 16px;
+    padding: 16px;
+    border: 1px dashed color-mix(in srgb, var(--app-primary) 62%, var(--app-border));
+    border-radius: 9px;
+    background: color-mix(in srgb, var(--app-primary-soft) 24%, var(--app-surface));
+    box-shadow: inset 3px 0 0 var(--app-primary);
+}
+
+.unit-master-page--registry-v2 [data-unit-master-category-rows] > .unit-master-inline-editor {
+    margin: 10px 12px 12px;
+}
+
+.unit-master-page--registry-v2 .unit-master-inline-editor > header {
+    padding-bottom: 2px;
+}
+
+.unit-master-page--registry-v2 .unit-master-inline-editor h2 {
+    font-size: 16px;
+    text-align: left;
+}
+
+.unit-master-page--registry-v2 .unit-master-inline-editor > footer {
+    align-items: stretch;
+}
+
+.unit-master-page--registry-v2 .unit-master-inline-editor > footer button {
+    min-width: 110px;
+}
+
+.unit-master-page--registry-v2 .unit-master-add-footer {
+    padding: 0 16px 16px;
+}
+
+.unit-master-page--registry-v2 .unit-master-add-footer .unit-master-add-shortcut {
+    display: flex;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 40px;
+    padding: 8px 12px;
+    border: 1px dashed color-mix(in srgb, var(--app-primary) 62%, var(--app-border));
+    border-radius: 7px;
+    background: transparent;
+}
+
+@media (max-width: 1100px) {
+    .unit-master-page--registry-v2 .unit-master-table-head {
+        display: none;
+    }
+
+    .unit-master-page--registry-v2 .unit-master-row {
+        grid-template-columns: minmax(0, 1fr) auto auto;
+    }
+
+    .unit-master-page--registry-v2 .unit-master-aliases {
+        grid-column: 1 / -1;
+        grid-row: 2;
+    }
+
+    .unit-master-page--registry-v2 .unit-master-usage {
+        grid-column: 1 / -1;
+        grid-row: 3;
+    }
+
+    .unit-master-page--registry-v2 .unit-master-source-badge {
+        grid-column: 2;
+        grid-row: 1;
+    }
+
+    .unit-master-page--registry-v2 .unit-master-edit-button {
+        grid-column: 3;
+        grid-row: 1;
+    }
+}
+
+@media (max-width: 1000px) {
+    .unit-master-header-actions {
+        width: 100%;
+        justify-items: stretch;
+    }
+
+    .unit-master-page--registry-v2 .unit-master-header-add {
+        width: 100%;
+        justify-self: stretch;
+    }
+}
+
+@media (max-width: 759px) {
+    .unit-master-page--registry-v2 .unit-master-filter-toolbar {
+        grid-template-columns: minmax(0, 1fr);
+        margin-inline: 10px;
+    }
+
+    .unit-master-page--registry-v2 .unit-master-category-list {
+        padding: 12px 10px;
+    }
+
+    .unit-master-page--registry-v2 .unit-master-inline-editor {
+        margin: 0 10px 12px;
+        padding: 12px;
+    }
+
+    .unit-master-page--registry-v2 [data-unit-master-category-rows] > .unit-master-inline-editor {
+        margin: 10px;
+    }
+
+    .unit-master-page--registry-v2 .unit-master-editor-grid,
+    .unit-master-page--registry-v2 .unit-master-alias-entry {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .unit-master-page--registry-v2 .unit-master-add-footer {
+        padding: 0 10px 12px;
+    }
+
+    .unit-master-page--registry-v2 .unit-master-inline-editor > footer {
+        display: grid;
+        width: 100%;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .unit-master-page--registry-v2 .unit-master-inline-editor > footer button {
+        width: 100%;
+        min-width: 0;
+    }
+}
+
 /* Ingredient editor v44: inline, atomic ingredient options. */
 body.recipe-edit-standalone-page .recipe-edit-ingredient-source-text {
     display: block;

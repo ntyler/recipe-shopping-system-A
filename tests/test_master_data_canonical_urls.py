@@ -190,9 +190,10 @@ def test_units_page_renders_the_persistent_registry_and_unit_editor(
     soup = BeautifulSoup(response.get_data(as_text=True), "html.parser")
     assert soup.title.get_text(strip=True) == "Units"
     assert soup.select_one("[data-unit-master-page]") is not None
-    assert soup.select_one("h1#unitsTitle").get_text(strip=True) == "Units"
+    assert soup.select_one("h1#unitsTitle").get_text(strip=True) == "Units (35)"
     assert soup.select_one("[data-unit-master-add-button]") is not None
-    assert soup.select_one("[data-unit-master-dialog]") is not None
+    assert soup.select_one("[data-unit-master-dialog]") is None
+    assert soup.select_one("form#unitMasterInlineEditor[data-unit-master-form]") is not None
     assert soup.select_one("[data-unit-master-alias-chips]") is not None
     built_in_rows = soup.select("[data-unit-master-row]")
     assert len(built_in_rows) == len(unit_registry_payload()["units"])

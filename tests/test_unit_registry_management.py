@@ -364,23 +364,27 @@ def test_registry_is_workspace_isolated_and_unit_routes_require_authorization(
         assert forbidden_usage.status_code == 404
 
 
-def test_units_page_exposes_accessible_persistent_editor_and_import_offer(
+def test_units_page_exposes_accessible_inline_editor_and_import_offer(
     unit_registry_app,
 ):
     with unit_registry_app.test_client() as client:
         sign_in(client, "user-a")
-        response = client.get(
-            "/admin/master-data/units",
-            query_string={"viewer_user_id": "user-a"},
-        )
+        response = client.get("/admin/master-data/units")
     assert response.status_code == 200
     soup = BeautifulSoup(response.get_data(as_text=True), "html.parser")
-    assert soup.select_one("[data-unit-master-add-button]").get_text(strip=True) == "Add Unit"
-    dialog = soup.select_one("dialog[data-unit-master-dialog]")
-    assert dialog is not None
-    assert dialog.select_one("[data-unit-master-name]") is not None
-    assert dialog.select_one("[data-unit-master-category-select]") is not None
-    category_select = dialog.select_one("[data-unit-master-category-select]")
+    add_buttons = soup.select("button[data-unit-master-add-button]")
+    assert len(add_buttons) == 2
+    assert all(button.get("type") == "button" for button in add_buttons)
+    assert all(button.get("aria-controls") == "unitMasterInlineEditor" for button in add_buttons)
+    assert all(button.get("aria-expanded") == "false" for button in add_buttons)
+    assert all(button.get_text(" ", strip=True) == "Add Unit" for button in add_buttons)
+    assert soup.select_one("dialog[data-unit-master-dialog]") is None
+    form = soup.select_one("form#unitMasterInlineEditor[data-unit-master-form]")
+    assert form is not None
+    assert form.has_attr("hidden")
+    assert form.select_one("[data-unit-master-name]") is not None
+    assert form.select_one("[data-unit-master-category-select]") is not None
+    category_select = form.select_one("[data-unit-master-category-select]")
     assert category_select.get("aria-describedby") == "unitCategoryHelp unitCategoryError"
     assert [option.get_text(strip=True) for option in category_select.select("option")] == [
         "Volume",
@@ -388,22 +392,34 @@ def test_units_page_exposes_accessible_persistent_editor_and_import_offer(
         "Count & Package",
         "Small Amounts & Optional",
     ]
-    assert "System-managed" in dialog.select_one(".unit-master-field-label").get_text(
+    assert "System-managed" in form.select_one(".unit-master-field-label").get_text(
         " ", strip=True
     )
-    category_help = dialog.select_one("#unitCategoryHelp").get_text(" ", strip=True)
+    category_help = form.select_one("#unitCategoryHelp").get_text(" ", strip=True)
     assert "Time, temperature, size, and preparation" in category_help
-    assert dialog.select_one("[data-unit-master-alias-chips]") is not None
-    assert dialog.select_one("[data-unit-master-save]") is not None
-    ai_button = dialog.select_one("[data-unit-master-ai-suggest]")
+    assert form.select_one("[data-unit-master-alias-chips]") is not None
+    assert form.select_one("[data-unit-master-save]") is not None
+    ai_button = form.select_one("[data-unit-master-ai-suggest]")
     assert ai_button is not None
     assert ai_button.get("aria-describedby") == "unitAiAssistHelp"
-    assert "Nothing is saved" in dialog.select_one("#unitAiAssistHelp").get_text(" ", strip=True)
+    assert "Nothing is saved" in form.select_one("#unitAiAssistHelp").get_text(" ", strip=True)
     assert soup.select_one("[data-unit-master-page]")["data-suggest-url"] == (
         "/api/master-data/units/suggest"
     )
     assert soup.select_one("[data-unit-master-import]") is not None
+    assert soup.select_one("[data-unit-master-total-count]").get_text(strip=True) == "35"
+    assert soup.select_one("[data-unit-master-count-label]").get_text(" ", strip=True) == (
+        "Showing 35 of 35 Units."
+    )
+    assert soup.select_one(".unit-master-stats") is None
+    assert soup.select_one(".unit-master-add-footer") is not None
     assert len(soup.select("[data-unit-master-edit-button]")) >= 30
+
+    script = Path("PushShoppingList/static/js/units.js").read_text(encoding="utf-8")
+    assert 'nameInput.focus({ preventScroll: true });' in script
+    assert 'nameInput.scrollIntoView({ block: "nearest", inline: "nearest" });' in script
+    assert 'form.hidden = false;' in script
+    assert 'closeEditor({ restoreFocus: false });' in script
 
 
 def test_unit_usage_counts_distinct_recipes_and_lists_matching_lines(
@@ -526,10 +542,7 @@ def test_units_page_renders_clickable_recipe_counts_and_usage_dialog(
 
     with unit_registry_app.test_client() as client:
         sign_in(client, "user-a")
-        response = client.get(
-            "/admin/master-data/units",
-            query_string={"viewer_user_id": "user-a"},
-        )
+        response = client.get("/admin/master-data/units")
 
     assert response.status_code == 200
     soup = BeautifulSoup(response.get_data(as_text=True), "html.parser")
@@ -567,28 +580,21 @@ def test_units_page_renders_clickable_recipe_counts_and_usage_dialog(
     assert ".unit-master-usage-recipe-fallback" in css
 
 
-def test_unit_editor_resets_legacy_button_sizing_and_uses_contextual_save_label():
+def test_unit_inline_editor_uses_compact_registry_styles_and_contextual_save_label():
     css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
     script = Path("PushShoppingList/static/js/units.js").read_text(encoding="utf-8")
-    unit_button_rules = css[
-        css.index(".unit-master-page button {"):
-        css.index(".unit-master-page button:is(:hover, :focus-visible)")
-    ]
-    close_button_rules = css[
-        css.index(".unit-master-dialog-close {"):
-        css.index(".unit-master-editor-grid {")
-    ]
     alias_button_rules = css[
         css.index(".unit-master-alias-chip button {"):
         css.index(".unit-master-alias-chip small {")
     ]
 
-    assert "width: auto;" in unit_button_rules
-    assert "margin: 0;" in unit_button_rules
-    assert "width: 38px;" in close_button_rules
     assert "width: 24px;" in alias_button_rules
     assert 'saveButtonLabel = unit ? "Save Changes" : "Add Unit";' in script
     assert 'saveButton.textContent = saveButtonLabel;' in script
+    assert ".unit-master-page--registry-v2 .unit-master-category-list" in css
+    assert "grid-template-columns: minmax(0, 1fr);" in css
+    assert ".unit-master-page--registry-v2 .unit-master-inline-editor[hidden]" in css
+    assert ".unit-master-page--registry-v2 .unit-master-add-footer" in css
 
 
 def test_unit_registry_uses_readable_type_at_normal_browser_zoom():

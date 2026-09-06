@@ -12,7 +12,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
 
 {% block app_content %}
     <script id="ingredientUnitConfig" type="application/json">{{ master_data.registry | tojson }}</script>
-    <section class="master-data-page unit-master-page"
+    <section class="master-data-page unit-master-page unit-master-page--registry-v2"
              aria-labelledby="unitsTitle"
              data-unit-master-page
              data-create-url="{{ master_data.create_url }}"
@@ -23,37 +23,34 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
         <header class="master-data-header">
             <div>
                 <a class="master-data-home-link" href="{{ url_for('main_bp.index') }}#userAccountSection">Account</a>
-                <h1 id="unitsTitle">Units</h1>
+                <h1 id="unitsTitle">Units (<span data-unit-master-total-count>{{ master_data.registry.units | length }}</span>)</h1>
                 <p>Manage canonical ingredient units and the aliases accepted across this workspace.</p>
+                <div class="unit-master-header-summary" aria-label="Unit summary">
+                    <span><strong data-unit-master-seeded-count>{{ master_data.seeded_count }}</strong> system-seeded</span>
+                    <span><strong data-unit-master-alias-count>{{ master_data.alias_count }}</strong> accepted aliases</span>
+                    <span><strong data-unit-master-category-count>{{ master_data.category_count }}</strong> categories</span>
+                    <span><strong data-unit-master-custom-count>{{ master_data.custom_count }}</strong> user-created</span>
+                </div>
             </div>
-            <nav class="master-data-tabs" aria-label="Master data">
-                <a href="{{ master_data.ingredient_url }}">Ingredients</a>
-                <a href="{{ master_data.equipment_url }}">Equipment</a>
-                <a href="{{ master_data.units_url }}" class="active" aria-current="page">Units</a>
-                <a href="{{ master_data.types_url }}">Types</a>
-                <a href="{{ master_data.cuisine_category_url }}">Cuisine Categories</a>
-                <a href="{{ master_data.store_section_url }}">Store Sections</a>
-            </nav>
+            <div class="unit-master-header-actions">
+                <nav class="master-data-tabs" aria-label="Master data">
+                    <a href="{{ master_data.ingredient_url }}">Ingredients</a>
+                    <a href="{{ master_data.equipment_url }}">Equipment</a>
+                    <a href="{{ master_data.units_url }}" class="active" aria-current="page">Units</a>
+                    <a href="{{ master_data.types_url }}">Types</a>
+                    <a href="{{ master_data.cuisine_category_url }}">Cuisine Categories</a>
+                    <a href="{{ master_data.store_section_url }}">Store Sections</a>
+                </nav>
+                <button type="button"
+                        class="unit-master-add-shortcut unit-master-header-add"
+                        aria-controls="unitMasterInlineEditor"
+                        aria-expanded="false"
+                        data-unit-master-add-button>
+                    {{ shell.svg_icon("plus") }}
+                    <span>Add Unit</span>
+                </button>
+            </div>
         </header>
-
-        <div class="unit-master-stats" aria-label="Unit summary">
-            <article>
-                <span>System-seeded</span>
-                <strong data-unit-master-seeded-count>{{ master_data.seeded_count }}</strong>
-            </article>
-            <article>
-                <span>Accepted aliases</span>
-                <strong data-unit-master-alias-count>{{ master_data.alias_count }}</strong>
-            </article>
-            <article>
-                <span>Categories</span>
-                <strong data-unit-master-category-count>{{ master_data.category_count }}</strong>
-            </article>
-            <article>
-                <span>User-created</span>
-                <strong data-unit-master-custom-count>{{ master_data.custom_count }}</strong>
-            </article>
-        </div>
 
         <section class="unit-master-import" data-unit-master-import hidden>
             <div>
@@ -68,24 +65,30 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
 
         <div class="unit-master-status" role="status" aria-live="polite" data-unit-master-status hidden></div>
 
-        <section class="unit-master-panel unit-master-catalog" aria-labelledby="unitRegistryTitle">
-            <header>
-                <div>
-                    <span>Workspace registry</span>
-                    <h2 id="unitRegistryTitle">Unit Registry</h2>
-                    <p>System-seeded and user-created units use the same editable rules.</p>
-                </div>
-                <div class="unit-master-toolbar">
-                    <label class="unit-master-search">
-                        <span>Search units</span>
+        <section class="unit-master-panel unit-master-catalog unit-master-list-section" aria-labelledby="unitRegistryTitle">
+            <header class="unit-master-table-toolbar">
+                <h2 id="unitRegistryTitle" class="sr-only">Unit Registry</h2>
+                <strong class="unit-master-visible-count"
+                        aria-live="polite"
+                        data-unit-master-count-label>
+                    Showing {{ master_data.registry.units | length }} of {{ master_data.registry.units | length }} Units.
+                </strong>
+            </header>
+            <div class="unit-master-filter-toolbar">
+                <label class="unit-master-search">
+                    <span class="unit-master-search-label">Search</span>
+                    <span class="unit-master-search-control">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <circle cx="11" cy="11" r="6.5"></circle>
+                            <path d="m16 16 4 4"></path>
+                        </svg>
                         <input type="search"
-                               placeholder="Name or alias"
+                               placeholder="Unit name or alias"
                                autocomplete="off"
                                data-unit-master-search>
-                    </label>
-                    <button type="button" data-unit-master-add-button>Add Unit</button>
-                </div>
-            </header>
+                    </span>
+                </label>
+            </div>
             <div class="unit-master-category-list" data-unit-master-category-list>
                 {% for category in master_data.categories %}
                     <section class="unit-master-category"
@@ -153,20 +156,20 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                     </section>
                 {% endfor %}
             </div>
-            <div class="unit-master-empty" data-unit-master-search-empty hidden>
-                No units match that search.
-            </div>
-        </section>
+            <div class="unit-master-empty" data-unit-master-search-empty hidden>No units match that search.</div>
 
-        <dialog class="unit-master-dialog" data-unit-master-dialog aria-labelledby="unitEditorTitle">
-            <form method="dialog" class="unit-master-editor" data-unit-master-form novalidate>
+            <form id="unitMasterInlineEditor"
+                  class="unit-master-editor unit-master-inline-editor"
+                  data-unit-master-form
+                  aria-labelledby="unitEditorTitle"
+                  novalidate
+                  hidden>
                 <header>
                     <div>
                         <span data-unit-master-editor-kicker>Workspace unit</span>
                         <h2 id="unitEditorTitle" data-unit-master-editor-title>Add Unit</h2>
                         <p>Canonical names and aliases are matched case-insensitively.</p>
                     </div>
-                    <button type="button" class="unit-master-dialog-close" data-unit-master-close aria-label="Close unit editor">×</button>
                 </header>
 
                 <div class="unit-master-editor-grid">
@@ -234,7 +237,18 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                     <button type="submit" data-unit-master-save>Add Unit</button>
                 </footer>
             </form>
-        </dialog>
+            <span data-unit-master-editor-home hidden></span>
+            <div class="unit-master-add-footer">
+                <button type="button"
+                        class="unit-master-add-shortcut"
+                        aria-controls="unitMasterInlineEditor"
+                        aria-expanded="false"
+                        data-unit-master-add-button>
+                    <span aria-hidden="true">{{ shell.svg_icon("plus") }}</span>
+                    <span>Add Unit</span>
+                </button>
+            </div>
+        </section>
 
         <dialog id="unitMasterUsageDialog"
                 class="unit-master-usage-dialog"
