@@ -715,6 +715,16 @@ def test_cuisine_category_rows_share_unit_usage_and_action_contract(
     inline_section = css.index(
         "/* Cuisine Category manager v3: direct create and per-row editing. */"
     )
+    compact_section = css.index(
+        "/* Cuisine Category manager v4: Store Section-style compact registry. */"
+    )
+    category_list = block_from(
+        css,
+        ".cuisine-category-master-category-list {",
+        compact_section,
+    )
+    assert "padding: 0;" in category_list
+
     inline_css = css[inline_section:]
     assert "[data-cuisine-category-master-create-form] {" in inline_css
     assert "[data-cuisine-category-master-row].is-dirty" in inline_css
