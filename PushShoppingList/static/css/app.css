@@ -67056,7 +67056,9 @@ body.recipe-edit-standalone-page :is(
     outline-offset: 1px;
 }
 
-.store-section-master-page button {
+.store-section-master-page button,
+.cuisine-category-master-page .cuisine-category-master-row-actions
+    > [data-cuisine-category-master-row-save] {
     min-height: 38px;
     margin: 0;
     padding: 7px 12px;
@@ -67081,7 +67083,9 @@ body.recipe-edit-standalone-page :is(
     color: var(--app-danger);
 }
 
-.store-section-master-page button:disabled {
+.store-section-master-page button:disabled,
+.cuisine-category-master-page .cuisine-category-master-row-actions
+    > [data-cuisine-category-master-row-save]:disabled {
     opacity: .42;
     cursor: not-allowed;
 }
@@ -67368,7 +67372,9 @@ body.recipe-edit-standalone-page :is(
     color: var(--app-muted);
 }
 
-.store-section-master-actions {
+/* Shared Action slots keep Save in the first slot, even without Delete. */
+.store-section-master-actions,
+.cuisine-category-master-table .cuisine-category-master-row-actions {
     display: grid;
     grid-template-columns: repeat(2, minmax(68px, 1fr));
     gap: 6px;
@@ -67952,17 +67958,23 @@ body.recipe-edit-standalone-page :is(
     grid-auto-flow: column;
 }
 
-.store-section-master-row .store-section-master-actions > button {
+.store-section-master-row .store-section-master-actions > button,
+.cuisine-category-master-page .cuisine-category-master-row-actions
+    > [data-cuisine-category-master-row-save] {
+    display: block;
     min-width: 0;
     padding-inline: 6px;
     font-size: 10px;
+    line-height: normal;
 }
 
 .store-section-master-row
     :is(
         .store-section-master-actions > button[value="save"],
         .store-section-master-mobile-save
-    ) {
+    ),
+.cuisine-category-master-page [data-cuisine-category-master-row]
+    .cuisine-category-master-row-actions > [data-cuisine-category-master-row-save] {
     border-color: transparent;
     background: transparent;
     color: var(--app-muted);
@@ -67977,7 +67989,9 @@ body.recipe-edit-standalone-page :is(
     :is(
         .store-section-master-actions > button[value="save"],
         .store-section-master-mobile-save
-    ):disabled {
+    ):disabled,
+.cuisine-category-master-page [data-cuisine-category-master-row]
+    .cuisine-category-master-row-actions > [data-cuisine-category-master-row-save]:disabled {
     border-color: transparent;
     background: transparent;
     color: var(--app-muted);
@@ -67988,7 +68002,9 @@ body.recipe-edit-standalone-page :is(
     :is(
         .store-section-master-actions > button[value="save"],
         .store-section-master-mobile-save
-    ) {
+    ),
+.cuisine-category-master-page [data-cuisine-category-master-row].is-dirty
+    .cuisine-category-master-row-actions > [data-cuisine-category-master-row-save]:not(:disabled) {
     border-color: var(--app-primary);
     background: var(--app-primary-soft);
     color: var(--app-primary-hover);
@@ -69593,7 +69609,9 @@ body.is-resizing-store-section-master-column * {
         column-gap: 12px;
     }
 
-    .store-section-master-table-head {
+    .store-section-master-table-head,
+    .cuisine-category-master-category .cuisine-category-master-table
+        > .unit-master-table-head {
         padding-inline: 14px;
     }
 
@@ -69671,7 +69689,8 @@ body.is-resizing-store-section-master-column * {
         opacity: .68;
     }
 
-    .store-section-master-row .store-section-master-actions {
+    .store-section-master-row .store-section-master-actions,
+    .cuisine-category-master-table .cuisine-category-master-row-actions {
         grid-template-columns: repeat(2, minmax(0, 1fr));
         grid-auto-columns: auto;
         grid-auto-flow: row;
@@ -69682,10 +69701,14 @@ body.is-resizing-store-section-master-column * {
         font-size: 11px;
     }
 
+    .cuisine-category-master-page .cuisine-category-master-row-actions
+        > [data-cuisine-category-master-row-save],
     .store-section-master-row .store-section-master-actions > button {
         font-size: 11px;
     }
 
+    .cuisine-category-master-page [data-cuisine-category-master-row]
+        .cuisine-category-master-row-actions > [data-cuisine-category-master-row-save]:disabled,
     .store-section-master-row
         .store-section-master-actions
         > button[value="save"]:disabled {
@@ -70466,53 +70489,23 @@ body.is-resizing-store-section-master-column * {
 }
 
 .cuisine-category-master-table .unit-master-action-cell {
-    display: grid;
     min-width: 0;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: center;
-    gap: 5px;
 }
 
 .cuisine-category-master-table > .unit-master-table-head > :last-child {
     text-align: center;
 }
 
-.cuisine-category-master-table
-    [data-cuisine-category-master-row]
-    .unit-master-action-cell
-    > [data-cuisine-category-master-row-save]:only-child {
-    grid-column: 1 / -1;
-}
-
 .cuisine-category-master-page
     .unit-master-action-cell
-    > :is(
-        [data-cuisine-category-master-row-save],
-        [data-cuisine-category-master-row-delete]
-    ) {
+    > [data-cuisine-category-master-row-delete] {
     min-width: 0;
     min-height: 36px;
     flex: 1 1 0;
     padding: 5px 6px;
     font-size: 11px;
     white-space: nowrap;
-}
-
-.cuisine-category-master-page
-    [data-cuisine-category-master-row-save]:disabled {
-    border-color: transparent;
-    background: transparent;
-    color: var(--app-muted);
-    cursor: not-allowed;
-    opacity: .68;
-}
-
-.cuisine-category-master-page
-    [data-cuisine-category-master-row].is-dirty
-    [data-cuisine-category-master-row-save]:not(:disabled) {
-    border-color: var(--app-primary);
-    background: var(--app-primary-soft);
-    color: var(--app-primary-hover);
 }
 
 .cuisine-category-master-page
@@ -70640,6 +70633,7 @@ body.is-resizing-store-section-master-column * {
             [data-cuisine-category-master-row-delete]
         ) {
         min-height: 40px;
+        flex: 1 1 0;
     }
 }
 

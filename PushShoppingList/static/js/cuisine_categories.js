@@ -547,7 +547,6 @@
 
             const save = document.createElement("button");
             save.type = "button";
-            save.className = "unit-master-edit-button";
             save.dataset.cuisineCategoryMasterRowSave = "";
             save.dataset.categoryId = item.id;
             save.textContent = draft.saving ? "Saving…" : "Save";
