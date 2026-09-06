@@ -420,16 +420,15 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert '<th scope="col">Item</th>' in all_html
     assert '<th scope="col">Normalized Name</th>' not in all_html
     assert '<th scope="col">Image</th>' not in all_html
-    assert 'class="master-data-item-cell"' in all_html
-    assert 'class="master-data-item-copy"' in all_html
+    assert 'class="ingredient-item-cell"' in all_html
+    assert 'class="ingredient-item"' in all_html
     assert 'data-full-src="/static/generated/tomato.png"' in all_html
     assert all_html.index('class="master-data-thumbnail"') < all_html.index('value="Tomato"')
-    assert '<th scope="rowgroup" colspan="5">Produce</th>' in all_html
-    assert '<th scope="col">User</th>' in all_html
-    assert "master-data-table--show-user" in all_html
-    assert 'class="master-data-user-data-cell"' in all_html
-    assert 'data-master-auto-normalized-name' in all_html
-    assert 'data-master-desktop-section-summary' in all_html
+    assert '<th scope="rowgroup" colspan="6">Produce</th>' in all_html
+    assert '<th scope="col">User</th>' not in all_html
+    assert 'class="ingredient-row-more"' in all_html
+    assert 'data-original-value="tomato"' in all_html
+    assert 'data-recipe-edit-store-section-trigger' in all_html
     assert '<th scope="col">Created At</th>' not in all_html
     assert 'class="master-data-created-cell"' not in all_html
     assert "Backfill progress" in all_html
@@ -445,9 +444,9 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert "Generate Missing Images" in all_html
     assert "Store Section" in all_html
     assert 'name="store_section"' in all_html
-    assert "data-master-store-section-panel" in all_html
-    assert "data-master-store-section-save" in all_html
-    assert "data-master-store-section-form" in all_html
+    assert "data-master-store-section-panel" not in all_html
+    assert "data-ingredient-row-save" in all_html
+    assert "data-ingredient-row-cancel" in all_html
     assert "Reclassify unconfirmed Misc ingredients" in all_html
     assert "data-master-misc-reclassification" in all_html
     assert 'id="masterDataMiscReferencesDialog"' in all_html
@@ -466,7 +465,7 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert "Review Undo" in all_html
     assert "Apply Changes" in all_html
     assert "/api/master-data/ingredients/reclassify-misc" in all_html
-    assert 'data-original-store-section="PRODUCE"' in all_html
+    assert 'data-original-value="PRODUCE"' in all_html
     assert '<button type="submit">Save</button>' not in all_html
     assert "All sections" in all_html
     assert "PRODUCE" in all_html
@@ -486,7 +485,7 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert '<th scope="col">User</th>' not in filtered_html
     assert "master-data-table--show-user" not in filtered_html
     assert 'class="master-data-user-data-cell"' not in filtered_html
-    assert '<th scope="rowgroup" colspan="4">Spices</th>' in filtered_html
+    assert '<th scope="rowgroup" colspan="6">Spices</th>' in filtered_html
     assert equipment_response.status_code == 200
     assert 'data-equipment-master-registry' in equipment_html
     assert '<span>Workspace registry</span>' in equipment_html
@@ -1846,48 +1845,15 @@ def test_master_data_user_filter_aligns_with_filter_row():
     assert "grid-row: auto;" in css
 
 
-def test_master_data_store_section_batch_save_is_wired():
+def test_master_data_row_editing_replaces_bulk_save():
     template = Path("PushShoppingList/templates/master_data.html").read_text(encoding="utf-8")
-    script = Path("PushShoppingList/static/js/master-data.js").read_text(encoding="utf-8")
-    css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
-
-    assert "data-master-store-section-panel" in template
-    assert "data-master-store-section-summary" in template
-    assert "data-master-store-section-detail" in template
-    assert "data-master-store-section-save" in template
-    assert "data-master-store-section-form" in template
-    assert "data-original-store-section" in template
-    assert "data-master-record-form" in template
-    assert "data-master-record-field" in template
-    assert 'name="name"' in template
+    for marker in ("data-ingredient-row-edit", "data-ingredient-row-save", "data-ingredient-row-cancel",
+                   "data-ingredient-alias-input", "data-ingredient-alias-remove", "data-original-value",
+                   "data-master-record-form", "update_ingredient_master_record_route"):
+        assert marker in template
+    assert "data-master-store-section-panel" not in template
+    assert "data-master-mobile-record-toggle" not in template
     assert 'name="normalized_name"' in template
-    assert "data-master-auto-normalized-name" in template
-    assert "update_ingredient_master_record_route" in template
-    assert '<button type="submit">Save</button>' not in template
-
-    assert "function initMasterDataStoreSectionBatchSave" in script
-    assert "function changedStoreSectionForms" in script
-    assert "function saveChangedStoreSections" in script
-    assert "function submitStoreSectionForm" in script
-    assert "function masterDataRecordFields" in script
-    assert "function normalizeMasterDataIngredientName(value)" in script
-    assert '.replace(/\\s+/g, " ").trim().toLowerCase()' in script
-    assert "normalizedInput.value = normalizeMasterDataIngredientName(nameInput.value);" in script
-    assert "currentMasterRecordFieldValue(field) !== originalMasterRecordFieldValue(field)" in script
-    assert "initMasterDataStoreSectionBatchSave();" in script
-    assert '"X-Requested-With": "fetch"' in script
-    assert "window.location.assign(canonicalMasterDataUrl(window.location.href).toString())" in script
-
-    assert ".master-data-store-section-save-panel" in css
-    assert ".master-data-store-section-save-panel.has-changes" in css
-    assert ".master-data-record-row-dirty td" in css
-    assert ".master-data-store-section-form {\n            display: block;" in css
-    assert ".master-data-record-field input" in css
-    assert "border: 1px solid transparent;" in css
-    assert "background: transparent;" in css
-    assert ".master-data-record-field input:is(:hover, :focus-visible)" in css
-    assert ".master-data-record-field input:focus-visible" in css
-    assert '.master-data-ingredients-table select[name="store_section"]' in css
 
 
 def test_master_data_ingredient_merge_ui_is_wired():
@@ -1931,7 +1897,7 @@ def test_master_data_mobile_layout_prioritizes_filters_and_results():
     assert filter_position < results_position < pagination_position
     assert "data-master-maintenance open" not in template
     assert "<span>Maintenance tools</span>" in template
-    assert 'data-label="Store section"' in template
+    assert 'data-label="Store Section"' in template
     assert 'class="unit-master-category equipment-master-category"' in template
     assert ".equipment-master-category-list" in css
     assert ".equipment-master-category .master-data-record-row" in css
@@ -1942,11 +1908,6 @@ def test_master_data_mobile_layout_prioritizes_filters_and_results():
     assert ".equipment-master-row-editable" in css
     assert "@media (max-width: 1280px)" in css
     assert ".equipment-master-category .master-data-equipment-details summary:is(:hover, :focus-visible)" in css
-    assert "data-master-mobile-record-name" in template
-    assert "data-master-mobile-section-summary" in template
-    assert "data-master-mobile-record-toggle" in template
-    assert "data-master-auto-normalized-name" in template
-    assert "data-master-desktop-section-summary" in template
     assert "data-master-mobile-reference-dialog" in template
     assert "data-master-mobile-reference-title" in template
     assert "data-master-mobile-reference-panel" in template
@@ -1955,11 +1916,6 @@ def test_master_data_mobile_layout_prioritizes_filters_and_results():
     assert 'const pagination = document.querySelector("[data-master-pagination]");' in script
     assert 'pagination.insertAdjacentElement("afterend", maintenance);' in script
     assert "maintenance.open = false;" in script
-    assert "function initMasterDataMobileRecords()" in script
-    assert "function setMasterDataMobileRecordExpanded(row, expanded)" in script
-    assert "function syncMasterDataMobileSectionSummary(select)" in script
-    assert '"[data-master-mobile-section-summary], [data-master-desktop-section-summary]"' in script
-    assert 'row.querySelector(\'input[name="normalized_name"]\')' in script
     assert "async function loadReferenceData(button, panel, options = {})" in script
     assert "function masterDataMobileReferenceElements()" in script
     assert "async function openMasterDataMobileReferences(button)" in script
@@ -1969,19 +1925,14 @@ def test_master_data_mobile_layout_prioritizes_filters_and_results():
     assert 'method: "PATCH"' in script
     assert 'window.matchMedia("(max-width: 760px)").matches' in script
     assert "await loadReferenceData(button, els.panel, { hideHeader: true });" in script
-    assert "if (referenceRow) referenceRow.hidden = true;" in script
     assert 'window.matchMedia("(max-width: 760px)")' in script
     assert "initMasterDataMaintenance();" in script
-    assert "initMasterDataMobileRecords();" in script
     assert "initEquipmentMasterDisplayName();" in script
     assert "@media (max-width: 760px)" in css
     assert ".master-data-maintenance:not([open]) > .master-data-maintenance-content" in css
     assert ".master-data-maintenance {" in css
     assert "order: 100;" in css
     assert ".master-data-ingredients-table .master-data-record-row" in css
-    assert ".master-data-mobile-record-toggle[aria-expanded=\"true\"] svg" in css
-    assert ".master-data-record-row.master-data-record-row-expanded" in css
-    assert ".master-data-desktop-section-summary" in css
     assert "@media (min-width: 761px)" in css
     assert "grid-template-columns: 17px minmax(0, 1fr);" in css
     assert "max-width: 240px;" in css
@@ -2001,6 +1952,9 @@ def test_master_data_mobile_layout_prioritizes_filters_and_results():
     assert "[data-master-record-results]" in css
     assert "overflow-x: clip;" in css
 
+
+    assert "data-ingredient-row-edit" in template
+    assert "function initIngredientRegistry()" in script
 
 def test_equipment_registry_header_uses_the_units_surface_treatment():
     css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
@@ -2292,20 +2246,14 @@ def test_master_data_reference_expander_is_wired():
     assert "master-data-item-copy" in template
     assert "data-master-reference-toggle" in template
     assert "data-master-reference-row" in template
-    assert "row.usage_count and master_data.record_type == 'ingredients'" in template
     assert "data-equipment-master-usage-dialog" in template
     assert "data-equipment-master-usage-button" in template
     assert "master_data_record_references_route" in template
     assert "aria-expanded=\"false\"" in template
-    assert "aria-label=\"Show {{ row.usage_count }} recipe" in template
+    assert "referencing {{ row.name }}" in template
     assert "{{ row.ingredient_name_usage_count }} by Ingredient Name" in template
     assert "{{ row.buy_as_usage_count }} by Buy As" in template
-    assert 'class="master-data-usage-total"' in template
-    assert 'class="master-data-usage-breakdown"' in template
-    assert "master-data-record-row-unused" in template
     assert 'data-master-record-unused="true"' in template
-    assert "<strong>Unused</strong>" in template
-    assert "<small>0 uses</small>" in template
     assert "View recipes" not in template
     assert "master-data-usage-chevron" not in template
     assert "data-reference-url" in template
@@ -2336,9 +2284,6 @@ def test_master_data_reference_expander_is_wired():
     assert 'nameMatch.textContent = "Ingredient Name";' in script
     assert 'buyAsMatch.textContent = "Buy As";' in script
     assert "[data-master-reference-toggle]" in script
-    assert "function initMasterDataStoreSectionIconPickers()" in script
-    assert "createRecipeIngredientStoreSectionTrigger(select)" in script
-    assert "initMasterDataStoreSectionIconPickers();" in script
     assert 'select.dataset.storeSectionAllowCustom !== "false"' in app_script
     assert ".master-data-store-section-trigger .recipe-edit-store-section-icon" in css
     assert "data-master-reference-panel" in script
@@ -2365,8 +2310,6 @@ def test_master_data_reference_expander_is_wired():
     assert "updateReferenceImageSizes" in script
 
     assert ".master-data-usage-button" in css
-    assert ".master-data-usage-total" in css
-    assert ".master-data-usage-breakdown" in css
     assert ".master-data-reference-usage-breakdown" in css
     assert ".master-data-reference-matches" in css
     assert ".master-data-usage-button span:nth-child" not in css
@@ -2387,6 +2330,9 @@ def test_master_data_reference_expander_is_wired():
     assert "width: var(--master-data-thumbnail-size, 64px);" in css
     assert "height: var(--master-data-thumbnail-size, 64px);" in css
 
+
+    assert "Unused</span>" in template
+    assert "recipeEditStoreSectionSelect = select" in script
 
 def test_admin_image_generation_status_route_returns_progress(monkeypatch, tmp_path):
     app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)

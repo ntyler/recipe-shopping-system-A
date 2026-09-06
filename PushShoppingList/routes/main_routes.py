@@ -1268,6 +1268,8 @@ def master_data_context(record_type, scope_info=None):
     sort = str(request.args.get("sort") or "updated_at_desc").strip()
     if sort not in recipe_master_data.MASTER_RECORD_SORTS:
         sort = "updated_at_desc"
+    if record_type != "ingredients" and sort == "manual_order":
+        sort = "updated_at_desc"
     limit = int_query_arg("limit", 100, minimum=1, maximum=500)
     page = int_query_arg("page", 1, minimum=1)
     offset = (page - 1) * limit
@@ -1462,6 +1464,16 @@ def master_data_context(record_type, scope_info=None):
     )
 
     row_groups = []
+    if record_type == "ingredients":
+        visible_groups = {}
+        for row in rows:
+            key = (row["user_id"], row["store_section"])
+            visible_groups[key] = visible_groups.get(key, 0) + 1
+        for row in rows:
+            row["order_enabled"] = bool(
+                sort == "manual_order" and not search and scope_info["scope"] != "all"
+                and visible_groups[(row["user_id"], row["store_section"])] == row["section_count"]
+            )
     if record_type == "ingredients" and rows and not store_section:
         for section_detail in store_section_details:
             section = section_detail["section_key"]
@@ -1544,6 +1556,7 @@ def master_data_context(record_type, scope_info=None):
             section["section_key"]: section["display_name"]
             for section in store_section_details
         },
+        "store_section_icons": {section["section_key"]: section["icon"] for section in store_section_details},
         "equipment_section": equipment_section,
         "equipment_summary": equipment_summary,
         "equipment_review_enabled": equipment_review_enabled,
@@ -1557,9 +1570,7 @@ def master_data_context(record_type, scope_info=None):
         "group_by_store_section": bool(record_type == "ingredients" and not store_section),
         "group_by_equipment_section": bool(record_type == "equipment"),
         "table_column_count": (
-            5
-            if record_type == "ingredients" and scope_info["scope"] == "all"
-            else 4
+            6
             if record_type == "ingredients"
             else 5
             if record_type == "equipment" and scope_info["scope"] == "all"
@@ -1569,7 +1580,7 @@ def master_data_context(record_type, scope_info=None):
             {"value": "updated_at_desc", "label": "Updated At"},
             {"value": "usage_count_desc", "label": "Usage Count"},
             {"value": "name_asc", "label": "Name"},
-        ],
+        ] + ([{"value": "manual_order", "label": "Manual Order"}] if record_type == "ingredients" else []),
         "limit_options": [50, 100, 250, 500],
         "db_status": status,
         "is_admin": is_admin,
@@ -2980,6 +2991,7 @@ def update_ingredient_master_record_route(ingredient_id):
         payload.get("normalized_name"),
         payload.get("store_section"),
         allow_other_users=allow_other_users,
+        aliases=payload.get("aliases") if request.is_json else None,
     )
     if result.get("ok"):
         if result.get("changed"):
@@ -3012,6 +3024,18 @@ def update_ingredient_master_record_route(ingredient_id):
         }), status
 
     return redirect(redirect_url)
+
+
+@main_bp.route("/api/master-data/ingredients/<int:ingredient_id>/order", methods=["PATCH"])
+def reorder_ingredient_master_record_route(ingredient_id):
+    payload = request.get_json(silent=True) or {}
+    if not isinstance(payload, dict):
+        payload = {}
+    result = recipe_master_data.move_ingredient_master_record(
+        ingredient_id, payload.get("position"), payload.get("expected_ids"),
+        allow_other_users=is_admin_user(current_public_user()),
+    )
+    return jsonify(result), 200 if result.get("ok") else int(result.get("status") or 400)
 
 
 @main_bp.route("/api/master-data/ingredients/<int:ingredient_id>/merge-options")

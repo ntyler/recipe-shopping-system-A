@@ -417,6 +417,7 @@ MASTER_RECORD_TABLES = {
     },
 }
 MASTER_RECORD_SORTS = {
+    "manual_order": "m.store_section ASC, m.sort_order ASC, m.id ASC",
     "updated_at_desc": "m.updated_at DESC, m.id DESC",
     "usage_count_desc": "usage_count DESC, m.updated_at DESC, m.id DESC",
     "name_asc": "m.normalized_name ASC, m.name ASC, m.id ASC",
@@ -1106,6 +1107,95 @@ def migrate_workspace_unit_order(connection):
     return changed
 
 
+def migrate_ingredient_order(connection):
+    """Backfill section order without changing names, timestamps, or valid order.
+
+    Database triggers cover imports, merges/undo, and section classifiers as well
+    as the registry editor. Every append, removal and section move participates
+    in its caller's transaction, including writes from another process.
+    """
+    if not connection.in_transaction:
+        connection.execute("BEGIN IMMEDIATE")
+    if not recipe_master_table_exists(connection, "ingredients"):
+        return 0
+    if "sort_order" not in recipe_master_column_names(connection, "ingredients"):
+        connection.execute("ALTER TABLE ingredients ADD COLUMN sort_order INTEGER NOT NULL DEFAULT -1")
+    groups = connection.execute("""
+        SELECT user_id, store_section FROM ingredients GROUP BY user_id, store_section
+        HAVING MIN(sort_order) <> 0 OR MAX(sort_order) <> COUNT(*) - 1
+            OR COUNT(DISTINCT sort_order) <> COUNT(*)
+            OR SUM(typeof(sort_order) <> 'integer') > 0
+    """).fetchall()
+    changed = 0
+    for group in groups:
+        rows = connection.execute("""
+            SELECT id, sort_order FROM ingredients WHERE user_id = ? AND store_section = ?
+            ORDER BY CASE WHEN typeof(sort_order) = 'integer' AND sort_order >= 0
+                          THEN sort_order ELSE 2147483647 END, updated_at DESC, id DESC
+        """, (group["user_id"], group["store_section"])).fetchall()
+        updates = [(index, row["id"]) for index, row in enumerate(rows) if row["sort_order"] != index]
+        connection.executemany("UPDATE ingredients SET sort_order = ? WHERE id = ?", updates)
+        changed += len(updates)
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_ingredients_section_order ON ingredients(user_id, store_section, sort_order, id)")
+    connection.execute("""
+        CREATE TRIGGER IF NOT EXISTS ingredient_order_append AFTER INSERT ON ingredients
+        BEGIN
+            UPDATE ingredients SET sort_order = (
+                SELECT COALESCE(MAX(sort_order), -1) + 1 FROM ingredients
+                WHERE user_id = NEW.user_id AND store_section = NEW.store_section AND id <> NEW.id
+            ) WHERE id = NEW.id;
+        END
+    """)
+    connection.execute("""
+        CREATE TRIGGER IF NOT EXISTS ingredient_order_section_move
+        AFTER UPDATE OF store_section, user_id ON ingredients
+        WHEN OLD.store_section <> NEW.store_section OR OLD.user_id <> NEW.user_id
+        BEGIN
+            UPDATE ingredients SET sort_order = sort_order - 1
+             WHERE user_id = OLD.user_id AND store_section = OLD.store_section
+               AND id <> NEW.id AND sort_order > OLD.sort_order;
+            UPDATE ingredients SET sort_order = (
+                SELECT COALESCE(MAX(sort_order), -1) + 1 FROM ingredients
+                WHERE user_id = NEW.user_id AND store_section = NEW.store_section AND id <> NEW.id
+            ) WHERE id = NEW.id;
+        END
+    """)
+    connection.execute("""
+        CREATE TRIGGER IF NOT EXISTS ingredient_order_remove AFTER DELETE ON ingredients
+        BEGIN
+            UPDATE ingredients SET sort_order = sort_order - 1
+             WHERE user_id = OLD.user_id AND store_section = OLD.store_section
+               AND sort_order > OLD.sort_order;
+        END
+    """)
+    return changed
+
+
+def move_ingredient_master_record(ingredient_id, position, expected_ids, user_id=None, allow_other_users=False):
+    if isinstance(position, bool) or not isinstance(position, int) or position < 1:
+        return {"ok": False, "status": 400, "error": "A positive ingredient position is required."}
+    if not isinstance(expected_ids, list) or not expected_ids or any(type(value) is not int for value in expected_ids):
+        return {"ok": False, "status": 400, "error": "The complete section order is required."}
+    owner = scoped_recipe_user_id(user_id)
+    with existing_recipe_master_connection(user_id=owner) as connection:
+        if connection is None:
+            return {"ok": False, "status": 404, "error": "Ingredient record was not found."}
+        row = connection.execute("SELECT * FROM ingredients WHERE id = ?", (ingredient_id,)).fetchone()
+        if not row or (not allow_other_users and row["user_id"] != owner):
+            return {"ok": False, "status": 404, "error": "Ingredient record was not found."}
+        rows = connection.execute("SELECT id FROM ingredients WHERE user_id = ? AND store_section = ? ORDER BY sort_order, id",
+                                  (row["user_id"], row["store_section"])).fetchall()
+        ordered = [item["id"] for item in rows]
+        if expected_ids != ordered:
+            return {"ok": False, "status": 409, "error": "This section changed. Refresh before reordering; your edits have been kept."}
+        if position > len(ordered):
+            return {"ok": False, "status": 400, "error": "The position is outside this Store Section."}
+        ordered.remove(row["id"])
+        ordered.insert(position - 1, row["id"])
+        connection.executemany("UPDATE ingredients SET sort_order = ? WHERE id = ?", enumerate(ordered))
+        return {"ok": True, "ordered_ids": ordered, "position": position, "message": "Ingredient order saved."}
+
+
 def ensure_recipe_master_schema(connection=None):
     if connection is None:
         with recipe_master_connection():
@@ -1621,6 +1711,7 @@ def ensure_recipe_master_schema(connection=None):
             connection.execute(
                 f"ALTER TABLE ingredients ADD COLUMN {column_name} {column_definition}"
             )
+    migrate_ingredient_order(connection)
     equipment_columns = recipe_master_column_names(connection, "equipment")
     if "display_name_override" not in equipment_columns:
         connection.execute(
@@ -4112,6 +4203,8 @@ def list_master_records(
     limit = bounded_master_limit(limit)
     offset = bounded_master_offset(offset)
     order_clause = MASTER_RECORD_SORTS.get(sort, MASTER_RECORD_SORTS["updated_at_desc"])
+    if table_name != "ingredients" and sort == "manual_order":
+        order_clause = MASTER_RECORD_SORTS["updated_at_desc"]
     if table_name == "equipment" and sort == "name_asc":
         order_clause = (
             "LOWER(COALESCE(NULLIF(TRIM(m.display_name_override), ''), m.name)) ASC, "
@@ -4203,6 +4296,18 @@ def list_master_records(
         if connection is None:
             return []
 
+        if table_name == "ingredients":
+            has_order = "sort_order" in recipe_master_column_names(connection, "ingredients")
+            section_select += ", m.sort_order" if has_order else ", 0 AS sort_order"
+            section_select += """, (SELECT COUNT(*) FROM ingredients section_member
+                WHERE section_member.user_id = m.user_id AND section_member.store_section = m.store_section) AS section_count"""
+            if sort == "manual_order":
+                order_clause = (
+                    "COALESCE((SELECT s.sort_order FROM ingredient_store_sections s "
+                    "WHERE s.user_id = m.user_id AND s.section_key = m.store_section), 2147483647), "
+                    "m.store_section, m.sort_order, m.id"
+                    if has_order else MASTER_RECORD_SORTS["updated_at_desc"]
+                )
         rows = connection.execute(
             f"""
             SELECT
@@ -4233,7 +4338,9 @@ def list_master_records(
         if table_name == "ingredients":
             row_data["store_section"] = clean_ingredient_store_section(row_data.get("store_section"))
             row_data["store_section_order"] = ingredient_store_section_sort_key(row_data["store_section"])
-            aliases_serialized = clean_text(row_data.pop("aliases_serialized", ""))
+            # Split before normalizing whitespace: the unit separator is itself
+            # whitespace, so clean_text would collapse multiple aliases into one.
+            aliases_serialized = str(row_data.pop("aliases_serialized", "") or "")
             row_data["aliases"] = [
                 clean_text(alias)
                 for alias in aliases_serialized.split(chr(31))
@@ -6157,6 +6264,7 @@ def update_ingredient_master_record(
     store_section,
     user_id=None,
     allow_other_users=False,
+    aliases=None,
 ):
     try:
         ingredient_id = int(ingredient_id or 0)
@@ -6173,6 +6281,11 @@ def update_ingredient_master_record(
         return {"ok": False, "status": 400, "error": "Ingredient name is required."}
     if not normalized_name:
         return {"ok": False, "status": 400, "error": "Normalized name is required."}
+    if aliases is not None and (
+        not isinstance(aliases, list) or len(aliases) > 100
+        or any(not isinstance(alias, str) or not clean_text(alias) or len(clean_text(alias)) > 160 for alias in aliases)
+    ):
+        return {"ok": False, "status": 400, "error": "Aliases must be a list of up to 100 names, each at most 160 characters."}
 
     with existing_recipe_master_connection(user_id=scoped_user_id) as connection:
         if connection is None:
@@ -6233,6 +6346,25 @@ def update_ingredient_master_record(
                 "status": 409,
                 "error": "That normalized ingredient is already an alias for another master ingredient.",
             }
+        existing_aliases = {
+            alias["normalized_alias"]: alias["alias_name"]
+            for alias in connection.execute(
+                "SELECT normalized_alias, alias_name FROM ingredient_aliases WHERE user_id = ? AND ingredient_id = ?",
+                (row["user_id"], row["id"]),
+            )
+        }
+        requested_aliases = existing_aliases.copy() if aliases is None else {
+            normalized_master_name(alias): clean_text(alias) for alias in aliases
+        }
+        requested_aliases.pop(normalized_name, None)
+        for alias_key in requested_aliases:
+            conflict = connection.execute("""
+                SELECT id FROM ingredients WHERE user_id = ? AND normalized_name = ? AND id <> ?
+                UNION ALL
+                SELECT ingredient_id FROM ingredient_aliases WHERE user_id = ? AND normalized_alias = ? AND ingredient_id <> ?
+            """, (row["user_id"], alias_key, row["id"], row["user_id"], alias_key, row["id"])).fetchone()
+            if conflict:
+                return {"ok": False, "status": 409, "error": f'The alias "{requested_aliases[alias_key]}" belongs to another ingredient.'}
         if alias_conflict:
             connection.execute(
                 """
@@ -6253,6 +6385,7 @@ def update_ingredient_master_record(
             previous["name"] != name
             or previous["normalized_name"] != normalized_name
             or previous["store_section"] != section
+            or existing_aliases != requested_aliases
         )
         section_changed = previous["store_section"] != section
         if changed:
@@ -6289,6 +6422,21 @@ def update_ingredient_master_record(
                 ),
             )
 
+        if existing_aliases != requested_aliases:
+            for alias_key in existing_aliases.keys() - requested_aliases.keys():
+                connection.execute("DELETE FROM ingredient_aliases WHERE user_id = ? AND ingredient_id = ? AND normalized_alias = ?",
+                                   (row["user_id"], row["id"], alias_key))
+            now = utc_now_iso()
+            for alias_key, alias_name in requested_aliases.items():
+                if existing_aliases.get(alias_key) == alias_name:
+                    continue
+                connection.execute("""
+                    INSERT INTO ingredient_aliases (user_id, ingredient_id, alias_name, normalized_alias, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(user_id, normalized_alias) DO UPDATE SET alias_name = excluded.alias_name, updated_at = excluded.updated_at
+                """, (row["user_id"], row["id"], alias_name, alias_key, now, now))
+        saved = connection.execute("SELECT sort_order, updated_at FROM ingredients WHERE id = ?", (row["id"],)).fetchone()
+
         return {
             "ok": True,
             "changed": changed,
@@ -6298,6 +6446,9 @@ def update_ingredient_master_record(
             "normalized_name": normalized_name,
             "store_section": section,
             "previous": previous,
+            "aliases": [requested_aliases[key] for key in sorted(requested_aliases)],
+            "sort_order": saved["sort_order"],
+            "updated_at": saved["updated_at"],
         }
 
 

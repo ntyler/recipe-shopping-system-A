@@ -1,0 +1,42 @@
+{% macro registry_order(name, position, enabled, count) -%}
+<div class="store-section-master-order">
+    <button type="button" class="store-section-master-drag-handle" data-ingredient-order-handle
+            draggable="{{ 'true' if enabled else 'false' }}" aria-disabled="{{ 'false' if enabled else 'true' }}"
+            aria-keyshortcuts="ArrowUp ArrowDown Home End" aria-describedby="ingredientOrderHelp"
+            aria-label="Reorder {{ name }}" title="Reorder {{ name }}">
+        <svg viewBox="0 0 16 20" aria-hidden="true"><circle cx="5" cy="4" r="1.4"></circle><circle cx="11" cy="4" r="1.4"></circle><circle cx="5" cy="10" r="1.4"></circle><circle cx="11" cy="10" r="1.4"></circle><circle cx="5" cy="16" r="1.4"></circle><circle cx="11" cy="16" r="1.4"></circle></svg>
+    </button>
+    <button type="button" value="move_up" data-ingredient-order-action="up" aria-label="Move {{ name }} up" {% if not enabled or position == 1 %}disabled{% endif %}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"></path><path d="m6 11 6-6 6 6"></path></svg>
+    </button>
+    <span class="store-section-master-order-step" data-ingredient-order-number aria-label="Position {{ position }}">{{ position }}</span>
+    <button type="button" value="move_down" data-ingredient-order-action="down" aria-label="Move {{ name }} down" {% if not enabled or position == count %}disabled{% endif %}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"></path><path d="m6 13 6 6 6-6"></path></svg>
+    </button>
+</div>
+{%- endmacro %}
+
+{% macro registry_section_icon(name) -%}
+{% if name == "leaf" %}<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M5 19c8 0 14-6 14-14C11 5 5 11 5 19Z"></path><path d="M5 19c3-4 7-7 12-10"></path></svg>
+{% elif name == "fish" %}<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 12c3-4 7-6 12-4l4-3v14l-4-3c-5 2-9 0-12-4Z"></path><path d="M8 12h.01"></path></svg>
+{% elif name == "dairy" %}<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M8 3h7l1 4 2 2v12H6V9l2-2Z"></path><path d="M8 7h8"></path><path d="M9 11h6v6H9Z"></path></svg>
+{% elif name == "snowflake" %}<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M12 2v20"></path><path d="m4 6.5 16 11"></path><path d="m20 6.5-16 11"></path><path d="m9 4 3 3 3-3"></path><path d="m9 20 3-3 3 3"></path></svg>
+{% elif name == "package" %}<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="m4 7 8-4 8 4v10l-8 4-8-4V7Z"></path><path d="m4 7 8 4 8-4"></path><path d="M12 11v10"></path></svg>
+{% elif name == "wheat" %}<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M12 21V6"></path><path d="M12 10C8 10 7 7 7 5c3 0 5 2 5 5Z"></path><path d="M12 14c4 0 5-3 5-5-3 0-5 2-5 5Z"></path><path d="M12 18c-4 0-5-3-5-5 3 0 5 2 5 5Z"></path></svg>
+{% elif name == "whisk" %}<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="m6 18 9-9"></path><path d="m4 20 3-3"></path><path d="M14.5 3.5c3-1 6 2 5 5-1 3-5 5-7.5 2.5S11.5 4.5 14.5 3.5Z"></path><path d="M15 5c2 1 3 3 2 5"></path></svg>
+{% elif name == "can" %}<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><ellipse cx="12" cy="5" rx="6" ry="2"></ellipse><path d="M6 5v14c0 1.1 2.7 2 6 2s6-.9 6-2V5"></path><path d="M6 19c0-1.1 2.7-2 6-2s6 .9 6 2"></path></svg>
+{% elif name == "sauce" %}<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M9 3h6v4l2 3v10H7V10l2-3V3Z"></path><path d="M9 7h6"></path><path d="M9 13h6"></path></svg>
+{% elif name == "cookie" %}<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M20 12a8 8 0 1 1-8-8 4 4 0 0 0 4 4 4 4 0 0 0 4 4Z"></path><path d="M8 10h.01"></path><path d="M11 16h.01"></path><path d="M7 15h.01"></path></svg>
+{% elif name == "cup" %}<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M5 7h12v10a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4V7Z"></path><path d="M17 10h2a3 3 0 0 1 0 6h-2"></path><path d="M8 3v2"></path><path d="M12 3v2"></path></svg>
+{% elif name == "jar" %}<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M8 4h8l-1 3H9L8 4Z"></path><path d="M7 9h10l1 10a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L7 9Z"></path><path d="M9 13h6"></path></svg>
+{% elif name == "oil" %}<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M10 3h4v4l2 2v11H8V9l2-2V3Z"></path><path d="M10 6h4"></path><path d="M9 12h6"></path><path d="M11 15h2"></path></svg>
+{% elif name == "bread" %}<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M5 20V9a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v11H5Z"></path><path d="M9 8h.01"></path><path d="M14 8h.01"></path></svg>
+{% elif name == "sandwich" %}<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="m4 8 8-4 8 4-8 4-8-4Z"></path><path d="m4 12 8 4 8-4"></path><path d="m4 16 8 4 8-4"></path></svg>
+{% elif name == "home" %}<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="m3 11 9-8 9 8"></path><path d="M5 10v11h14V10"></path><path d="M9 21v-6h6v6"></path></svg>
+{% elif name == "broom" %}<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="m15 3-5 11"></path><path d="m8.5 12.5 5 2.5"></path><path d="M8 12c-2 3-3 5-3 8h11c-1-3-2-5-4-7"></path><path d="M8 17h7"></path></svg>
+{% elif name == "heart" %}<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M20.8 8.8c0 5.2-8.8 10.4-8.8 10.4S3.2 14 3.2 8.8A4.6 4.6 0 0 1 12 6.9a4.6 4.6 0 0 1 8.8 1.9Z"></path></svg>
+{% elif name == "personal-care" %}<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M9 3h6v4l2 2v12H7V9l2-2V3Z"></path><path d="M9 7h6"></path><path d="M10 13h4"></path><path d="M12 11v4"></path></svg>
+{% elif name == "paw" %}<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><circle cx="7" cy="8" r="2"></circle><circle cx="17" cy="8" r="2"></circle><circle cx="12" cy="5" r="2"></circle><path d="M6.5 18c0-3 2.5-6 5.5-6s5.5 3 5.5 6c0 2-2 3-5.5 1.5C8.5 21 6.5 20 6.5 18Z"></path></svg>
+{% elif name == "basket" %}<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M7 9 10 4"></path><path d="m17 9-3-5"></path><path d="M4 9h16l-2 10H6L4 9Z"></path><path d="M9 13v3"></path><path d="M15 13v3"></path></svg>
+{% endif %}
+{%- endmacro %}
