@@ -280,7 +280,7 @@ OPENAI_MODEL_USAGE_BY_ENV = {
     "OPENAI_INGREDIENT_REVIEW_MODEL": {
         "kind": "data",
         "icon": "DATA",
-        "title": "Ingredient Master Data",
+        "title": "Ingredient",
         "detail": "Cleanup, duplicates, and AI review",
         "href": "/admin/master-data/ingredients",
         "surfaces": ("Ingredients", "AI review"),

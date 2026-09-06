@@ -153,7 +153,7 @@ def test_master_data_page_does_not_create_missing_database(monkeypatch, tmp_path
 
     html = response.get_data(as_text=True)
     assert response.status_code == 200
-    assert "Ingredient Master Data" in html
+    assert "Ingredient" in html
     assert "Normalized recipe master database has not been created yet" in html
     assert str(db_path) in html
     assert "Missing" in html
@@ -424,7 +424,7 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert 'class="master-data-item-copy"' in all_html
     assert 'data-full-src="/static/generated/tomato.png"' in all_html
     assert all_html.index('class="master-data-thumbnail"') < all_html.index('value="Tomato"')
-    assert '<th scope="rowgroup" colspan="5">PRODUCE</th>' in all_html
+    assert '<th scope="rowgroup" colspan="5">Produce</th>' in all_html
     assert '<th scope="col">User</th>' in all_html
     assert "master-data-table--show-user" in all_html
     assert 'class="master-data-user-data-cell"' in all_html
@@ -486,7 +486,7 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert '<th scope="col">User</th>' not in filtered_html
     assert "master-data-table--show-user" not in filtered_html
     assert 'class="master-data-user-data-cell"' not in filtered_html
-    assert '<th scope="rowgroup" colspan="4">SPICES &amp; SEASONINGS</th>' in filtered_html
+    assert '<th scope="rowgroup" colspan="4">Spices</th>' in filtered_html
     assert equipment_response.status_code == 200
     assert 'data-equipment-master-registry' in equipment_html
     assert '<span>Workspace registry</span>' in equipment_html
@@ -2313,7 +2313,7 @@ def test_master_data_reference_expander_is_wired():
     assert "data-master-thumbnail-size-controls" in template
     assert "data-master-thumbnail-size-decrease" in template
     assert "data-master-thumbnail-size-increase" in template
-    assert "data-master-thumbnail-size-value>64px" in template
+    assert "data-master-thumbnail-size-value>{% if master_data.record_type == 'ingredients' %}48{% else %}64{% endif %}px" in template
     assert "data-full-src=\"{{ row.image_url }}\"" in template
     assert "data-master-store-section-select" in template
     assert 'data-store-section-allow-custom="false"' in template
@@ -2422,7 +2422,7 @@ def test_account_menu_links_to_master_data_pages(monkeypatch, tmp_path):
 
     html = response.get_data(as_text=True)
     assert response.status_code == 200
-    assert "Ingredient Master Data" in html
+    assert "Ingredient" in html
     assert '<span class="user-account-menu-item-label">Equipment</span>' in html
     assert ">Units<" in html
     assert "Store Sections" in html

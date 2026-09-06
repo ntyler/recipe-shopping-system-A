@@ -113,7 +113,7 @@ def test_dashboard_includes_all_openai_model_environment_variables(monkeypatch, 
         "href": "/#importPage",
         "surfaces": ["Recipe URL", "Menu document"],
     }
-    assert rows["OPENAI_INGREDIENT_REVIEW_MODEL"]["usage"]["title"] == "Ingredient Master Data"
+    assert rows["OPENAI_INGREDIENT_REVIEW_MODEL"]["usage"]["title"] == "Ingredient"
     assert rows["OPENAI_INGREDIENT_REVIEW_MODEL"]["usage"]["href"] == "/admin/master-data/ingredients"
     assert rows["OPENAI_INGREDIENT_STORE_SECTION_MODEL"]["usage"]["title"] == "Ingredient Store Sections"
     assert rows["OPENAI_INGREDIENT_STORE_SECTION_MODEL"]["usage"]["href"] == "/admin/master-data/ingredients"

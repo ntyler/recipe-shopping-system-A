@@ -205,8 +205,8 @@ APP_LOCAL_DATE_COOKIE = "ai_pantry_local_date"
 RECIPE_VIEW_PAGE_SIZE = 8
 MASTER_DATA_PAGE_CONFIG = {
     "ingredients": {
-        "title": "Ingredient Master Data",
-        "nav_label": "Ingredients",
+        "title": "Ingredient",
+        "nav_label": "Ingredient",
         "empty_label": "ingredients",
         "route_endpoint": "main_bp.master_data_ingredients_route",
         "list_func": recipe_master_data.list_ingredients,

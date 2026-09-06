@@ -3776,7 +3776,7 @@ def classify_ingredient_store_section_result(
             master_section,
             "user_master_data",
             master.get("store_section_confidence", 1.0),
-            master.get("store_section_reason") or "Matched user Ingredient Master Data.",
+            master.get("store_section_reason") or "Matched the user's Ingredient record.",
             master.get("store_section_rule") or "master.user_exact",
         )
 
@@ -4874,7 +4874,7 @@ def update_ingredient_store_section(ingredient_id, store_section, user_id=None, 
                        store_section_confidence = 1,
                        store_section_user_confirmed = 1,
                        classifier_version = ?,
-                       store_section_reason = 'User confirmed this Ingredient Master Data section.',
+                       store_section_reason = 'User confirmed this Ingredient section.',
                        store_section_rule = 'manual.master_data',
                        updated_at = ?
                  WHERE id = ?
@@ -6266,7 +6266,7 @@ def update_ingredient_master_record(
                        store_section_confidence = CASE WHEN ? THEN 1 ELSE store_section_confidence END,
                        store_section_user_confirmed = CASE WHEN ? THEN 1 ELSE store_section_user_confirmed END,
                        classifier_version = CASE WHEN ? THEN ? ELSE classifier_version END,
-                       store_section_reason = CASE WHEN ? THEN 'User confirmed this Ingredient Master Data section.' ELSE store_section_reason END,
+                       store_section_reason = CASE WHEN ? THEN 'User confirmed this Ingredient section.' ELSE store_section_reason END,
                        store_section_rule = CASE WHEN ? THEN 'manual.master_data' ELSE store_section_rule END,
                        updated_at = ?
                  WHERE id = ?

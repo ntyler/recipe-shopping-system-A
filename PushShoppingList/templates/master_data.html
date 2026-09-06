@@ -4,6 +4,23 @@
 {% set app_active_nav_item = "settings" %}
 {% set app_search_id = "masterDataGlobalSearch" %}
 {% set app_content_class = "master-data-app-content" %}
+{% block app_head %}
+{% if master_data.record_type == 'ingredients' %}
+<script>
+    // Restore the existing preference before any thumbnails can be painted.
+    (() => {
+        let size = 48;
+        try {
+            const saved = Number.parseInt(localStorage.getItem("master-data-thumbnail-size"), 10);
+            if (Number.isFinite(saved)) size = Math.max(32, Math.min(80, Math.round(saved / 8) * 8));
+        } catch (_error) { /* Storage can be unavailable in private contexts. */ }
+        window.masterDataInitialThumbnailSize = size;
+        document.documentElement.style.setProperty("--master-data-thumbnail-size", `${size}px`);
+        document.documentElement.style.setProperty("--master-data-thumbnail-slot", `${size + 2}px`);
+    })();
+</script>
+{% endif %}
+{% endblock %}
 {% macro master_data_reference_url(row, master_data) -%}
     {{- url_for(
         'main_bp.master_data_record_references_route',
@@ -53,15 +70,21 @@
     </span>
 {%- endmacro %}
 {% macro render_master_data_filters(master_data, include_thumbnail_controls=false) -%}
-    <form class="master-data-filter-form{% if master_data.record_type == 'ingredients' %} master-data-filter-form--ingredients{% else %} equipment-master-toolbar{% endif %}"
+    <form class="master-data-filter-form{% if master_data.record_type == 'ingredients' %} master-data-filter-form--ingredients unit-master-filter-toolbar{% else %} equipment-master-toolbar{% endif %}"
           method="GET"
           action="{{ url_for(master_data.route_endpoint) }}">
         <label class="master-data-search-field">
             <span>Search</span>
+            {% if master_data.record_type == 'ingredients' %}
+            <span class="ingredient-master-search-control">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="m16 16 4 4"></path></svg>
+            {% endif %}
             <input type="search"
                    name="search"
                    value="{{ master_data.search }}"
-                   placeholder="{% if master_data.record_type == 'equipment' %}Equipment name{% else %}Name or normalized name{% endif %}">
+                   placeholder="{% if master_data.record_type == 'equipment' %}Equipment name{% else %}Name or normalized name{% endif %}"
+                   autocomplete="off">
+            {% if master_data.record_type == 'ingredients' %}</span>{% endif %}
         </label>
         {% if master_data.is_admin and master_data.record_type != 'equipment' %}
             {{ render_master_data_scope_controls(master_data) }}
@@ -120,7 +143,7 @@
                             data-master-thumbnail-size-decrease
                             aria-label="Decrease thumbnail size"
                             title="Decrease thumbnail size">-</button>
-                    <span class="master-data-thumbnail-size-value" data-master-thumbnail-size-value>64px</span>
+                    <span class="master-data-thumbnail-size-value" data-master-thumbnail-size-value>{% if master_data.record_type == 'ingredients' %}48{% else %}64{% endif %}px</span>
                     <button type="button"
                             class="master-data-thumbnail-size-button"
                             data-master-thumbnail-size-increase
@@ -155,6 +178,17 @@
         {% endif %}
         <button type="submit">Apply</button>
     </form>
+    {% if master_data.record_type == 'ingredients' %}
+    <script>
+        (() => {
+            const form = document.currentScript.previousElementSibling;
+            const size = window.masterDataInitialThumbnailSize;
+            form.querySelector("[data-master-thumbnail-size-value]").textContent = `${size}px`;
+            form.querySelector("[data-master-thumbnail-size-decrease]").disabled = size <= 32;
+            form.querySelector("[data-master-thumbnail-size-increase]").disabled = size >= 80;
+        })();
+    </script>
+    {% endif %}
 {%- endmacro %}
 {% macro render_master_data_row(row, master_data) -%}
     {% set reference_row_id = 'masterDataReferences-' ~ master_data.record_type ~ '-' ~ row.id %}
@@ -373,7 +407,7 @@ data-user-id="{{ master_data.viewer_user_id }}"
 data-viewer-user-id="{{ master_data.viewer_user_id }}"
 {% endblock %}
 {% block app_content %}
-    <section class="master-data-page{% if master_data.record_type == 'equipment' %} equipment-master-page{% endif %}"
+    <section class="master-data-page{% if master_data.record_type == 'equipment' %} equipment-master-page{% else %} ingredient-master-page{% endif %}"
              aria-labelledby="masterDataTitle">
         <header class="master-data-header">
             <div>
@@ -397,7 +431,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                 <a href="{{ master_data.ingredient_url }}"
                    class="{% if master_data.record_type == 'ingredients' %}active{% endif %}"
                    {% if master_data.record_type == 'ingredients' %}aria-current="page"{% endif %}>
-                    Ingredients
+                    Ingredient
                 </a>
                 <a href="{{ master_data.equipment_url }}"
                    class="{% if master_data.record_type == 'equipment' %}active{% endif %}"
@@ -440,10 +474,6 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                     <div class="master-data-message {{ message.category }}">{{ message.text }}</div>
                 {% endfor %}
             </div>
-        {% endif %}
-
-        {% if master_data.record_type == 'ingredients' %}
-            {{ render_master_data_filters(master_data) }}
         {% endif %}
 
         <details class="master-data-maintenance" data-master-maintenance>
@@ -1393,6 +1423,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                 </div>
             </dialog>
         {% else %}
+        <section class="unit-master-panel ingredient-master-registry" aria-label="Ingredient registry">
         <div class="master-data-results-header" data-master-results-header>
             <div class="master-data-results-copy">
                 <div class="master-data-results-summary" aria-live="polite">
@@ -1403,32 +1434,8 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                     {% endif %}
                 </div>
             </div>
-            <div class="master-data-thumbnail-size-section">
-                <span class="master-data-thumbnail-size-label">Thumbnail Size</span>
-                <div class="master-data-thumbnail-size-controls" data-master-thumbnail-size-controls>
-                    <button type="button"
-                            class="master-data-thumbnail-size-button"
-                            data-master-thumbnail-size-decrease
-                            aria-label="Decrease thumbnail size"
-                            title="Decrease thumbnail size">
-                        -
-                    </button>
-                    <span class="master-data-thumbnail-size-value" data-master-thumbnail-size-value>64px</span>
-                    <button type="button"
-                            class="master-data-thumbnail-size-button"
-                            data-master-thumbnail-size-increase
-                            aria-label="Increase thumbnail size"
-                            title="Increase thumbnail size">
-                        +
-                    </button>
-                    <button type="button"
-                            class="master-data-thumbnail-size-reset"
-                            data-master-thumbnail-size-reset>
-                        Reset
-                    </button>
-                </div>
-            </div>
         </div>
+        {{ render_master_data_filters(master_data, include_thumbnail_controls=true) }}
 
         {% if master_data.rows and master_data.record_type == 'ingredients' %}
             <section class="master-data-store-section-save-panel"
@@ -1449,8 +1456,8 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
         {% endif %}
         <div data-master-record-results>
             {% if master_data.rows %}
-                <div class="master-data-table-wrap">
-                    <table class="master-data-table {% if master_data.record_type == 'ingredients' %}master-data-ingredients-table{% elif master_data.record_type == 'equipment' %}master-data-equipment-table{% endif %}{% if master_data.scope == 'all' %} master-data-table--show-user{% endif %}{% if master_data.store_section %} master-data-table--section-filtered{% endif %}">
+                <div class="master-data-table-wrap unit-master-category master-data-registry-category">
+                    <table aria-label="Ingredient" class="master-data-table master-data-registry-table {% if master_data.record_type == 'ingredients' %}master-data-ingredients-table{% elif master_data.record_type == 'equipment' %}master-data-equipment-table{% endif %}{% if master_data.scope == 'all' %} master-data-table--show-user{% endif %}{% if master_data.store_section %} master-data-table--section-filtered{% endif %}">
                     <thead>
                         <tr>
                             <th scope="col">Item</th>
@@ -1475,7 +1482,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                         {% if master_data.row_groups %}
                             {% for group in master_data.row_groups %}
                                 <tr class="master-data-section-row">
-                                    <th scope="rowgroup" colspan="{{ master_data.table_column_count }}">{{ group.section }}</th>
+                                    <th scope="rowgroup" colspan="{{ master_data.table_column_count }}">{{ master_data.store_section_labels.get(group.section, group.section) }}</th>
                                 </tr>
                                 {% for row in group.rows %}
                                     {{ render_master_data_row(row, master_data) }}
@@ -1541,7 +1548,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                     <input type="hidden" name="redirect_url" value="{{ master_data.current_url }}">
                     <header class="master-data-merge-header">
                         <div>
-                            <span>Ingredient Master Data</span>
+                            <span>Ingredient</span>
                             <h2 id="masterDataMergeTitle">Merge duplicate ingredient</h2>
                         </div>
                         <button type="button"
@@ -1606,6 +1613,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                 <span aria-disabled="true">Next</span>
             {% endif %}
         </div>
+        </section>
         {% endif %}
     </section>
 {% endblock %}

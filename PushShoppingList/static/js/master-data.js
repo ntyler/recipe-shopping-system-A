@@ -2,7 +2,7 @@
     const POLL_INTERVAL_MS = 700;
     const REFRESH_DELAY_MS = 1200;
     const MASTER_DATA_THUMBNAIL_SIZE_STORAGE_KEY = "master-data-thumbnail-size";
-    const MASTER_DATA_THUMBNAIL_DEFAULT_SIZE = 64;
+    const MASTER_DATA_THUMBNAIL_DEFAULT_SIZE = document.querySelector(".ingredient-master-page") ? 48 : 64;
     const MASTER_DATA_THUMBNAIL_MIN_SIZE = 32;
     const MASTER_DATA_THUMBNAIL_MAX_SIZE = 80;
     const MASTER_DATA_THUMBNAIL_STEP_SIZE = 8;
@@ -1328,7 +1328,7 @@
 
     function updateStoreSectionSavePanel() {
         const els = storeSectionPanelElements();
-        if (!els.panel) {
+        if (!els.panel || els.panel.getAttribute("aria-busy") === "true") {
             return;
         }
 
@@ -1376,17 +1376,20 @@
         masterDataStoreSectionForms().forEach((form) => {
             masterDataRecordFields(form).forEach((field) => {
                 field.disabled = busy;
+                if (field === storeSectionSelectFor(form) && typeof syncRecipeIngredientStoreSectionControl === "function") {
+                    syncRecipeIngredientStoreSectionControl(field);
+                }
             });
         });
     }
 
-    async function submitStoreSectionForm(form) {
+    async function submitStoreSectionForm(form, body) {
         if (typeof form.reportValidity === "function" && !form.reportValidity()) {
             throw new Error("Complete the ingredient name before saving.");
         }
         const response = await fetch(form.action, {
             method: form.method || "POST",
-            body: new FormData(form),
+            body,
             headers: {
                 Accept: "application/json",
                 "X-Requested-With": "fetch",
@@ -1403,6 +1406,8 @@
         if (event) {
             event.preventDefault();
         }
+        const panel = storeSectionPanelElements().panel;
+        if (panel && panel.getAttribute("aria-busy") === "true") return;
 
         let forms = changedStoreSectionForms();
         if (!forms.length) {
@@ -1427,6 +1432,9 @@
             return;
         }
 
+        // FormData omits disabled controls, including controls associated via form=.
+        // Snapshot every submission before locking the editors during the batch.
+        const submissions = new Map(forms.map((form) => [form, new FormData(form)]));
         setStoreSectionSaveBusy(true);
         setStoreSectionPanelMessage(
             `Saving ${forms.length} ingredient change${forms.length === 1 ? "" : "s"}...`,
@@ -1439,7 +1447,7 @@
             const select = storeSectionSelectFor(form);
             const row = form.closest(".master-data-record-row");
             try {
-                await submitStoreSectionForm(form);
+                await submitStoreSectionForm(form, submissions.get(form));
                 masterDataRecordFields(form).forEach((field) => {
                     field.dataset.originalValue = currentMasterRecordFieldValue(field);
                 });
@@ -1496,6 +1504,11 @@
             masterDataRecordFields(form).forEach((field) => {
                 if (!Object.prototype.hasOwnProperty.call(field.dataset, "originalValue")) {
                     field.dataset.originalValue = currentMasterRecordFieldValue(field);
+                }
+                // Associated controls outside the form do not bubble events to it.
+                if (!form.contains(field)) {
+                    field.addEventListener("change", updateStoreSectionSavePanel);
+                    field.addEventListener("input", updateStoreSectionSavePanel);
                 }
             });
             form.addEventListener("submit", saveChangedStoreSections);
@@ -1560,13 +1573,6 @@
         const label = selectedOption ? selectedOption.textContent.trim() : select.value;
         summaries.forEach((summary) => {
             summary.replaceChildren();
-
-            if (typeof recipeIngredientStoreSectionIconHtml === "function") {
-                const icon = document.createElement("span");
-                icon.className = "master-data-mobile-section-icon";
-                icon.innerHTML = recipeIngredientStoreSectionIconHtml(select.value);
-                summary.appendChild(icon);
-            }
 
             const textLabel = document.createElement("span");
             textLabel.textContent = label;
@@ -3667,7 +3673,7 @@
             setMasterDataDuplicateStatus(
                 data.review_count
                     ? `${data.review_count} ingredient pair${data.review_count === 1 ? "" : "s"} waiting for your decision.${masterDataDuplicateScanSuffix(data.scan)}`
-                    : `No unresolved suggestions. Run a scan whenever your ingredient master data changes.${masterDataDuplicateScanSuffix(data.scan)}`
+                    : `No unresolved suggestions. Run a scan whenever your Ingredient records change.${masterDataDuplicateScanSuffix(data.scan)}`
             );
             return true;
         } catch (error) {
@@ -4986,7 +4992,7 @@
                 panel.dataset.undoAvailable = data.undo_available ? "true" : panel.dataset.undoAvailable;
                 if (data.batch_id) panel.dataset.undoBatchId = String(data.batch_id);
                 panel.classList.add("is-applied");
-                if (summary) summary.textContent = `Applied ${Number(data.changed_count) || 0} reviewed change${Number(data.changed_count) === 1 ? "" : "s"} to Ingredient Master Data.`;
+                if (summary) summary.textContent = `Applied ${Number(data.changed_count) || 0} reviewed change${Number(data.changed_count) === 1 ? "" : "s"} to Ingredient.`;
                 if (applyButton) {
                     applyButton.textContent = "Applied";
                     applyButton.disabled = true;
@@ -5414,7 +5420,7 @@
             els.impact.replaceChildren();
             appendMasterDataUndoPreviewImpact(
                 els.impact,
-                `Restore ${changeCount} Ingredient Master Data store-section assignment${changeCount === 1 ? "" : "s"}.`
+                `Restore ${changeCount} Ingredient store-section assignment${changeCount === 1 ? "" : "s"}.`
             );
             appendMasterDataUndoPreviewImpact(
                 els.impact,

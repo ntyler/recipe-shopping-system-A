@@ -285,7 +285,7 @@ def build_master_ingredient_image_prompt(row, index):
         "purchasable_item": row.get("name") or row.get("normalized_name") or "",
     }
     return build_recipe_ingredient_image_prompt(
-        recipe_title="Ingredient master data",
+        recipe_title="Ingredient",
         servings="Not specified",
         ingredient_number=index,
         ingredient=ingredient,

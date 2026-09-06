@@ -51980,7 +51980,7 @@ function ensureRecipeIngredientMasterMenu() {
     menu.id = "recipeIngredientMasterMenu";
     menu.className = "recipe-edit-row-menu recipe-edit-ingredient-master-menu";
     menu.setAttribute("role", "listbox");
-    menu.setAttribute("aria-label", "Ingredient master data");
+    menu.setAttribute("aria-label", "Ingredient");
     menu.hidden = true;
     document.body.appendChild(menu);
     return menu;
@@ -52183,7 +52183,7 @@ function renderRecipeIngredientMasterMenu(menu, input, data = {}, options = {}) 
     );
     menu.innerHTML = `
         <div class="recipe-edit-ingredient-master-heading">
-            <strong>Ingredient Master Data</strong>
+            <strong>Ingredient</strong>
             <span>${query ? `Matches for “${escapeHtml(query)}”` : "Most-used normalized ingredients"}</span>
         </div>
         <div class="recipe-edit-ingredient-master-list">${content}</div>
@@ -52224,7 +52224,7 @@ async function loadRecipeIngredientMasterOptions(menu, input) {
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok || data.ok === false) {
-            throw new Error(data.error || "Ingredient master data could not be loaded.");
+            throw new Error(data.error || "Ingredient records could not be loaded.");
         }
         if (
             menu.hidden
@@ -52239,7 +52239,7 @@ async function loadRecipeIngredientMasterOptions(menu, input) {
         if (menu.recipeEditAnchorButton === input && menu.dataset.masterRequestId === String(requestId)) {
             renderRecipeIngredientMasterMenu(menu, input, {}, {
                 query,
-                error: error && error.message ? error.message : "Ingredient master data could not be loaded.",
+                error: error && error.message ? error.message : "Ingredient records could not be loaded.",
             });
         }
     }
@@ -52395,7 +52395,7 @@ function chooseRecipeIngredientMasterOption(button) {
     }
     updateRecipeEditorDirtyState(row.closest("#recipeEditForm"));
     focusRecipeIngredientMasterSelectionInput(input, row, targetField, modalPanel);
-    setRecipeEditStatus(`Selected ${name} from Ingredient Master Data. Save Recipe to keep it.`);
+    setRecipeEditStatus(`Selected ${name} from Ingredient. Save Recipe to keep it.`);
     return false;
 }
 

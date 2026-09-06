@@ -7632,7 +7632,7 @@ def test_recipe_editor_v75_keeps_alternatives_in_their_column_and_two_actions_re
 
     marker = "/* Ingredient editor v75: keep alternatives in their column and actions compact. */"
     assert marker in css
-    action_css = css[css.index(marker):]
+    action_css = css[css.index(marker):css.index("/* Ingredient registry:")]
     for declaration in (
         "--recipe-edit-ingredient-actions-column-width: 80px;",
         "grid-template-columns: repeat(2, 32px);",
@@ -9655,7 +9655,8 @@ def test_recipe_editor_v7_separates_toolbar_options_actions_and_popover():
     assert "const availableWidth = Math.max(0, horizontalRightLimit - horizontalLeftLimit);" in position
     assert "const popupWidth = Math.min(1080, availableWidth);" in position
     assert "buttonRect.left + menuWidth <= rightLimit" in position
-    assert 'menu.matches(".recipe-edit-unit-menu, .recipe-edit-type-menu")' in position
+    assert 'menu.matches(' in position
+    assert '".recipe-edit-unit-menu, .recipe-edit-type-menu, .recipe-edit-image-change-actions"' in position
     assert "let left = alignMenuToAnchorStart ? buttonRect.left : buttonRect.right - menuWidth;" in position
     assert "left = Math.max(horizontalLeftLimit, Math.min(left, rightLimit - menuWidth));" in position
 
@@ -10253,7 +10254,7 @@ def test_recipe_editor_alternatives_use_nested_table_rows_without_losing_edit_fi
 def test_recipe_editor_v46_aligns_expanded_options_to_the_shared_table_grid():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
-    v46 = css[css.index("/* Ingredient editor v46:"):]
+    v46 = css[css.index("/* Ingredient editor v46:"):css.index("/* Ingredient registry:")]
 
     assert css.index("/* Ingredient editor v46:") > css.index("/* Ingredient editor v45:")
     assert "grid-template-columns: var(--recipe-edit-ingredient-grid) !important;" in v46
@@ -10660,7 +10661,7 @@ def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_s
     assert "if (!explicitType && optional)" in type_helpers
     assert 'recipeIngredientTypeKey(recipeIngredientTypeValue(values)) === "optional"' in type_helpers
     assert 'return builtIn ? builtIn.value : explicitType || "main";' in type_helpers
-    assert 'return builtIn ? builtIn.label : value;' in type_helpers
+    assert 'return recipeIngredientTypeDefinition(value)?.label || value;' in type_helpers
 
     summary = script[
         script.index("function updateRecipeIngredientSummary"):
@@ -10713,7 +10714,8 @@ def test_recipe_editor_visible_ingredient_columns_are_inline_editors_with_read_s
     assert "fallbackRow?.recipeIngredientInlineSummarySourceRow" in script
     assert "const sourceRow = recipeIngredientInlineEditorSourceRow(control, row);" in binding
     assert "const source = recipeIngredientDirectField(sourceRow, fieldName);" in binding
-    assert 'source.dispatchEvent(new Event(eventName, { bubbles: true }));' in binding
+    assert 'source.dispatchEvent(new Event(eventName));' in binding
+    assert 'currentSource.dispatchEvent(new Event(eventName));' in binding
     assert 'control.tagName === "SELECT"' in binding
     assert 'control.replaceChildren(...[...source.options].map(option => option.cloneNode(true)));' in script
     assert 'bindRecipeIngredientUnitPickerTrigger(control);' in binding
@@ -11641,7 +11643,7 @@ process.stdout.write(JSON.stringify({
         "menuSync": 0,
         "dirty": 1,
         "focus": 1,
-        "status": "Selected Rice from Ingredient Master Data. Save Recipe to keep it.",
+        "status": "Selected Rice from Ingredient. Save Recipe to keep it.",
     }
 
 
@@ -14520,7 +14522,7 @@ def test_ingredients_table_uses_quiet_logical_group_boundaries():
     marker = "/* Ingredient editor v108: one quiet boundary per complete ingredient group. */"
 
     assert css.index(marker) > css.index("/* Ingredient editor v107:")
-    hierarchy_css = css[css.index(marker):]
+    hierarchy_css = css[css.index(marker):css.index("/* Ingredient registry:")]
 
     tab_start = hierarchy_css.index(
         "body.recipe-edit-standalone-page .recipe-edit-tab-bar {"
