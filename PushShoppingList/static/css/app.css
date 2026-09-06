@@ -70471,6 +70471,17 @@ body.is-resizing-store-section-master-column * {
     gap: 5px;
 }
 
+.cuisine-category-master-table > .unit-master-table-head > :last-child {
+    text-align: center;
+}
+
+.cuisine-category-master-table
+    [data-cuisine-category-master-row]
+    .unit-master-action-cell
+    > [data-cuisine-category-master-row-save]:only-child {
+    grid-column: 1 / -1;
+}
+
 .cuisine-category-master-page
     .unit-master-action-cell
     > :is(

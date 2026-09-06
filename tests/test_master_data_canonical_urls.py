@@ -786,6 +786,18 @@ def test_cuisine_category_rows_share_unit_usage_and_action_contract(
     assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in action_cell
     assert "gap: 5px;" in action_cell
 
+    action_header = block_from(
+        inline_css,
+        ".cuisine-category-master-table > .unit-master-table-head > :last-child",
+    )
+    assert "text-align: center;" in action_header
+
+    lone_save = block_from(
+        inline_css,
+        "> [data-cuisine-category-master-row-save]:only-child",
+    )
+    assert "grid-column: 1 / -1;" in lone_save
+
     mobile = block_from(css, "@media (max-width: 760px)", inline_section)
     mobile_row = block_from(
         mobile,
