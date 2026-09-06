@@ -66650,6 +66650,7 @@ body.recipe-edit-standalone-page :is(
 }
 
 .cuisine-category-master-category-list {
+    width: auto;
     grid-template-columns: minmax(0, 1fr);
     padding: 0;
 }

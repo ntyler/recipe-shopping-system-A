@@ -723,6 +723,7 @@ def test_cuisine_category_rows_share_unit_usage_and_action_contract(
         ".cuisine-category-master-category-list {",
         compact_section,
     )
+    assert "width: auto;" in category_list
     assert "padding: 0;" in category_list
 
     inline_css = css[inline_section:]
