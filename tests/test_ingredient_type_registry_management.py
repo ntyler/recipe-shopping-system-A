@@ -126,7 +126,12 @@ def test_types_page_matches_compact_registry_and_exposes_inline_editors(
     assert [
         header.get_text(strip=True)
         for header in soup.select(".type-master-table [role='columnheader']")
-    ] == ["Type name", "Used in", "Source", "Action"]
+    ] == ["Order", "Type name", "Used in", "Source", "Action"]
+    assert soup.select_one(".type-master-table")["aria-colcount"] == "5"
+    assert [number.get_text(strip=True) for number in soup.select("[data-type-master-order-number]")] == ["1", "2", "3", "4", "5", "6"]
+    assert len(soup.select("[data-type-master-drag-handle][aria-describedby='typeMasterOrderHelp']")) == 6
+    assert soup.select_one("[data-type-master-order-action='up']").has_attr("disabled")
+    assert soup.select("[data-type-master-order-action='down']")[-1].has_attr("disabled")
     assert soup.select_one(".type-master-status-badge") is None
     assert soup.select_one("[data-type-master-active]") is None
     assert soup.select_one("[data-type-master-active-error]") is None
@@ -230,7 +235,7 @@ def test_types_and_cuisine_share_used_in_anchor_and_responsive_layout():
         if any(".type-master-table" in selector for selector in selectors):
             type_desktop_rules.append((selectors, match.group(2)))
 
-    assert len(type_desktop_rules) == 6
+    assert len(type_desktop_rules) == 7
     for rule_index, (selectors, _declarations) in enumerate(type_desktop_rules):
         assert len(selectors) == (3 if rule_index == 0 else 2)
         assert all(
@@ -254,6 +259,7 @@ def test_types_and_cuisine_share_used_in_anchor_and_responsive_layout():
     type_tracks = grid_tracks(type_grid_rules[0])
 
     assert type_tracks == [
+        "116px",
         "minmax(0,1fr)",
         "150px",
         "128px",
@@ -264,6 +270,7 @@ def test_types_and_cuisine_share_used_in_anchor_and_responsive_layout():
         (2, "2"),
         (3, "3"),
         (4, "4"),
+        (5, "5"),
     ):
         mappings = [
             (selectors, declarations)
@@ -435,7 +442,7 @@ def test_types_reuse_usage_markup_and_cuisine_save_control(
     ).read_text(encoding="utf-8")
     assert 'action.className = "unit-master-action-cell type-master-row-actions";' in script
     assert 'action.setAttribute("role", "cell");' in script
-    assert "row.append(nameField, createUsageCell(item), sourceBadge, action, error);" in script
+    assert "row.append(createOrderCell(item, index + 1), nameField, createUsageCell(item), sourceBadge, action, error);" in script
     assert 'button.title = `Show recipes using ${item.name}`;' in script
     assert 'empty.title = `No recipes currently use ${item.name}`;' in script
 
@@ -921,3 +928,48 @@ def test_type_mutations_require_authentication_and_validate_names(
             json={"name": "x" * 41, "active": True},
         )
         assert too_long.status_code == 422
+
+
+def test_type_order_route_preserves_edits_usage_and_survives_app_recreation(ingredient_type_app):
+    with ingredient_type_app.test_client() as client:
+        sign_in(client, 'user-a')
+        initial = registry_for(client)['types']
+        assert [item['id'] for item in initial] == ['main', 'optional', 'garnish', 'topping', 'sauce', 'substitute']
+        moved = client.patch('/api/master-data/types/sauce', json={'action': 'move_to', 'position': 1})
+        assert moved.status_code == 200
+        ordered = moved.get_json()['registry']['types']
+        assert [item['id'] for item in ordered] == ['sauce', 'main', 'optional', 'garnish', 'topping', 'substitute']
+        assert [item['sort_order'] for item in ordered] == list(range(6))
+        assert all('recipe_count' in item for item in ordered)
+        renamed = client.patch('/api/master-data/types/main', json={'name': 'Main course'})
+        assert renamed.status_code == 200
+        assert [item['id'] for item in renamed.get_json()['registry']['types']] == [item['id'] for item in ordered]
+        created = create_type(client, 'Finishing touch')['registry']['types'][-1]
+        assert created['name'] == 'Finishing touch'
+        assert created['sort_order'] == 6
+        user_b = ingredient_type_app.test_client()
+        sign_in(user_b, 'user-b')
+        assert user_b.patch('/api/master-data/types/' + created['id'], json={'action': 'move_to', 'position': 1}).status_code == 404
+        assert [item['id'] for item in registry_for(user_b)['types']] == [item['id'] for item in initial]
+
+    restarted = create_app()
+    restarted.config.update(TESTING=True)
+    with restarted.test_client() as client:
+        sign_in(client, 'user-a')
+        registry = registry_for(client)['types']
+        assert [item['id'] for item in registry] == [item['id'] for item in ordered] + [created['id']]
+        assert registry[1]['name'] == 'Main course'
+        soup = BeautifulSoup(client.get('/admin/master-data/types').data, 'html.parser')
+        assert [row['data-type-id'] for row in soup.select('[data-type-master-row]')] == [item['id'] for item in registry]
+        assert soup.select_one('[data-type-master-create-order-number]').get_text() == '8'
+
+
+@pytest.mark.parametrize('position', [None, '', 'bad', True, False, 1.5, [], {}])
+def test_type_order_api_rejects_invalid_position_without_changing_registry(ingredient_type_app, position):
+    with ingredient_type_app.test_client() as client:
+        sign_in(client, 'user-a')
+        create_type(client, 'Extra')
+        before = registry_for(client)
+        response = client.patch('/api/master-data/types/main', json={'action': 'move_to', 'position': position})
+        assert response.status_code == 400
+        assert registry_for(client) == before

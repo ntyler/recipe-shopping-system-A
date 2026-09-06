@@ -50,6 +50,11 @@
         let registry = parseRegistry();
         let usageReturnFocus = null;
         let usageRequestToken = 0;
+        let orderPending = false;
+        let mutationRequests = 0;
+        let draggedRow = null;
+        let rowDropTarget = null;
+        let rowDropAfter = false;
         const drafts = new Map();
 
         const source = document.getElementById("ingredientTypeConfig");
@@ -82,17 +87,29 @@
         };
 
         const requestJson = async (url, options = {}) => {
-            const response = await fetch(url, {
-                ...options,
-                headers: {
-                    Accept: "application/json",
-                    "Content-Type": "application/json",
-                    "X-Requested-With": "fetch",
-                    ...(options.headers || {}),
-                },
-            });
-            const data = await response.json().catch(() => ({}));
-            return { response, data };
+            const mutation = options.method && options.method !== "GET";
+            if (mutation) {
+                mutationRequests += 1;
+                updateRowOrderControls();
+            }
+            try {
+                const response = await fetch(url, {
+                    ...options,
+                    headers: {
+                        Accept: "application/json",
+                        "Content-Type": "application/json",
+                        "X-Requested-With": "fetch",
+                        ...(options.headers || {}),
+                    },
+                });
+                const data = await response.json().catch(() => ({}));
+                return { response, data };
+            } finally {
+                if (mutation) {
+                    mutationRequests -= 1;
+                    updateRowOrderControls();
+                }
+            }
         };
 
         const createUsageCell = item => {
@@ -164,18 +181,83 @@
             row.classList.toggle("is-dirty", dirty);
             row.classList.toggle("is-saving", draft.saving);
             row.classList.toggle("has-error", Boolean(message));
-            row.setAttribute("aria-busy", String(draft.saving || draft.deleting));
+            row.setAttribute("aria-busy", String(orderPending || draft.saving || draft.deleting));
             controls.name.setAttribute("aria-invalid", String(Boolean(message)));
             controls.name.classList.toggle("is-dirty", dirty);
             controls.name.disabled = draft.saving || draft.deleting;
-            controls.save.disabled = !dirty || draft.saving || draft.deleting;
+            controls.save.disabled = orderPending || !dirty || draft.saving || draft.deleting;
             controls.save.textContent = draft.saving ? "Saving…" : "Save";
             if (controls.delete) {
-                controls.delete.disabled = draft.saving || draft.deleting;
+                controls.delete.disabled = orderPending || draft.saving || draft.deleting;
                 controls.delete.textContent = draft.deleting ? "Deleting…" : "Delete";
             }
             controls.error.textContent = message;
             controls.error.hidden = !message;
+        };
+
+        const createOrderCell = (item, position) => {
+            const label = item.name;
+            const cell = document.createElement("div");
+            cell.className = "store-section-master-order-cell type-master-order-cell";
+            cell.setAttribute("role", "cell");
+            cell.setAttribute("aria-colindex", "1");
+            cell.dataset.mobileLabel = "Order";
+
+            const order = document.createElement("div");
+            order.className = "store-section-master-order";
+
+            const handle = document.createElement("button");
+            handle.type = "button";
+            handle.className = "store-section-master-drag-handle";
+            handle.dataset.typeMasterDragHandle = "";
+            handle.setAttribute("aria-label", `Drag ${label} to reorder`);
+            handle.title = "Drag to reorder Types";
+            handle.setAttribute("aria-describedby", "typeMasterOrderHelp");
+            handle.setAttribute("aria-keyshortcuts", "ArrowUp ArrowDown Home End");
+            handle.innerHTML = [
+                '<svg viewBox="0 0 16 20" aria-hidden="true">',
+                '<circle cx="5" cy="4" r="1.4"></circle>',
+                '<circle cx="11" cy="4" r="1.4"></circle>',
+                '<circle cx="5" cy="10" r="1.4"></circle>',
+                '<circle cx="11" cy="10" r="1.4"></circle>',
+                '<circle cx="5" cy="16" r="1.4"></circle>',
+                '<circle cx="11" cy="16" r="1.4"></circle>',
+                "</svg>",
+            ].join("");
+
+            const up = document.createElement("button");
+            up.type = "button";
+            up.value = "move_up";
+            up.dataset.typeMasterOrderAction = "up";
+            up.setAttribute("aria-label", `Move ${label} up`);
+            up.innerHTML = [
+                '<svg viewBox="0 0 24 24" aria-hidden="true">',
+                '<path d="M12 19V5"></path>',
+                '<path d="m6 11 6-6 6 6"></path>',
+                "</svg>",
+            ].join("");
+
+            const number = document.createElement("span");
+            number.className = "store-section-master-order-step";
+            number.dataset.typeMasterOrderNumber = "";
+            number.textContent = String(position);
+            number.setAttribute("aria-label", `Step ${position}`);
+
+            const down = document.createElement("button");
+            down.type = "button";
+            down.value = "move_down";
+            down.dataset.typeMasterOrderAction = "down";
+            down.setAttribute("aria-label", `Move ${label} down`);
+            down.innerHTML = [
+                '<svg viewBox="0 0 24 24" aria-hidden="true">',
+                '<path d="M12 5v14"></path>',
+                '<path d="m6 13 6 6 6-6"></path>',
+                "</svg>",
+            ].join("");
+
+            order.append(handle, up, number, down);
+            cell.appendChild(order);
+            return cell;
         };
 
         const createTypeRow = (item, index) => {
@@ -238,7 +320,7 @@
             error.dataset.typeMasterRowError = "";
             error.hidden = true;
 
-            row.append(nameField, createUsageCell(item), sourceBadge, action, error);
+            row.append(createOrderCell(item, index + 1), nameField, createUsageCell(item), sourceBadge, action, error);
             syncRowState(row);
             return row;
         };
@@ -269,6 +351,7 @@
             const total = registry.types.length;
             countLabel.textContent = `Showing ${visible} of ${total} Type${total === 1 ? "" : "s"}.`;
             searchEmpty.hidden = visible > 0;
+            updateRowOrderControls();
         };
 
         const renderRegistry = () => {
@@ -288,6 +371,102 @@
             };
             source.textContent = JSON.stringify(registry);
             renderRegistry();
+        };
+
+        const typeRows = () => Array.from(rows.querySelectorAll("[data-type-master-row]"));
+        const reorderIsFiltered = () => Boolean(cleanText(search.value));
+        const reorderIsBlocked = () => orderPending || mutationRequests > 0 || reorderIsFiltered();
+
+        const updateRowOrderControls = () => {
+            const currentRows = typeRows();
+            const blocked = reorderIsBlocked();
+            currentRows.forEach((row, index) => {
+                const number = row.querySelector("[data-type-master-order-number]");
+                number.textContent = String(index + 1);
+                number.setAttribute("aria-label", `Step ${index + 1}`);
+                row.querySelectorAll("[data-type-master-order-action]").forEach(button => {
+                    const up = button.dataset.typeMasterOrderAction === "up";
+                    button.disabled = blocked || (up ? index === 0 : index === currentRows.length - 1);
+                    button.title = reorderIsFiltered()
+                        ? "Clear the filters before reordering."
+                        : `Move this Type ${up ? "up" : "down"} from position ${index + 1}`;
+                });
+                const handle = row.querySelector("[data-type-master-drag-handle]");
+                handle.draggable = !blocked;
+                handle.setAttribute("aria-disabled", String(blocked));
+                handle.title = reorderIsFiltered()
+                    ? "Clear the filters before reordering."
+                    : "Drag to reorder Types";
+            });
+            const next = root.querySelector("[data-type-master-create-order-number]");
+            next.textContent = String(currentRows.length + 1);
+            next.setAttribute("aria-label", `Step ${currentRows.length + 1}`);
+        };
+
+        const setOrderPending = pending => {
+            orderPending = pending;
+            typeRows().forEach(syncRowState);
+            addButtons.forEach(button => { button.disabled = pending; });
+            createSubmit.disabled = pending;
+            importButton.disabled = pending;
+            updateRowOrderControls();
+        };
+
+        const acceptPersistedOrder = nextRegistry => {
+            const currentRows = typeRows();
+            const byId = new Map(currentRows.map(row => [row.dataset.typeId, row]));
+            const nextTypes = nextRegistry.types;
+            if (nextTypes.length !== byId.size || nextTypes.some(item => !byId.has(String(item.id)))) {
+                updateRegistry(nextRegistry);
+                return;
+            }
+            // Move existing nodes so an order response never discards name drafts.
+            nextTypes.forEach(item => rows.append(byId.get(String(item.id))));
+            registry = { types: nextTypes };
+            source.textContent = JSON.stringify(registry);
+            renderStats();
+            applySearch();
+        };
+
+        const moveRowTo = async (row, targetIndex, submitter) => {
+            if (reorderIsBlocked()) return;
+            const previousRows = typeRows();
+            const currentIndex = previousRows.indexOf(row);
+            if (currentIndex < 0 || targetIndex < 0 || targetIndex >= previousRows.length || currentIndex === targetIndex) return;
+            const typeId = row.dataset.typeId;
+            const label = typeById(typeId).name;
+            setOrderPending(true);
+            previousRows[targetIndex].insertAdjacentElement(targetIndex < currentIndex ? "beforebegin" : "afterend", row);
+            updateRowOrderControls();
+            try {
+                const url = root.dataset.updateUrlTemplate.replace("__TYPE_ID__", encodeURIComponent(typeId));
+                const { response, data } = await requestJson(url, {
+                    method: "PATCH",
+                    body: JSON.stringify({ action: "move_to", position: targetIndex + 1 }),
+                });
+                if (!response.ok || data.ok === false || !Array.isArray(data.registry?.types)) {
+                    throw new Error(data.error || "The new Type order could not be saved.");
+                }
+                acceptPersistedOrder(data.registry);
+                setStatus(`${label} moved to position ${data.position}.`);
+            } catch (error) {
+                rows.append(...previousRows);
+                applySearch();
+                setStatus(error.message || "The new Type order could not be saved. Try again.", "error");
+            } finally {
+                setOrderPending(false);
+                const movedRow = typeRows().find(item => item.dataset.typeId === typeId);
+                const focusTarget = submitter?.isConnected && !submitter.disabled
+                    ? submitter
+                    : movedRow?.querySelector("[data-type-master-drag-handle]");
+                focusTarget?.focus({ preventScroll: true });
+            }
+        };
+
+        const clearRowDropState = () => {
+            typeRows().forEach(row => row.classList.remove("is-row-drop-before", "is-row-drop-after", "is-row-dragging"));
+            rowDropTarget = null;
+            rowDropAfter = false;
         };
 
         const validateName = (name, item = null) => {
@@ -314,6 +493,7 @@
         };
 
         const saveTypeRow = async row => {
+            if (orderPending) return;
             const item = typeById(row?.dataset.typeId);
             if (!item) return;
             const draft = captureRowDraft(row);
@@ -365,6 +545,7 @@
         };
 
         const deleteTypeRow = async row => {
+            if (orderPending) return;
             const item = typeById(row?.dataset.typeId);
             if (!item?.custom) return;
             const draft = ensureDraft(item);
@@ -479,6 +660,7 @@
 
         const saveNewType = async event => {
             event.preventDefault();
+            if (orderPending) return;
             const name = cleanText(createName.value);
             createName.value = name;
             const errorMessage = validateName(name);
@@ -684,6 +866,17 @@
             captureRowDraft(event.target.closest("[data-type-master-row]"));
         });
         root.addEventListener("keydown", event => {
+            const handle = event.target.closest("[data-type-master-drag-handle]");
+            if (handle && ["ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) {
+                event.preventDefault();
+                const row = handle.closest("[data-type-master-row]");
+                const currentRows = typeRows();
+                const index = currentRows.indexOf(row);
+                const target = event.key === "Home" ? 0 : event.key === "End" ? currentRows.length - 1
+                    : index + (event.key === "ArrowUp" ? -1 : 1);
+                moveRowTo(row, target, handle);
+                return;
+            }
             if (!event.target.matches("[data-type-master-row-name]")) return;
             const row = event.target.closest("[data-type-master-row]");
             if (event.key === "Enter") {
@@ -700,6 +893,13 @@
             }
         });
         root.addEventListener("click", event => {
+            const orderAction = event.target.closest("[data-type-master-order-action]");
+            if (orderAction) {
+                const row = orderAction.closest("[data-type-master-row]");
+                const direction = orderAction.dataset.typeMasterOrderAction === "up" ? -1 : 1;
+                moveRowTo(row, typeRows().indexOf(row) + direction, orderAction);
+                return;
+            }
             const save = event.target.closest("[data-type-master-row-save]");
             if (save) {
                 saveTypeRow(save.closest("[data-type-master-row]"));
@@ -712,6 +912,53 @@
             }
             const usage = event.target.closest("[data-type-master-usage-button]");
             if (usage) openUsage(typeById(usage.dataset.typeId), usage);
+        });
+
+        rows.addEventListener("dragstart", event => {
+            const handle = event.target.closest("[data-type-master-drag-handle]");
+            if (!handle || reorderIsBlocked()) {
+                event.preventDefault();
+                return;
+            }
+            draggedRow = handle.closest("[data-type-master-row]");
+            draggedRow.classList.add("is-row-dragging");
+            event.dataTransfer.effectAllowed = "move";
+            event.dataTransfer.setData("text/plain", draggedRow.dataset.typeId);
+        });
+        rows.addEventListener("dragover", event => {
+            if (!draggedRow) return;
+            event.preventDefault();
+            if (reorderIsBlocked()) {
+                clearRowDropState();
+                event.dataTransfer.dropEffect = "none";
+                return;
+            }
+            const target = event.target.closest("[data-type-master-row]");
+            clearRowDropState();
+            if (!target || target === draggedRow || !rows.contains(target)) return;
+            event.dataTransfer.dropEffect = "move";
+            draggedRow.classList.add("is-row-dragging");
+            const rect = target.getBoundingClientRect();
+            rowDropAfter = event.clientY > rect.top + rect.height / 2;
+            rowDropTarget = target;
+            target.classList.add(rowDropAfter ? "is-row-drop-after" : "is-row-drop-before");
+        });
+        rows.addEventListener("drop", event => {
+            if (!draggedRow) return;
+            event.preventDefault();
+            if (!rowDropTarget || reorderIsBlocked()) return;
+            const moving = draggedRow;
+            const currentRows = typeRows();
+            const from = currentRows.indexOf(moving);
+            let target = currentRows.indexOf(rowDropTarget) + (rowDropAfter ? 1 : 0);
+            if (from < target) target -= 1;
+            clearRowDropState();
+            draggedRow = null;
+            moveRowTo(moving, target, moving.querySelector("[data-type-master-drag-handle]"));
+        });
+        rows.addEventListener("dragend", () => {
+            clearRowDropState();
+            draggedRow = null;
         });
 
         root.querySelectorAll("[data-type-master-usage-close]").forEach(

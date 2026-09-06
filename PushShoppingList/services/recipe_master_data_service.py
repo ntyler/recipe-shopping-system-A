@@ -1005,6 +1005,62 @@ def recipe_master_table_exists(connection, table_name):
     ).fetchone())
 
 
+def migrate_ingredient_type_order(connection):
+    """Backfill legacy positions without resetting valid workspace ordering.
+
+    The caller owns the transaction. Acquiring the SQLite write lock before
+    inspecting positions also serializes ordering and appends across processes.
+    """
+    if not connection.in_transaction:
+        connection.execute("BEGIN IMMEDIATE")
+    if not recipe_master_table_exists(connection, "workspace_ingredient_types"):
+        return 0
+    if "sort_order" not in recipe_master_column_names(connection, "workspace_ingredient_types"):
+        connection.execute(
+            "ALTER TABLE workspace_ingredient_types "
+            "ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0"
+        )
+
+    owners = connection.execute(
+        """
+        SELECT user_id FROM workspace_ingredient_types
+         GROUP BY user_id
+        HAVING COUNT(DISTINCT sort_order) <> COUNT(*)
+            OR MIN(sort_order) < 0
+            OR SUM(typeof(sort_order) <> 'integer') > 0
+        """
+    ).fetchall()
+    # Import at runtime: the type service also uses this schema's connections.
+    from PushShoppingList.services.ingredient_type_service import INGREDIENT_TYPE_SEEDS
+
+    seed_positions = {type_id: index for index, (type_id, _name) in enumerate(INGREDIENT_TYPE_SEEDS)}
+    changed = 0
+    for owner in owners:
+        rows = connection.execute(
+            "SELECT id, sort_order, created_at, normalized_name "
+            "FROM workspace_ingredient_types WHERE user_id = ?",
+            (owner["user_id"],),
+        ).fetchall()
+        # Keep known positions; resolve unpositioned/tied seeds by stable ID,
+        # then custom types by creation order. Renamed seeds keep their places.
+        rows = sorted(rows, key=lambda row: (
+            row["sort_order"] if isinstance(row["sort_order"], int) and row["sort_order"] >= 0 else float("inf"),
+            seed_positions.get(row["id"], len(seed_positions)),
+            row["created_at"], row["normalized_name"], row["id"],
+        ))
+        updates = [
+            (index, owner["user_id"], row["id"])
+            for index, row in enumerate(rows)
+            if not isinstance(row["sort_order"], int) or row["sort_order"] != index
+        ]
+        connection.executemany(
+            "UPDATE workspace_ingredient_types SET sort_order = ? WHERE user_id = ? AND id = ?",
+            updates,
+        )
+        changed += len(updates)
+    return changed
+
+
 def ensure_recipe_master_schema(connection=None):
     if connection is None:
         with recipe_master_connection():
@@ -1089,6 +1145,7 @@ def ensure_recipe_master_schema(connection=None):
         )
         """
     )
+    migrate_ingredient_type_order(connection)
     # Keep the legacy column compatible while enforcing the permanent-active
     # ingredient type invariant for existing databases.
     connection.execute(

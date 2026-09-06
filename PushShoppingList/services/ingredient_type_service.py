@@ -77,6 +77,8 @@ def _seed_registry(connection, user_id):
         """,
         (user_id, INGREDIENT_TYPE_SEED_VERSION, timestamp),
     )
+    # A legacy workspace may contain custom rows before its seed marker exists.
+    master_data.migrate_ingredient_type_order(connection)
     return True
 
 
@@ -446,6 +448,45 @@ def _update_ingredient_rows_type(connection, user_id, previous_keys, replacement
             "UPDATE recipe_ingredients SET ingredient_type = ? WHERE id = ?",
             (replacement, int(row["id"])),
         )
+
+
+def move_workspace_ingredient_type(type_id, position, user_id=None):
+    """Persist a one-based move as one workspace-scoped transaction."""
+    user_id = str(user_id or master_data.scoped_recipe_user_id()).strip()
+    type_id = str(type_id or "").strip()
+    if not type_id:
+        return {"ok": False, "status": 400, "error": "Type is required."}
+    if isinstance(position, bool) or not isinstance(position, (int, str)) or not re.fullmatch(
+        r"[+-]?\d+", str(position).strip()
+    ):
+        return {"ok": False, "status": 400, "error": "A valid Type position is required."}
+    requested_position = int(position)
+
+    with master_data.recipe_master_connection(user_id=user_id) as connection:
+        _seed_registry(connection, user_id)
+        ordered = _registry_from_connection(connection, user_id)["types"]
+        ordered_ids = [item["id"] for item in ordered]
+        if type_id not in ordered_ids:
+            return {"ok": False, "status": 404, "error": "Type not found."}
+        current_index = ordered_ids.index(type_id)
+        target_index = max(0, min(len(ordered_ids) - 1, requested_position - 1))
+        changed = current_index != target_index
+        if changed:
+            ordered_ids.pop(current_index)
+            ordered_ids.insert(target_index, type_id)
+            timestamp = master_data.utc_now_iso()
+            connection.executemany(
+                """
+                UPDATE workspace_ingredient_types SET sort_order = ?, updated_at = ?
+                 WHERE user_id = ? AND id = ?
+                """,
+                [(index, timestamp, user_id, item_id) for index, item_id in enumerate(ordered_ids)],
+            )
+    return {
+        "ok": True, "status": 200, "changed": changed,
+        "type_id": type_id, "position": target_index + 1,
+        "message": f"Type moved to position {target_index + 1}.",
+    }
 
 
 def save_workspace_ingredient_type(values, type_id="", user_id=None):

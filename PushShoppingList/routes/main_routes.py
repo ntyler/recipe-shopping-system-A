@@ -2014,11 +2014,15 @@ def master_data_type_api_route(type_id):
             user_id=workspace_user_id,
         )
     else:
-        result = ingredient_types.save_workspace_ingredient_type(
-            request.get_json(silent=True) or {},
-            type_id=type_id,
-            user_id=workspace_user_id,
-        )
+        values = request.get_json(silent=True) or {}
+        if isinstance(values, dict) and str(values.get("action") or "").strip().lower() == "move_to":
+            result = ingredient_types.move_workspace_ingredient_type(
+                type_id, values.get("position"), user_id=workspace_user_id,
+            )
+        else:
+            result = ingredient_types.save_workspace_ingredient_type(
+                values, type_id=type_id, user_id=workspace_user_id,
+            )
     if result.get("ok"):
         result["registry"] = ingredient_types.ingredient_type_registry_payload(
             workspace_user_id,
