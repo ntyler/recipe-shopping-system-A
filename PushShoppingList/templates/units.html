@@ -175,6 +175,8 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                                     class="unit-master-edit-button"
                                                     data-unit-master-edit-button
                                                     data-unit-id="{{ unit.id }}"
+                                                    aria-controls="unitMasterInlineEditor"
+                                                    aria-expanded="false"
                                                     aria-label="Edit {{ unit.name }}">Edit</button>
                                         </div>
                                     </div>
@@ -194,44 +196,49 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                   hidden>
                 <header>
                     <div>
-                        <span data-unit-master-editor-kicker>Workspace unit</span>
                         <h2 id="unitEditorTitle" data-unit-master-editor-title>Add Unit</h2>
-                        <p>Canonical names and aliases are matched case-insensitively.</p>
+                        <p class="unit-master-editor-context" data-unit-master-editor-context>
+                            <span data-unit-master-editor-kicker>New workspace unit</span>
+                            <span data-unit-master-editor-usage hidden></span>
+                            <span data-unit-master-editor-impact hidden>Changes affect every recipe using this canonical unit.</span>
+                        </p>
+                        <p class="unit-master-editor-permissions" id="unitEditorPermissions" data-unit-master-editor-permissions>Choose a canonical name, category, and accepted aliases.</p>
                     </div>
                 </header>
 
                 <div class="unit-master-editor-grid">
                     <label class="unit-master-field">
-                        <span>Canonical name</span>
+                        <span id="unitCanonicalLabel">Canonical name</span>
                         <input type="text"
                                maxlength="60"
                                autocomplete="off"
                                data-unit-master-name
-                               aria-describedby="unitCanonicalError">
-                        <small class="unit-master-field-error" id="unitCanonicalError" data-unit-master-name-error hidden></small>
+                               required
+                               aria-labelledby="unitCanonicalLabel"
+                               aria-describedby="unitEditorPermissions unitCanonicalError">
+                        <small class="unit-master-field-error" id="unitCanonicalError" data-unit-master-name-error aria-live="polite" hidden></small>
                     </label>
                     <label class="unit-master-field">
                         <span class="unit-master-field-label">
-                            <span>Category</span>
-                            <small>System-managed</small>
+                            <span id="unitCategoryLabel">Category</span>
                         </span>
-                        <select data-unit-master-category-select aria-describedby="unitCategoryHelp unitCategoryError">
+                        <select data-unit-master-category-select aria-labelledby="unitCategoryLabel" aria-describedby="unitCategoryHelp unitCategoryError">
                             {% for category in master_data.category_options %}
                                 <option value="{{ category.key }}">{{ category.label }}</option>
                             {% endfor %}
                         </select>
                         <small class="unit-master-field-help" id="unitCategoryHelp">
-                            Choose the closest culinary group. Time, temperature, size, and preparation are captured elsewhere.
+                            Choose the closest culinary group for this unit.
                         </small>
-                        <small class="unit-master-field-error" id="unitCategoryError" data-unit-master-category-error hidden></small>
+                        <small class="unit-master-field-error" id="unitCategoryError" data-unit-master-category-error aria-live="polite" hidden></small>
                     </label>
                 </div>
 
                 <section class="unit-master-ai-assist" aria-labelledby="unitAiAssistTitle">
                     <div>
                         <span>AI assist</span>
-                        <strong id="unitAiAssistTitle">Build the unit details for me</strong>
-                        <p id="unitAiAssistHelp">Enter a canonical name first. AI can refine the name, choose a category, and suggest aliases. Nothing is saved until you use the Save button.</p>
+                        <strong id="unitAiAssistTitle">Suggest unit details</strong>
+                        <p id="unitAiAssistHelp">Refine the name, category, and aliases. Review suggestions before saving.</p>
                     </div>
                     <button type="button"
                             class="secondary unit-master-ai-suggest"
@@ -251,18 +258,22 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                autocomplete="off"
                                placeholder="For example, tbsp"
                                aria-label="New accepted alias"
-                               aria-describedby="unitAliasHelp unitAliasError"
+                               aria-describedby="unitAliasHelp unitAliasError unitAliasPreview"
                                data-unit-master-alias-input>
                         <button type="button" data-unit-master-alias-add>Add alias</button>
                     </div>
-                    <div class="unit-master-alias-chips" data-unit-master-alias-chips aria-live="polite"></div>
-                    <small class="unit-master-field-error" id="unitAliasError" data-unit-master-alias-error hidden></small>
+                    <div class="unit-master-alias-chips" data-unit-master-alias-chips role="group" aria-label="Accepted aliases"></div>
+                    <small class="unit-master-field-error" id="unitAliasError" data-unit-master-alias-error aria-live="polite" hidden></small>
+                    <p id="unitAliasPreview" class="unit-master-alias-preview" data-unit-master-alias-preview></p>
                 </fieldset>
 
-                <div class="unit-master-editor-feedback" role="alert" data-unit-master-editor-feedback hidden></div>
                 <footer>
+                    <div class="unit-master-editor-state">
+                        <span data-unit-master-dirty-status role="status" aria-live="polite"></span>
+                        <div class="unit-master-editor-feedback" role="status" aria-live="polite" tabindex="-1" data-unit-master-editor-feedback hidden></div>
+                    </div>
                     <button type="button" class="secondary" data-unit-master-cancel>Cancel</button>
-                    <button type="submit" data-unit-master-save>Add Unit</button>
+                    <button type="submit" data-unit-master-save disabled>Add Unit</button>
                 </footer>
             </form>
             <span data-unit-master-editor-home hidden></span>

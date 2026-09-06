@@ -163,6 +163,25 @@ def test_edit_custom_name_and_add_remove_aliases_updates_normalization(
         assert unit_named(removed["registry"], "measuring scoop")["aliases"] == ["ms"]
 
 
+def test_seeded_category_is_editable_but_unit_cannot_be_deleted(unit_registry_app):
+    with unit_registry_app.test_client() as client:
+        sign_in(client, "user-a")
+        original = unit_named(registry_for(client), "teaspoon")
+        edited = client.put(
+            f'/api/master-data/units/{original["id"]}',
+            json={"canonical_name": original["name"], "category": "count_package",
+                  "aliases": original["aliases"]},
+        )
+        assert edited.status_code == 200
+        saved = unit_named(edited.get_json()["registry"], "teaspoon")
+        assert saved["category"] == "count_package"
+        assert saved["seeded"] is True
+        assert saved["aliases"] == original["aliases"]
+        assert saved["id"] == original["id"]
+        assert client.delete(f'/api/master-data/units/{original["id"]}').status_code == 405
+        assert unit_named(registry_for(client), "teaspoon") == saved
+
+
 def test_edit_seeded_unit_keeps_stable_id_and_migrates_recipe_references(
     unit_registry_app,
 ):
@@ -392,17 +411,25 @@ def test_units_page_exposes_accessible_inline_editor_and_import_offer(
         "Count & Package",
         "Small Amounts & Optional",
     ]
-    assert "System-managed" in form.select_one(".unit-master-field-label").get_text(
-        " ", strip=True
-    )
+    assert not category_select.has_attr("disabled")
+    assert not category_select.has_attr("readonly")
+    assert "System-managed" not in form.get_text(" ", strip=True)
     category_help = form.select_one("#unitCategoryHelp").get_text(" ", strip=True)
-    assert "Time, temperature, size, and preparation" in category_help
+    assert category_help == "Choose the closest culinary group for this unit."
     assert form.select_one("[data-unit-master-alias-chips]") is not None
-    assert form.select_one("[data-unit-master-save]") is not None
+    assert form.select_one("[data-unit-master-save]").has_attr("disabled")
+    assert form.select_one("[data-unit-master-editor-usage]") is not None
+    assert "every recipe" in form.select_one("[data-unit-master-editor-impact]").get_text()
+    assert form.select_one("[data-unit-master-name]").has_attr("required")
+    assert "unitEditorPermissions" in form.select_one("[data-unit-master-name]")["aria-describedby"]
+    assert "unitAliasPreview" in form.select_one("[data-unit-master-alias-input]")["aria-describedby"]
+    assert form.select_one("[data-unit-master-alias-error]")["aria-live"] == "polite"
+    assert form.select_one("[data-unit-master-dirty-status]")["aria-live"] == "polite"
+    assert form.select_one("[data-unit-master-editor-feedback]")["role"] == "status"
     ai_button = form.select_one("[data-unit-master-ai-suggest]")
     assert ai_button is not None
     assert ai_button.get("aria-describedby") == "unitAiAssistHelp"
-    assert "Nothing is saved" in form.select_one("#unitAiAssistHelp").get_text(" ", strip=True)
+    assert "Review suggestions before saving" in form.select_one("#unitAiAssistHelp").get_text(" ", strip=True)
     assert soup.select_one("[data-unit-master-page]")["data-suggest-url"] == (
         "/api/master-data/units/suggest"
     )
@@ -419,7 +446,9 @@ def test_units_page_exposes_accessible_inline_editor_and_import_offer(
     assert 'nameInput.focus({ preventScroll: true });' in script
     assert 'nameInput.scrollIntoView({ block: "nearest", inline: "nearest" });' in script
     assert 'form.hidden = false;' in script
-    assert 'closeEditor({ restoreFocus: false });' in script
+    assert all(button.get("aria-controls") == "unitMasterInlineEditor"
+               and button.get("aria-expanded") == "false"
+               for button in soup.select("[data-unit-master-edit-button]"))
 
 
 def test_unit_usage_counts_distinct_recipes_and_lists_matching_lines(
