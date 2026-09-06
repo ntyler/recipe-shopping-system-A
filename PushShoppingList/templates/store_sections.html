@@ -5,6 +5,7 @@
 {% set app_active_nav_item = "settings" %}
 {% set app_search_id = "storeSectionsGlobalSearch" %}
 {% set app_content_class = "master-data-app-content" %}
+{% set app_html_class = "store-section-master-initializing" %}
 {% set icon_glyphs = {
     "leaf": "◒",
     "fish": "◇",
@@ -84,8 +85,26 @@ data-user-id="{{ master_data.viewer_user_id }}"
 data-viewer-user-id="{{ master_data.viewer_user_id }}"
 {% endblock %}
 
+{% block app_head %}
+    <style id="storeSectionMasterInitialVisibility">
+        html.store-section-master-initializing body {
+            visibility: hidden;
+        }
+    </style>
+    <noscript>
+        <style>
+            html.store-section-master-initializing body {
+                visibility: visible;
+            }
+        </style>
+    </noscript>
+{% endblock %}
+
 {% block app_content %}
-    <section class="master-data-page store-section-master-page" aria-labelledby="storeSectionsTitle">
+    <section class="master-data-page store-section-master-page"
+             aria-labelledby="storeSectionsTitle"
+             aria-busy="true"
+             data-store-section-master-state="initializing">
         <header class="master-data-header">
             <div>
                 <a class="master-data-home-link" href="{{ url_for('main_bp.index') }}#userAccountSection">Account</a>

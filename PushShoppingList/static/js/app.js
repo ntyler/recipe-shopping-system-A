@@ -49585,6 +49585,39 @@ function initStoreSectionMasterIconPickers() {
     );
 }
 
+function initStoreSectionMasterPage() {
+    const page = document.querySelector(".store-section-master-page");
+    if (!page) return;
+
+    initStoreSectionMasterTable();
+    initStoreSectionMasterIconPickers();
+    initStoreSectionMasterUsageDialog();
+
+    const table = page.querySelector(".store-section-master-table");
+    const pickers = [
+        ...page.querySelectorAll("[data-store-section-master-icon-picker]"),
+    ];
+    const pickersReady = pickers.length > 0 && pickers.every(picker => {
+        const select = picker.querySelector("[data-store-section-master-icon-select]");
+        const trigger = picker.querySelector("[data-store-section-master-icon-trigger]");
+        return picker.classList.contains("is-enhanced")
+            && select?.getAttribute("aria-hidden") === "true"
+            && trigger?.hidden === false;
+    });
+    const tableReady = ["table", "list"].includes(table?.getAttribute("role"));
+    const stylesReady = window.getComputedStyle(page)
+        .getPropertyValue("--store-section-master-styles-ready")
+        .trim() === "1";
+
+    if (!pickersReady || !tableReady || !stylesReady) {
+        throw new Error("Store Section styles and controls did not finish initializing.");
+    }
+
+    page.dataset.storeSectionMasterState = "ready";
+    page.setAttribute("aria-busy", "false");
+    document.documentElement.classList.remove("store-section-master-initializing");
+}
+
 const RECIPE_INGREDIENT_CUSTOM_STORE_SECTIONS_KEY = "recipeIngredientCustomStoreSections";
 
 function recipeIngredientStoreSectionKey(value) {
@@ -67883,9 +67916,7 @@ document.addEventListener("DOMContentLoaded", function () {
         ["initRecipeEditContextPanels", initRecipeEditContextPanels],
         ["initRecipeImageProviderSelector", initRecipeImageProviderSelector],
         ["initRecipeImageThumbnailSizeControls", initRecipeImageThumbnailSizeControls],
-        ["initStoreSectionMasterTable", initStoreSectionMasterTable],
-        ["initStoreSectionMasterIconPickers", initStoreSectionMasterIconPickers],
-        ["initStoreSectionMasterUsageDialog", initStoreSectionMasterUsageDialog],
+        ["initStoreSectionMasterPage", initStoreSectionMasterPage],
     ].forEach(([name, callback]) => runStartupTask(name, callback));
 
     runIdleStartupTasks([

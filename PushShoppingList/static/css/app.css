@@ -69917,6 +69917,10 @@ body.is-resizing-store-section-master-column * {
 }
 
 /* Keep the Store Section registry summary and search compact. */
+.store-section-master-page {
+    --store-section-master-styles-ready: 1;
+}
+
 .store-section-master-list-section > .store-section-master-table-toolbar {
     display: block;
     padding: 16px 16px 8px;
