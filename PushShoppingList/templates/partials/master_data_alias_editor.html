@@ -1,0 +1,15 @@
+{% macro accepted_alias_editor(prefix, id_prefix, max_length=60, placeholder='For example, tbsp') -%}
+<fieldset class="unit-master-alias-editor">
+    <legend>Accepted aliases</legend>
+    <p id="{{ id_prefix }}Help">Type an alias, then press Enter or choose Add alias. Remove a chip with its button.</p>
+    <div class="unit-master-alias-entry">
+        <input type="text" maxlength="{{ max_length }}" autocomplete="off" placeholder="{{ placeholder }}"
+               aria-label="New accepted alias" aria-describedby="{{ id_prefix }}Help {{ id_prefix }}Error {{ id_prefix }}Preview"
+               data-{{ prefix }}-alias-input>
+        <button type="button" data-{{ prefix }}-alias-add>Add alias</button>
+    </div>
+    <div class="unit-master-alias-chips" data-{{ prefix }}-alias-chips role="group" aria-label="Accepted aliases"></div>
+    <small class="unit-master-field-error" id="{{ id_prefix }}Error" data-{{ prefix }}-alias-error aria-live="polite" hidden></small>
+    <p id="{{ id_prefix }}Preview" class="unit-master-alias-preview" data-{{ prefix }}-alias-preview></p>
+</fieldset>
+{%- endmacro %}

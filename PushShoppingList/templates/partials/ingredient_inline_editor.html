@@ -1,0 +1,62 @@
+{% from "partials/master_data_alias_editor.html" import accepted_alias_editor %}
+<form id="ingredientMasterInlineEditor" class="unit-master-editor unit-master-inline-editor ingredient-inline-editor"
+      data-ingredient-editor-form aria-labelledby="ingredientEditorTitle" novalidate hidden>
+    <header><div>
+        <h2 id="ingredientEditorTitle" data-ingredient-editor-title>Edit ingredient</h2>
+        <p class="unit-master-editor-context">
+            <span data-ingredient-editor-source></span>
+            <span data-ingredient-editor-usage></span>
+            <span>Changes affect every recipe using this canonical ingredient.</span>
+        </p>
+        <p class="unit-master-editor-permissions" id="ingredientEditorPermissions">You may change the name, Store Section, aliases, and image.</p>
+    </div></header>
+    <div class="unit-master-editor-grid">
+        <label class="unit-master-field">
+            <span id="ingredientEditorNameLabel">Ingredient name</span>
+            <input class="ingredient-editor-control" type="text" data-ingredient-editor-name maxlength="160" autocomplete="off" required
+                   aria-labelledby="ingredientEditorNameLabel" aria-describedby="ingredientEditorPermissions ingredientEditorNameError">
+            <small id="ingredientEditorNameError" class="unit-master-field-error" data-ingredient-editor-name-error aria-live="polite" hidden></small>
+        </label>
+        <div class="unit-master-field">
+            <label id="ingredientEditorSectionLabel" for="ingredientEditorSection">Store Section</label>
+            <div class="ingredient-editor-section-control">
+                <span data-ingredient-editor-section-icon aria-hidden="true"></span>
+                <select id="ingredientEditorSection" class="ingredient-editor-control" data-ingredient-editor-section
+                        aria-labelledby="ingredientEditorSectionLabel" aria-describedby="ingredientEditorSectionHelp ingredientEditorSectionError"></select>
+                <span class="ingredient-editor-control" data-ingredient-editor-section-readonly hidden></span>
+            </div>
+            <small id="ingredientEditorSectionHelp" class="unit-master-field-help" data-ingredient-editor-section-help>Choose the Store Section for this ingredient.</small>
+            <small id="ingredientEditorSectionError" class="unit-master-field-error" data-ingredient-editor-section-error aria-live="polite" hidden></small>
+        </div>
+    </div>
+    {{ accepted_alias_editor('ingredient-editor', 'ingredientEditorAlias', 160, 'For example, sweet potatoes') }}
+    <section class="ingredient-editor-image-section" aria-labelledby="ingredientEditorImageTitle">
+        <strong id="ingredientEditorImageTitle">Ingredient image</strong>
+        <div class="ingredient-editor-image-layout">
+            <div class="ingredient-editor-image-preview">
+                <img data-ingredient-editor-image alt="Ingredient preview" hidden>
+                <span data-ingredient-editor-no-image>No image</span>
+            </div>
+            <div class="ingredient-editor-image-options">
+                <div class="ingredient-editor-image-actions">
+                    <input type="file" data-ingredient-editor-image-file accept="image/png,image/jpeg,image/webp,image/gif,image/bmp,image/avif" aria-label="Replace ingredient image" hidden>
+                    <button type="button" class="secondary" data-ingredient-editor-image-replace aria-describedby="ingredientEditorImageError">Replace image</button>
+                    <button type="button" class="secondary" data-ingredient-editor-image-generate>Generate image</button>
+                    <button type="button" class="secondary" data-ingredient-editor-image-remove disabled>Remove image</button>
+                </div>
+                <p data-ingredient-editor-image-note>Preview image changes here. Nothing changes until you save.</p>
+                <small id="ingredientEditorImageError" class="unit-master-field-error" data-ingredient-editor-image-error aria-live="polite" hidden></small>
+            </div>
+        </div>
+    </section>
+    <footer>
+        <div class="unit-master-editor-state">
+            <span data-ingredient-editor-dirty-status role="status" aria-live="polite"></span>
+            <div class="unit-master-editor-feedback" data-ingredient-editor-feedback role="status" aria-live="polite" tabindex="-1" hidden></div>
+            <button type="button" class="secondary" data-ingredient-editor-retry hidden>Retry loading editor</button>
+        </div>
+        <button type="button" class="secondary" data-ingredient-editor-cancel>Cancel</button>
+        <button type="submit" class="unit-master-edit-button" data-ingredient-editor-save disabled>Save Changes</button>
+    </footer>
+</form>
+<span data-ingredient-editor-home hidden></span>

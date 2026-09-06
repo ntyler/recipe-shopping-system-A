@@ -6265,6 +6265,7 @@ def update_ingredient_master_record(
     user_id=None,
     allow_other_users=False,
     aliases=None,
+    image=None,
 ):
     try:
         ingredient_id = int(ingredient_id or 0)
@@ -6299,7 +6300,7 @@ def update_ingredient_master_record(
 
         row = connection.execute(
             f"""
-            SELECT id, user_id, name, normalized_name, store_section
+            SELECT id, user_id, name, normalized_name, store_section, image_url, image_path
               FROM ingredients
              WHERE id = ?
                {user_clause}
@@ -6329,6 +6330,7 @@ def update_ingredient_master_record(
                 "ok": False,
                 "status": 409,
                 "error": "That normalized ingredient already exists in this workspace.",
+                "errors": {"name": "This name belongs to another ingredient. Use Merge duplicate to combine them."},
             }
 
         alias_conflict = connection.execute(
@@ -6345,6 +6347,7 @@ def update_ingredient_master_record(
                 "ok": False,
                 "status": 409,
                 "error": "That normalized ingredient is already an alias for another master ingredient.",
+                "errors": {"name": "This name is already an alias for another ingredient."},
             }
         existing_aliases = {
             alias["normalized_alias"]: alias["alias_name"]
@@ -6364,7 +6367,8 @@ def update_ingredient_master_record(
                 SELECT ingredient_id FROM ingredient_aliases WHERE user_id = ? AND normalized_alias = ? AND ingredient_id <> ?
             """, (row["user_id"], alias_key, row["id"], row["user_id"], alias_key, row["id"])).fetchone()
             if conflict:
-                return {"ok": False, "status": 409, "error": f'The alias "{requested_aliases[alias_key]}" belongs to another ingredient.'}
+                message = f'The alias "{requested_aliases[alias_key]}" belongs to another ingredient.'
+                return {"ok": False, "status": 409, "error": message, "errors": {"aliases": message}}
         if alias_conflict:
             connection.execute(
                 """
@@ -6388,6 +6392,10 @@ def update_ingredient_master_record(
             or existing_aliases != requested_aliases
         )
         section_changed = previous["store_section"] != section
+        image_values = {key: clean_text((image if image is not None else row)[key])
+                        for key in ("image_url", "image_path")}
+        image_changed = any(image_values[key] != clean_text(row[key]) for key in image_values)
+        changed = changed or image_changed
         if changed:
             connection.execute(
                 """
@@ -6435,6 +6443,9 @@ def update_ingredient_master_record(
                     VALUES (?, ?, ?, ?, ?, ?)
                     ON CONFLICT(user_id, normalized_alias) DO UPDATE SET alias_name = excluded.alias_name, updated_at = excluded.updated_at
                 """, (row["user_id"], row["id"], alias_name, alias_key, now, now))
+        if image_changed:
+            connection.execute("UPDATE ingredients SET image_url = ?, image_path = ? WHERE id = ? AND user_id = ?",
+                               (image_values["image_url"], image_values["image_path"], row["id"], row["user_id"]))
         saved = connection.execute("SELECT sort_order, updated_at FROM ingredients WHERE id = ?", (row["id"],)).fetchone()
 
         return {
@@ -6449,6 +6460,7 @@ def update_ingredient_master_record(
             "aliases": [requested_aliases[key] for key in sorted(requested_aliases)],
             "sort_order": saved["sort_order"],
             "updated_at": saved["updated_at"],
+            "image_url": image_values["image_url"],
         }
 
 

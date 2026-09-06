@@ -36,6 +36,7 @@ from PushShoppingList.services import ingredient_duplicate_review_service as ing
 from PushShoppingList.services import ingredient_type_service as ingredient_types
 from PushShoppingList.services import cuisine_category_service as cuisine_categories
 from PushShoppingList.services import unit_suggestion_service as unit_suggestions
+from PushShoppingList.services import ingredient_editor_service as ingredient_editor
 from PushShoppingList.services.food_rules_service import load_food_rules
 from PushShoppingList.services.food_rules_service import shopping_item_food_rule_status
 from PushShoppingList.services.feedback_service import feedback_dashboard_for_user
@@ -2975,6 +2976,39 @@ def master_data_record_references_route(record_type, record_id):
     })
 
 
+@main_bp.route("/api/master-data/ingredients/<int:ingredient_id>/editor")
+def ingredient_master_editor_route(ingredient_id):
+    record = recipe_master_data.master_record_for_id(
+        "ingredients", ingredient_id, include_all_users=is_admin_user(current_public_user()),
+    )
+    if not record:
+        return jsonify({"ok": False, "error": "Ingredient record was not found."}), 404
+    return jsonify({"ok": True, **ingredient_editor.ingredient_editor_context(record)})
+
+
+@main_bp.route("/api/master-data/ingredients/<int:ingredient_id>/image-preview", methods=["POST"])
+def ingredient_master_image_preview_route(ingredient_id):
+    record = recipe_master_data.master_record_for_id(
+        "ingredients", ingredient_id, include_all_users=is_admin_user(current_public_user()),
+    )
+    if not record:
+        return jsonify({"ok": False, "error": "Ingredient record was not found."}), 404
+    payload = request.get_json(silent=True) if request.is_json else {}
+    payload = payload if isinstance(payload, dict) else {}
+    try:
+        if payload.get("name"):
+            record = {**record, "name": recipe_master_data.clean_text(payload["name"])[:160]}
+        preview = ingredient_editor.prepare_ingredient_image(
+            record, uploaded_file=request.files.get("image"), generate=payload.get("action") == "generate",
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception:
+        current_app.logger.exception("Ingredient image preview failed")
+        return jsonify({"ok": False, "error": "The image could not be prepared. Please try again."}), 502
+    return jsonify({"ok": True, **preview})
+
+
 @main_bp.route("/admin/master-data/ingredients/<int:ingredient_id>", methods=["POST"])
 def update_ingredient_master_record_route(ingredient_id):
     active_public_user = current_public_user()
@@ -2985,6 +3019,15 @@ def update_ingredient_master_record_route(ingredient_id):
         payload.get("redirect_url"),
         default_page="ingredients",
     )
+    image = None
+    if request.is_json and payload.get("image") is not None:
+        record = recipe_master_data.master_record_for_id("ingredients", ingredient_id, include_all_users=allow_other_users)
+        if not record:
+            return jsonify({"ok": False, "error": "Ingredient record was not found."}), 404
+        try:
+            image = ingredient_editor.resolve_ingredient_image(record, payload["image"])
+        except ValueError as exc:
+            return jsonify({"ok": False, "error": str(exc), "result": {"errors": {"image": str(exc)}}}), 400
     result = recipe_master_data.update_ingredient_master_record(
         ingredient_id,
         payload.get("name"),
@@ -2992,6 +3035,7 @@ def update_ingredient_master_record_route(ingredient_id):
         payload.get("store_section"),
         allow_other_users=allow_other_users,
         aliases=payload.get("aliases") if request.is_json else None,
+        image=image,
     )
     if result.get("ok"):
         if result.get("changed"):

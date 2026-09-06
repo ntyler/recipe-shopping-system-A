@@ -427,8 +427,8 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert '<th scope="rowgroup" colspan="6">Produce</th>' in all_html
     assert '<th scope="col">User</th>' not in all_html
     assert 'class="ingredient-row-more"' in all_html
-    assert 'data-original-value="tomato"' in all_html
-    assert 'data-recipe-edit-store-section-trigger' in all_html
+    assert 'name="normalized_name" value="tomato"' in all_html
+    assert 'data-ingredient-editor-section' in all_html
     assert '<th scope="col">Created At</th>' not in all_html
     assert 'class="master-data-created-cell"' not in all_html
     assert "Backfill progress" in all_html
@@ -446,7 +446,7 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert 'name="store_section"' in all_html
     assert "data-master-store-section-panel" not in all_html
     assert "data-ingredient-row-save" in all_html
-    assert "data-ingredient-row-cancel" in all_html
+    assert "data-ingredient-editor-cancel" in all_html
     assert "Reclassify unconfirmed Misc ingredients" in all_html
     assert "data-master-misc-reclassification" in all_html
     assert 'id="masterDataMiscReferencesDialog"' in all_html
@@ -465,7 +465,7 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert "Review Undo" in all_html
     assert "Apply Changes" in all_html
     assert "/api/master-data/ingredients/reclassify-misc" in all_html
-    assert 'data-original-value="PRODUCE"' in all_html
+    assert 'name="store_section" value="PRODUCE"' in all_html
     assert '<button type="submit">Save</button>' not in all_html
     assert "All sections" in all_html
     assert "PRODUCE" in all_html
@@ -1847,10 +1847,13 @@ def test_master_data_user_filter_aligns_with_filter_row():
 
 def test_master_data_row_editing_replaces_bulk_save():
     template = Path("PushShoppingList/templates/master_data.html").read_text(encoding="utf-8")
-    for marker in ("data-ingredient-row-edit", "data-ingredient-row-save", "data-ingredient-row-cancel",
-                   "data-ingredient-alias-input", "data-ingredient-alias-remove", "data-original-value",
+    for marker in ("data-ingredient-row-edit", "data-ingredient-row-save",
                    "data-master-record-form", "update_ingredient_master_record_route"):
         assert marker in template
+    assert 'partials/ingredient_inline_editor.html' in template
+    editor = Path("PushShoppingList/templates/partials/ingredient_inline_editor.html").read_text(encoding="utf-8")
+    assert 'data-ingredient-editor-cancel' in editor
+    assert "accepted_alias_editor('ingredient-editor'" in editor
     assert "data-master-store-section-panel" not in template
     assert "data-master-mobile-record-toggle" not in template
     assert 'name="normalized_name"' in template
@@ -2263,8 +2266,9 @@ def test_master_data_reference_expander_is_wired():
     assert "data-master-thumbnail-size-increase" in template
     assert "data-master-thumbnail-size-value>{% if master_data.record_type == 'ingredients' %}48{% else %}64{% endif %}px" in template
     assert "data-full-src=\"{{ row.image_url }}\"" in template
-    assert "data-master-store-section-select" in template
-    assert 'data-store-section-allow-custom="false"' in template
+    assert 'class="ingredient-section-summary"' in template
+    editor = Path("PushShoppingList/templates/partials/ingredient_inline_editor.html").read_text(encoding="utf-8")
+    assert "data-ingredient-editor-section" in editor
     assert ".master-data-record-row-unused td" in css
     assert ".master-data-record-row-unused td:first-child" in css
     assert ".master-data-usage-empty strong" in css
@@ -2332,7 +2336,7 @@ def test_master_data_reference_expander_is_wired():
 
 
     assert "Unused</span>" in template
-    assert "recipeEditStoreSectionSelect = select" in script
+    assert "function syncIngredientSectionIcon()" in script
 
 def test_admin_image_generation_status_route_returns_progress(monkeypatch, tmp_path):
     app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)

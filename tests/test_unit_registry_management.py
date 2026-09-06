@@ -623,7 +623,7 @@ def test_unit_inline_editor_uses_compact_registry_styles_and_contextual_save_lab
     assert 'saveButton.textContent = saveButtonLabel;' in script
     assert ".unit-master-page--registry-v2 .unit-master-category-list" in css
     assert "grid-template-columns: minmax(0, 1fr);" in css
-    assert ".unit-master-page--registry-v2 .unit-master-inline-editor[hidden]" in css
+    assert ":is(.unit-master-page--registry-v2, .ingredient-master-page) .unit-master-inline-editor[hidden]" in css
     assert ".unit-master-page--registry-v2 .unit-master-add-footer" in css
 
 

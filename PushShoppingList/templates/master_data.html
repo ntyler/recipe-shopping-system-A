@@ -300,6 +300,10 @@
         data-ingredient-master-row data-master-record-id="{{ row.id }}" data-user-id="{{ row.user_id }}"
         data-store-section="{{ row.store_section }}" data-order-enabled="{{ 'true' if row.order_enabled else 'false' }}"
         data-section-count="{{ row.section_count }}" data-sort-order="{{ row.sort_order }}"
+        data-editor-url="{{ url_for('main_bp.ingredient_master_editor_route', ingredient_id=row.id) }}"
+        data-image-url="{{ url_for('main_bp.ingredient_master_image_preview_route', ingredient_id=row.id) }}"
+        data-record-name="{{ row.name }}" data-image-src="{{ row.image_url }}" data-usage-count="{{ row.usage_count }}"
+        data-source-label="{{ 'User-created' if row.user_id else 'Workspace ingredient' }}"
         data-order-url="{{ url_for('main_bp.reorder_ingredient_master_record_route', ingredient_id=row.id) }}"
         {% if not row.usage_count %}data-master-record-unused="true"{% endif %}>
         <td class="ingredient-order-cell" data-label="Order">{{ registry_order(row.name, row.sort_order + 1, row.order_enabled, row.section_count) }}</td>
@@ -307,39 +311,26 @@
             <div class="ingredient-item">
                 {% if row.image_url %}<img class="master-data-thumbnail" src="{{ row.image_url }}" data-full-src="{{ row.image_url }}" alt="{{ row.name }} image">
                 {% else %}<span class="master-data-no-image">No image</span>{% endif %}
-                <form id="{{ form_id }}" class="ingredient-row-form" data-master-record-form method="POST"
+                <strong class="ingredient-row-name-display" data-ingredient-row-name>{{ row.name }}</strong>
+                <form id="{{ form_id }}" data-master-record-form method="POST" hidden
                       action="{{ url_for('main_bp.update_ingredient_master_record_route', ingredient_id=row.id) }}">
-                    <input type="hidden" name="redirect_url" value="{{ master_data.current_url }}">
-                    <input type="text" class="ingredient-row-name" name="name" value="{{ row.name }}" maxlength="160" required autocomplete="off"
-                           data-original-value="{{ row.name }}" aria-label="Ingredient name for {{ row.name }}" aria-describedby="ingredientRowStatus-{{ row.id }}">
-                    <input type="hidden" name="normalized_name" value="{{ row.normalized_name }}" data-original-value="{{ row.normalized_name }}">
+                    <input type="hidden" name="name" value="{{ row.name }}">
+                    <input type="hidden" name="normalized_name" value="{{ row.normalized_name }}">
+                    <input type="hidden" name="store_section" value="{{ row.store_section }}">
                 </form>
             </div>
         </td>
         <td class="ingredient-aliases-cell" data-label="Aliases">
             <div class="unit-master-aliases ingredient-aliases" data-ingredient-aliases role="group" aria-label="Aliases for {{ row.name }}" tabindex="0">
-                {% for alias in row.aliases %}<code data-ingredient-alias="{{ alias }}"><span>{{ alias }}</span><button type="button" data-ingredient-alias-remove aria-label="Remove alias {{ alias }}" hidden>&times;</button></code>{% endfor %}
+                {% for alias in row.aliases %}<code data-ingredient-alias="{{ alias }}">{{ alias }}</code>{% endfor %}
                 <span data-ingredient-alias-empty {% if row.aliases %}hidden{% endif %}>No aliases</span>
-                <span class="ingredient-alias-add" data-ingredient-alias-add-controls hidden>
-                    <input type="text" data-ingredient-alias-input maxlength="160" placeholder="Add alias" aria-label="New alias for {{ row.name }}" autocomplete="off">
-                    <button type="button" data-ingredient-alias-add aria-label="Add alias to {{ row.name }}">+</button>
-                </span>
             </div>
         </td>
         <td class="ingredient-section-cell" data-label="Store Section">
-            <div class="recipe-edit-store-section-label ingredient-section-picker">
-                <button type="button" class="recipe-edit-store-section-trigger" data-recipe-edit-store-section-trigger
-                        role="combobox" aria-haspopup="listbox" aria-controls="recipeIngredientStoreSectionMenu" aria-expanded="false"
-                        aria-label="Store Section for {{ row.name }}">
-                    <span class="recipe-edit-store-section-icon" data-store-section-icon aria-hidden="true">{{ registry_section_icon(master_data.store_section_icons.get(row.store_section, 'basket')) }}</span>
-                    <span data-store-section-trigger-label>{{ master_data.store_section_labels.get(row.store_section, row.store_section) }}</span>
-                    <svg class="ingredient-section-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
-                </button>
-                <select name="store_section" form="{{ form_id }}" data-master-store-section-select data-store-section-allow-custom="false"
-                        data-original-value="{{ row.store_section }}" aria-label="Store Section for {{ row.name }}" hidden>
-                    {% for section in master_data.store_section_options %}<option value="{{ section }}" {% if row.store_section == section %}selected{% endif %}>{{ master_data.store_section_labels.get(section, section) }}</option>{% endfor %}
-                </select>
-            </div>
+            <span class="ingredient-section-summary">
+                <span class="recipe-edit-store-section-icon" aria-hidden="true">{{ registry_section_icon(master_data.store_section_icons.get(row.store_section, 'basket')) }}</span>
+                <span>{{ master_data.store_section_labels.get(row.store_section, row.store_section) }}</span>
+            </span>
         </td>
         <td class="master-data-usage-cell" data-label="Used In">
             {% if row.usage_count %}
@@ -352,9 +343,8 @@
         </td>
         <td class="ingredient-action-cell" data-label="Action">
             <div class="ingredient-row-actions">
-                <button type="button" class="unit-master-edit-button" data-ingredient-row-edit aria-label="Edit {{ row.name }}">Edit</button>
-                <button type="submit" form="{{ form_id }}" class="unit-master-edit-button" data-ingredient-row-save disabled hidden>Save</button>
-                <button type="button" class="unit-master-edit-button" data-ingredient-row-cancel hidden>Cancel</button>
+                <button type="button" class="unit-master-edit-button" data-ingredient-row-edit aria-controls="ingredientMasterInlineEditor" aria-expanded="false" aria-label="Edit {{ row.name }}">Edit</button>
+                <button type="submit" form="ingredientMasterInlineEditor" class="unit-master-edit-button" data-ingredient-row-save disabled hidden>Save</button>
                 <button type="button" class="ingredient-row-more-button" popovertarget="ingredientMore-{{ row.id }}" aria-label="More actions and details for {{ row.name }}">&hellip;</button>
             </div>
             <span id="ingredientRowStatus-{{ row.id }}" class="ingredient-row-status" data-ingredient-row-status role="status" aria-live="polite"></span>
@@ -1420,6 +1410,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
             {% else %}Drag the handle or use Arrow Up/Down, Home or End. Ordering saves immediately. Load a complete Store Section to enable movement; increase Limit or filter by section if needed.{% endif %}
         </p>
         <p class="ingredient-registry-status sr-only" data-ingredient-registry-status role="status" aria-live="polite"></p>
+        {% include "partials/ingredient_inline_editor.html" %}
         <div data-master-record-results>
             {% if master_data.rows %}
                 <div class="master-data-table-wrap unit-master-category master-data-registry-category">

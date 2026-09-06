@@ -1,4 +1,5 @@
 {% extends "layouts/app_layout.html" %}
+{% from "partials/master_data_alias_editor.html" import accepted_alias_editor %}
 {% set app_page_title = master_data.title %}
 {% set app_shell_mode = "route" %}
 {% set app_active_nav_item = "settings" %}
@@ -249,23 +250,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                     </button>
                 </section>
 
-                <fieldset class="unit-master-alias-editor">
-                    <legend>Accepted aliases</legend>
-                    <p id="unitAliasHelp">Type an alias, then press Enter or choose Add alias. Remove a chip with its button.</p>
-                    <div class="unit-master-alias-entry">
-                        <input type="text"
-                               maxlength="60"
-                               autocomplete="off"
-                               placeholder="For example, tbsp"
-                               aria-label="New accepted alias"
-                               aria-describedby="unitAliasHelp unitAliasError unitAliasPreview"
-                               data-unit-master-alias-input>
-                        <button type="button" data-unit-master-alias-add>Add alias</button>
-                    </div>
-                    <div class="unit-master-alias-chips" data-unit-master-alias-chips role="group" aria-label="Accepted aliases"></div>
-                    <small class="unit-master-field-error" id="unitAliasError" data-unit-master-alias-error aria-live="polite" hidden></small>
-                    <p id="unitAliasPreview" class="unit-master-alias-preview" data-unit-master-alias-preview></p>
-                </fieldset>
+                {{ accepted_alias_editor('unit-master', 'unitAlias') }}
 
                 <footer>
                     <div class="unit-master-editor-state">
