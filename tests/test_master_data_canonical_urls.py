@@ -367,6 +367,7 @@ def test_cuisine_categories_page_renders_registry_management_ui(master_data_app)
         )
     ]
     assert column_headers == [
+        "Order",
         "Icon",
         "Abbreviation",
         "Cuisine Category Name",
@@ -404,6 +405,13 @@ def test_cuisine_categories_page_renders_registry_management_ui(master_data_app)
         assert row_icon.get("aria-haspopup") == "listbox"
         assert row_icon.get("aria-expanded") == "false"
         assert row_icon.get("aria-controls") == "cuisineCategoryIconListbox"
+        if row_icon.get("data-icon-value", "").startswith("flag:"):
+            # Server markup must never expose a country abbreviation as an icon,
+            # even before the enhancement script or flag sprite has arrived.
+            preview = row_icon.select_one(
+                "[data-cuisine-category-master-row-icon-preview]"
+            )
+            assert preview.get_text(strip=True) == "\u25c6"
         assert row_abbreviation is not None
         assert row_name is not None and row_name.has_attr("required")
         assert row_save is not None
@@ -586,7 +594,20 @@ def test_cuisine_category_rows_share_unit_usage_and_action_contract(
         child.get("role")
         for child in identity.find_all(recursive=False)
     ] == ["cell", "cell", "cell"]
-    assert len(row.select("[role='cell']")) == 6
+    assert len(row.select("[role='cell']")) == 7
+    order_cell = row.find(
+        "div",
+        class_="cuisine-category-master-order-cell",
+        recursive=False,
+    )
+    assert order_cell is not None
+    assert order_cell.get("aria-colindex") == "1"
+    assert order_cell.select_one(
+        "[data-cuisine-category-master-drag-handle]"
+    ) is not None
+    assert order_cell.select_one(
+        "[data-cuisine-category-master-order-number]"
+    ).get_text(strip=True) == "11"
     category_name = row.select_one(
         "input[data-cuisine-category-master-row-name]"
     )["value"]
@@ -687,6 +708,11 @@ def test_cuisine_category_rows_share_unit_usage_and_action_contract(
     assert 'identity.className = "cuisine-category-master-identity";' in script
     assert 'identity.setAttribute("role", "presentation");' in script
     assert "identity.append(iconField, abbreviationField, nameField);" in script
+    assert "const createOrderCell = (item, position) => {" in script
+    assert "const persistRowPosition = async (row, position, rollback) => {" in script
+    assert 'action: "move_to"' in script
+    assert "reorderIsFiltered" in script
+    assert "data-cuisine-category-master-drag-handle" in script
     assert "identity," in script
     assert "cuisineCategoryMasterEditButton" not in script
 
@@ -852,6 +878,11 @@ def test_cuisine_category_routes_support_workspace_crud_and_references(
                 "active": False,
             },
         )
+        moved = client.patch(
+            f"/api/master-data/cuisine-categories/{category_id}",
+            json={"action": "move_to", "position": 1},
+        )
+        refreshed = client.get("/api/master-data/cuisine-categories")
         with master_data.recipe_master_connection(user_id="user-a") as connection:
             stored_active = connection.execute(
                 """
@@ -879,6 +910,11 @@ def test_cuisine_category_routes_support_workspace_crud_and_references(
         for item in updated.get_json()["registry"]["categories"]
     )
     assert stored_active == 1
+    assert moved.status_code == 200
+    assert moved.get_json()["position"] == 1
+    assert moved.get_json()["registry"]["categories"][0]["id"] == category_id
+    assert refreshed.status_code == 200
+    assert refreshed.get_json()["registry"]["categories"][0]["id"] == category_id
     assert references.status_code == 200
     assert references.get_json()["category"]["id"] == category_id
     assert references.get_json()["references"] == []
@@ -887,7 +923,7 @@ def test_cuisine_category_routes_support_workspace_crud_and_references(
         item["id"] != category_id
         for item in deleted.get_json()["registry"]["categories"]
     )
-    for response in (created, updated, references, deleted):
+    for response in (created, updated, moved, refreshed, references, deleted):
         assert_private_no_store(response)
 
 

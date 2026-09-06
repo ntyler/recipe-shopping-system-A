@@ -1458,6 +1458,82 @@ def _category_abbreviation_collision(registry, abbreviation, current_id=""):
     return None
 
 
+def move_workspace_cuisine_category(category_id, position, user_id=None):
+    """Move a Cuisine Category to a one-based position in its workspace."""
+    user_id = str(user_id or master_data.scoped_recipe_user_id()).strip()
+    category_id = str(category_id or "").strip()
+    if not category_id:
+        return {
+            "ok": False,
+            "status": 400,
+            "error": "Cuisine category is required.",
+        }
+    try:
+        requested_position = int(position)
+    except (TypeError, ValueError):
+        return {
+            "ok": False,
+            "status": 400,
+            "error": "A valid Cuisine Category position is required.",
+        }
+
+    with master_data.recipe_master_connection(user_id=user_id) as connection:
+        _seed_registry(connection, user_id)
+        existing = connection.execute(
+            """
+            SELECT id, name
+              FROM workspace_cuisine_categories
+             WHERE user_id = ? AND id = ?
+            """,
+            (user_id, category_id),
+        ).fetchone()
+        if not existing:
+            return {
+                "ok": False,
+                "status": 404,
+                "error": "Cuisine category not found.",
+            }
+
+        ordered_rows = connection.execute(
+            """
+            SELECT id
+              FROM workspace_cuisine_categories
+             WHERE user_id = ?
+             ORDER BY sort_order ASC, normalized_name ASC, id ASC
+            """,
+            (user_id,),
+        ).fetchall()
+        ordered_ids = [str(item["id"]) for item in ordered_rows]
+        current_index = ordered_ids.index(category_id)
+        target_index = max(0, min(len(ordered_ids) - 1, requested_position - 1))
+        changed = current_index != target_index
+        if changed:
+            ordered_ids.pop(current_index)
+            ordered_ids.insert(target_index, category_id)
+            timestamp = master_data.utc_now_iso()
+            connection.executemany(
+                """
+                UPDATE workspace_cuisine_categories
+                   SET sort_order = ?, updated_at = ?
+                 WHERE user_id = ? AND id = ?
+                """,
+                [
+                    (index, timestamp, user_id, ordered_id)
+                    for index, ordered_id in enumerate(ordered_ids)
+                ],
+            )
+
+    return {
+        "ok": True,
+        "status": 200,
+        "changed": changed,
+        "category_id": category_id,
+        "position": target_index + 1,
+        "name": str(existing["name"] or "Cuisine category"),
+        "message": f"Cuisine category moved to position {target_index + 1}.",
+    }
+
+
 def save_workspace_cuisine_category(values, category_id="", user_id=None):
     user_id = str(user_id or master_data.scoped_recipe_user_id()).strip()
     category_id = str(category_id or "").strip()

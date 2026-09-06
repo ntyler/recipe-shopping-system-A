@@ -81818,6 +81818,217 @@ body.recipe-edit-standalone-page #recipeEditForm
     }
 }
 
+/* Cuisine Category registry: share the Store Section order and terminal columns. */
+.cuisine-category-master-table
+    [data-cuisine-category-master-row].is-row-dragging {
+    opacity: .48;
+}
+
+.cuisine-category-master-table
+    [data-cuisine-category-master-row]:is(.is-row-drop-before, .is-row-drop-after) {
+    position: relative;
+}
+
+.cuisine-category-master-table
+    [data-cuisine-category-master-row].is-row-drop-before::before,
+.cuisine-category-master-table
+    [data-cuisine-category-master-row].is-row-drop-after::after {
+    position: absolute;
+    z-index: 5;
+    right: 10px;
+    left: 10px;
+    height: 3px;
+    border-radius: 999px;
+    background: var(--app-primary);
+    box-shadow: 0 0 0 2px var(--app-primary-soft);
+    content: "";
+}
+
+.cuisine-category-master-table
+    [data-cuisine-category-master-row].is-row-drop-before::before {
+    top: -2px;
+}
+
+.cuisine-category-master-table
+    [data-cuisine-category-master-row].is-row-drop-after::after {
+    bottom: -2px;
+}
+
+.cuisine-category-master-table
+    [data-cuisine-category-master-row]
+    .store-section-master-order
+    > button:not(.store-section-master-drag-handle) {
+    opacity: 0;
+    pointer-events: none;
+    transform: scale(.88);
+    transition:
+        opacity 120ms ease,
+        transform 120ms ease,
+        border-color 120ms ease,
+        background-color 120ms ease,
+        color 120ms ease;
+}
+
+.cuisine-category-master-table
+    [data-cuisine-category-master-row]:is(:hover, :focus-within)
+    .store-section-master-order
+    > button:not(.store-section-master-drag-handle),
+.cuisine-category-master-table
+    [data-cuisine-category-master-row]
+    .store-section-master-order
+    > button:not(.store-section-master-drag-handle):focus-visible {
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+}
+
+.cuisine-category-master-table
+    [data-cuisine-category-master-row]:is(:hover, :focus-within)
+    .store-section-master-order
+    > button:not(.store-section-master-drag-handle):disabled {
+    opacity: .28;
+}
+
+.cuisine-category-master-table
+    [data-cuisine-category-master-row]:is(:hover, :focus-within)
+    .store-section-master-order-step {
+    border-color: var(--app-primary-hover);
+    background: var(--app-primary-soft);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-primary-hover) 10%, transparent);
+}
+
+.cuisine-category-master-page
+    .cuisine-category-master-table
+    .store-section-master-drag-handle {
+    width: 24px;
+    min-height: 28px;
+    cursor: grab;
+}
+
+.cuisine-category-master-page
+    .cuisine-category-master-table
+    .store-section-master-drag-handle[aria-disabled="true"] {
+    opacity: .38;
+    cursor: not-allowed;
+}
+
+.cuisine-category-master-create-order .store-section-master-order-step {
+    grid-column: 3;
+}
+
+@media (min-width: 761px) {
+    .cuisine-category-master-table > .unit-master-table-head,
+    .cuisine-category-master-table [data-cuisine-category-master-row],
+    .cuisine-category-master-table > .cuisine-category-master-create-row {
+        box-sizing: border-box;
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+        grid-template-columns: 116px minmax(0, 1fr) 150px 128px 160px;
+        column-gap: 12px;
+        padding-inline: 14px;
+    }
+
+    .cuisine-category-master-table > .unit-master-table-head > :nth-child(1),
+    .cuisine-category-master-table
+        > :is([data-cuisine-category-master-rows], .cuisine-category-master-create-row)
+        > .cuisine-category-master-order-cell {
+        grid-column: 1;
+    }
+
+    .cuisine-category-master-table > .unit-master-table-head
+        > .cuisine-category-master-identity,
+    .cuisine-category-master-table
+        :is([data-cuisine-category-master-row], .cuisine-category-master-create-row)
+        > .cuisine-category-master-identity {
+        grid-column: 2;
+    }
+
+    .cuisine-category-master-table > .unit-master-table-head > :nth-child(3),
+    .cuisine-category-master-table
+        :is([data-cuisine-category-master-row], .cuisine-category-master-create-row)
+        > .unit-master-usage {
+        grid-column: 3;
+    }
+
+    .cuisine-category-master-table > .unit-master-table-head > :nth-child(4),
+    .cuisine-category-master-table
+        :is([data-cuisine-category-master-row], .cuisine-category-master-create-row)
+        > .unit-master-source-badge {
+        grid-column: 4;
+    }
+
+    .cuisine-category-master-table > .unit-master-table-head > :nth-child(5),
+    .cuisine-category-master-table
+        :is([data-cuisine-category-master-row], .cuisine-category-master-create-row)
+        > .unit-master-action-cell {
+        grid-column: 5;
+    }
+
+    .cuisine-category-master-table .cuisine-category-master-identity {
+        grid-template-columns: 54px 104px minmax(220px, 1fr);
+        gap: 10px;
+    }
+
+    .cuisine-category-master-table > .unit-master-table-head > :last-child {
+        text-align: left;
+    }
+
+    .cuisine-category-master-table
+        :is([data-cuisine-category-master-row], .cuisine-category-master-create-row)
+        > :is(
+            .cuisine-category-master-order-cell,
+            .cuisine-category-master-identity,
+            .unit-master-usage,
+            .unit-master-source-badge,
+            .unit-master-action-cell
+        ) {
+        min-width: 0;
+        align-self: center;
+    }
+}
+
+@media (min-width: 761px) and (max-width: 1180px) {
+    .cuisine-category-master-table > .unit-master-table-head,
+    .cuisine-category-master-table [data-cuisine-category-master-row],
+    .cuisine-category-master-table > .cuisine-category-master-create-row {
+        grid-template-columns: 96px minmax(0, 1fr) 100px 100px 120px;
+        column-gap: 8px;
+        padding-inline: 10px;
+    }
+
+    .cuisine-category-master-table .cuisine-category-master-identity {
+        grid-template-columns: 42px 80px minmax(130px, 1fr);
+        gap: 8px;
+    }
+
+    .cuisine-category-master-table .store-section-master-order {
+        grid-template-columns: 22px 18px 30px 18px;
+        gap: 2px;
+    }
+
+    .cuisine-category-master-table .store-section-master-order-step {
+        width: 28px;
+        height: 28px;
+    }
+
+    .cuisine-category-master-table .store-section-master-order button {
+        width: 20px;
+    }
+}
+
+@media (max-width: 760px) {
+    .cuisine-category-master-table
+        [data-cuisine-category-master-row]
+        > .cuisine-category-master-order-cell,
+    .cuisine-category-master-table
+        > .cuisine-category-master-create-row
+        > .cuisine-category-master-order-cell {
+        grid-column: 1;
+        grid-row: auto;
+    }
+}
+
 /* Ingredient editor v108: one quiet boundary per complete ingredient group. */
 body.recipe-edit-standalone-page .recipe-edit-tab-bar {
     border-bottom-color: color-mix(

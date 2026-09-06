@@ -158,6 +158,55 @@ def test_default_registry_is_read_only_and_has_stable_seed_ids(cuisine_workspace
     assert not master_data.recipe_master_db_path().exists()
 
 
+def test_workspace_cuisine_category_order_moves_and_persists(cuisine_workspace):
+    original = cuisines.cuisine_category_registry_payload("user-a")
+    original_ids = [item["id"] for item in original["categories"]]
+
+    moved = cuisines.move_workspace_cuisine_category(
+        "mexican",
+        1,
+        user_id="user-a",
+    )
+
+    assert moved == {
+        "ok": True,
+        "status": 200,
+        "changed": True,
+        "category_id": "mexican",
+        "position": 1,
+        "name": "Mexican",
+        "message": "Cuisine category moved to position 1.",
+    }
+    refreshed_ids = [
+        item["id"]
+        for item in cuisines.cuisine_category_registry_payload("user-a")[
+            "categories"
+        ]
+    ]
+    assert refreshed_ids == ["mexican", *original_ids[:1], *original_ids[2:]]
+    assert [
+        item["id"]
+        for item in cuisines.cuisine_category_registry_payload("user-b")[
+            "categories"
+        ]
+    ] == original_ids
+
+
+@pytest.mark.parametrize("position", [None, "", "not-a-position"])
+def test_workspace_cuisine_category_move_rejects_invalid_position(
+    cuisine_workspace,
+    position,
+):
+    result = cuisines.move_workspace_cuisine_category(
+        "american",
+        position,
+        user_id="user-a",
+    )
+
+    assert result["status"] == 400
+    assert result["error"] == "A valid Cuisine Category position is required."
+
+
 def test_registry_read_reactivates_and_persists_legacy_inactive_rows(
     cuisine_workspace,
 ):

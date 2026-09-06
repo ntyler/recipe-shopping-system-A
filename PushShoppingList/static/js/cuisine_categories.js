@@ -50,7 +50,7 @@
         }
     }
 
-    function initCuisineCategoryMasterPage() {
+    async function initCuisineCategoryMasterPage() {
         const root = document.querySelector("[data-cuisine-category-master-page]");
         if (!root) return;
 
@@ -63,6 +63,9 @@
         let suggestedIconToken = "";
         let createValidationErrors = {};
         let createValidationFeedback = "";
+        let draggedRow = null;
+        let rowDropTarget = null;
+        let rowDropAfter = false;
 
         const source = document.getElementById("cuisineCategoryConfig");
         const status = root.querySelector("[data-cuisine-category-master-status]");
@@ -130,7 +133,9 @@
             if (!container) return iconDescriptor(value);
             if (iconVisuals?.render) return iconVisuals.render(container, value);
             const item = iconDescriptor(value);
-            container.textContent = item.glyph || (item.kind === "none" ? "—" : "◆");
+            container.textContent = /^(flag|symbol):/i.test(item.token)
+                ? "◆"
+                : item.glyph || (item.kind === "none" ? "—" : "◆");
             return item;
         };
 
@@ -339,12 +344,14 @@
             ].filter(Boolean).join(" ");
             row.dataset.cuisineCategoryMasterIconValue = normalized.icon;
             setRowErrors(row, errors, draft.feedback);
+            if (row.isConnected) updateRowOrderControls();
         };
 
         const createUsageCell = item => {
             const usage = document.createElement("div");
             usage.className = "unit-master-usage";
             usage.setAttribute("role", "cell");
+            usage.setAttribute("aria-colindex", "5");
             const recipeCount = Math.max(0, Number(item.recipe_count) || 0);
             if (!recipeCount) {
                 const empty = document.createElement("span");
@@ -377,6 +384,69 @@
             return usage;
         };
 
+        const createOrderCell = (item, position) => {
+            const label = categoryDisplayLabel(item);
+            const cell = document.createElement("div");
+            cell.className = "store-section-master-order-cell cuisine-category-master-order-cell";
+            cell.setAttribute("role", "cell");
+            cell.setAttribute("aria-colindex", "1");
+            cell.dataset.cuisineCategoryMasterCell = "order";
+
+            const order = document.createElement("div");
+            order.className = "store-section-master-order";
+
+            const handle = document.createElement("button");
+            handle.type = "button";
+            handle.className = "store-section-master-drag-handle";
+            handle.dataset.cuisineCategoryMasterDragHandle = "";
+            handle.setAttribute("aria-label", `Drag ${label} to reorder`);
+            handle.title = "Drag to reorder Cuisine Categories";
+            handle.innerHTML = [
+                '<svg viewBox="0 0 16 20" aria-hidden="true">',
+                '<circle cx="5" cy="4" r="1.4"></circle>',
+                '<circle cx="11" cy="4" r="1.4"></circle>',
+                '<circle cx="5" cy="10" r="1.4"></circle>',
+                '<circle cx="11" cy="10" r="1.4"></circle>',
+                '<circle cx="5" cy="16" r="1.4"></circle>',
+                '<circle cx="11" cy="16" r="1.4"></circle>',
+                "</svg>",
+            ].join("");
+
+            const up = document.createElement("button");
+            up.type = "button";
+            up.value = "move_up";
+            up.dataset.cuisineCategoryMasterOrderAction = "up";
+            up.setAttribute("aria-label", `Move ${label} up`);
+            up.innerHTML = [
+                '<svg viewBox="0 0 24 24" aria-hidden="true">',
+                '<path d="M12 19V5"></path>',
+                '<path d="m6 11 6-6 6 6"></path>',
+                "</svg>",
+            ].join("");
+
+            const number = document.createElement("span");
+            number.className = "store-section-master-order-step";
+            number.dataset.cuisineCategoryMasterOrderNumber = "";
+            number.textContent = String(position);
+            number.setAttribute("aria-label", `Step ${position}`);
+
+            const down = document.createElement("button");
+            down.type = "button";
+            down.value = "move_down";
+            down.dataset.cuisineCategoryMasterOrderAction = "down";
+            down.setAttribute("aria-label", `Move ${label} down`);
+            down.innerHTML = [
+                '<svg viewBox="0 0 24 24" aria-hidden="true">',
+                '<path d="M12 5v14"></path>',
+                '<path d="m6 13 6 6 6-6"></path>',
+                "</svg>",
+            ].join("");
+
+            order.append(handle, up, number, down);
+            cell.appendChild(order);
+            return cell;
+        };
+
         const createCategoryRow = item => {
             const draft = ensureRowDraft(item);
             const displayLabel = categoryDisplayLabel(item);
@@ -390,6 +460,7 @@
             const iconField = document.createElement("div");
             iconField.className = "cuisine-category-master-row-icon-field";
             iconField.setAttribute("role", "cell");
+            iconField.setAttribute("aria-colindex", "2");
             iconField.dataset.mobileLabel = "Icon";
             const icon = document.createElement("button");
             icon.type = "button";
@@ -418,6 +489,7 @@
             const abbreviationField = document.createElement("label");
             abbreviationField.className = "cuisine-category-master-row-abbreviation-field";
             abbreviationField.setAttribute("role", "cell");
+            abbreviationField.setAttribute("aria-colindex", "3");
             abbreviationField.dataset.mobileLabel = "Abbreviation";
             const abbreviationLabel = document.createElement("span");
             abbreviationLabel.className = "sr-only";
@@ -436,6 +508,7 @@
             const nameField = document.createElement("label");
             nameField.className = "cuisine-category-master-row-name-field";
             nameField.setAttribute("role", "cell");
+            nameField.setAttribute("aria-colindex", "4");
             nameField.dataset.mobileLabel = "Cuisine Category Name";
             const nameLabel = document.createElement("span");
             nameLabel.className = "sr-only";
@@ -466,6 +539,7 @@
             const sourceBadge = document.createElement("span");
             sourceBadge.className = `unit-master-source-badge${item.custom ? " user-created" : ""}`;
             sourceBadge.setAttribute("role", "cell");
+            sourceBadge.setAttribute("aria-colindex", "6");
             sourceBadge.textContent = item.custom ? "User-created" : "Built-in";
 
             const save = document.createElement("button");
@@ -479,6 +553,7 @@
             const actionCell = document.createElement("span");
             actionCell.className = "unit-master-action-cell cuisine-category-master-row-actions";
             actionCell.setAttribute("role", "cell");
+            actionCell.setAttribute("aria-colindex", "7");
             actionCell.dataset.mobileLabel = "Action";
             actionCell.appendChild(save);
             if (item.custom) {
@@ -500,6 +575,12 @@
             rowError.hidden = true;
 
             row.append(
+                createOrderCell(
+                    item,
+                    registry.categories.findIndex(category => (
+                        String(category.id) === String(item.id)
+                    )) + 1,
+                ),
                 identity,
                 createUsageCell(item),
                 sourceBadge,
@@ -553,6 +634,7 @@
                 `Showing ${visible} of ${registry.categories.length} Cuisine Categories.`
             );
             searchEmpty.hidden = visible > 0;
+            updateRowOrderControls();
         };
 
         const renderRegistry = () => {
@@ -934,6 +1016,168 @@
             });
             const data = await response.json().catch(() => ({}));
             return { response, data };
+        };
+
+        const categoryRows = () => Array.from(
+            rows.querySelectorAll("[data-cuisine-category-master-row]"),
+        );
+
+        const reorderIsFiltered = () => Boolean(
+            cleanText(search?.value) || cleanText(iconFilter?.value),
+        );
+
+        const updateRowOrderControls = () => {
+            const currentRows = categoryRows();
+            const filtered = reorderIsFiltered();
+            currentRows.forEach((row, index) => {
+                const item = categoryById(row.dataset.categoryId);
+                const draft = item ? ensureRowDraft(item) : null;
+                const pending = (
+                    row.dataset.cuisineCategoryMasterOrderPending === "true"
+                    || Boolean(draft?.saving || draft?.deleting)
+                );
+                const number = row.querySelector(
+                    "[data-cuisine-category-master-order-number]",
+                );
+                if (number) {
+                    number.textContent = String(index + 1);
+                    number.setAttribute("aria-label", `Step ${index + 1}`);
+                }
+                row.querySelectorAll('[data-cuisine-category-master-order-action="up"]')
+                    .forEach(button => {
+                        button.disabled = pending || filtered || index === 0;
+                        button.title = filtered
+                            ? "Clear the filters before reordering."
+                            : `Move this Cuisine Category up from position ${index + 1}`;
+                    });
+                row.querySelectorAll('[data-cuisine-category-master-order-action="down"]')
+                    .forEach(button => {
+                        button.disabled = (
+                            pending
+                            || filtered
+                            || index === currentRows.length - 1
+                        );
+                        button.title = filtered
+                            ? "Clear the filters before reordering."
+                            : `Move this Cuisine Category down from position ${index + 1}`;
+                    });
+                const handle = row.querySelector(
+                    "[data-cuisine-category-master-drag-handle]",
+                );
+                if (handle) {
+                    const dragDisabled = pending || filtered;
+                    handle.draggable = !dragDisabled;
+                    handle.setAttribute("aria-disabled", String(dragDisabled));
+                    handle.title = filtered
+                        ? "Clear the filters before reordering."
+                        : "Drag to reorder Cuisine Categories";
+                }
+            });
+        };
+
+        const acceptPersistedOrder = nextRegistry => {
+            const nextCategories = Array.isArray(nextRegistry?.categories)
+                ? nextRegistry.categories
+                : categoryRows().map(row => categoryById(row.dataset.categoryId)).filter(Boolean);
+            const domOrder = categoryRows().map(row => String(row.dataset.categoryId));
+            const responseOrder = nextCategories.map(item => String(item.id));
+            if (
+                domOrder.length !== responseOrder.length
+                || domOrder.some((categoryId, index) => categoryId !== responseOrder[index])
+            ) {
+                updateRegistry(nextRegistry);
+                return;
+            }
+            registry = {
+                ...(nextRegistry || registry),
+                categories: nextCategories,
+            };
+            reconcileRowDrafts(registry.categories);
+            source.textContent = JSON.stringify(registry);
+            renderStats();
+            syncIconFilterOptions();
+            applySearch();
+        };
+
+        const persistRowPosition = async (row, position, rollback) => {
+            const item = categoryById(row.dataset.categoryId);
+            const label = categoryDisplayLabel(item);
+            const url = root.dataset.updateUrlTemplate.replace(
+                "__CATEGORY_ID__",
+                encodeURIComponent(row.dataset.categoryId),
+            );
+            try {
+                const { response, data } = await requestJson(url, {
+                    method: "PATCH",
+                    body: JSON.stringify({
+                        action: "move_to",
+                        position,
+                    }),
+                });
+                if (!response.ok || data.ok === false) {
+                    throw new Error(
+                        data.error || "The new Cuisine Category order could not be saved.",
+                    );
+                }
+                acceptPersistedOrder(data.registry);
+                setStatus(`${label} moved to position ${position}.`);
+                return true;
+            } catch (error) {
+                rollback();
+                updateRowOrderControls();
+                setStatus(
+                    error.message || "The new Cuisine Category order could not be saved.",
+                    "error",
+                );
+                console.error("Unable to reorder Cuisine Categories.", error);
+                return false;
+            }
+        };
+
+        const moveRowByOrderControl = async (row, direction, submitter) => {
+            const currentRows = categoryRows();
+            const currentIndex = currentRows.indexOf(row);
+            const targetIndex = currentIndex + direction;
+            const targetRow = currentRows[targetIndex];
+            if (currentIndex < 0 || !targetRow || reorderIsFiltered()) return;
+
+            const originalNextSibling = row.nextElementSibling;
+            row.dataset.cuisineCategoryMasterOrderPending = "true";
+            row.setAttribute("aria-busy", "true");
+            if (direction < 0) rows.insertBefore(row, targetRow);
+            else targetRow.insertAdjacentElement("afterend", row);
+            const position = categoryRows().indexOf(row) + 1;
+            updateRowOrderControls();
+
+            const rollback = () => {
+                if (originalNextSibling?.parentElement === rows) {
+                    rows.insertBefore(row, originalNextSibling);
+                } else {
+                    rows.append(row);
+                }
+            };
+            await persistRowPosition(row, position, rollback);
+            delete row.dataset.cuisineCategoryMasterOrderPending;
+            row.removeAttribute("aria-busy");
+            updateRowOrderControls();
+
+            const opposite = direction < 0 ? "down" : "up";
+            const focusTarget = !submitter.disabled
+                ? submitter
+                : row.querySelector(
+                    `[data-cuisine-category-master-order-action="${opposite}"]:not(:disabled)`,
+                ) || row.querySelector("[data-cuisine-category-master-drag-handle]");
+            focusTarget?.focus({ preventScroll: true });
+        };
+
+        const clearRowDropState = () => {
+            categoryRows().forEach(row => row.classList.remove(
+                "is-row-drop-before",
+                "is-row-drop-after",
+                "is-row-dragging",
+            ));
+            rowDropTarget = null;
+            rowDropAfter = false;
         };
 
         const focusFirstInvalid = (container, fallback = null) => {
@@ -1480,6 +1724,17 @@
         });
 
         root.addEventListener("click", event => {
+            const orderAction = event.target.closest(
+                "[data-cuisine-category-master-order-action]",
+            );
+            if (orderAction) {
+                const row = orderAction.closest("[data-cuisine-category-master-row]");
+                const direction = orderAction.dataset.cuisineCategoryMasterOrderAction === "up"
+                    ? -1
+                    : 1;
+                if (row) moveRowByOrderControl(row, direction, orderAction);
+                return;
+            }
             const iconTrigger = event.target.closest(
                 "[data-cuisine-category-master-create-icon-trigger], "
                 + "[data-cuisine-category-master-row-icon-trigger]",
@@ -1506,6 +1761,68 @@
             if (usage) {
                 openUsage(categoryById(usage.dataset.categoryId), usage);
             }
+        });
+        rows.addEventListener("dragstart", event => {
+            const handle = event.target.closest(
+                "[data-cuisine-category-master-drag-handle]",
+            );
+            if (!handle || reorderIsFiltered()) {
+                event.preventDefault();
+                return;
+            }
+            draggedRow = handle.closest("[data-cuisine-category-master-row]");
+            if (!draggedRow) return;
+            draggedRow.classList.add("is-row-dragging");
+            event.dataTransfer.effectAllowed = "move";
+            event.dataTransfer.setData(
+                "text/plain",
+                draggedRow.dataset.categoryId || "",
+            );
+        });
+        rows.addEventListener("dragover", event => {
+            if (!draggedRow) return;
+            const target = event.target.closest("[data-cuisine-category-master-row]");
+            if (!target || target === draggedRow || !rows.contains(target)) return;
+            event.preventDefault();
+            clearRowDropState();
+            draggedRow.classList.add("is-row-dragging");
+            const rect = target.getBoundingClientRect();
+            rowDropAfter = event.clientY > rect.top + rect.height / 2;
+            rowDropTarget = target;
+            target.classList.add(rowDropAfter ? "is-row-drop-after" : "is-row-drop-before");
+        });
+        rows.addEventListener("drop", async event => {
+            if (!draggedRow || !rowDropTarget) return;
+            event.preventDefault();
+            const movingRow = draggedRow;
+            const originalNextSibling = movingRow.nextElementSibling;
+            const target = rowDropTarget;
+            const placeAfter = rowDropAfter;
+            clearRowDropState();
+            target.insertAdjacentElement(placeAfter ? "afterend" : "beforebegin", movingRow);
+            const position = categoryRows().indexOf(movingRow) + 1;
+            movingRow.dataset.cuisineCategoryMasterOrderPending = "true";
+            movingRow.setAttribute("aria-busy", "true");
+            updateRowOrderControls();
+
+            const rollback = () => {
+                if (originalNextSibling?.parentElement === rows) {
+                    rows.insertBefore(movingRow, originalNextSibling);
+                } else {
+                    rows.append(movingRow);
+                }
+            };
+            await persistRowPosition(movingRow, position, rollback);
+            delete movingRow.dataset.cuisineCategoryMasterOrderPending;
+            movingRow.removeAttribute("aria-busy");
+            updateRowOrderControls();
+            movingRow.querySelector("[data-cuisine-category-master-drag-handle]")
+                ?.focus({ preventScroll: true });
+            draggedRow = null;
+        });
+        rows.addEventListener("dragend", () => {
+            clearRowDropState();
+            draggedRow = null;
         });
         search.addEventListener("input", applySearch);
         iconFilter?.addEventListener("change", applySearch);
@@ -1548,7 +1865,16 @@
 
         populateFlagOptions();
         enhanceIconPicker();
+        try {
+            if (!iconVisuals?.prepareFlagSprite) throw new Error("Cuisine icon visuals are unavailable.");
+            await iconVisuals.prepareFlagSprite();
+        } catch (error) {
+            setStatus("Flag artwork could not be loaded. Reload the page to try again.", "error");
+            console.error("Unable to initialize cuisine flags.", error);
+        }
         renderRegistry();
+        root.querySelector(".cuisine-category-master-list-section").setAttribute("aria-busy", "false");
+        document.documentElement.classList.remove("cuisine-category-icons-pending");
     }
 
     if (document.readyState === "loading") {

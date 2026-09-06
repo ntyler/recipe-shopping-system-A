@@ -17,7 +17,7 @@
 {% macro cuisine_icon_fallback(icon) -%}
     {% set icon_value = icon|string %}
     {% if icon_value[:5] == "flag:" %}
-        <span class="cuisine-category-flag-fallback" aria-hidden="true">{{ icon_value[5:]|upper }}</span>
+        <span class="cuisine-category-flag-generic" aria-hidden="true">&#9670;</span>
     {% elif icon_value[:7] == "symbol:" %}
         <span class="cuisine-category-symbol-fallback" aria-hidden="true">&#9670;</span>
     {% elif icon_value %}
@@ -26,6 +26,16 @@
         &mdash;
     {% endif %}
 {%- endmacro %}
+
+{% block app_head %}
+<script>document.documentElement.classList.add("cuisine-category-icons-pending");</script>
+<style>
+    /* Reserve the final layout from the first paint, including while scripts load. */
+    .cuisine-category-icons-pending .cuisine-category-master-list-section {
+        visibility: hidden;
+    }
+</style>
+{% endblock %}
 
 {% block app_body_attributes %}
 data-user-id="{{ master_data.viewer_user_id }}"
@@ -91,6 +101,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
              hidden></div>
 
         <section class="unit-master-panel unit-master-catalog cuisine-category-master-list-section"
+                 aria-busy="true"
                  aria-labelledby="cuisineCategoryRegistryTitle">
             <header class="cuisine-category-master-table-toolbar">
                 <div class="cuisine-category-master-registry-copy">
@@ -130,17 +141,21 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                          data-cuisine-category-master-category
                          aria-labelledby="allCuisineCategoriesTitle">
                     <h3 class="sr-only" id="allCuisineCategoriesTitle">Cuisine categories</h3>
-                    <div class="unit-master-table type-master-table cuisine-category-master-table" role="table" aria-label="Cuisine categories">
+                    <div class="unit-master-table type-master-table cuisine-category-master-table"
+                         role="table"
+                         aria-colcount="7"
+                         aria-label="Cuisine categories">
                         <div class="unit-master-table-head" role="row">
+                            <span role="columnheader" aria-colindex="1">Order</span>
                             <div class="cuisine-category-master-identity"
                                  role="presentation">
-                                <span role="columnheader">Icon</span>
-                                <span role="columnheader">Abbreviation</span>
-                                <span role="columnheader">Cuisine Category Name</span>
+                                <span role="columnheader" aria-colindex="2">Icon</span>
+                                <span role="columnheader" aria-colindex="3">Abbreviation</span>
+                                <span role="columnheader" aria-colindex="4">Cuisine Category Name</span>
                             </div>
-                            <span role="columnheader">Used in</span>
-                            <span role="columnheader">Source</span>
-                            <span role="columnheader">Action</span>
+                            <span role="columnheader" aria-colindex="5">Used in</span>
+                            <span role="columnheader" aria-colindex="6">Source</span>
+                            <span role="columnheader" aria-colindex="7">Action</span>
                         </div>
                         <div data-cuisine-category-master-rows>
                             {% for category in master_data.categories %}
@@ -150,10 +165,57 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                      data-category-id="{{ category.id }}"
                                      data-cuisine-category-master-icon-value="{{ category.icon or '' }}"
                                      data-cuisine-category-master-search-value="{{ category.icon or '' }} {{ category.abbreviation or '' }} {{ category.category_name or category.canonical_name or category.name }}">
+                                    <div class="store-section-master-order-cell cuisine-category-master-order-cell"
+                                         role="cell"
+                                         aria-colindex="1"
+                                         data-cuisine-category-master-cell="order">
+                                        <div class="store-section-master-order">
+                                            <button type="button"
+                                                    class="store-section-master-drag-handle"
+                                                    aria-label="Drag {{ category.category_name or category.canonical_name or category.name }} to reorder"
+                                                    title="Drag to reorder Cuisine Categories"
+                                                    data-cuisine-category-master-drag-handle>
+                                                <svg viewBox="0 0 16 20" aria-hidden="true">
+                                                    <circle cx="5" cy="4" r="1.4"></circle>
+                                                    <circle cx="11" cy="4" r="1.4"></circle>
+                                                    <circle cx="5" cy="10" r="1.4"></circle>
+                                                    <circle cx="11" cy="10" r="1.4"></circle>
+                                                    <circle cx="5" cy="16" r="1.4"></circle>
+                                                    <circle cx="11" cy="16" r="1.4"></circle>
+                                                </svg>
+                                            </button>
+                                            <button type="button"
+                                                    value="move_up"
+                                                    title="Move {{ category.category_name or category.canonical_name or category.name }} up"
+                                                    aria-label="Move {{ category.category_name or category.canonical_name or category.name }} up"
+                                                    data-cuisine-category-master-order-action="up"
+                                                    {% if loop.first %}disabled{% endif %}>
+                                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                                    <path d="M12 19V5"></path>
+                                                    <path d="m6 11 6-6 6 6"></path>
+                                                </svg>
+                                            </button>
+                                            <span class="store-section-master-order-step"
+                                                  data-cuisine-category-master-order-number
+                                                  aria-label="Step {{ loop.index }}">{{ loop.index }}</span>
+                                            <button type="button"
+                                                    value="move_down"
+                                                    title="Move {{ category.category_name or category.canonical_name or category.name }} down"
+                                                    aria-label="Move {{ category.category_name or category.canonical_name or category.name }} down"
+                                                    data-cuisine-category-master-order-action="down"
+                                                    {% if loop.last %}disabled{% endif %}>
+                                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                                    <path d="M12 5v14"></path>
+                                                    <path d="m6 13 6 6 6-6"></path>
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </div>
                                     <div class="cuisine-category-master-identity"
                                          role="presentation">
                                         <div class="cuisine-category-master-row-icon-field"
                                              role="cell"
+                                             aria-colindex="2"
                                              data-mobile-label="Icon">
                                             <button type="button"
                                                     class="cuisine-category-master-icon-trigger cuisine-category-master-row-icon-trigger"
@@ -179,6 +241,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                         </div>
                                         <label class="cuisine-category-master-row-abbreviation-field"
                                                role="cell"
+                                               aria-colindex="3"
                                                data-mobile-label="Abbreviation">
                                             <span class="sr-only">Abbreviation for {{ category.category_name or category.canonical_name or category.name }}</span>
                                             <input type="text"
@@ -192,6 +255,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                         </label>
                                         <label class="cuisine-category-master-row-name-field"
                                                role="cell"
+                                               aria-colindex="4"
                                                data-mobile-label="Cuisine Category Name">
                                             <span class="sr-only">
                                                 Cuisine category name for {{ category.category_name or category.canonical_name or category.name }}{% if category.seeded %}; built-in names cannot be changed{% endif %}
@@ -212,7 +276,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                             {% endif %}
                                         </label>
                                     </div>
-                                    <div class="unit-master-usage" role="cell">
+                                    <div class="unit-master-usage" role="cell" aria-colindex="5">
                                         {% if category.recipe_count %}
                                             <button type="button"
                                                     class="unit-master-usage-button"
@@ -231,11 +295,14 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                                   title="No recipes currently use {{ category.category_name or category.canonical_name or category.name }}">0</span>
                                         {% endif %}
                                     </div>
-                                    <span class="unit-master-source-badge{% if category.custom %} user-created{% endif %}" role="cell">
+                                    <span class="unit-master-source-badge{% if category.custom %} user-created{% endif %}"
+                                          role="cell"
+                                          aria-colindex="6">
                                         {{ "User-created" if category.custom else "Built-in" }}
                                     </span>
                                     <span class="unit-master-action-cell cuisine-category-master-row-actions"
                                           role="cell"
+                                          aria-colindex="7"
                                           data-mobile-label="Action">
                                         <button type="button"
                                                 class="unit-master-edit-button"
@@ -267,10 +334,20 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                               data-cuisine-category-master-create-form
                               novalidate
                               hidden>
+                            <div class="store-section-master-order-cell cuisine-category-master-order-cell"
+                                 role="cell"
+                                 aria-colindex="1"
+                                 aria-label="New Cuisine Category position">
+                                <div class="store-section-master-order cuisine-category-master-create-order">
+                                    <span class="store-section-master-order-step"
+                                          aria-label="Step {{ master_data.categories | length + 1 }}">{{ master_data.categories | length + 1 }}</span>
+                                </div>
+                            </div>
                             <div class="cuisine-category-master-identity"
                                  role="presentation">
                                 <div class="cuisine-category-master-row-icon-field"
                                      role="cell"
+                                     aria-colindex="2"
                                      data-mobile-label="Icon">
                                     <span class="sr-only" id="cuisineCategoryCreateIconLabel">Icon</span>
                                     <input type="hidden"
@@ -300,6 +377,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                 </div>
                                 <label class="cuisine-category-master-row-abbreviation-field"
                                        role="cell"
+                                       aria-colindex="3"
                                        data-mobile-label="Abbreviation">
                                     <span class="sr-only">Abbreviation for the new Cuisine Category</span>
                                     <input type="text"
@@ -314,6 +392,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                 </label>
                                 <label class="cuisine-category-master-row-name-field"
                                        role="cell"
+                                       aria-colindex="4"
                                        data-mobile-label="Cuisine Category Name">
                                     <span class="sr-only">Cuisine Category Name</span>
                                     <input type="text"
@@ -327,13 +406,16 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                            data-cuisine-category-master-create-name>
                                 </label>
                             </div>
-                            <div class="unit-master-usage" role="cell">
+                            <div class="unit-master-usage" role="cell" aria-colindex="5">
                                 <span class="unit-master-usage-empty"
                                       aria-label="No recipes use the new Cuisine Category">0</span>
                             </div>
-                            <span class="unit-master-source-badge user-created" role="cell">User-created</span>
+                            <span class="unit-master-source-badge user-created"
+                                  role="cell"
+                                  aria-colindex="6">User-created</span>
                             <span class="unit-master-action-cell cuisine-category-master-row-actions"
                                   role="cell"
+                                  aria-colindex="7"
                                   data-mobile-label="Action">
                                 <button type="submit"
                                         class="cuisine-category-master-create-submit"

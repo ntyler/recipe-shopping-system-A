@@ -2169,6 +2169,9 @@ def master_data_cuisine_categories_route():
         cuisine_categories_js_version=static_asset_version(
             "js/cuisine_categories.js"
         ),
+        cuisine_icon_visuals_js_version=static_asset_version(
+            "js/cuisine-icon-visuals.js"
+        ),
     )
 
 
@@ -2209,11 +2212,19 @@ def master_data_cuisine_category_api_route(category_id):
             user_id=workspace_user_id,
         )
     else:
-        result = cuisine_categories.save_workspace_cuisine_category(
-            request.get_json(silent=True) or {},
-            category_id=category_id,
-            user_id=workspace_user_id,
-        )
+        values = request.get_json(silent=True) or {}
+        if str(values.get("action") or "").strip().lower() == "move_to":
+            result = cuisine_categories.move_workspace_cuisine_category(
+                category_id,
+                values.get("position"),
+                user_id=workspace_user_id,
+            )
+        else:
+            result = cuisine_categories.save_workspace_cuisine_category(
+                values,
+                category_id=category_id,
+                user_id=workspace_user_id,
+            )
     if result.get("ok"):
         result["registry"] = cuisine_categories.cuisine_category_registry_payload(
             workspace_user_id,

@@ -24,6 +24,42 @@
     });
 
     const svgNamespace = "http://www.w3.org/2000/svg";
+    let flagSpriteDocument = null;
+    let inlineFlagSprite = null;
+    let flagSpriteFailed = false;
+    let flagSpritePromise = null;
+
+    // Opt in when a page must have drawable flags before its first visible render.
+    // External <use> elements can still be blank after their markup is created.
+    function prepareFlagSprite() {
+        if (!flagSpritePromise) {
+            flagSpritePromise = (async () => {
+                try {
+                    const response = await fetch(flagSpriteUrl);
+                    if (!response.ok) throw new Error(`Flag sprite request failed: ${response.status}`);
+                    const parsed = new DOMParser().parseFromString(
+                        await response.text(), "image/svg+xml",
+                    );
+                    if (
+                        parsed.querySelector("parsererror")
+                        || !supportedFlagCodes.every(code => parsed.getElementById(`flag-icons-${code}`))
+                    ) {
+                        throw new Error("The cuisine flag sprite is incomplete.");
+                    }
+                    inlineFlagSprite = document.createElementNS(svgNamespace, "svg");
+                    inlineFlagSprite.setAttribute("aria-hidden", "true");
+                    inlineFlagSprite.setAttribute("focusable", "false");
+                    inlineFlagSprite.style.cssText = "position:absolute;width:0;height:0;overflow:hidden;pointer-events:none";
+                    document.body.appendChild(inlineFlagSprite);
+                    flagSpriteDocument = parsed;
+                } catch (error) {
+                    flagSpriteFailed = true;
+                    throw error;
+                }
+            })();
+        }
+        return flagSpritePromise;
+    }
 
     function clean(value) {
         return String(value || "").normalize("NFKC").trim().replace(/\s+/g, " ");
@@ -89,7 +125,15 @@
 
     function createFlagSvg(code) {
         const normalizedCode = catalog?.normalizeCode?.(code) || clean(code).toLowerCase();
-        if (!flagLabels[normalizedCode] || typeof document === "undefined") return null;
+        if (!flagLabels[normalizedCode] || typeof document === "undefined" || flagSpriteFailed) return null;
+
+        const symbolId = `flag-icons-${normalizedCode}`;
+        if (flagSpriteDocument && !inlineFlagSprite.querySelector(`#${symbolId}`)) {
+            // Keep unused artwork detached; picker options import their symbols on demand.
+            inlineFlagSprite.appendChild(document.importNode(
+                flagSpriteDocument.getElementById(symbolId), true,
+            ));
+        }
 
         const svg = document.createElementNS(svgNamespace, "svg");
         svg.setAttribute("viewBox", "0 0 640 480");
@@ -99,7 +143,7 @@
         svg.classList.add("cuisine-category-flag-svg");
 
         const use = document.createElementNS(svgNamespace, "use");
-        use.setAttribute("href", `${flagSpriteUrl}#flag-icons-${normalizedCode}`);
+        use.setAttribute("href", `${flagSpriteDocument ? "" : flagSpriteUrl}#${symbolId}`);
         svg.appendChild(use);
         return svg;
     }
@@ -149,6 +193,7 @@
         flagEntries,
         flagSpriteUrl,
         normalizeToken,
+        prepareFlagSprite,
         render,
         supportedFlagCodes,
         symbolTokens: Object.freeze(Object.keys(symbols)),
