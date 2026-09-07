@@ -83617,11 +83617,18 @@ body.recipe-edit-standalone-page #recipeEditIngredients
         scroll-padding-bottom: calc(176px + env(safe-area-inset-bottom));
     }
 
-    .unit-master-page--registry-v2 .unit-master-category-list { margin: 12px 10px 10px; }
-    .unit-master-page--registry-v2 .unit-master-category { border-color: var(--app-border); }
-    .unit-master-page--registry-v2 .unit-master-category > header { border-bottom-color: var(--app-border); }
+    .unit-master-page--registry-v2 .unit-master-list-section { background: color-mix(in srgb, var(--app-surface) 94%, var(--app-bg-soft)); }
+    .unit-master-page--registry-v2 .unit-master-category-list { gap: 14px; margin: 16px 10px 10px; }
+    .unit-master-page--registry-v2 .unit-master-category { overflow: visible; border: 0; border-radius: 0; }
+    .unit-master-page--registry-v2 .unit-master-category > header { padding: 0 4px 8px; border: 0; background: transparent; }
+    .unit-master-page--registry-v2 .unit-master-category h3 { color: var(--app-muted); font-size: 12px; }
+    .unit-master-page--registry-v2 .unit-master-table {
+        overflow: clip;
+        border: 1px solid var(--app-border);
+        border-radius: 9px;
+        background: var(--app-surface-soft);
+    }
     .unit-master-page--registry-v2 .unit-master-draft-table { margin-inline: 8px; }
-    .unit-master-page--registry-v2 .unit-master-category > header { padding: 10px; }
     .unit-master-page--registry-v2 .unit-master-category > header > span { flex-shrink: 0; }
 
     .unit-master-page--registry-v2 .unit-master-row {
