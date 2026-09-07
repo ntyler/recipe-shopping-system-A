@@ -313,7 +313,6 @@
 
             const details = [
                 ".cuisine-category-master-row-abbreviation-field",
-                ".unit-master-usage",
                 ".unit-master-source-badge",
                 ".cuisine-category-master-row-actions",
                 ".cuisine-category-master-mobile-order",
@@ -323,7 +322,6 @@
                 field.dataset.cuisineCategoryMasterDetail = "";
                 return field.id;
             });
-            row.querySelector(".unit-master-usage").dataset.mobileLabel = "Used in";
             toggle.setAttribute("aria-controls", details.join(" "));
         };
 
