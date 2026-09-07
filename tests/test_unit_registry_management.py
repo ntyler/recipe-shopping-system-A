@@ -474,10 +474,10 @@ def test_units_page_exposes_accessible_inline_editor_and_import_offer(
     assert all(button.get("aria-controls") == "unitMasterInlineEditor"
                and button.get("aria-expanded") == "false"
                and button.get("aria-haspopup") == "dialog"
-               and button.get("aria-label") == button.get("title")
+               and button.get("aria-label") == button.get("title") == "Manage aliases"
                for button in soup.select("[data-unit-row-alias]"))
     assert len(soup.select('[data-unit-row-alias="add"]')) == 35
-    assert len(soup.select('[data-unit-row-alias="suggest"]')) == 35
+    assert not soup.select('[data-unit-row-alias="suggest"]')
 
 
 def test_unit_usage_counts_distinct_recipes_and_lists_matching_lines(

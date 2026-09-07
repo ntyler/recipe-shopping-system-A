@@ -288,15 +288,18 @@
             if (!actions) {
                 actions = document.createElement('span');
                 actions.className = 'unit-master-alias-actions';
-                for (const [mode, label, icon] of [['add', 'Add alias', '+'], ['suggest', 'Suggest aliases', '✨']]) {
-                    const button = document.createElement('button');
-                    button.type = 'button'; button.dataset.unitRowAlias = mode; button.textContent = icon;
-                    button.title = label; button.setAttribute('aria-label', label);
-                    button.setAttribute('aria-haspopup', 'dialog'); button.setAttribute('aria-controls', form.id);
-                    actions.append(button);
-                }
                 aliases.append(actions);
             }
+            // Retire the old inline AI trigger even when the server cached its markup.
+            actions.querySelector('[data-unit-row-alias="suggest"]')?.remove();
+            let manage = actions.querySelector('[data-unit-row-alias="add"]');
+            if (!manage) {
+                manage = document.createElement('button');
+                manage.type = 'button'; manage.dataset.unitRowAlias = 'add'; manage.textContent = '+';
+                manage.setAttribute('aria-haspopup', 'dialog'); manage.setAttribute('aria-controls', form.id);
+                actions.append(manage);
+            }
+            manage.title = 'Manage aliases'; manage.setAttribute('aria-label', 'Manage aliases');
             const values = editing ? draft.values.aliases : unit.aliases || [];
             const signature = JSON.stringify(values);
             if (aliases.dataset.aliases !== signature) {
@@ -309,7 +312,7 @@
                 aliases.dataset.aliases = signature;
             }
             actions.querySelectorAll('button').forEach(button => {
-                button.disabled = mutationPending || orderPending;
+                button.disabled = !editing || mutationPending || orderPending;
                 button.setAttribute('aria-expanded', String(!form.hidden && editorUnitId === id && returnFocus === button));
             });
             row.querySelector('[data-unit-row-save]').hidden = !editing;
@@ -1208,7 +1211,7 @@
             }
         };
 
-        const openEditor = (unit = null, trigger = null, mode = 'add') => {
+        const openEditor = (unit = null, trigger = null) => {
             if (orderPending || mutationPending) return;
             if (unit ? !activateInlineRow(unit.id, 'name', false) : !releaseInlineRow()) return;
             if (!form.hidden) {
@@ -1217,7 +1220,6 @@
                     returnFocus = trigger || returnFocus;
                     returnFocus?.setAttribute('aria-expanded', 'true');
                     focusEditorName();
-                    if (mode === 'suggest') suggestUnitDetails();
                     return;
                 }
                 if (!closeEditor({ restoreFocus: false })) { focusEditorName(); return; }
@@ -1255,7 +1257,6 @@
             syncOrderControls();
             positionAliasPopover();
             focusEditorName();
-            if (mode === 'suggest') suggestUnitDetails();
         };
 
         const closeEditor = ({ restoreFocus = true, discard = false } = {}) => {
@@ -1534,7 +1535,7 @@
         categoryList.addEventListener("click", event => {
             const aliasControl = event.target.closest('[data-unit-row-alias]');
             if (aliasControl) {
-                openEditor(unitById(aliasControl.closest('[data-unit-master-row]').dataset.unitId), aliasControl, aliasControl.dataset.unitRowAlias);
+                openEditor(unitById(aliasControl.closest('[data-unit-master-row]').dataset.unitId), aliasControl);
                 return;
             }
             const activate = event.target.closest('[data-unit-row-activate]');

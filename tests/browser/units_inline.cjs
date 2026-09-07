@@ -77,7 +77,6 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
         await display(a()).focus(); await page.keyboard.press('Enter');
         assert(await name(a()).evaluate(e => e === document.activeElement));
         await page.keyboard.press('Tab'); assert(await a().locator('[data-unit-row-alias="add"]').evaluate(e => e === document.activeElement));
-        await page.keyboard.press('Tab'); assert(await a().locator('[data-unit-row-alias="suggest"]').evaluate(e => e === document.activeElement));
         await page.keyboard.press('Tab'); assert(await category(a()).evaluate(e => e === document.activeElement));
         await page.keyboard.press('Escape'); assert.equal(await name(a()).count(), 0);
         await display(a()).press('Space'); assert(await name(a()).evaluate(e => e === document.activeElement));
@@ -118,6 +117,7 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
         await page.reload(); assert.equal(await display(a()).innerText(), 'teaspoon'); assert.equal(await group(a()), 'weight');
 
         // The alias popover shares the active row's draft and single Save/Cancel workflow.
+        await display(a()).click();
         await a().locator('[data-unit-row-alias="add"]').click();
         assert(await name(a()).isEnabled()); assert(await form.isVisible());
         assert.equal(await form.locator('[data-unit-master-name]:visible, [data-unit-master-category-select]:visible').count(), 0);
@@ -130,7 +130,7 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
         await form.getByRole('button', { name: 'Close aliases', exact: true }).click();
         await name(a()).fill('measuring teaspoon'); await save(a()).click(); await display(a()).waitFor();
         assert.equal(await display(a()).innerText(), 'measuring teaspoon'); assert.match(await a().locator('.unit-master-aliases').innerText(), /tea measure/);
-        await a().locator('[data-unit-row-alias="add"]').click(); await alias.fill('canceled alias');
+        await display(a()).click(); await a().locator('[data-unit-row-alias="add"]').click(); await alias.fill('canceled alias');
         await name(a()).fill('canceled name'); await selectCategory(category(a()), 'optional'); await cancel(a()).click();
         assert(await form.isHidden()); assert.equal(await display(a()).innerText(), 'measuring teaspoon'); assert.equal(await group(a()), 'weight');
 

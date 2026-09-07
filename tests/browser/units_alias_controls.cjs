@@ -30,6 +30,7 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
             ['short', ['as1','as2','as3','as4','as5','as6']],
             ['long', ['generous tablespoon measurement', 'small rounded tablespoon measure', 'level serving spoon measurement', 'large serving spoon measurement', 'small measuring spoon quantity']],
             ['unbroken', ['a'.repeat(60), 'b'.repeat(60), 'c'.repeat(60)]],
+            ['many', Array.from({length:50}, (_, index) => `spoon measure variant ${index}`)],
         ];
         for (const fixture of fixtures) {
             const response = await context.request.post(base + '/api/master-data/units', {
@@ -41,7 +42,7 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
         await page.goto(base + '/admin/master-data/units');
         await page.evaluate(() => document.fonts.ready);
         assert.equal(await page.title(), 'Units'); assert(page.url().endsWith('/admin/master-data/units'));
-        assert.equal(await page.locator('[data-unit-master-row]').count(), 40);
+        assert.equal(await page.locator('[data-unit-master-row]').count(), 35 + fixtures.length);
         assert.equal(await page.locator('vite-error-overlay, nextjs-portal').count(), 0);
         const form = page.locator('[data-unit-master-form]');
         const input = form.locator('[data-unit-master-alias-input]');
@@ -58,7 +59,10 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
                 assert(Math.abs(await page.evaluate(() => innerWidth) - width / zoom) <= 1);
                 for (const [kind, aliases, id] of fixtures) {
                     const row = page.locator(`[data-unit-master-row][data-unit-id="${id}"]`);
+                    const restingHeight = (await row.boundingBox()).height;
+                    assert(await row.locator('[data-unit-row-alias="add"]').isHidden());
                     await row.locator('[data-unit-row-activate="name"]').click();
+                    assert(Math.abs((await row.boundingBox()).height - restingHeight) < .1, `${kind} at ${width}/${zoom}: editing preserves row height`);
                     const actions = row.locator('.unit-master-alias-actions');
                     await actions.evaluate(e => e.scrollIntoView({block:'center',inline:'nearest'}));
                     await page.mouse.move(0,0); // Editing keeps controls visible without hover.
@@ -83,11 +87,12 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
                     assert.equal(metrics.opacity,'1',detail); assert.equal(metrics.shrink,'0',detail);
                     assert.deepEqual(metrics.children,['unit-master-alias-chip-list','unit-master-alias-actions']);
                     assert.equal(metrics.chips.length,aliases.length);
-                    const [add,suggest] = metrics.buttons;
-                    assert.equal(add.width,suggest.width,detail); assert.equal(add.height,suggest.height,detail);
+                    assert.equal(metrics.buttons.length,1);
+                    const [add] = metrics.buttons;
                     assert.equal(add.width,add.height,detail); assert(add.width>=32,detail);
-                    assert.equal(add.minWidth,add.minHeight,detail); assert.equal(suggest.minWidth,suggest.minHeight,detail);
-                    assert(Math.abs(add.y-suggest.y)<.1,detail); assert(Math.abs(suggest.x-add.right-4)<1,detail);
+                    assert.equal(add.minWidth,add.minHeight,detail);
+                    assert.equal(metrics.group.width,add.width,detail);
+                    assert.equal(add.label,'Manage aliases');
                     assert(metrics.group.x>=metrics.cell.x-.5 && metrics.group.right<=metrics.cell.right+.5,detail);
                     assert(metrics.group.bottom<=metrics.cell.bottom+.5,detail);
                     for (const button of metrics.buttons) {
@@ -100,11 +105,22 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
                     }
                     const addControl = row.locator('[data-unit-row-alias="add"]');
                     await addControl.click(); assert(await form.isVisible());
+                    const panel = await form.boundingBox();
+                    const viewport = await page.evaluate(() => ({width:innerWidth,height:innerHeight}));
+                    assert(panel.x >= 11 && panel.y >= 11
+                        && panel.x + panel.width <= viewport.width - 11
+                        && panel.y + panel.height <= viewport.height - 11, detail);
+                    assert(await form.evaluate(e => e.scrollWidth <= e.clientWidth + 1), `${kind} at ${width}/${zoom}: popover content fits without horizontal scrolling`);
+                    assert(Math.abs((await row.boundingBox()).height - restingHeight) < .1);
                     assert.match(await form.locator('[data-unit-master-editor-title]').innerText(), new RegExp(`layout ${kind}`));
                     await input.press('Escape'); assert(await addControl.evaluate(e=>e===document.activeElement));
                     if (kind==='long' && [1440,390].includes(width)) {
                         await shot(`units-alias-controls-${width}-${zoom*100}.png`);
-                        await row.locator('[data-unit-row-alias="suggest"]').click();
+                        assert.equal(await row.locator('[data-unit-row-alias="suggest"]').count(),0);
+                        await addControl.click();
+                        const suggest = form.getByRole('button',{name:'Suggest aliases',exact:true});
+                        assert.match(await suggest.getAttribute('class'),/secondary/);
+                        await suggest.click();
                         await form.getByText('No new aliases to suggest.',{exact:true}).waitFor();
                         await input.press('Escape');
                     }
@@ -113,7 +129,7 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
             }
         }
         assert.deepEqual(errors,[]);
-        console.log(`PASS ${cases} alias-layout cases at actual 100%, 125%, 150% browser zoom: zero/one/short/long/unbroken aliases; desktop/narrow widths; equal hit targets, full hit testing, chip separation, Add/Suggest, Escape/focus, console.`);
+        console.log(`PASS ${cases} alias-layout cases at actual 100%, 125%, 150% browser zoom: zero/one/short/long/unbroken/50 aliases; desktop/narrow widths; single Manage control, stable heights, full hit testing, chip separation, popover bounds and content, Suggest, Escape/focus, console.`);
     } finally {
         await context.close();
         const resolved = fs.realpathSync(extension);
