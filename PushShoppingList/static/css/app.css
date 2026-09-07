@@ -83997,14 +83997,23 @@ body.recipe-edit-standalone-page #recipeEditIngredients
 .ingredient-master-page .ingredient-order-help { margin: 0; color: var(--app-muted); font-size: 11px; line-height: 1.5; }
 .ingredient-master-page .ingredient-registry-status { margin: 0; font-size: 12px; }
 .ingredient-master-page .is-error { color: var(--app-danger); }
-.ingredient-master-page .master-data-table-wrap { overflow: clip; border: 1px solid var(--app-border); border-radius: 9px; background: var(--app-surface-soft); }
-.ingredient-master-page .master-data-ingredients-table { width: 100%; min-width: 0; table-layout: fixed; border-collapse: separate; border-spacing: 0; }
-.ingredient-master-page .master-data-ingredients-table :is(th, td) { width: auto; min-width: 0; padding: 9px 14px; border-bottom: 1px solid var(--app-border); color: var(--app-text); vertical-align: middle; }
-.ingredient-master-page .master-data-ingredients-table thead th { padding-block: 10px; background: var(--app-surface); color: var(--app-muted); font-size: 12px; font-weight: 850; letter-spacing: .03em; }
+.ingredient-master-page .master-data-table-wrap { overflow: clip; border: 1px solid var(--app-border-subtle); border-radius: 9px; background: transparent; }
+.ingredient-master-page .master-data-ingredients-table { width: 100%; min-width: 0; table-layout: fixed; border-collapse: separate; border-spacing: 0; background: transparent; }
+.ingredient-master-page .master-data-ingredients-table :is(th, td) { width: auto; min-width: 0; padding: 9px 14px; border-bottom: 1px solid var(--app-border-subtle); color: var(--app-text); vertical-align: middle; }
+.ingredient-master-page .master-data-ingredients-table thead th { padding-block: 10px; background: transparent; color: var(--app-muted); font-size: 12px; font-weight: 850; letter-spacing: .03em; }
 .ingredient-master-page .master-data-ingredients-table .master-data-section-row th { padding: 10px 14px; border-top: 0; border-radius: 0; background: var(--app-surface-soft); color: var(--app-text-strong); font-size: 12px; font-weight: 800; text-transform: none; letter-spacing: 0; }
-.ingredient-master-page .master-data-ingredients-table [data-ingredient-master-row] { height: 68px; border-radius: 0; border-color: var(--app-border); background: transparent; box-shadow: none; }
+.ingredient-master-page .master-data-ingredients-table [data-ingredient-master-row] { height: 68px; border-radius: 0; border-color: var(--app-border-subtle); background: transparent; box-shadow: none; }
 .ingredient-master-page .master-data-ingredients-table [data-ingredient-master-row] > td { background: transparent; box-shadow: none; }
-.ingredient-master-page .master-data-ingredients-table [data-ingredient-master-row]:hover { background: color-mix(in srgb, var(--app-text) 4%, var(--app-surface-soft)); }
+/* Match Units: selection stays quiet; only a hovering pointer fills the whole row. */
+.ingredient-master-page .master-data-ingredients-table [data-ingredient-master-row]:is(.is-selected, .is-editing, .is-dirty) { box-shadow: inset 2px 0 0 color-mix(in srgb, var(--app-primary-hover) 60%, transparent); }
+@media (hover: hover) {
+    .ingredient-master-page .master-data-ingredients-table [data-ingredient-master-row]:hover { background: var(--app-primary-soft); }
+}
+.ingredient-master-page .master-data-ingredients-table [data-ingredient-master-row]:has(:focus-visible) { outline: 2px solid var(--app-primary-hover); outline-offset: -2px; }
+@media (forced-colors: active) {
+    .ingredient-master-page .master-data-ingredients-table [data-ingredient-master-row]:is(.is-selected, .is-editing, .is-dirty) { outline: 1px solid Highlight; outline-offset: -1px; }
+    .ingredient-master-page .master-data-ingredients-table [data-ingredient-master-row]:has(:focus-visible) { outline: 2px solid Highlight; outline-offset: -2px; }
+}
 .ingredient-master-page .master-data-ingredients-table [data-ingredient-master-row].is-saving { opacity: .7; }
 .ingredient-master-page .master-data-ingredients-table tbody > tr:last-child,
 .ingredient-master-page .master-data-ingredients-table tbody > tr:last-child > td,
@@ -84027,10 +84036,12 @@ body.recipe-edit-standalone-page #recipeEditIngredients
 .ingredient-master-page .ingredient-section-picker [data-store-section-icon] { min-width: 16px; max-width: 16px; min-height: 16px; max-height: 16px; }
 .ingredient-master-page .ingredient-section-picker svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 1.8; }
 .ingredient-master-page .ingredient-section-chevron { color: var(--app-muted); }
-.ingredient-master-page [data-ingredient-master-row]:hover :is(.ingredient-row-name, .recipe-edit-store-section-trigger),
-.ingredient-master-page [data-ingredient-master-row].is-editing :is(.ingredient-row-name, .recipe-edit-store-section-trigger) { border-color: var(--app-border-strong); background: var(--app-bg-soft); }
-.ingredient-master-page [data-ingredient-master-row].is-dirty :is(.ingredient-row-name, .recipe-edit-store-section-trigger) { border-color: var(--app-primary); }
-.ingredient-master-page :is(input, button):focus-visible { outline: 0; box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-primary-hover) 22%, transparent); }
+.ingredient-master-page .unit-master-inline-editor .ingredient-editor-control { border: 1px solid transparent; border-radius: 6px; background: transparent; box-shadow: none; }
+.ingredient-master-page :is(.ingredient-row-name, .recipe-edit-store-section-trigger, .ingredient-editor-control):hover:where(:not(:disabled)) { border-color: var(--app-border); }
+.ingredient-master-page :is(input, button, select):focus-visible { outline: 2px solid var(--app-primary-hover); outline-offset: 2px; }
+.ingredient-master-page :is(.ingredient-row-name, .recipe-edit-store-section-trigger, .ingredient-editor-control):focus-visible { border-color: var(--app-primary-hover); box-shadow: none; }
+.ingredient-master-page :is(.ingredient-row-name, .recipe-edit-store-section-trigger, .ingredient-editor-control)[aria-invalid="true"] { border-color: var(--app-danger); }
+.ingredient-master-page :is(.ingredient-row-name, .recipe-edit-store-section-trigger, .ingredient-editor-control)[aria-invalid="true"]:focus-visible { outline-color: var(--app-danger); }
 .ingredient-master-page .master-data-thumbnail,
 .ingredient-master-page .master-data-no-image { flex: 0 0 var(--master-data-thumbnail-size, 48px); width: var(--master-data-thumbnail-size, 48px); height: var(--master-data-thumbnail-size, 48px); border: 1px solid var(--app-border); border-radius: 7px; background: var(--app-surface); color: var(--app-muted); font-size: 10px; }
 .ingredient-master-page .master-data-no-image { display: grid; place-items: center; border-style: dashed; text-align: center; }
@@ -84077,7 +84088,7 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     .ingredient-master-page .master-data-filter-form > label, .ingredient-master-page .master-data-filter-form > button[type="submit"], .ingredient-master-page .master-data-filter-form .master-data-thumbnail-size-section { grid-column: 1; grid-row: auto; }
     .ingredient-master-page .master-data-ingredients-table colgroup, .ingredient-master-page .master-data-ingredients-table thead { display: none; }
     .ingredient-master-page .master-data-ingredients-table tbody { display: block; }
-    .ingredient-master-page .master-data-ingredients-table [data-ingredient-master-row] { display: grid; grid-template-columns: 116px minmax(0, 1fr); height: auto; gap: 0; padding: 10px; border: 0; border-bottom: 1px solid var(--app-border); }
+    .ingredient-master-page .master-data-ingredients-table [data-ingredient-master-row] { display: grid; grid-template-columns: 116px minmax(0, 1fr); height: auto; gap: 0; padding: 10px; border: 0; border-bottom: 1px solid var(--app-border-subtle); }
     .ingredient-master-page .master-data-ingredients-table [data-ingredient-master-row] > td { display: block; width: auto; min-width: 0; padding: 4px; border: 0; }
     .ingredient-master-page .master-data-ingredients-table .ingredient-order-cell { grid-column: 1 / -1; }
     .ingredient-master-page .master-data-ingredients-table .ingredient-item-cell { grid-column: 1 / -1; }

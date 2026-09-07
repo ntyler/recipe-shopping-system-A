@@ -314,6 +314,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
 {% endblock %}
 
 {% block app_scripts %}
+<script src="{{ url_for('static', filename='js/master-data-alias-editor.js', v=units_js_version) }}" defer></script>
 <script src="{{ url_for('static', filename='js/unit_categories.js', v=unit_categories_js_version) }}" defer></script>
 <script src="{{ url_for('static', filename='js/units.js', v=units_js_version) }}" defer></script>
 {% endblock %}
