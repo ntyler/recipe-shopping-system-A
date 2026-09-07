@@ -402,8 +402,13 @@ def test_units_page_exposes_accessible_inline_editor_and_import_offer(
     assert form.has_attr("hidden")
     assert form.select_one("[data-unit-master-name]") is not None
     assert form.select_one("[data-unit-master-category-select]") is not None
-    assert form.select_one("[data-unit-master-name]")["form"] == form["id"]
-    assert form.select_one("[data-unit-master-category-select]")["form"] == form["id"]
+    for selector in ("[data-unit-master-name]", "[data-unit-master-category-select]",
+                     "[data-unit-master-alias-input]"):
+        control = soup.select_one(selector)
+        assert control.find_parent("form") == form
+        assert not control.has_attr("disabled")
+        assert not control.has_attr("readonly")
+    assert not soup.select("[data-unit-master-row] input, [data-unit-master-row] select")
     assert soup.select_one("[data-unit-master-name-cell] [data-unit-master-cell-text]")
     assert soup.select_one("[data-unit-master-category-cell] [data-unit-master-cell-text]")
     assert not soup.select("[data-unit-master-category-readonly]")

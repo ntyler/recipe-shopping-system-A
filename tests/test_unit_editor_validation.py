@@ -17,13 +17,15 @@ const assert = require('node:assert/strict');
 const registry = {
     categories: [{key: 'volume'}, {key: 'weight'}],
     units: [
-        {id:'teaspoon', name:'teaspoon', aliases:['tsp', 'teaspoons']},
+        {id:'teaspoon', name:'teaspoon', seeded:true, aliases:['tsp', 'teaspoons']},
         {id:'tablespoon', name:'tablespoon', aliases:['tbsp', 'table-spoons']},
     ],
 };
 const original = {canonical_name:'teaspoon', category:'volume', aliases:['tsp', 'teaspoons']};
 const validate = draft => validateUnitDraft({...original, ...draft}, registry, 'teaspoon');
 assert.deepEqual(validate({}), {aliases:{}});
+assert.deepEqual(validate({canonical_name:'tea measure', category:'weight'}), {aliases:{}});
+assert.match(validate({canonical_name:' tAbLeSpOoN '}).canonical_name, /already accepted by tablespoon/);
 assert.deepEqual(validate({aliases:['  scoops  ']}), {aliases:{}});
 assert.match(validate({aliases:['tsp', ' TSP ']}).aliases[1], /already in this unit/);
 assert.match(validate({aliases:['T.S.P.', 'tsp']}).aliases[1], /already in this unit/);

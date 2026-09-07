@@ -210,23 +210,22 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                 </header>
 
                 <div class="unit-master-editor-grid">
-                    <label class="unit-master-field" data-unit-master-name-field>
+                    <label class="unit-master-field">
                         <span id="unitCanonicalLabel">Canonical name</span>
                         <input type="text"
                                maxlength="60"
                                autocomplete="off"
                                data-unit-master-name
-                               form="unitMasterInlineEditor"
                                required
                                aria-labelledby="unitCanonicalLabel"
                                aria-describedby="unitEditorPermissions unitCanonicalError">
                         <small class="unit-master-field-error" id="unitCanonicalError" data-unit-master-name-error aria-live="polite" hidden></small>
                     </label>
-                    <div class="unit-master-field" data-unit-master-category-field>
+                    <div class="unit-master-field">
                         <span class="unit-master-field-label">
                             <span id="unitCategoryLabel">Category</span>
                         </span>
-                        <select data-unit-master-category-select form="unitMasterInlineEditor" aria-labelledby="unitCategoryLabel" aria-describedby="unitCategoryHelp unitCategoryError">
+                        <select data-unit-master-category-select aria-labelledby="unitCategoryLabel" aria-describedby="unitCategoryHelp unitCategoryError">
                             {% for category in master_data.category_options %}
                                 <option value="{{ category.key }}">{{ category.label }}</option>
                             {% endfor %}

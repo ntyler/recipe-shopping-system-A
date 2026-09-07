@@ -119,9 +119,6 @@
         const countLabel = root.querySelector("[data-unit-master-count-label]");
         const nameInput = root.querySelector("[data-unit-master-name]");
         const categorySelect = root.querySelector("[data-unit-master-category-select]");
-        const nameField = root.querySelector("[data-unit-master-name-field]");
-        const categoryField = root.querySelector("[data-unit-master-category-field]");
-        const fieldHome = form.querySelector(".unit-master-editor-grid");
         const firstInvalidControl = () => [nameInput, categorySelect, aliasInput].find(control => control.getAttribute("aria-invalid") === "true");
         const aliasInput = root.querySelector("[data-unit-master-alias-input]");
         const aliasChips = root.querySelector("[data-unit-master-alias-chips]");
@@ -193,28 +190,6 @@
                 ? "Edit the name, category group, and aliases together. The previous name remains an alias. Quantities and the measurement stay the same."
                     + (unit.seeded ? " System-seeded units cannot be deleted." : "")
                 : "Choose a canonical name, category, and accepted aliases.";
-            // Existing units use their table cells; the expanded panel holds aliases
-            // and the sole save/cancel pair. Add Unit still needs the standalone fields.
-            form.querySelector("header").classList.toggle("sr-only", Boolean(unit));
-            fieldHome.hidden = Boolean(unit);
-        };
-
-        const parkFields = () => {
-            for (const field of [nameField, categoryField]) {
-                const cell = field.parentElement;
-                cell.querySelector("[data-unit-master-cell-text]")?.removeAttribute("hidden");
-                cell.closest("[data-unit-master-row]")?.classList.remove("is-editing");
-                fieldHome.appendChild(field);
-            }
-        };
-
-        const attachFields = row => {
-            for (const [selector, field] of [["[data-unit-master-name-cell]", nameField], ["[data-unit-master-category-cell]", categoryField]]) {
-                const cell = row.querySelector(selector);
-                cell.querySelector("[data-unit-master-cell-text]").hidden = true;
-                cell.appendChild(field);
-            }
-            row.classList.add("is-editing");
         };
 
         const editorValues = (includePending = false) => ({
@@ -516,8 +491,7 @@
             root.querySelectorAll("[data-unit-master-category]").forEach(category => {
                 let categoryCount = 0;
                 category.querySelectorAll("[data-unit-master-row]").forEach(row => {
-                    // Keep a saved rename visible until its editor closes, even if it
-                    // no longer matches the search, without changing the filter.
+                    // Keep the active editor and its row together while filtering.
                     const visible = !query || unitKey(row.dataset.unitMasterSearchValue).includes(query)
                         || (!form.hidden && row.dataset.unitId === editorUnitId);
                     row.hidden = !visible;
@@ -607,7 +581,6 @@
         };
 
         const parkEditor = () => {
-            parkFields();
             if (form.parentElement !== editorHome.parentElement || form.nextElementSibling !== editorHome) {
                 editorHome.before(form);
             }
@@ -867,13 +840,20 @@
         };
 
         const focusEditorName = () => {
+            const rect = nameInput.getBoundingClientRect();
+            // Preserve the table's scroll position. If the expanded field is below
+            // the viewport or covered by mobile navigation, keep focus on Edit;
+            // Tab then enters the editor and scrolls the field into view normally.
+            if (editorUnitId && document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2) !== nameInput) {
+                returnFocus?.focus({ preventScroll: true });
+                return;
+            }
             try {
                 nameInput.focus({ preventScroll: true });
             } catch (_error) {
                 nameInput.focus();
             }
-            const rect = nameInput.getBoundingClientRect();
-            if (rect.top < 0 || rect.bottom > window.innerHeight) {
+            if (!editorUnitId && (rect.top < 0 || rect.bottom > window.innerHeight)) {
                 nameInput.scrollIntoView({ block: "nearest", inline: "nearest" });
             }
         };
@@ -909,7 +889,6 @@
                 ? root.querySelector(`[data-unit-master-row][data-unit-id="${CSS.escape(String(unit.id))}"]`)
                 : null;
             if (row) {
-                attachFields(row);
                 row.insertAdjacentElement("afterend", form);
             } else {
                 editorHome.before(form);
@@ -1164,7 +1143,7 @@
             }
         });
         cancelButton.addEventListener("click", () => closeEditor({ discard: true }));
-        root.addEventListener("input", event => {
+        form.addEventListener("input", event => {
             if (![nameInput, categorySelect, aliasInput].includes(event.target)) return;
             showValidation = true;
             if (event.target === nameInput) delete serverErrors.canonical_name;
@@ -1176,8 +1155,8 @@
         window.addEventListener("beforeunload", event => {
             if (!form.hidden && (editorIsDirty() || mutationPending)) { event.preventDefault(); event.returnValue = ""; }
         });
-        root.addEventListener("keydown", event => {
-            if (form.hidden || (!form.contains(event.target) && ![nameInput, categorySelect].includes(event.target))) return;
+        form.addEventListener("keydown", event => {
+            if (form.hidden) return;
             if (event.key !== "Escape") return;
             event.preventDefault();
             closeEditor();
