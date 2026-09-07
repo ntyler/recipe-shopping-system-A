@@ -4696,6 +4696,7 @@ def list_master_record_recipe_references(
     user_id=None,
     include_all_users=False,
     limit=25,
+    offset=0,
 ):
     config = master_record_table_config(table_name)
     record = master_record_for_id(
@@ -4715,6 +4716,7 @@ def list_master_record_recipe_references(
         }
 
     limit = bounded_master_limit(limit, default=25, maximum=500)
+    offset = bounded_master_offset(offset)
     usage_table = config["usage_table"]
     usage_fk = config["usage_fk"]
     if table_name == "ingredients":
@@ -4831,13 +4833,14 @@ def list_master_record_recipe_references(
                         OR {buy_as_match_sql}
                    )
                  ORDER BY LOWER(r.recipe_id) ASC, r.sort_order ASC, r.id ASC
-                 LIMIT ?
+                 LIMIT ? OFFSET ?
                 """,
                 (
                     record["user_id"],
                     int(record["id"]),
                     *target_names,
                     limit,
+                    offset,
                 ),
             ).fetchall()
         else:
@@ -4864,9 +4867,9 @@ def list_master_record_recipe_references(
                  WHERE r.user_id = ?
                    AND r.{usage_fk} = ?
                  ORDER BY LOWER(r.recipe_id) ASC, r.sort_order ASC, r.id ASC
-                 LIMIT ?
+                 LIMIT ? OFFSET ?
                 """,
-                (record["user_id"], int(record["id"]), limit),
+                (record["user_id"], int(record["id"]), limit, offset),
             ).fetchall()
 
     metadata = recipe_reference_metadata(record["user_id"])
@@ -4929,6 +4932,8 @@ def list_master_record_recipe_references(
         if table_name == "ingredients" and summary_row
         else 0,
         "limit": limit,
+        "offset": offset,
+        "next_offset": offset + len(rows) if rows and offset + len(rows) < int(summary_row["reference_count"] or 0) else None,
     }
 
 

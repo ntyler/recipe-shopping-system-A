@@ -1,0 +1,24 @@
+{% macro recipe_usage_dialog(record_type) -%}
+<dialog id="masterDataUsageDialog" class="unit-master-usage-dialog master-data-usage-dialog"
+        data-master-usage-dialog data-record-type="{{ record_type }}"
+        aria-labelledby="masterDataUsageTitle" aria-describedby="masterDataUsageContext" aria-modal="true">
+    <div class="unit-master-usage-dialog-shell">
+        <header>
+            <div>
+                <span>Recipe usage</span>
+                <h2 id="masterDataUsageTitle" data-master-usage-title>Recipes using this {{ 'ingredient' if record_type == 'ingredients' else 'equipment' }}</h2>
+                <p id="masterDataUsageContext">{{ 'These recipes reference this canonical ingredient through Ingredient Name, Buy As, or both.' if record_type == 'ingredients' else 'Review every recipe connected to this recipe-derived equipment record.' }}</p>
+            </div>
+            <button type="button" class="unit-master-usage-dialog-close" data-master-usage-close
+                    aria-label="Close {{ 'ingredient' if record_type == 'ingredients' else 'equipment' }} recipe usage" autofocus>&times;</button>
+        </header>
+        <div class="unit-master-usage-dialog-summary" data-master-usage-summary aria-live="polite"></div>
+        <div class="unit-master-usage-results" data-master-usage-results role="region"
+             aria-label="Recipe list" aria-live="polite" tabindex="0"></div>
+        <footer>
+            <span>Recipe links open in a new tab.</span>
+            <button type="button" data-master-usage-close>Close</button>
+        </footer>
+    </div>
+</dialog>
+{%- endmacro %}

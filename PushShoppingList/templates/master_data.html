@@ -1,4 +1,5 @@
 {% extends "layouts/app_layout.html" %}
+{% from "partials/master_data_recipe_usage.html" import recipe_usage_dialog %}
 {% from "includes/master_data_controls.html" import registry_order, registry_section_icon %}
 {% set app_page_title = master_data.title %}
 {% set app_shell_mode = "route" %}
@@ -241,10 +242,10 @@
                 <button type="button"
                         class="master-data-usage-button unit-master-usage-button equipment-master-usage-button"
                         data-master-reference-toggle
-                        data-equipment-master-usage-button
+                        data-equipment-master-usage-button data-master-usage-button="equipment" data-record-name="{{ row.name }}"
                         data-reference-url="{{ master_data_reference_url(row, master_data) }}"
                         aria-expanded="false"
-                        aria-controls="equipmentMasterUsageDialog"
+                        aria-controls="masterDataUsageDialog"
                         aria-haspopup="dialog"
                         aria-label="Show {{ row.usage_count }} recipe{% if row.usage_count != 1 %}s{% endif %} referencing {{ row.name }}"
                         title="Show recipes referencing {{ row.name }}">
@@ -295,7 +296,6 @@
 {% macro render_master_data_row(row, master_data) -%}
 {% if master_data.record_type == "equipment" %}{{ render_equipment_master_data_row(row, master_data) }}{% else %}
     {% set form_id = 'masterDataIngredientForm-' ~ row.id %}
-    {% set reference_id = 'masterDataReferences-ingredients-' ~ row.id %}
     <tr id="masterDataRecord-ingredients-{{ row.id }}" class="master-data-record-row"
         data-ingredient-master-row data-master-record-id="{{ row.id }}" data-user-id="{{ row.user_id }}"
         data-store-section="{{ row.store_section }}" data-order-enabled="{{ 'true' if row.order_enabled else 'false' }}"
@@ -334,8 +334,8 @@
         </td>
         <td class="master-data-usage-cell" data-label="Used In">
             {% if row.usage_count %}
-            <button type="button" class="unit-master-usage-button master-data-usage-button" data-master-reference-toggle
-                    data-reference-url="{{ master_data_reference_url(row, master_data) }}" aria-expanded="false" aria-controls="{{ reference_id }}"
+            <button type="button" class="unit-master-usage-button master-data-usage-button" data-master-reference-toggle data-master-usage-button="ingredients" data-record-name="{{ row.name }}"
+                    data-reference-url="{{ master_data_reference_url(row, master_data) }}" aria-expanded="false" aria-controls="masterDataUsageDialog" aria-haspopup="dialog"
                     aria-label="Show {{ row.usage_count }} {{ 'recipe' if row.usage_count == 1 else 'recipes' }} referencing {{ row.name }}: {{ row.ingredient_name_usage_count }} by Ingredient Name and {{ row.buy_as_usage_count }} by Buy As; these counts may overlap">
                 <span><strong>{{ row.usage_count }}</strong> {{ 'recipe' if row.usage_count == 1 else 'recipes' }}</span>
             </button>
@@ -360,11 +360,7 @@
             </div>
         </td>
     </tr>
-    {% if row.usage_count %}
-    <tr class="master-data-reference-row" id="{{ reference_id }}" data-master-reference-row hidden><td colspan="6">
-        <div class="master-data-reference-panel" data-master-reference-panel aria-live="polite"><div class="master-data-reference-placeholder">Recipe references will load when expanded.</div></div>
-    </td></tr>
-    {% endif %}
+
 {% endif %}
 {%- endmacro %}
 
@@ -1356,38 +1352,6 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                 </form>
             </dialog>
 
-            <dialog id="equipmentMasterUsageDialog"
-                    class="unit-master-usage-dialog equipment-master-usage-dialog"
-                    data-equipment-master-usage-dialog
-                    aria-labelledby="equipmentMasterUsageTitle"
-                    aria-describedby="equipmentMasterUsageContext">
-                <div class="unit-master-usage-dialog-shell">
-                    <header>
-                        <div>
-                            <span>Recipe usage</span>
-                            <h2 id="equipmentMasterUsageTitle"
-                                data-equipment-master-usage-title>Recipes using this equipment</h2>
-                            <p id="equipmentMasterUsageContext">
-                                Review every recipe connected to this recipe-derived equipment record.
-                            </p>
-                        </div>
-                        <button type="button"
-                                class="unit-master-usage-dialog-close"
-                                data-equipment-master-usage-close
-                                aria-label="Close equipment recipe usage">&times;</button>
-                    </header>
-                    <div class="unit-master-usage-dialog-summary"
-                         data-equipment-master-usage-summary></div>
-                    <div class="unit-master-usage-results equipment-master-usage-results"
-                         data-equipment-master-usage-results
-                         role="region"
-                         aria-live="polite"></div>
-                    <footer>
-                        <span>Recipe links open in a new tab.</span>
-                        <button type="button" data-equipment-master-usage-close>Close</button>
-                    </footer>
-                </div>
-            </dialog>
         {% else %}
         <section class="unit-master-panel ingredient-master-registry" aria-label="Ingredient registry">
         <div class="master-data-results-header" data-master-results-header>
@@ -1444,38 +1408,6 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                 </div>
             {% endif %}
         </div>
-
-        {% if master_data.record_type == 'ingredients' and master_data.rows %}
-            <dialog id="masterDataMobileReferencesDialog"
-                    class="master-data-mobile-reference-dialog"
-                    data-master-mobile-reference-dialog
-                    aria-labelledby="masterDataMobileReferencesTitle">
-                <div class="master-data-mobile-reference-shell">
-                    <header class="master-data-mobile-reference-header">
-                        <div>
-                            <span>Ingredient usage</span>
-                            <h2 id="masterDataMobileReferencesTitle"
-                                data-master-mobile-reference-title>
-                                Recipes using this ingredient
-                            </h2>
-                        </div>
-                        <button type="button"
-                                data-master-mobile-reference-close
-                                aria-label="Close recipe usage">
-                            &times;
-                        </button>
-                    </header>
-                    <div class="master-data-reference-panel master-data-mobile-reference-panel"
-                         data-master-mobile-reference-panel
-                         aria-live="polite">
-                        <div class="master-data-reference-placeholder">Recipe references will load when opened.</div>
-                    </div>
-                    <footer class="master-data-mobile-reference-footer">
-                        <button type="button" data-master-mobile-reference-close>Close</button>
-                    </footer>
-                </div>
-            </dialog>
-        {% endif %}
 
         {% if master_data.record_type == 'ingredients' and master_data.rows %}
             <dialog id="masterDataIngredientMergeDialog"
@@ -1557,6 +1489,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
         </div>
         </section>
         {% endif %}
+        {{ recipe_usage_dialog(master_data.record_type) }}
     </section>
 {% endblock %}
 {% block app_scripts %}

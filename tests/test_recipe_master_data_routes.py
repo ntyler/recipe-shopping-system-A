@@ -434,7 +434,7 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert "Backfill progress" in all_html
     assert "data-master-backfill-form" in all_html
     assert "data-master-reference-toggle" in all_html
-    assert "data-master-reference-row" in all_html
+    assert "data-master-reference-row" not in all_html
     assert 'data-reference-url="/api/master-data/ingredients/0/references"' in all_html
     assert "data-master-duplicate-reference-dialog" in all_html
     assert "Show 1 recipe referencing Tomato" in all_html
@@ -523,13 +523,13 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert 'aria-label="Prep Tools equipment"' in equipment_html
     assert 'unit-master-usage-button equipment-master-usage-button' in equipment_html
     assert 'data-equipment-master-usage-button' in equipment_html
-    assert 'aria-controls="equipmentMasterUsageDialog"' in equipment_html
+    assert 'aria-controls="masterDataUsageDialog"' in equipment_html
     assert 'aria-haspopup="dialog"' in equipment_html
-    assert 'data-equipment-master-usage-dialog' in equipment_html
-    assert 'data-equipment-master-usage-title' in equipment_html
-    assert 'data-equipment-master-usage-summary' in equipment_html
-    assert 'data-equipment-master-usage-results' in equipment_html
-    assert 'data-equipment-master-usage-close' in equipment_html
+    assert 'data-master-usage-dialog' in equipment_html
+    assert 'data-master-usage-title' in equipment_html
+    assert 'data-master-usage-summary' in equipment_html
+    assert 'data-master-usage-results' in equipment_html
+    assert 'data-master-usage-close' in equipment_html
     assert 'data-master-reference-row' not in equipment_html
     assert '<strong aria-hidden="true">1</strong>' in equipment_html
     assert "recipe" in equipment_html
@@ -1911,24 +1911,16 @@ def test_master_data_mobile_layout_prioritizes_filters_and_results():
     assert ".equipment-master-row-editable" in css
     assert "@media (max-width: 1280px)" in css
     assert ".equipment-master-category .master-data-equipment-details summary:is(:hover, :focus-visible)" in css
-    assert "data-master-mobile-reference-dialog" in template
-    assert "data-master-mobile-reference-title" in template
-    assert "data-master-mobile-reference-panel" in template
-    assert "data-master-mobile-reference-close" in template
+    assert "data-master-mobile-reference-dialog" not in template
     assert "function initMasterDataMaintenance()" in script
     assert 'const pagination = document.querySelector("[data-master-pagination]");' in script
     assert 'pagination.insertAdjacentElement("afterend", maintenance);' in script
     assert "maintenance.open = false;" in script
     assert "async function loadReferenceData(button, panel, options = {})" in script
-    assert "function masterDataMobileReferenceElements()" in script
-    assert "async function openMasterDataMobileReferences(button)" in script
-    assert "function closeMasterDataMobileReferences()" in script
     assert "function initEquipmentMasterDisplayName()" in script
     assert "async function saveEquipmentMasterDisplayName(reset = false)" in script
     assert 'method: "PATCH"' in script
-    assert 'window.matchMedia("(max-width: 760px)").matches' in script
-    assert "await loadReferenceData(button, els.panel, { hideHeader: true });" in script
-    assert 'window.matchMedia("(max-width: 760px)")' in script
+    assert "function openMasterDataUsage(button)" in script
     assert "initMasterDataMaintenance();" in script
     assert "initEquipmentMasterDisplayName();" in script
     assert "@media (max-width: 760px)" in css
@@ -2236,7 +2228,7 @@ def test_master_data_duplicate_review_ui_is_wired():
     assert "Nothing is merged automatically." in template
 
 
-def test_master_data_reference_expander_is_wired():
+def test_master_data_shared_usage_dialog_is_wired():
     template = Path("PushShoppingList/templates/master_data.html").read_text(encoding="utf-8")
     script = Path("PushShoppingList/static/js/master-data.js").read_text(encoding="utf-8")
     app_script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
@@ -2248,8 +2240,8 @@ def test_master_data_reference_expander_is_wired():
     assert "master-data-item-cell" in template
     assert "master-data-item-copy" in template
     assert "data-master-reference-toggle" in template
-    assert "data-master-reference-row" in template
-    assert "data-equipment-master-usage-dialog" in template
+    assert "data-master-reference-row" not in template
+    assert "recipe_usage_dialog(master_data.record_type)" in template
     assert "data-equipment-master-usage-button" in template
     assert "master_data_record_references_route" in template
     assert "aria-expanded=\"false\"" in template
@@ -2273,12 +2265,12 @@ def test_master_data_reference_expander_is_wired():
     assert ".master-data-record-row-unused td:first-child" in css
     assert ".master-data-usage-empty strong" in css
 
-    assert "function toggleReferenceRow" in script
-    assert "function openEquipmentMasterUsage(button)" in script
-    assert "function closeEquipmentMasterUsage()" in script
-    assert "function restoreEquipmentMasterUsageFocus()" in script
-    assert 'button.matches("[data-equipment-master-usage-button]")' in script
-    assert "equipmentMasterUsageRequestId" in script
+    assert "function toggleReferenceRow" not in script
+    assert "function openMasterDataUsage(button)" in script
+    assert "function closeMasterDataUsage()" in script
+    assert "function restoreMasterDataUsageFocus()" in script
+    assert 'event.target.closest?.("[data-master-usage-button]")' in script
+    assert "masterDataUsageRequestId" in script
     assert "function renderReferences" in script
     assert "master-data-reference-usage-breakdown" in script
     assert "Ingredient Name ${ingredientNameCount}" in script
@@ -2287,10 +2279,9 @@ def test_master_data_reference_expander_is_wired():
     assert "master-data-reference-matches" in script
     assert 'nameMatch.textContent = "Ingredient Name";' in script
     assert 'buyAsMatch.textContent = "Buy As";' in script
-    assert "[data-master-reference-toggle]" in script
+    assert "[data-master-usage-button]" in script
     assert 'select.dataset.storeSectionAllowCustom !== "false"' in app_script
     assert ".master-data-store-section-trigger .recipe-edit-store-section-icon" in css
-    assert "data-master-reference-panel" in script
     assert "recipe_image_url" in script
     assert "recipe_image_full_url" in script
     assert "recipe_image_srcset" in script
@@ -2299,8 +2290,8 @@ def test_master_data_reference_expander_is_wired():
     assert "master-data-reference-title-link" in script
     assert "has-title-image" in script
     assert "Open Recipe" in script
-    assert ".equipment-master-usage-dialog .master-data-reference-main code" in css
-    assert ".equipment-master-usage-dialog .master-data-reference-link" in css
+    assert ".master-data-usage-dialog .master-data-reference-main code" in css
+    assert ".master-data-usage-dialog .master-data-reference-link" in css
     assert 'details.push(`Preparation: ${reference.preparation}`)' in script
     assert 'details.push(`Notes: ${reference.notes}`)' in script
     assert "function ensureMasterDataImageLightbox" in script

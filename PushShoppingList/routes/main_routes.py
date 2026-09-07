@@ -2906,6 +2906,7 @@ def master_data_record_references_route(record_type, record_id):
         user_id=scope_info["user_id"],
         include_all_users=scope_info["include_all_users"],
         limit=int_query_arg("limit", 25, minimum=1, maximum=500),
+        offset=int_query_arg("offset", 0, minimum=0),
     )
     if not references.get("record"):
         return jsonify({
@@ -2973,6 +2974,7 @@ def master_data_record_references_route(record_type, record_id):
         ),
         "buy_as_recipe_count": int(references.get("buy_as_recipe_count") or 0),
         "limit": int(references.get("limit") or 0),
+        "next_offset": references.get("next_offset"),
     })
 
 

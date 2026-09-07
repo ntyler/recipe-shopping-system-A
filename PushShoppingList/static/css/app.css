@@ -64185,7 +64185,7 @@ body.recipe-edit-standalone-page :is(
 :is(
     .unit-master-page,
     .ingredient-inline-editor,
-    .equipment-master-usage-dialog,
+    .master-data-usage-dialog,
     .equipment-master-display-dialog
 ) :is(input, select, button):focus-visible {
     outline: 2px solid color-mix(in srgb, var(--app-primary) 64%, white);
@@ -64222,7 +64222,7 @@ body.recipe-edit-standalone-page :is(
 :is(
     .unit-master-page,
     .ingredient-inline-editor,
-    .equipment-master-usage-dialog,
+    .master-data-usage-dialog,
     .equipment-master-display-dialog
 ) button {
     display: inline-flex;
@@ -64245,7 +64245,7 @@ body.recipe-edit-standalone-page :is(
 :is(
     .unit-master-page,
     .ingredient-inline-editor,
-    .equipment-master-usage-dialog,
+    .master-data-usage-dialog,
     .equipment-master-display-dialog
 ) button:is(:hover, :focus-visible) {
     background: color-mix(in srgb, var(--app-primary) 25%, transparent);
@@ -64254,7 +64254,7 @@ body.recipe-edit-standalone-page :is(
 :is(
     .unit-master-page,
     .ingredient-inline-editor,
-    .equipment-master-usage-dialog,
+    .master-data-usage-dialog,
     .equipment-master-display-dialog
 ) button:disabled {
     cursor: wait;
@@ -64264,7 +64264,7 @@ body.recipe-edit-standalone-page :is(
 :is(
     .unit-master-page,
     .ingredient-inline-editor,
-    .equipment-master-usage-dialog,
+    .master-data-usage-dialog,
     .equipment-master-display-dialog
 ) button.secondary {
     border-color: var(--app-border);
@@ -64275,7 +64275,7 @@ body.recipe-edit-standalone-page :is(
 :is(
     .unit-master-page,
     .ingredient-inline-editor,
-    .equipment-master-usage-dialog,
+    .master-data-usage-dialog,
     .equipment-master-display-dialog
 ) button.danger {
     border-color: color-mix(in srgb, var(--app-danger) 56%, var(--app-border));
@@ -65664,31 +65664,31 @@ body.recipe-edit-standalone-page :is(
     grid-column: 1 / -1;
 }
 
-.equipment-master-usage-dialog .master-data-reference-list {
+.master-data-usage-dialog .master-data-reference-list {
     gap: 10px;
 }
 
-.equipment-master-usage-dialog .master-data-reference-item {
+.master-data-usage-dialog .master-data-reference-item {
     padding: 13px 14px;
     border-color: var(--app-border);
     border-radius: 9px;
     background: var(--app-surface-soft);
 }
 
-.equipment-master-usage-dialog .master-data-reference-title-row.has-title-image {
+.master-data-usage-dialog .master-data-reference-title-row.has-title-image {
     grid-template-columns: 52px minmax(0, 1fr);
 }
 
-.equipment-master-usage-dialog .master-data-reference-title-image {
+.master-data-usage-dialog .master-data-reference-title-image {
     width: 52px;
     height: 52px;
 }
 
-.equipment-master-usage-dialog .master-data-reference-main code {
+.master-data-usage-dialog .master-data-reference-main code {
     display: none;
 }
 
-.equipment-master-usage-dialog .master-data-reference-link {
+.master-data-usage-dialog .master-data-reference-link {
     min-height: 0;
     align-self: start;
     padding: 2px 0;
@@ -65697,7 +65697,7 @@ body.recipe-edit-standalone-page :is(
     color: var(--app-primary-hover);
 }
 
-.equipment-master-usage-dialog .master-data-reference-link:is(:hover, :focus-visible) {
+.master-data-usage-dialog .master-data-reference-link:is(:hover, :focus-visible) {
     background: transparent;
     text-decoration: underline;
     text-underline-offset: 3px;
@@ -65914,11 +65914,11 @@ body.recipe-edit-standalone-page :is(
         padding: 0;
     }
 
-    .equipment-master-usage-dialog .master-data-reference-item {
+    .master-data-usage-dialog .master-data-reference-item {
         grid-template-columns: minmax(0, 1fr);
     }
 
-    .equipment-master-usage-dialog .master-data-reference-link {
+    .master-data-usage-dialog .master-data-reference-link {
         justify-self: start;
     }
 
@@ -83456,4 +83456,19 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     .ingredient-master-page .ingredient-inline-editor > footer > button { width: 100%; min-width: 0; }
     .ingredient-editor-image-layout { align-items: start; }
     .ingredient-editor-image-actions { gap: 6px; }
+}
+
+/* Equipment and Ingredient use the same viewport-bound Recipe Usage dialog. */
+.master-data-usage-dialog { max-height: min(820px, calc(100dvh - 28px)); margin: auto; }
+.master-data-usage-dialog .unit-master-usage-dialog-shell { max-height: min(818px, calc(100dvh - 30px)); grid-template-rows: auto auto minmax(0, 1fr) auto; }
+.master-data-usage-dialog .unit-master-usage-results { overscroll-behavior: contain; }
+.master-data-usage-dialog .master-data-reference-title-placeholder { display: grid; place-items: center; border: 1px solid var(--app-border); border-radius: 7px; background: var(--app-surface); color: var(--app-muted); font-size: 10px; text-align: center; }
+.master-data-usage-dialog .master-data-reference-detail { overflow-wrap: anywhere; }
+.master-data-usage-dialog .master-data-reference-matches { flex-wrap: wrap; }
+.master-data-usage-dialog .unit-master-usage-dialog-summary small { display: block; margin-top: 4px; font-size: 11px; font-weight: 500; }
+.ingredient-master-page [data-master-usage-button]:is(:hover, :focus-visible) { color: var(--app-primary-hover); text-decoration: underline; text-underline-offset: 3px; }
+.master-data-usage-dialog :focus-visible { outline: 2px solid var(--app-primary-hover); outline-offset: 2px; }
+@media (max-height: 600px) {
+    .master-data-usage-dialog .unit-master-usage-results { min-height: 0; }
+    .master-data-usage-dialog .unit-master-usage-dialog-shell > :is(header, footer) { padding-block: 10px; }
 }

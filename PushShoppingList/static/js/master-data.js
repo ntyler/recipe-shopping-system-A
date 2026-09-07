@@ -12,10 +12,10 @@
     let activeImageJobId = "";
     let imagePollTimer = null;
     let imageRefreshTimer = null;
-    let masterDataMobileReferenceReturnFocus = null;
     let equipmentMasterDisplayNameReturnFocus = null;
-    let equipmentMasterUsageReturnFocus = null;
-    let equipmentMasterUsageRequestId = 0;
+    let masterDataUsageReturnFocus = null;
+    let restoreMasterDataUsageScroll = null;
+    let masterDataUsageRequestId = 0;
     let masterDataThumbnailSize = MASTER_DATA_THUMBNAIL_DEFAULT_SIZE;
     let masterDataThumbnailSizeEventsBound = false;
     let masterDataMergeSearchTimer = null;
@@ -591,15 +591,6 @@
         return row;
     }
 
-    function referenceRowForButton(button) {
-        const rowId = button && button.getAttribute("aria-controls");
-        return rowId ? document.getElementById(rowId) : null;
-    }
-
-    function panelForReferenceRow(row) {
-        return row ? row.querySelector("[data-master-reference-panel]") : null;
-    }
-
     function setReferenceLoading(panel) {
         if (!panel) {
             return;
@@ -652,7 +643,31 @@
         return details.join(" | ");
     }
 
-    function renderReferenceItem(reference) {
+    function recipeUsageImagePlaceholder() {
+        const placeholder = document.createElement("span");
+        placeholder.className = "master-data-reference-title-image master-data-reference-title-placeholder";
+        placeholder.textContent = "No image"; placeholder.setAttribute("aria-label", "No recipe image");
+        return placeholder;
+    }
+
+    function groupRecipeUsageReferences(references) {
+        const recipes = new Map();
+        references.forEach(reference => {
+            const key = JSON.stringify([reference.user_id || "", reference.recipe_id]);
+            let recipe = recipes.get(key);
+            if (!recipe) {
+                recipe = {...reference, matches_ingredient_name: false, matches_buy_as: false, usage_details: []};
+                recipes.set(key, recipe);
+            }
+            recipe.matches_ingredient_name ||= Boolean(reference.matches_ingredient_name);
+            recipe.matches_buy_as ||= Boolean(reference.matches_buy_as);
+            const detail = referenceDetailText(reference);
+            if (detail && !recipe.usage_details.includes(detail)) recipe.usage_details.push(detail);
+        });
+        return [...recipes.values()];
+    }
+
+    function renderReferenceItem(reference, options = {}) {
         const item = document.createElement("article");
         item.className = "master-data-reference-item";
 
@@ -676,7 +691,11 @@
                 image.srcset = srcset;
                 image.sizes = `${masterDataThumbnailSize}px`;
             }
+            if (options.recipeUsage) image.addEventListener("error", () => image.replaceWith(recipeUsageImagePlaceholder()), {once: true});
             titleRow.appendChild(image);
+        } else if (options.recipeUsage) {
+            titleRow.classList.add("has-title-image");
+            titleRow.appendChild(recipeUsageImagePlaceholder());
         }
 
         const copy = document.createElement("div");
@@ -689,7 +708,7 @@
             title.target = "_blank";
             title.rel = "noopener noreferrer";
         }
-        title.textContent = text(reference.recipe_title || reference.recipe_id || "Recipe");
+        title.textContent = text(reference.recipe_title || (options.recipeUsage ? "Recipe" : reference.recipe_id) || "Recipe");
         copy.appendChild(title);
 
         if (reference.matches_ingredient_name || reference.matches_buy_as) {
@@ -712,11 +731,12 @@
 
         const detail = document.createElement("div");
         detail.className = "master-data-reference-detail";
-        detail.textContent = referenceDetailText(reference) || text(reference.recipe_id || "");
+        const details = options.recipeUsage ? reference.usage_details || [] : [referenceDetailText(reference) || text(reference.recipe_id || "")];
+        details.forEach(value => { const line = document.createElement("div"); line.textContent = value; detail.appendChild(line); });
         copy.appendChild(detail);
 
         const recipeId = text(reference.recipe_id || "");
-        if (recipeId) {
+        if (recipeId && !options.recipeUsage) {
             const code = document.createElement("code");
             code.textContent = recipeId;
             copy.appendChild(code);
@@ -746,7 +766,8 @@
         }
         panel.replaceChildren();
 
-        const references = Array.isArray(data && data.references) ? data.references : [];
+        const rawReferences = Array.isArray(data && data.references) ? data.references : [];
+        const references = options.recipeUsage ? groupRecipeUsageReferences(rawReferences) : rawReferences;
         const total = Number(data && data.total) || references.length;
         const totalReferences = Number(data && data.total_reference_count) || references.length;
         const ingredientNameCount = Math.max(
@@ -801,10 +822,10 @@
         const list = document.createElement("div");
         list.className = "master-data-reference-list";
         references.forEach((reference) => {
-            list.appendChild(renderReferenceItem(reference || {}));
+            list.appendChild(renderReferenceItem(reference || {}, options));
         });
         panel.appendChild(list);
-        decorateMasterDataLightboxImages(panel);
+        if (!options.recipeUsage) decorateMasterDataLightboxImages(panel);
     }
 
     function renderLoadedReferenceData(panel, data, options = {}) {
@@ -834,19 +855,21 @@
 
         setReferenceLoading(panel);
         try {
-            const response = await fetch(canonicalMasterDataUrl(referenceUrl).toString(), {
-                headers: {
-                    Accept: "application/json",
-                    "X-Requested-With": "fetch",
-                },
-            });
-            const data = await response.json().catch(() => ({}));
-            if (!response.ok || data.ok === false) {
-                if (typeof options.shouldRender !== "function" || options.shouldRender()) {
-                    setReferenceError(panel, data.error || data.message || "Recipe references could not be loaded.");
-                }
-                return null;
-            }
+            const requestUrl = canonicalMasterDataUrl(referenceUrl, options.allReferences ? {limit: "500"} : {});
+            let data;
+            do {
+                const response = await fetch(requestUrl.toString(), {
+                    headers: {Accept: "application/json", "X-Requested-With": "fetch"},
+                });
+                const page = await response.json().catch(() => ({}));
+                if (typeof options.shouldRender === "function" && !options.shouldRender()) return null;
+                if (!response.ok || page.ok === false) throw new Error(page.error || page.message || "Recipe references could not be loaded.");
+                data = data ? {...page, references: [...data.references, ...page.references]} : page;
+                if (!options.allReferences || page.next_offset == null) break;
+                const nextOffset = Number(page.next_offset);
+                if (!Number.isFinite(nextOffset) || nextOffset <= Number(requestUrl.searchParams.get("offset") || 0)) throw new Error("The remaining recipe references could not be loaded.");
+                requestUrl.searchParams.set("offset", String(nextOffset));
+            } while (true);
             button.masterDataReferenceData = data;
             renderLoadedReferenceData(panel, data, options);
             return data;
@@ -856,73 +879,6 @@
             }
             return null;
         }
-    }
-
-    function closeOtherReferenceRows(activeButton) {
-        document.querySelectorAll("[data-master-reference-toggle]").forEach((button) => {
-            if (button === activeButton) {
-                return;
-            }
-            button.setAttribute("aria-expanded", "false");
-            const row = referenceRowForButton(button);
-            if (row && row.matches("[data-master-reference-row]")) {
-                row.hidden = true;
-            }
-        });
-    }
-
-    function masterDataMobileReferenceElements() {
-        const dialog = document.querySelector("[data-master-mobile-reference-dialog]");
-        return {
-            dialog,
-            title: dialog && dialog.querySelector("[data-master-mobile-reference-title]"),
-            panel: dialog && dialog.querySelector("[data-master-mobile-reference-panel]"),
-            closeButtons: dialog
-                ? Array.from(dialog.querySelectorAll("[data-master-mobile-reference-close]"))
-                : [],
-        };
-    }
-
-    function restoreMasterDataMobileReferenceFocus() {
-        const returnFocus = masterDataMobileReferenceReturnFocus;
-        masterDataMobileReferenceReturnFocus = null;
-        if (returnFocus) returnFocus.setAttribute("aria-expanded", "false");
-        if (returnFocus && returnFocus.isConnected) returnFocus.focus();
-    }
-
-    function closeMasterDataMobileReferences() {
-        const els = masterDataMobileReferenceElements();
-        if (!els.dialog) return;
-
-        if (typeof els.dialog.close === "function" && els.dialog.open) {
-            els.dialog.close();
-        } else {
-            els.dialog.removeAttribute("open");
-            restoreMasterDataMobileReferenceFocus();
-        }
-    }
-
-    async function openMasterDataMobileReferences(button) {
-        const els = masterDataMobileReferenceElements();
-        if (!els.dialog || !els.panel) return false;
-
-        closeOtherReferenceRows(button);
-        button.setAttribute("aria-expanded", "true");
-        masterDataMobileReferenceReturnFocus = button;
-
-        const row = button.closest(".master-data-record-row");
-        const name = row && row.querySelector("[data-master-mobile-record-name]");
-        const resolvedName = name ? name.textContent.trim() : "this ingredient";
-        if (els.title) els.title.textContent = `Recipes using ${resolvedName}`;
-
-        if (typeof els.dialog.showModal === "function") {
-            if (!els.dialog.open) els.dialog.showModal();
-        } else {
-            els.dialog.setAttribute("open", "");
-        }
-
-        await loadReferenceData(button, els.panel, { hideHeader: true });
-        return true;
     }
 
     function equipmentMasterDisplayNameElements() {
@@ -1085,170 +1041,114 @@
         els.dialog.addEventListener("close", restoreEquipmentMasterDisplayNameFocus);
     }
 
-    function equipmentMasterUsageElements() {
-        const dialog = document.querySelector("[data-equipment-master-usage-dialog]");
+    function masterDataUsageElements() {
+        const dialog = document.querySelector("[data-master-usage-dialog]");
         return {
             dialog,
-            title: dialog && dialog.querySelector("[data-equipment-master-usage-title]"),
-            summary: dialog && dialog.querySelector("[data-equipment-master-usage-summary]"),
-            results: dialog && dialog.querySelector("[data-equipment-master-usage-results]"),
-            closeButtons: dialog
-                ? Array.from(dialog.querySelectorAll("[data-equipment-master-usage-close]"))
-                : [],
+            title: dialog?.querySelector("[data-master-usage-title]"),
+            summary: dialog?.querySelector("[data-master-usage-summary]"),
+            results: dialog?.querySelector("[data-master-usage-results]"),
+            closeButtons: dialog ? Array.from(dialog.querySelectorAll("[data-master-usage-close]")) : [],
         };
     }
 
-    function equipmentNameForUsageButton(button) {
-        const row = button && button.closest(".master-data-record-row");
-        const name = row && row.querySelector(".master-data-item-copy > strong");
-        return text(name && name.textContent).trim() || "this equipment";
+    function lockRecipeUsageBackground(button) {
+        const ancestors = new Set([document.documentElement, document.body]);
+        for (let element = button.parentElement; element; element = element.parentElement) {
+            if (/(auto|scroll)/.test(getComputedStyle(element).overflowY)) ancestors.add(element);
+        }
+        const states = [...ancestors].map(element => {
+            const computed = getComputedStyle(element);
+            return {element, top: element.scrollTop, left: element.scrollLeft, padding: computed.paddingRight, width: element.clientWidth,
+                styles: ["overflow", "padding-right"].map(key => [key, element.style.getPropertyValue(key), element.style.getPropertyPriority(key)])};
+        });
+        states.forEach(({element, padding, width}) => {
+            element.style.setProperty("overflow", "hidden");
+            const scrollbar = element.clientWidth - width;
+            if (scrollbar > 0) element.style.setProperty("padding-right", `${parseFloat(padding) + scrollbar}px`);
+        });
+        const restorePositions = () => states.forEach(({element, top, left}) => { element.scrollTop = top; element.scrollLeft = left; });
+        restorePositions();
+        return (unlock = true) => {
+            if (unlock) states.forEach(({element, styles}) => styles.forEach(([key, value, priority]) => {
+                if (value) element.style.setProperty(key, value, priority); else element.style.removeProperty(key);
+            }));
+            restorePositions();
+        };
     }
 
-    function restoreEquipmentMasterUsageFocus() {
-        const returnFocus = equipmentMasterUsageReturnFocus;
-        equipmentMasterUsageReturnFocus = null;
+    function restoreMasterDataUsageFocus() {
+        const returnFocus = masterDataUsageReturnFocus;
+        masterDataUsageReturnFocus = null;
+        restoreMasterDataUsageScroll?.(); restoreMasterDataUsageScroll = null;
         if (returnFocus) returnFocus.setAttribute("aria-expanded", "false");
-        if (returnFocus && returnFocus.isConnected) returnFocus.focus();
+        if (returnFocus?.isConnected) returnFocus.focus({preventScroll: true});
     }
 
-    function closeEquipmentMasterUsage() {
-        const els = equipmentMasterUsageElements();
+    function closeMasterDataUsage() {
+        const els = masterDataUsageElements();
         if (!els.dialog) return;
-
-        equipmentMasterUsageRequestId += 1;
-        if (typeof els.dialog.close === "function" && els.dialog.open) {
-            els.dialog.close();
-        } else {
-            els.dialog.removeAttribute("open");
-            restoreEquipmentMasterUsageFocus();
-        }
+        masterDataUsageRequestId += 1;
+        if (els.dialog.open) els.dialog.close();
+        restoreMasterDataUsageFocus();
     }
 
-    async function openEquipmentMasterUsage(button) {
-        const els = equipmentMasterUsageElements();
+    async function openMasterDataUsage(button) {
+        const els = masterDataUsageElements();
         if (!button || !els.dialog || !els.results) return false;
-
-        document.querySelectorAll("[data-equipment-master-usage-button]").forEach((usageButton) => {
-            usageButton.setAttribute("aria-expanded", usageButton === button ? "true" : "false");
-        });
-        equipmentMasterUsageReturnFocus = button;
-        const equipmentName = equipmentNameForUsageButton(button);
-        if (els.title) els.title.textContent = `Recipes using ${equipmentName}`;
-        if (els.summary) els.summary.textContent = "";
-        setReferenceLoading(els.results);
-
-        if (typeof els.dialog.showModal === "function") {
-            if (!els.dialog.open) els.dialog.showModal();
-        } else {
-            els.dialog.setAttribute("open", "");
-        }
-
-        const requestId = ++equipmentMasterUsageRequestId;
-        const shouldRender = () => (
-            requestId === equipmentMasterUsageRequestId
-            && (els.dialog.open || els.dialog.hasAttribute("open"))
-        );
-        const data = await loadReferenceData(button, els.results, {
-            hideHeader: true,
-            shouldRender,
-        });
-        if (!data || !shouldRender()) return true;
-
-        const recordName = text(data.record && data.record.name).trim() || equipmentName;
+        if (els.dialog.open) return true;
+        masterDataUsageReturnFocus = button;
+        button.setAttribute("aria-expanded", "true");
+        const recordName = button.dataset.recordName || "this record";
+        els.title.textContent = `Recipes using ${recordName}`;
+        els.summary.textContent = ""; els.results.scrollTop = 0;
+        els.results.setAttribute("aria-busy", "true"); setReferenceLoading(els.results);
+        restoreMasterDataUsageScroll = lockRecipeUsageBackground(button);
+        els.dialog.showModal();
+        els.closeButtons[0].focus({preventScroll: true}); restoreMasterDataUsageScroll(false);
+        const requestId = ++masterDataUsageRequestId;
+        const shouldRender = () => requestId === masterDataUsageRequestId && els.dialog.open;
+        const data = await loadReferenceData(button, els.results, {hideHeader: true, recipeUsage: true, allReferences: true, shouldRender});
+        if (!shouldRender()) return true;
+        els.results.setAttribute("aria-busy", "false");
+        if (!data) return true;
+        els.title.textContent = `Recipes using ${text(data.record?.name).trim() || recordName}`;
         const total = Math.max(0, Number(data.total) || 0);
-        const referenceCount = Math.max(0, Number(data.total_reference_count) || 0);
-        if (els.title) els.title.textContent = `Recipes using ${recordName}`;
-        if (els.summary) {
-            els.summary.textContent = `${total} distinct recipe${total === 1 ? "" : "s"} · ${referenceCount} matching equipment reference${referenceCount === 1 ? "" : "s"}`;
+        els.summary.textContent = `${total} distinct recipe${total === 1 ? "" : "s"}`;
+        if (els.dialog.dataset.recordType === "ingredients") {
+            const nameCount = Math.max(0, Number(data.ingredient_name_recipe_count) || 0);
+            const buyAsCount = Math.max(0, Number(data.buy_as_recipe_count) || 0);
+            els.summary.append(` · Ingredient Name ${nameCount} · Buy As ${buyAsCount}`);
+            const note = document.createElement("small"); note.textContent = "A recipe using both fields is counted once in the total.";
+            els.summary.append(note);
+        } else {
+            const referenceCount = Math.max(0, Number(data.total_reference_count) || 0);
+            els.summary.append(` · ${referenceCount} matching equipment reference${referenceCount === 1 ? "" : "s"}`);
         }
         return true;
     }
 
-    async function toggleReferenceRow(button) {
-        if (!button) {
-            return;
-        }
-
-        const useMobileDialog = (
-            typeof window.matchMedia === "function"
-            && window.matchMedia("(max-width: 760px)").matches
-        );
-        if (useMobileDialog && await openMasterDataMobileReferences(button)) {
-            return;
-        }
-
-        const row = referenceRowForButton(button);
-        const panel = panelForReferenceRow(row);
-        if (!row || !panel) {
-            return;
-        }
-
-        const isExpanded = button.getAttribute("aria-expanded") === "true";
-        if (isExpanded) {
-            button.setAttribute("aria-expanded", "false");
-            row.hidden = true;
-            return;
-        }
-
-        closeOtherReferenceRows(button);
-        button.setAttribute("aria-expanded", "true");
-        row.hidden = false;
-
-        if (row.dataset.loaded === "true") {
-            return;
-        }
-
-        const data = await loadReferenceData(button, panel);
-        if (data) {
-            row.dataset.loaded = "true";
+    function trapRecipeUsageFocus(event) {
+        if (event.key !== "Tab") return;
+        const controls = [...event.currentTarget.querySelectorAll('button:not(:disabled), a[href], [tabindex="0"]')].filter(element => element.getClientRects().length);
+        const first = controls[0], last = controls[controls.length - 1];
+        if ((event.shiftKey && document.activeElement === first) || (!event.shiftKey && document.activeElement === last)) {
+            event.preventDefault(); (event.shiftKey ? last : first).focus({preventScroll: true});
         }
     }
 
     function initMasterDataReferences() {
-        const mobileEls = masterDataMobileReferenceElements();
-        if (mobileEls.dialog) {
-            mobileEls.closeButtons.forEach((button) => {
-                button.addEventListener("click", closeMasterDataMobileReferences);
-            });
-            mobileEls.dialog.addEventListener("cancel", (event) => {
-                event.preventDefault();
-                closeMasterDataMobileReferences();
-            });
-            mobileEls.dialog.addEventListener("click", (event) => {
-                if (event.target === mobileEls.dialog) closeMasterDataMobileReferences();
-            });
-            mobileEls.dialog.addEventListener("close", () => {
-                restoreMasterDataMobileReferenceFocus();
-            });
+        const usage = masterDataUsageElements();
+        if (usage.dialog) {
+            usage.closeButtons.forEach(button => button.addEventListener("click", closeMasterDataUsage));
+            usage.dialog.addEventListener("cancel", event => { event.preventDefault(); closeMasterDataUsage(); });
+            usage.dialog.addEventListener("click", event => { if (event.target === usage.dialog) closeMasterDataUsage(); });
+            usage.dialog.addEventListener("close", () => { if (!usage.dialog.open) restoreMasterDataUsageFocus(); });
+            usage.dialog.addEventListener("keydown", trapRecipeUsageFocus);
         }
-
-        const equipmentEls = equipmentMasterUsageElements();
-        if (equipmentEls.dialog) {
-            equipmentEls.closeButtons.forEach((button) => {
-                button.addEventListener("click", closeEquipmentMasterUsage);
-            });
-            equipmentEls.dialog.addEventListener("cancel", (event) => {
-                event.preventDefault();
-                closeEquipmentMasterUsage();
-            });
-            equipmentEls.dialog.addEventListener("click", (event) => {
-                if (event.target === equipmentEls.dialog) closeEquipmentMasterUsage();
-            });
-            equipmentEls.dialog.addEventListener("close", restoreEquipmentMasterUsageFocus);
-        }
-
-        document.addEventListener("click", (event) => {
-            const target = event.target && event.target.closest ? event.target : null;
-            const button = target ? target.closest("[data-master-reference-toggle]") : null;
-            if (!button) {
-                return;
-            }
-            event.preventDefault();
-            if (button.matches("[data-equipment-master-usage-button]")) {
-                openEquipmentMasterUsage(button);
-            } else {
-                toggleReferenceRow(button);
-            }
+        document.addEventListener("click", event => {
+            const button = event.target.closest?.("[data-master-usage-button]");
+            if (button) { event.preventDefault(); void openMasterDataUsage(button); }
         });
     }
 
@@ -1589,10 +1489,8 @@
         const anchor = document.createComment('ingredient order');
         previous[0].before(anchor);
         ordered.forEach((row, index) => {
-            const reference = document.getElementById(`masterDataReferences-ingredients-${row.dataset.masterRecordId}`);
             anchor.before(row);
             if (row === ingredientEditingRow && ingredientEditorRow) anchor.before(ingredientEditorRow);
-            if (reference) anchor.before(reference);
             row.dataset.sortOrder = String(index);
             const number = row.querySelector('[data-ingredient-order-number]');
             number.textContent = String(index + 1);
