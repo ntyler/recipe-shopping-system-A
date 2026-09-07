@@ -82930,7 +82930,38 @@ body.recipe-edit-standalone-page #recipeEditIngredients
 }
 
 .unit-master-page--registry-v2 .unit-master-row:is(.is-selected, .is-inline-editing, .is-dirty) {
-    background: var(--app-primary-soft);
+    background: color-mix(in srgb, var(--app-primary-soft) 30%, transparent);
+    box-shadow: inset 3px 0 0 var(--app-primary-hover);
+}
+
+/* Only a hovering pointer gets the solid fill, across all seven cells. */
+@media (hover: hover) {
+    .unit-master-page--registry-v2 .unit-master-row:hover {
+        background: var(--app-primary-soft);
+    }
+}
+
+/* Keep keyboard location visible even when Save or Cancel clears selection. */
+.unit-master-page--registry-v2 .unit-master-row:has(:focus-visible) {
+    outline: 2px solid var(--app-primary-hover);
+    outline-offset: -2px;
+}
+
+.unit-master-page--registry-v2 .unit-master-row :is(button, input, select):focus-visible {
+    outline: 2px solid var(--app-primary-hover);
+    outline-offset: 2px;
+}
+
+@media (forced-colors: active) {
+    .unit-master-page--registry-v2 .unit-master-row:is(.is-selected, .is-inline-editing, .is-dirty) {
+        outline: 1px solid Highlight;
+        outline-offset: -1px;
+    }
+
+    .unit-master-page--registry-v2 .unit-master-row:has(:focus-visible) {
+        outline: 2px solid Highlight;
+        outline-offset: -2px;
+    }
 }
 
 .unit-master-page--registry-v2 .unit-master-row > strong {
@@ -83440,11 +83471,14 @@ body.recipe-edit-standalone-page #recipeEditIngredients
 .unit-master-page--registry-v2 .unit-master-inline-value { text-align: left; cursor: text; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .unit-master-page--registry-v2 .unit-master-row :is([data-unit-row-activate="category"], [data-unit-row-category]) { appearance: none; background-image: none; padding-right: 24px; cursor: pointer; text-overflow: ellipsis; }
 .unit-master-page--registry-v2 .unit-master-row :is(.unit-master-inline-value, [data-unit-row-name], [data-unit-row-category]):hover:where(:not(:disabled)) { border-color: var(--app-border); }
-.unit-master-page--registry-v2 .unit-master-row :is(.unit-master-inline-value, [data-unit-row-name], [data-unit-row-category]):focus-visible { border-color: var(--app-primary-hover); outline: 2px solid var(--app-primary-hover); outline-offset: -2px; }
+.unit-master-page--registry-v2 .unit-master-row :is(.unit-master-inline-value, [data-unit-row-name], [data-unit-row-category]):focus { border-color: var(--app-primary-hover); outline: 2px solid var(--app-primary-hover); outline-offset: 2px; }
 .unit-master-page--registry-v2 .unit-master-category-cell { position: relative; }
-.unit-master-page--registry-v2 .unit-master-category-cell::after { content: ''; position: absolute; right: 10px; top: 15px; width: 5px; height: 5px; border: solid var(--app-muted); border-width: 0 1px 1px 0; transform: rotate(45deg); pointer-events: none; }
+.unit-master-page--registry-v2 .unit-master-category-cell::after { content: ''; position: absolute; right: 10px; top: 15px; width: 5px; height: 5px; border: solid var(--app-muted); border-width: 0 1px 1px 0; transform: rotate(45deg); pointer-events: none; opacity: 0; }
+@media (hover: hover) {
+    .unit-master-page--registry-v2 .unit-master-category-cell:has(> :is([data-unit-row-activate="category"], [data-unit-row-category]):hover)::after { opacity: 1; }
+}
 .unit-master-page--registry-v2 .unit-master-row :is([data-unit-row-name], [data-unit-row-category])[aria-invalid="true"] { border-color: var(--app-danger); }
-.unit-master-page--registry-v2 .unit-master-row :is([data-unit-row-name], [data-unit-row-category])[aria-invalid="true"]:focus-visible { outline-color: var(--app-danger); }
+.unit-master-page--registry-v2 .unit-master-row :is([data-unit-row-name], [data-unit-row-category])[aria-invalid="true"]:focus { outline-color: var(--app-danger); }
 .unit-master-page--registry-v2 .unit-master-row [hidden] { display: none !important; }
 .master-data-registry-table .master-data-row-actions { position: relative; }
 .unit-master-page--registry-v2 .unit-master-action-cell [data-unit-row-save] { grid-column: 1; grid-row: 1; }
@@ -83462,7 +83496,7 @@ body.recipe-edit-standalone-page #recipeEditIngredients
 .unit-master-page--registry-v2 .unit-master-aliases code { box-sizing: border-box; flex: 0 1 auto; min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
 .unit-master-page--registry-v2 .unit-master-alias-actions { display: inline-flex; flex-grow: 0; flex-shrink: 0; flex-basis: auto; flex-wrap: nowrap; align-items: center; min-width: var(--unit-alias-control-size); margin: 0; padding: 0; overflow: visible; }
 .unit-master-page--registry-v2 .unit-master-alias-actions button { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 var(--unit-alias-control-size); width: var(--unit-alias-control-size); min-width: var(--unit-alias-control-size); max-width: var(--unit-alias-control-size); height: var(--unit-alias-control-size); min-height: var(--unit-alias-control-size); max-height: var(--unit-alias-control-size); padding: 0; margin: 0; overflow: visible; border: 1px solid transparent; border-radius: 5px; background: transparent; color: var(--app-muted); font-size: 15px; line-height: 1; text-align: center; cursor: pointer; }
-.unit-master-page--registry-v2 .unit-master-alias-actions button:is(:hover, :focus-visible, [aria-expanded="true"]) { border-color: var(--app-border); background: var(--app-surface); color: var(--app-primary-hover); }
+.unit-master-page--registry-v2 .unit-master-alias-actions button:is(:hover, :focus-visible, [aria-expanded="true"]) { border-color: var(--app-border); }
 .unit-master-page--registry-v2 .unit-master-alias-actions button:focus-visible { outline: 2px solid var(--app-primary-hover); outline-offset: 1px; }
 .unit-master-page--registry-v2 .unit-master-alias-popover { display: grid; position: fixed; inset: auto; z-index: 100; box-sizing: border-box; width: min(360px, calc(100vw - 24px)); max-width: none; max-height: calc(100dvh - 24px); margin: 0; padding: 14px; gap: 10px; background: var(--app-surface); overflow: auto; overscroll-behavior: contain; border: 1px solid var(--app-border); border-radius: 10px; box-shadow: 0 10px 30px #0005; }
 .unit-master-page--registry-v2 .unit-master-alias-popover > header { display: block; padding: 0; }
