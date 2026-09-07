@@ -119,6 +119,10 @@
         const countLabel = root.querySelector("[data-unit-master-count-label]");
         const nameInput = root.querySelector("[data-unit-master-name]");
         const categorySelect = root.querySelector("[data-unit-master-category-select]");
+        const nameField = root.querySelector("[data-unit-master-name-field]");
+        const categoryField = root.querySelector("[data-unit-master-category-field]");
+        const fieldHome = form.querySelector(".unit-master-editor-grid");
+        const firstInvalidControl = () => [nameInput, categorySelect, aliasInput].find(control => control.getAttribute("aria-invalid") === "true");
         const aliasInput = root.querySelector("[data-unit-master-alias-input]");
         const aliasChips = root.querySelector("[data-unit-master-alias-chips]");
         const saveButton = root.querySelector("[data-unit-master-save]");
@@ -184,21 +188,33 @@
 
         const unitById = unitId => registry.units.find(unit => String(unit.id) === String(unitId)) || null;
 
-        const syncReadOnlyContext = unit => {
-            categorySelect.hidden = Boolean(unit);
-            categorySelect.disabled = Boolean(unit);
-            const context = root.querySelector("[data-unit-master-category-readonly]");
-            context.hidden = !unit;
-            context.textContent = registry.categories.find(item => item.key === unit?.category)?.label || "";
-            root.querySelector("[data-unit-master-category-help]").textContent = unit
-                ? "Read-only. Editing a unit does not redefine its measurement."
-                : "Choose the closest culinary group for this new unit.";
-            root.querySelector("[data-unit-master-source-context]").hidden = !unit;
-            root.querySelector("[data-unit-master-source-readonly]").textContent = unit?.seeded ? "System-seeded" : "User-created";
+        const syncEditingContext = unit => {
             editorPermissions.textContent = unit
-                ? "Edit the canonical name and accepted aliases. The previous name remains an alias. Change recipe ingredients through Used in."
+                ? "Edit the name, category group, and aliases together. The previous name remains an alias. Quantities and the measurement stay the same."
                     + (unit.seeded ? " System-seeded units cannot be deleted." : "")
                 : "Choose a canonical name, category, and accepted aliases.";
+            // Existing units use their table cells; the expanded panel holds aliases
+            // and the sole save/cancel pair. Add Unit still needs the standalone fields.
+            form.querySelector("header").classList.toggle("sr-only", Boolean(unit));
+            fieldHome.hidden = Boolean(unit);
+        };
+
+        const parkFields = () => {
+            for (const field of [nameField, categoryField]) {
+                const cell = field.parentElement;
+                cell.querySelector("[data-unit-master-cell-text]")?.removeAttribute("hidden");
+                cell.closest("[data-unit-master-row]")?.classList.remove("is-editing");
+                fieldHome.appendChild(field);
+            }
+        };
+
+        const attachFields = row => {
+            for (const [selector, field] of [["[data-unit-master-name-cell]", nameField], ["[data-unit-master-category-cell]", categoryField]]) {
+                const cell = row.querySelector(selector);
+                cell.querySelector("[data-unit-master-cell-text]").hidden = true;
+                cell.appendChild(field);
+            }
+            row.classList.add("is-editing");
         };
 
         const editorValues = (includePending = false) => ({
@@ -223,7 +239,7 @@
             saveButton.disabled = busy || !dirty || invalid;
             suggestButton.disabled = busy || !unitKey(nameInput.value);
             [nameInput, aliasInput, aliasAddButton].forEach(control => { control.disabled = busy; });
-            categorySelect.disabled = busy || Boolean(editorUnitId);
+            categorySelect.disabled = busy;
             cancelButton.disabled = mutationPending || orderPending;
             aliasChips.querySelectorAll("button").forEach(button => { button.disabled = busy; });
             setFieldError(nameInput, nameError, showValidation ? errors.canonical_name : "");
@@ -439,10 +455,15 @@
             row.dataset.unitId = unit.id;
             row.dataset.unitMasterSearchValue = `${unit.name} ${(unit.aliases || []).join(" ")}`;
 
-            const name = document.createElement("strong");
+            const name = document.createElement("div");
+            name.className = "unit-master-name-cell";
+            name.dataset.unitMasterNameCell = "";
             name.setAttribute("role", "cell");
             name.dataset.mobileLabel = "Canonical name";
-            name.textContent = unit.name;
+            const nameText = document.createElement("strong");
+            nameText.dataset.unitMasterCellText = "";
+            nameText.textContent = unit.name;
+            name.appendChild(nameText);
             const aliases = document.createElement("div");
             aliases.className = "unit-master-aliases";
             aliases.setAttribute("role", "cell");
@@ -476,11 +497,15 @@
             action.className = "unit-master-action-cell";
             action.setAttribute("role", "cell");
             action.appendChild(edit);
-            const category = document.createElement("span");
+            const category = document.createElement("div");
+            category.dataset.unitMasterCategoryCell = "";
             category.className = "unit-master-category-cell";
             category.setAttribute("role", "cell");
             category.dataset.mobileLabel = "Category";
-            category.textContent = registry.categories.find(item => item.key === unit.category)?.label || unit.category;
+            const categoryText = document.createElement("span");
+            categoryText.dataset.unitMasterCellText = "";
+            categoryText.textContent = registry.categories.find(item => item.key === unit.category)?.label || unit.category;
+            category.appendChild(categoryText);
             row.append(createOrderCell(unit, index + 1), name, aliases, category, usage, sourceBadge, action);
             return row;
         };
@@ -508,7 +533,7 @@
         };
 
         const categoryRows = container => Array.from(container.querySelectorAll("[data-unit-master-row]"));
-        const reorderIsBlocked = () => orderPending || mutationPending || Boolean(unitKey(search.value));
+        const reorderIsBlocked = () => orderPending || mutationPending || !form.hidden || Boolean(unitKey(search.value));
         const syncOrderControls = () => {
             const blocked = reorderIsBlocked();
             root.querySelectorAll("[data-unit-master-category-rows]").forEach(container => {
@@ -582,6 +607,7 @@
         };
 
         const parkEditor = () => {
+            parkFields();
             if (form.parentElement !== editorHome.parentElement || form.nextElementSibling !== editorHome) {
                 editorHome.before(form);
             }
@@ -868,7 +894,7 @@
             const count = Number(unit?.recipe_count || 0);
             editorUsage.textContent = `Used in ${count} recipe${count === 1 ? "" : "s"}`;
             editorImpact.hidden = !unit;
-            syncReadOnlyContext(unit);
+            syncEditingContext(unit);
             saveButtonLabel = unit ? "Save changes" : "Add Unit";
             saveButton.textContent = saveButtonLabel;
             nameInput.value = unit?.name || "";
@@ -883,6 +909,7 @@
                 ? root.querySelector(`[data-unit-master-row][data-unit-id="${CSS.escape(String(unit.id))}"]`)
                 : null;
             if (row) {
+                attachFields(row);
                 row.insertAdjacentElement("afterend", form);
             } else {
                 editorHome.before(form);
@@ -891,7 +918,7 @@
             form.classList.toggle("is-editing", Boolean(unit));
             addButtons.forEach(button => button.setAttribute("aria-expanded", String(!unit)));
             if (trigger) trigger.setAttribute("aria-expanded", "true");
-            syncEditorState();
+            syncOrderControls();
             requestAnimationFrame(focusEditorName);
         };
 
@@ -933,7 +960,7 @@
             showValidation = true;
             syncEditorState();
             setEditorFeedback(payload.error || "Unable to save this unit.");
-            const firstInvalid = form.querySelector('[aria-invalid="true"]');
+            const firstInvalid = firstInvalidControl();
             if (firstInvalid) firstInvalid.focus({ preventScroll: true });
         };
 
@@ -995,8 +1022,7 @@
         const saveUnit = async event => {
             event.preventDefault();
             if (orderPending || mutationPending || aiSuggestionPending) return;
-            const activeControl = form.contains(document.activeElement) ? document.activeElement : nameInput;
-            const restoreScroll = captureEditorScroll();
+            const restoreScroll = captureEditorScroll(returnFocus?.isConnected ? returnFocus : form);
             showValidation = true;
             syncEditorState();
             if (saveButton.disabled) return;
@@ -1027,37 +1053,20 @@
                     applyServerErrors(result);
                     return;
                 }
-                // Keep the editor expanded so feedback and keyboard context stay local.
-                editorUnitId = String(result.unit_id || editorUnitId);
+                const savedId = String(result.unit_id || editorUnitId);
+                // Rebuild only after the transaction succeeds; draft category changes
+                // never move the row or alter the saved usage data.
+                form.hidden = true;
+                form.classList.remove("is-editing");
                 updateRegistry(result.registry);
-                const unit = unitById(result.unit_id || editorUnitId);
-                editorUnitId = String(unit.id);
-                const row = root.querySelector(`[data-unit-master-row][data-unit-id="${CSS.escape(editorUnitId)}"]`);
-                row.insertAdjacentElement("afterend", form);
-                returnFocus = row.querySelector("[data-unit-master-edit-button]");
-                returnFocus.setAttribute("aria-expanded", "true");
-                nameInput.value = unit.name;
-                categorySelect.value = unit.category;
-                syncReadOnlyContext(unit);
-                editorAliases = [...unit.aliases];
+                editorUnitId = "";
+                originalDraft = null;
                 aliasInput.value = "";
-                originalDraft = editorValues();
-                editorTitle.textContent = `Edit ${unit.name}`;
-                editorKicker.textContent = unit.seeded ? "System-seeded" : "User-created";
-                editorUsage.hidden = false;
-                const count = Number(unit.recipe_count || 0);
-                editorUsage.textContent = `Used in ${count} recipe${count === 1 ? "" : "s"}`;
-                editorImpact.hidden = false;
-                form.classList.add("is-editing");
                 addButtons.forEach(button => button.setAttribute("aria-expanded", "false"));
-                saveButtonLabel = "Save changes";
-                renderAliasChips();
+                const row = root.querySelector(`[data-unit-master-row][data-unit-id="${CSS.escape(savedId)}"]`);
+                returnFocus = row?.querySelector("[data-unit-master-edit-button]");
                 saved = true;
-                const outsideSearch = unitKey(search.value) && !unitKey(row.dataset.unitMasterSearchValue).includes(unitKey(search.value));
-                setEditorFeedback([
-                    result.message || "Changes saved.",
-                    outsideSearch ? "This unit no longer matches your search and will be hidden when you close the editor." : "",
-                ].filter(Boolean).join(" "), "success");
+                setStatus(result.message || "Changes saved.", "success");
             } catch (error) {
                 setEditorFeedback("The unit could not be saved. Check your connection and try again.");
                 console.error("Unable to save unit.", error);
@@ -1066,10 +1075,12 @@
                 syncOrderControls();
                 saveButton.textContent = saveButtonLabel;
                 if (saved) {
-                    (activeControl.isConnected && !activeControl.disabled ? activeControl : editorFeedback).focus({ preventScroll: true });
                     restoreScroll();
+                    const focusTarget = returnFocus?.getClientRects().length ? returnFocus : search;
+                    focusTarget.focus({ preventScroll: true });
+                    returnFocus = null;
                 } else {
-                    form.querySelector('[aria-invalid="true"]')?.focus({ preventScroll: true });
+                    firstInvalidControl()?.focus({ preventScroll: true });
                 }
             }
         };
@@ -1152,8 +1163,9 @@
                 addPendingAlias();
             }
         });
-        cancelButton.addEventListener("click", () => closeEditor());
-        form.addEventListener("input", event => {
+        cancelButton.addEventListener("click", () => closeEditor({ discard: true }));
+        root.addEventListener("input", event => {
+            if (![nameInput, categorySelect, aliasInput].includes(event.target)) return;
             showValidation = true;
             if (event.target === nameInput) delete serverErrors.canonical_name;
             if (event.target === categorySelect) delete serverErrors.category;
@@ -1164,7 +1176,8 @@
         window.addEventListener("beforeunload", event => {
             if (!form.hidden && (editorIsDirty() || mutationPending)) { event.preventDefault(); event.returnValue = ""; }
         });
-        form.addEventListener("keydown", event => {
+        root.addEventListener("keydown", event => {
+            if (form.hidden || (!form.contains(event.target) && ![nameInput, categorySelect].includes(event.target))) return;
             if (event.key !== "Escape") return;
             event.preventDefault();
             closeEditor();

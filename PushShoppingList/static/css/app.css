@@ -83473,10 +83473,19 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     .master-data-usage-dialog .unit-master-usage-dialog-shell > :is(header, footer) { padding-block: 10px; }
 }
 
-/* Units retain their measurement category while names and aliases are edited. */
+/* Inline unit fields keep the table columns and measurement identity intact. */
 .unit-master-page--registry-v2 .unit-master-category-cell { color: var(--app-muted); font-size: 11px; overflow-wrap: anywhere; }
-.unit-master-page--registry-v2 .unit-master-readonly-context { min-height: 38px; display: flex; align-items: center; font-weight: 700; }
-.unit-master-page--registry-v2 .unit-master-source-context { color: var(--app-muted); font-size: 11px; }
+.unit-master-page--registry-v2 .unit-master-name-cell { min-width: 0; font-size: 12px; font-weight: 750; overflow-wrap: anywhere; }
+.unit-master-page--registry-v2 .unit-master-name-cell > strong { display: block; padding-inline: 10px; font: inherit; }
+.unit-master-page--registry-v2 .unit-master-row .unit-master-field { display: grid; min-width: 0; gap: 4px; margin: 0; }
+.unit-master-page--registry-v2 .unit-master-row .unit-master-field > :is(#unitCanonicalLabel, .unit-master-field-label, #unitCategoryHelp) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.unit-master-page--registry-v2 .unit-master-row :is([data-unit-master-name], [data-unit-master-category-select]) { box-sizing: border-box; width: 100%; min-width: 0; height: 38px; min-height: 38px; margin: 0; padding: 7px 10px; border: 1px solid var(--app-border); border-radius: 6px; background: var(--app-surface); color: var(--app-text-strong); font: inherit; }
+.unit-master-page--registry-v2 .unit-master-row :is(input, select):focus-visible { outline: 2px solid var(--app-primary-hover); outline-offset: 1px; }
+.unit-master-page--registry-v2 .unit-master-row [aria-invalid="true"] { border-color: var(--app-danger); }
+.unit-master-page--registry-v2 .unit-master-row [hidden] { display: none !important; }
+@media (max-width: 760px) {
+    .unit-master-page--registry-v2 .unit-master-name-cell > strong { padding-inline: 0; }
+}
 .unit-master-page--registry-v2 .unit-master-action-cell { grid-template-columns: minmax(0, 90px); }
 .unit-master-usage-match-edit { justify-self: start; color: var(--app-primary-hover); font-size: 11px; font-weight: 700; }
 .unit-master-usage-match-edit:is(:hover, :focus-visible) { text-decoration: underline; }

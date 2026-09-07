@@ -25,7 +25,8 @@ def reference_measurements():
                 for table in ('recipe_ingredients', 'recipe_ingredient_option_items')}
 
 
-def test_rename_and_alias_removal_preserve_identity_amounts_and_saved_usage(unit_registry_app):
+@pytest.mark.parametrize('category', ['volume', 'weight'])
+def test_rename_and_alias_removal_preserve_identity_amounts_and_saved_usage(unit_registry_app, category):
     seed_usage()
     with unit_registry_app.test_client() as client:
         sign_in(client, 'user-a')
@@ -36,12 +37,12 @@ def test_rename_and_alias_removal_preserve_identity_amounts_and_saved_usage(unit
             db.execute("UPDATE recipe_ingredient_option_items SET unit_id=NULL WHERE unit_id=?", (unit['id'],))
         before = reference_measurements()
         result = client.put(f'/api/master-data/units/{unit["id"]}', json={
-            'canonical_name': 'measuring teaspoon', 'category': 'volume', 'aliases': [],
+            'canonical_name': 'measuring teaspoon', 'category': category, 'aliases': [],
         })
         assert result.status_code == 200
         renamed = unit_named(result.json['registry'], 'measuring teaspoon')
         assert renamed['id'] == unit['id'] and renamed['recipe_count'] == 3
-        assert renamed['category'] == unit['category'] and 'teaspoon' in renamed['aliases']
+        assert renamed['category'] == category and 'teaspoon' in renamed['aliases']
         after = reference_measurements()
         for table, rows in before.items():
             for old, new in zip(rows, after[table]):
@@ -56,6 +57,56 @@ def test_rename_and_alias_removal_preserve_identity_amounts_and_saved_usage(unit
         assert removed.status_code == 200
         assert unit_named(removed.json['registry'], 'measuring teaspoon')['recipe_count'] == 3
         assert client.delete(f'/api/master-data/units/{unit["id"]}/references').status_code == 405
+
+
+@pytest.mark.parametrize('failure', ['validation', 'write'])
+def test_combined_edit_failure_preserves_units_aliases_order_and_references(unit_registry_app, failure):
+    import sqlite3
+    seed_usage()
+    md.ensure_workspace_unit_registry('user-a')
+    md.ensure_workspace_unit_registry('user-b')
+
+    def snapshot():
+        with md.existing_recipe_master_read_connection() as db:
+            return {table: [tuple(row) for row in db.execute(f'SELECT * FROM {table} ORDER BY 1, 2')]
+                    for table in ('workspace_units', 'workspace_unit_aliases', 'canonical_units',
+                                  'recipe_ingredients', 'recipe_ingredient_option_items')}
+
+    before = snapshot()
+    values = {'canonical_name': 'measuring teaspoon', 'category': 'weight',
+              'aliases': ['tbsp' if failure == 'validation' else 'measuring tsp']}
+    if failure == 'write':
+        with md.recipe_master_connection(user_id='user-a') as db:
+            db.execute("CREATE TRIGGER fail_alias BEFORE INSERT ON workspace_unit_aliases "
+                       "WHEN NEW.alias = 'measuring tsp' BEGIN SELECT RAISE(ABORT, 'alias failure'); END")
+        with pytest.raises(sqlite3.IntegrityError, match='alias failure'):
+            md.save_workspace_unit(values, 'volume_teaspoon', 'user-a')
+    else:
+        result = md.save_workspace_unit(values, 'volume_teaspoon', 'user-a')
+        assert result['status'] == 422 and result['errors']['aliases']
+    assert snapshot() == before
+
+
+def test_category_change_only_changes_workspace_group_and_order(unit_registry_app):
+    seed_usage()
+    registry = md.ensure_workspace_unit_registry('user-a')
+    other = md.ensure_workspace_unit_registry('user-b')
+    unit = unit_named(registry, 'teaspoon')
+    before = reference_measurements()
+    with md.existing_recipe_master_read_connection() as db:
+        measurements = [tuple(row) for row in db.execute('SELECT * FROM canonical_units ORDER BY id')]
+    result = md.save_workspace_unit({'canonical_name': unit['name'], 'category': 'weight',
+                                     'aliases': unit['aliases']}, unit['id'], 'user-a')
+    assert result['ok']
+    assert reference_measurements() == before
+    assert md.read_workspace_unit_registry('user-b') == other
+    with md.existing_recipe_master_read_connection() as db:
+        assert [tuple(row) for row in db.execute('SELECT * FROM canonical_units ORDER BY id')] == measurements
+    # Startup seeding and another connection must preserve the customized group.
+    persisted = md.ensure_workspace_unit_registry('user-a')
+    changed = unit_named(persisted, 'teaspoon')
+    assert changed['id'] == unit['id'] and changed['category'] == 'weight'
+    assert unit_named(md.workspace_unit_registry_with_usage('user-a'), 'teaspoon')['recipe_count'] == 3
 
 
 @pytest.mark.parametrize('field,value', [('recipe_count', 88), ('usage_count', 0), ('references', []), ('quantity', 123), ('conversion_factor', 10)])

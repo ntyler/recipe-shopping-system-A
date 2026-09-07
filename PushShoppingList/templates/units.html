@@ -142,7 +142,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                                 </button>
                                             </div>
                                         </div>
-                                        <strong role="cell" data-mobile-label="Canonical name">{{ unit.name }}</strong>
+                                        <div class="unit-master-name-cell" role="cell" data-mobile-label="Canonical name" data-unit-master-name-cell><strong data-unit-master-cell-text>{{ unit.name }}</strong></div>
                                         <div class="unit-master-aliases" role="cell" data-mobile-label="Accepted aliases">
                                             {% for alias in unit.aliases %}
                                                 <code>{{ alias }}</code>
@@ -150,7 +150,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                                 <span>Canonical name only</span>
                                             {% endfor %}
                                         </div>
-                                        <span class="unit-master-category-cell" role="cell" data-mobile-label="Category">{{ category.label }}</span>
+                                        <div class="unit-master-category-cell" role="cell" data-mobile-label="Category" data-unit-master-category-cell><span data-unit-master-cell-text>{{ category.label }}</span></div>
                                         <div class="unit-master-usage" role="cell" data-mobile-label="Used in">
                                             {% if unit.recipe_count %}
                                                 <button type="button"
@@ -210,23 +210,23 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                 </header>
 
                 <div class="unit-master-editor-grid">
-                    <label class="unit-master-field">
+                    <label class="unit-master-field" data-unit-master-name-field>
                         <span id="unitCanonicalLabel">Canonical name</span>
                         <input type="text"
                                maxlength="60"
                                autocomplete="off"
                                data-unit-master-name
+                               form="unitMasterInlineEditor"
                                required
                                aria-labelledby="unitCanonicalLabel"
                                aria-describedby="unitEditorPermissions unitCanonicalError">
                         <small class="unit-master-field-error" id="unitCanonicalError" data-unit-master-name-error aria-live="polite" hidden></small>
                     </label>
-                    <div class="unit-master-field">
+                    <div class="unit-master-field" data-unit-master-category-field>
                         <span class="unit-master-field-label">
                             <span id="unitCategoryLabel">Category</span>
                         </span>
-                        <span class="unit-master-readonly-context" data-unit-master-category-readonly hidden></span>
-                        <select data-unit-master-category-select aria-labelledby="unitCategoryLabel" aria-describedby="unitCategoryHelp unitCategoryError">
+                        <select data-unit-master-category-select form="unitMasterInlineEditor" aria-labelledby="unitCategoryLabel" aria-describedby="unitCategoryHelp unitCategoryError">
                             {% for category in master_data.category_options %}
                                 <option value="{{ category.key }}">{{ category.label }}</option>
                             {% endfor %}
@@ -235,7 +235,6 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                             Choose the closest culinary group for this unit.
                         </small>
                         <small class="unit-master-field-error" id="unitCategoryError" data-unit-master-category-error aria-live="polite" hidden></small>
-                        <span class="unit-master-source-context" data-unit-master-source-context hidden>Source: <strong data-unit-master-source-readonly></strong></span>
                     </div>
                 </div>
 

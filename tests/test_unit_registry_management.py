@@ -163,7 +163,7 @@ def test_edit_custom_name_and_add_remove_aliases_updates_normalization(
         assert unit_named(removed["registry"], "measuring scoop")["aliases"] == ["ms"]
 
 
-def test_seeded_category_is_readonly_and_unit_cannot_be_deleted(unit_registry_app):
+def test_seeded_category_is_editable_and_unit_cannot_be_deleted(unit_registry_app):
     master_data.ensure_workspace_unit_registry('user-a')
     with unit_registry_app.test_client() as client:
         sign_in(client, "user-a")
@@ -173,10 +173,12 @@ def test_seeded_category_is_readonly_and_unit_cannot_be_deleted(unit_registry_ap
             json={"canonical_name": original["name"], "category": "count_package",
                   "aliases": original["aliases"]},
         )
-        assert edited.status_code == 422
-        assert "category" in edited.get_json()["errors"]
+        assert edited.status_code == 200
+        changed = unit_named(edited.json["registry"], "teaspoon")
+        assert changed["category"] == "count_package"
+        assert changed["id"] == original["id"] and changed["seeded"] is True
         assert client.delete(f'/api/master-data/units/{original["id"]}').status_code == 405
-        assert unit_named(registry_for(client), "teaspoon") == original
+        assert unit_named(registry_for(client), "teaspoon") == changed
 
 
 def test_edit_seeded_unit_keeps_stable_id_and_migrates_recipe_references(
@@ -400,6 +402,11 @@ def test_units_page_exposes_accessible_inline_editor_and_import_offer(
     assert form.has_attr("hidden")
     assert form.select_one("[data-unit-master-name]") is not None
     assert form.select_one("[data-unit-master-category-select]") is not None
+    assert form.select_one("[data-unit-master-name]")["form"] == form["id"]
+    assert form.select_one("[data-unit-master-category-select]")["form"] == form["id"]
+    assert soup.select_one("[data-unit-master-name-cell] [data-unit-master-cell-text]")
+    assert soup.select_one("[data-unit-master-category-cell] [data-unit-master-cell-text]")
+    assert not soup.select("[data-unit-master-category-readonly]")
     category_select = form.select_one("[data-unit-master-category-select]")
     assert category_select.get("aria-describedby") == "unitCategoryHelp unitCategoryError"
     assert [option.get_text(strip=True) for option in category_select.select("option")] == [
@@ -588,7 +595,7 @@ def test_units_page_renders_clickable_recipe_counts_and_usage_dialog(
     teaspoon_row = next(
         row
         for row in soup.select("[data-unit-master-row]")
-        if row.select_one("strong[role='cell']").get_text(strip=True) == "teaspoon"
+        if row.select_one("[data-unit-master-name-cell] strong").get_text(strip=True) == "teaspoon"
     )
     usage_button = teaspoon_row.select_one("[data-unit-master-usage-button]")
     assert usage_button is not None

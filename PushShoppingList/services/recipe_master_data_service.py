@@ -2634,10 +2634,7 @@ def save_workspace_unit(values, unit_id="", user_id=None):
                 return {"ok": False, "status": 404, "error": "Unit not found."}
 
         if existing:
-            if "category" in values and values["category"] != existing["category"]:
-                return {"ok": False, "status": 422, "error": "Category is read-only for existing units.",
-                        "errors": {"category": "Renaming a unit cannot redefine its measurement category."}}
-            values = {**values, "category": existing["category"]}
+            values = {"category": existing["category"], **values}
 
         validated = _unit_registry_validation(
             connection,
@@ -2688,6 +2685,12 @@ def save_workspace_unit(values, unit_id="", user_id=None):
         if existing:
             _preserve_workspace_unit_references(connection, user_id, unit_id, validated["canonical_name"])
             sort_order = existing["sort_order"]
+            if existing["category"] != validated["category"]:
+                sort_order = int(connection.execute(
+                    "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM workspace_units "
+                    "WHERE user_id = ? AND category = ?",
+                    (user_id, validated["category"]),
+                ).fetchone()[0])
             connection.execute(
                 """
                 UPDATE workspace_units
@@ -2704,6 +2707,18 @@ def save_workspace_unit(values, unit_id="", user_id=None):
                     unit_id,
                 ),
             )
+            if existing["category"] != validated["category"]:
+                # Category is a display group. Keep the unit identity and measurement
+                # intact, appending to the destination and closing the source gap.
+                for category in (existing["category"], validated["category"]):
+                    ordered = connection.execute(
+                        "SELECT id FROM workspace_units WHERE user_id = ? AND category = ? "
+                        "ORDER BY sort_order, id", (user_id, category),
+                    ).fetchall()
+                    connection.executemany(
+                        "UPDATE workspace_units SET sort_order = ? WHERE user_id = ? AND id = ?",
+                        [(position, user_id, row["id"]) for position, row in enumerate(ordered)],
+                    )
         else:
             unit_id = f"custom_{uuid.uuid4().hex}"
             sort_order = int(connection.execute(

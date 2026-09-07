@@ -53,7 +53,7 @@ def test_category_order_persists_and_preserves_fields_and_other_groups(unit_regi
     assert group(json.loads(result.stdout))[0]['id'] == 'volume_cup'
 
 
-def test_append_and_rename_keep_positions_and_category_is_locked(unit_registry_app):
+def test_append_and_rename_keep_positions_and_category_change_appends(unit_registry_app):
     md.ensure_workspace_unit_registry('user-a')
     md.move_workspace_unit('weight_gram', 1, 'user-a')
     result = md.save_workspace_unit({'canonical_name':'scoop', 'category':'volume', 'aliases':['scoops']}, user_id='user-a')
@@ -63,11 +63,14 @@ def test_append_and_rename_keep_positions_and_category_is_locked(unit_registry_a
     result = md.save_workspace_unit({'canonical_name':'measure', 'category':'volume', 'aliases':['measures']}, unit_id, 'user-a')
     assert group(result['registry'])[0]['id'] == unit_id
     result = md.save_workspace_unit({'canonical_name':'measure', 'category':'weight', 'aliases':['measures']}, unit_id, 'user-a')
-    assert result['status'] == 422 and not result['ok']
+    assert result['ok']
     registry = md.read_workspace_unit_registry('user-a')
-    assert group(registry)[0]['id'] == unit_id
-    assert len(group(registry)) == 10
-    assert len(group(registry, 'weight')) == 4
+    assert group(registry, 'weight')[-1]['id'] == unit_id
+    assert group(registry, 'weight')[0]['id'] == 'weight_gram'
+    assert len(group(registry)) == 9
+    assert len(group(registry, 'weight')) == 5
+    for category in ('volume', 'weight'):
+        assert [u['sort_order'] for u in group(registry, category)] == list(range(len(group(registry, category))))
 
 
 
