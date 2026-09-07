@@ -70091,6 +70091,109 @@ body.is-resizing-store-section-master-column * {
     }
 }
 
+/* Store Sections share Units' surfaces without changing desktop or phone geometry. */
+.store-section-master-page .store-section-master-category {
+    border-color: var(--app-border-subtle);
+    background: transparent;
+}
+
+.store-section-master-page .store-section-master-table > .store-section-master-table-head,
+.store-section-master-page .store-section-master-table .store-section-master-row {
+    border-bottom-color: var(--app-border-subtle);
+    background: transparent;
+    box-shadow: none;
+}
+
+.store-section-master-page .store-section-master-table :is(
+    [data-store-section-master-cell], [role="columnheader"],
+    .store-section-master-mobile-details
+) {
+    background: transparent;
+}
+
+.store-section-master-page .store-section-master-table .store-section-master-row {
+    transition: opacity 140ms ease;
+}
+
+.store-section-master-page .store-section-master-table .store-section-master-row:is(
+    .is-selected, .is-dirty, .is-mobile-expanded, .store-section-master-create-row,
+    :has([name="display_name"]:focus), :has(.store-section-master-icon-picker.is-open)
+) {
+    box-shadow: inset 2px 0 0 color-mix(in srgb, var(--app-primary-hover) 60%, transparent);
+}
+
+.store-section-master-page .store-section-master-table .store-section-master-row :is(
+    [name="display_name"], .store-section-master-icon-trigger,
+    [data-store-section-master-icon-select]
+) {
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+}
+
+/* Paint the row once, including the gaps from Order through Action. */
+@media (hover: hover) {
+    .store-section-master-page .store-section-master-table .store-section-master-row:hover {
+        background: var(--app-primary-soft);
+    }
+
+    .store-section-master-page .store-section-master-table .store-section-master-row :is(
+        [name="display_name"], .store-section-master-icon-trigger,
+        [data-store-section-master-icon-select]
+    ):hover:where(:not(:disabled)) {
+        border-color: var(--app-border);
+    }
+}
+
+.store-section-master-page .store-section-master-table .store-section-master-row
+    :is(button, input, select):focus-visible,
+.store-section-master-page .store-section-master-table .store-section-master-row :is(
+    [name="display_name"], .store-section-master-icon-trigger,
+    [data-store-section-master-icon-select]
+):focus {
+    border-color: var(--app-primary-hover);
+    outline: 2px solid var(--app-primary-hover);
+    outline-offset: 2px;
+}
+
+.store-section-master-page .store-section-master-table .store-section-master-row
+    [aria-invalid="true"]:is(:hover, :focus) {
+    border-color: var(--app-danger);
+}
+
+.store-section-master-page .store-section-master-table .store-section-master-row
+    [aria-invalid="true"]:focus {
+    outline-color: var(--app-danger);
+}
+
+.store-section-master-page .store-section-master-mobile-details {
+    border-top-color: var(--app-border-subtle);
+}
+
+.store-section-master-page .store-section-master-mobile-details > div {
+    border-bottom-color: var(--app-border-subtle);
+}
+
+@media (hover: none) {
+    .store-section-master-page .store-section-master-table .store-section-master-row:active {
+        background: var(--app-primary-soft);
+    }
+}
+
+@media (forced-colors: active) {
+    .store-section-master-page .store-section-master-table .store-section-master-row:is(
+        .is-selected, .is-dirty, .is-mobile-expanded, .store-section-master-create-row
+    ) {
+        outline: 1px solid Highlight;
+        outline-offset: -1px;
+    }
+
+    .store-section-master-page .store-section-master-table .store-section-master-row
+        :is(button, input, select):focus {
+        outline-color: Highlight;
+    }
+}
+
 /* Cuisine Category manager v2: Store Section-style composition deltas. */
 .cuisine-category-master-create,
 .cuisine-category-master-list-section {
@@ -70982,6 +71085,104 @@ body.is-resizing-store-section-master-column * {
 @media (max-width: 759px) {
     .cuisine-category-master-list-section > .cuisine-category-master-filter-toolbar {
         grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+/* Cuisine Categories share Units' transparent surface and independent field states. */
+.cuisine-category-master-page .cuisine-category-master-category {
+    border-color: var(--app-border-subtle);
+    background: transparent;
+}
+
+.cuisine-category-master-page .cuisine-category-master-table > .unit-master-table-head,
+.cuisine-category-master-page .cuisine-category-master-table .unit-master-row {
+    border-bottom-color: var(--app-border-subtle);
+    background: transparent;
+    box-shadow: none;
+}
+
+.cuisine-category-master-page .cuisine-category-master-table :is(
+    [role="cell"], [role="columnheader"], .cuisine-category-master-identity
+) {
+    background: transparent;
+}
+
+/* The shared Type classes also mark expanded phone rows; expansion is not a draft. */
+.cuisine-category-master-page .cuisine-category-master-table
+    .unit-master-row:not(.is-dirty):not(.cuisine-category-master-create-row) {
+    box-shadow: none;
+}
+
+.cuisine-category-master-page .cuisine-category-master-table .unit-master-row:is(
+    .is-dirty, .cuisine-category-master-create-row
+) {
+    box-shadow: inset 2px 0 0 color-mix(in srgb, var(--app-primary-hover) 60%, transparent);
+}
+
+.cuisine-category-master-page .cuisine-category-master-table .unit-master-row :is(
+    [data-cuisine-category-master-row-icon-trigger],
+    [data-cuisine-category-master-row-abbreviation],
+    [data-cuisine-category-master-row-name],
+    [data-cuisine-category-master-create-icon-trigger],
+    [data-cuisine-category-master-create-abbreviation],
+    [data-cuisine-category-master-create-name]
+) {
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+}
+
+/* Paint the row once, including the gaps between Order, identity, and Action. */
+@media (hover: hover) {
+    .cuisine-category-master-page .cuisine-category-master-table .unit-master-row:hover {
+        background: var(--app-primary-soft);
+    }
+
+    .cuisine-category-master-page .cuisine-category-master-table .unit-master-row :is(
+        [data-cuisine-category-master-row-icon-trigger],
+        [data-cuisine-category-master-row-abbreviation],
+        [data-cuisine-category-master-row-name],
+        [data-cuisine-category-master-create-icon-trigger],
+        [data-cuisine-category-master-create-abbreviation],
+        [data-cuisine-category-master-create-name]
+    ):hover:where(:not(:disabled)) {
+        border-color: var(--app-border);
+    }
+}
+
+.cuisine-category-master-page .cuisine-category-master-table .unit-master-row
+    :is(button, input, select):focus-visible {
+    border-color: var(--app-primary-hover);
+    outline: 2px solid var(--app-primary-hover);
+    outline-offset: 2px;
+}
+
+.cuisine-category-master-page .cuisine-category-master-table .unit-master-row
+    [aria-invalid="true"]:is(:hover, :focus-visible) {
+    border-color: var(--app-danger);
+}
+
+.cuisine-category-master-page .cuisine-category-master-table .unit-master-row
+    [aria-invalid="true"]:focus-visible {
+    outline-color: var(--app-danger);
+}
+
+.cuisine-category-master-page .cuisine-category-master-table [data-cuisine-category-master-row].is-mobile-expanded
+    .cuisine-category-master-row-abbreviation-field {
+    border-top-color: var(--app-border-subtle);
+}
+
+@media (forced-colors: active) {
+    .cuisine-category-master-page .cuisine-category-master-table .unit-master-row:is(
+        .is-dirty, .cuisine-category-master-create-row
+    ) {
+        outline: 1px solid Highlight;
+        outline-offset: -1px;
+    }
+
+    .cuisine-category-master-page .cuisine-category-master-table .unit-master-row
+        :is(button, input, select):focus-visible {
+        outline-color: Highlight;
     }
 }
 
