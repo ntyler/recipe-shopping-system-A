@@ -13,7 +13,7 @@ from test_unit_registry_management import unit_registry_app, sign_in
 from test_unit_edit_usage_flow import seed_usage, reference_measurements
 
 
-@pytest.mark.parametrize('script', ['units_inline.cjs', 'unit_categories.cjs', 'units_alias_popover.cjs', 'units_alias_controls.cjs'])
+@pytest.mark.parametrize('script', ['units_inline.cjs', 'unit_categories.cjs', 'units_alias_popover.cjs', 'units_alias_controls.cjs', 'units_new_draft.cjs'])
 def test_unit_cells_activate_real_controls_on_click(unit_registry_app, script):
     node = shutil.which('node')
     module = os.environ.get('AI_PANTRY_PLAYWRIGHT_MODULE', 'playwright')

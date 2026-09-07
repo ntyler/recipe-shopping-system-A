@@ -143,14 +143,18 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
 
         // The Add Unit dropdown receives live changes and keeps all unsaved fields too.
         await page.locator('[data-unit-master-add-button]').first().click();
-        const addForm = page.locator('[data-unit-master-form]');
-        const addPicker = addForm.locator('[data-unit-master-category-select]');
-        await addForm.locator('[data-unit-master-name]').fill('test scoop'); await aliases.fill('scoopful');
+        const addForm = page.locator('[data-unit-new-draft]');
+        const addPicker = addForm.locator('[data-unit-row-category]');
+        await addForm.locator('[data-unit-row-name]').fill('test scoop');
+        await addForm.getByRole('button', {name:'Manage aliases', exact:true}).click();
+        await aliases.fill('scoopful');
         await menuAction(addPicker, '+ Add category');
         await catName.fill('Temporary group'); await saveCategory();
         const temporary = await value(addPicker);
+        await addForm.getByRole('button', {name:'Manage aliases', exact:true}).click();
         assert.equal(await aliases.inputValue(), 'scoopful');
-        assert.equal(await addForm.locator('[data-unit-master-name]').inputValue(), 'test scoop');
+        await aliases.press('Escape');
+        assert.equal(await addForm.locator('[data-unit-row-name]').inputValue(), 'test scoop');
         await menuAction(addPicker, 'Manage categories…');
         await manager.getByRole('button', {name: 'Delete Temporary group', exact: true}).click();
         assert.match(await editor.locator('[data-category-delete-context]').innerText(), /unsaved unit/);
@@ -158,7 +162,7 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
         await closeManager(); assert.equal(await value(addPicker), 'count_package');
         assert(!(await registry()).categories.some(c => c.key === temporary));
         await menuAction(addPicker, '+ Add category'); await catName.fill('Scoops'); await saveCategory();
-        await addForm.locator('[data-unit-master-save]').click(); await addForm.waitFor({state: 'hidden'});
+        await addForm.locator('[data-unit-row-save]').click(); await addForm.waitFor({state: 'detached'});
         await page.reload();
         assert((await registry()).units.some(u => u.name === 'test scoop' && u.aliases.includes('scoopful')));
 

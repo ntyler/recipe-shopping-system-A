@@ -393,21 +393,20 @@ def test_units_page_exposes_accessible_inline_editor_and_import_offer(
     add_buttons = soup.select("button[data-unit-master-add-button]")
     assert len(add_buttons) == 2
     assert all(button.get("type") == "button" for button in add_buttons)
-    assert all(button.get("aria-controls") == "unitMasterInlineEditor" for button in add_buttons)
+    assert all(button.get("aria-controls") == "unitMasterDraft" for button in add_buttons)
     assert all(button.get("aria-expanded") == "false" for button in add_buttons)
     assert all(button.get_text(" ", strip=True) == "Add Unit" for button in add_buttons)
     assert soup.select_one("dialog[data-unit-master-dialog]") is None
     form = soup.select_one("form#unitMasterInlineEditor[data-unit-master-form]")
     assert form is not None
     assert form.has_attr("hidden")
-    assert form.select_one("[data-unit-master-name]") is not None
-    assert form.select_one("[data-unit-master-category-select]") is not None
-    for selector in ("[data-unit-master-name]", "[data-unit-master-category-select]",
-                     "[data-unit-master-alias-input]"):
-        control = soup.select_one(selector)
-        assert control.find_parent("form") == form
-        assert not control.has_attr("disabled")
-        assert not control.has_attr("readonly")
+    assert form.get("role") == "dialog"
+    assert form.get("popover") == "manual"
+    assert form.select_one("[data-unit-master-name], [data-unit-master-category-select], [data-unit-master-save]") is None
+    assert soup.select_one(".unit-master-ai-assist, .unit-master-inline-editor") is None
+    assert soup.select_one("[data-unit-draft-home]").has_attr("hidden")
+    alias_input = form.select_one("[data-unit-master-alias-input]")
+    assert alias_input is not None and not alias_input.has_attr("disabled")
     expected = {unit['id']: unit for unit in master_data.default_workspace_unit_registry_payload()['units']}
     rows = soup.select('[data-unit-master-row]')
     assert len(rows) == len(expected)
@@ -428,33 +427,13 @@ def test_units_page_exposes_accessible_inline_editor_and_import_offer(
         assert row.select_one('[data-unit-row-cancel]').has_attr('hidden')
         assert row.select_one('[data-unit-master-edit-button]').get_text(strip=True) == 'Edit unit'
     assert not soup.select("[data-unit-master-category-readonly]")
-    category_select = form.select_one("[data-unit-master-category-select]")
-    assert category_select.get("aria-describedby") == "unitCategoryHelp unitCategoryError"
-    assert [option.get_text(strip=True) for option in category_select.select("option")] == [
-        "Volume",
-        "Weight",
-        "Count & Package",
-        "Small Amounts & Optional",
-    ]
-    assert not category_select.has_attr("disabled")
-    assert not category_select.has_attr("readonly")
-    assert "System-managed" not in form.get_text(" ", strip=True)
-    category_help = form.select_one("#unitCategoryHelp").get_text(" ", strip=True)
-    assert category_help == "Choose the closest culinary group for this unit."
     assert form.select_one("[data-unit-master-alias-chips]") is not None
-    assert form.select_one("[data-unit-master-save]").has_attr("disabled")
-    assert form.select_one("[data-unit-master-editor-usage]") is not None
-    assert "Quantities and the measurement stay the same" in form.select_one("[data-unit-master-editor-impact]").get_text()
-    assert form.select_one("[data-unit-master-name]").has_attr("required")
-    assert "unitEditorPermissions" in form.select_one("[data-unit-master-name]")["aria-describedby"]
     assert "unitAliasPreview" in form.select_one("[data-unit-master-alias-input]")["aria-describedby"]
     assert form.select_one("[data-unit-master-alias-error]")["aria-live"] == "polite"
     assert form.select_one("[data-unit-master-dirty-status]")["aria-live"] == "polite"
     assert form.select_one("[data-unit-master-editor-feedback]")["role"] == "status"
     ai_button = form.select_one("[data-unit-master-ai-suggest]")
     assert ai_button is not None
-    assert ai_button.get("aria-describedby") == "unitAiAssistHelp"
-    assert "Review aliases before saving" in form.select_one("#unitAiAssistHelp").get_text(" ", strip=True)
     assert soup.select_one("[data-unit-master-page]")["data-suggest-url"] == (
         "/api/master-data/units/suggest"
     )
@@ -467,10 +446,6 @@ def test_units_page_exposes_accessible_inline_editor_and_import_offer(
     assert soup.select_one(".unit-master-add-footer") is not None
     assert len(soup.select("[data-unit-master-edit-button]")) >= 30
 
-    script = Path("PushShoppingList/static/js/units.js").read_text(encoding="utf-8")
-    assert 'target.focus({ preventScroll: true });' in script
-    assert 'nameInput.scrollIntoView({ block: "nearest", inline: "nearest" });' in script
-    assert 'form.hidden = false;' in script
     assert all(button.get("aria-controls") == "unitMasterInlineEditor"
                and button.get("aria-expanded") == "false"
                and button.get("aria-haspopup") == "dialog"
@@ -644,20 +619,17 @@ def test_units_page_renders_clickable_recipe_counts_and_usage_dialog(
     assert ".unit-master-usage-recipe-fallback" in css
 
 
-def test_unit_inline_editor_uses_compact_registry_styles_and_contextual_save_label():
+def test_unit_inline_editor_uses_compact_registry_styles():
     css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
-    script = Path("PushShoppingList/static/js/units.js").read_text(encoding="utf-8")
     alias_button_rules = css[
         css.index(".unit-master-alias-chip button {"):
         css.index(".unit-master-alias-chip small {")
     ]
 
     assert "width: 24px;" in alias_button_rules
-    assert 'saveButtonLabel = unit ? "Save changes" : "Add Unit";' in script
-    assert 'saveButton.textContent = saveButtonLabel;' in script
     assert ".unit-master-page--registry-v2 .unit-master-category-list" in css
     assert "grid-template-columns: minmax(0, 1fr);" in css
-    assert ":is(.unit-master-page--registry-v2, .ingredient-master-page) .unit-master-inline-editor[hidden]" in css
+    assert ".unit-master-page--registry-v2 .unit-master-alias-popover[hidden]" in css
     assert ".unit-master-page--registry-v2 .unit-master-add-footer" in css
 
 

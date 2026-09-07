@@ -157,7 +157,7 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
 
         // Natural Tab exit restores the row context without moving the page.
         await openManage();
-        await form.locator('[data-unit-master-ai-suggest]').focus(); const tabScroll = await scroll();
+        await input.focus(); const tabScroll = await scroll();
         await page.keyboard.press('Shift+Tab'); assert(await form.isHidden()); assert(await focused(add));
         await add.click(); await form.getByRole('button', {name:'Close aliases',exact:true}).focus();
         await page.keyboard.press('Tab'); assert(await form.isHidden());

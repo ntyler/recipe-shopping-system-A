@@ -4,7 +4,7 @@
 {% set app_shell_mode = "route" %}
 {% set app_active_nav_item = "settings" %}
 {% set app_search_id = "unitsGlobalSearch" %}
-{% set app_content_class = "master-data-app-content" %}
+{% set app_content_class = "master-data-app-content unit-master-app-content" %}
 
 {% block app_body_attributes %}
 data-user-id="{{ master_data.viewer_user_id }}"
@@ -46,7 +46,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                 </nav>
                 <button type="button"
                         class="unit-master-add-shortcut unit-master-header-add"
-                        aria-controls="unitMasterInlineEditor"
+                        aria-controls="unitMasterDraft"
                         aria-expanded="false"
                         data-unit-master-add-button>
                     {{ shell.svg_icon("plus") }}
@@ -93,6 +93,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                 </label>
             </div>
             <p id="unitMasterOrderHelp" class="sr-only">Drag units within their category, or focus a drag handle and use Arrow Up, Arrow Down, Home, or End. Order saves automatically. Clear the search to reorder.</p>
+            <div class="unit-master-draft-table" data-unit-draft-home role="table" aria-colcount="7" aria-label="New unit" hidden></div>
             <div class="unit-master-category-list" data-unit-master-category-list>
                 {% for category in master_data.categories %}
                     <section class="unit-master-category master-data-registry-category"
@@ -205,67 +206,20 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
             <div class="unit-master-empty" data-unit-master-search-empty hidden>No units match that search.</div>
 
             <form id="unitMasterInlineEditor"
-                  class="unit-master-editor unit-master-inline-editor"
-                  data-unit-master-form
-                  aria-labelledby="unitEditorTitle"
-                  novalidate
-                  hidden>
+                  class="unit-master-editor unit-master-alias-popover"
+                  data-unit-master-form role="dialog" popover="manual"
+                  aria-labelledby="unitEditorTitle" novalidate hidden>
                 <header>
-                    <div>
-                        <h2 id="unitEditorTitle" data-unit-master-editor-title>Add Unit</h2>
-                        <p class="unit-master-editor-context" data-unit-master-editor-context>
-                            <span data-unit-master-editor-kicker>New workspace unit</span>
-                            <span data-unit-master-editor-usage hidden></span>
-                            <span data-unit-master-editor-impact hidden>Name and alias changes apply wherever this unit is used. Quantities and the measurement stay the same.</span>
-                        </p>
-                        <p class="unit-master-editor-permissions" id="unitEditorPermissions" data-unit-master-editor-permissions>Choose a canonical name, category, and accepted aliases.</p>
-                    </div>
+                    <h2 id="unitEditorTitle" data-unit-master-editor-title>Aliases</h2>
+                    <p class="unit-master-editor-permissions" data-unit-master-editor-permissions>Use the row’s Save or Cancel for all alias changes.</p>
                 </header>
 
-                <div class="unit-master-editor-grid">
-                    <label class="unit-master-field">
-                        <span id="unitCanonicalLabel">Canonical name</span>
-                        <input type="text"
-                               maxlength="60"
-                               autocomplete="off"
-                               data-unit-master-name
-                               required
-                               aria-labelledby="unitCanonicalLabel"
-                               aria-describedby="unitEditorPermissions unitCanonicalError">
-                        <small class="unit-master-field-error" id="unitCanonicalError" data-unit-master-name-error aria-live="polite" hidden></small>
-                    </label>
-                    <div class="unit-master-field">
-                        <span class="unit-master-field-label">
-                            <span id="unitCategoryLabel">Category</span>
-                        </span>
-                        <select data-unit-master-category-select aria-labelledby="unitCategoryLabel" aria-describedby="unitCategoryHelp unitCategoryError">
-                            {% for category in master_data.category_options %}
-                                <option value="{{ category.key }}">{{ category.label }}</option>
-                            {% endfor %}
-                        </select>
-                        <small class="unit-master-field-help" id="unitCategoryHelp" data-unit-master-category-help>
-                            Choose the closest culinary group for this unit.
-                        </small>
-                        <small class="unit-master-field-error" id="unitCategoryError" data-unit-master-category-error aria-live="polite" hidden></small>
-                    </div>
-                </div>
-
-                <section class="unit-master-ai-assist" aria-labelledby="unitAiAssistTitle">
-                    <div>
-                        <span>AI assist</span>
-                        <strong id="unitAiAssistTitle">Suggest aliases</strong>
-                        <p id="unitAiAssistHelp">Suggest spelling variants for this same measurement. Review aliases before saving; AI does not change the name, category, or recipe usage.</p>
-                    </div>
-                    <button type="button"
-                            class="secondary unit-master-ai-suggest"
-                            data-unit-master-ai-suggest
-                            aria-describedby="unitAiAssistHelp">
-                        <span aria-hidden="true">&#10024;</span>
-                        <span data-unit-master-ai-suggest-label>Suggest aliases</span>
-                    </button>
-                </section>
-
                 {{ accepted_alias_editor('unit-master', 'unitAlias') }}
+
+                <button type="button" class="secondary unit-master-ai-suggest" data-unit-master-ai-suggest>
+                    <span aria-hidden="true">&#10024;</span>
+                    <span data-unit-master-ai-suggest-label>Suggest aliases</span>
+                </button>
 
                 <section class="unit-master-alias-suggestions" data-unit-alias-suggestions aria-label="Suggested aliases" hidden>
                     <p data-unit-alias-suggestion-status role="status" aria-live="polite"></p>
@@ -278,15 +232,13 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                         <span data-unit-master-dirty-status role="status" aria-live="polite"></span>
                         <div class="unit-master-editor-feedback" role="status" aria-live="polite" tabindex="-1" data-unit-master-editor-feedback hidden></div>
                     </div>
-                    <button type="button" class="secondary" data-unit-master-cancel>Cancel</button>
-                    <button type="submit" data-unit-master-save disabled>Add Unit</button>
+                    <button type="button" class="secondary" data-unit-master-cancel>Close aliases</button>
                 </footer>
             </form>
-            <span data-unit-master-editor-home hidden></span>
-            <div class="unit-master-add-footer">
+            <div class="unit-master-add-footer unit-master-draft-table" role="table" aria-colcount="7" aria-label="New unit">
                 <button type="button"
                         class="unit-master-add-shortcut"
-                        aria-controls="unitMasterInlineEditor"
+                        aria-controls="unitMasterDraft"
                         aria-expanded="false"
                         data-unit-master-add-button>
                     <span aria-hidden="true">{{ shell.svg_icon("plus") }}</span>

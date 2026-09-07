@@ -89,6 +89,10 @@
         if (!root) return;
 
         let registry = parseRegistry();
+        // This ID exists only in local draft state, never in the saved registry.
+        const NEW_UNIT_ID = '__new_unit__';
+        const newUnit = {id: NEW_UNIT_ID, name: '', category: '', aliases: [], seeded: false};
+        let draftTrigger = null;
         const rowDrafts = new Map();
         let inlineUnitId = "";
         let inlineField = "name";
@@ -96,7 +100,6 @@
         let editorAliases = [];
         let editorAliasErrors = {};
         let returnFocus = null;
-        let saveButtonLabel = "Add Unit";
         let aiSuggestionPending = false;
         let suggestionRequestToken = 0;
         let suggestionController = null;
@@ -111,7 +114,6 @@
         let rowDropTarget = null;
         let rowDropAfter = false;
         let originalDraft = null;
-        let serverErrors = {};
         let showValidation = false;
         let categoryUI;
 
@@ -121,17 +123,14 @@
         const searchEmpty = root.querySelector("[data-unit-master-search-empty]");
         const categoryList = root.querySelector("[data-unit-master-category-list]");
         const form = root.querySelector("[data-unit-master-form]");
-        const editorHome = root.querySelector("[data-unit-master-editor-home]");
+        const draftHome = root.querySelector('[data-unit-draft-home]');
+        const addFooter = root.querySelector('.unit-master-add-footer');
         const addButtons = Array.from(root.querySelectorAll("[data-unit-master-add-button]"));
         const countLabel = root.querySelector("[data-unit-master-count-label]");
-        const nameInput = root.querySelector("[data-unit-master-name]");
-        let categorySelect = root.querySelector("[data-unit-master-category-select]");
         const categoryTemplate = categoryList.querySelector('[data-unit-master-category]').cloneNode(true);
         categoryTemplate.querySelector('[data-unit-master-category-rows]').replaceChildren();
-        const firstInvalidControl = () => [nameInput, categorySelect, aliasInput].find(control => control.getAttribute("aria-invalid") === "true");
         const aliasInput = root.querySelector("[data-unit-master-alias-input]");
         const aliasChips = root.querySelector("[data-unit-master-alias-chips]");
-        const saveButton = root.querySelector("[data-unit-master-save]");
         const suggestButton = root.querySelector("[data-unit-master-ai-suggest]");
         const suggestButtonLabel = root.querySelector("[data-unit-master-ai-suggest-label]");
         const aliasAddButton = root.querySelector("[data-unit-master-alias-add]");
@@ -150,15 +149,10 @@
         const suggestionChips = root.querySelector('[data-unit-alias-suggestion-chips]');
         const addSelected = root.querySelector('[data-unit-alias-add-selected]');
         const editorTitle = root.querySelector("[data-unit-master-editor-title]");
-        const editorKicker = root.querySelector("[data-unit-master-editor-kicker]");
         const editorFeedback = root.querySelector("[data-unit-master-editor-feedback]");
-        const nameError = root.querySelector("[data-unit-master-name-error]");
-        const categoryError = root.querySelector("[data-unit-master-category-error]");
         const aliasError = root.querySelector("[data-unit-master-alias-error]");
         const aliasPreview = root.querySelector("[data-unit-master-alias-preview]");
         const dirtyStatus = root.querySelector("[data-unit-master-dirty-status]");
-        const editorUsage = root.querySelector("[data-unit-master-editor-usage]");
-        const editorImpact = root.querySelector("[data-unit-master-editor-impact]");
         const editorPermissions = root.querySelector("[data-unit-master-editor-permissions]");
         const cancelButton = root.querySelector("[data-unit-master-cancel]");
         const importPanel = root.querySelector("[data-unit-master-import]");
@@ -198,15 +192,13 @@
 
         const clearErrors = () => {
             editorAliasErrors = {};
-            serverErrors = {};
-            setFieldError(nameInput, nameError, "");
-            setFieldError(categorySelect, categoryError, "");
             setFieldError(aliasInput, aliasError, "");
             setEditorFeedback("");
             renderAliasChips();
         };
 
-        const unitById = unitId => registry.units.find(unit => String(unit.id) === String(unitId)) || null;
+        const unitById = unitId => unitId === NEW_UNIT_ID ? newUnit
+            : registry.units.find(unit => String(unit.id) === String(unitId)) || null;
 
         const rowFor = id => root.querySelector(`[data-unit-master-row][data-unit-id="${CSS.escape(String(id))}"]`);
         const savedValues = unit => ({canonical_name: unit.name, category: unit.category, aliases: [...(unit.aliases || [])]});
@@ -214,7 +206,7 @@
             id = String(id);
             if (!rowDrafts.has(id)) {
                 const original = savedValues(unitById(id));
-                rowDrafts.set(id, {original, values: {...original, aliases: [...original.aliases]}, pendingAlias: "", errors: {}, feedback: "", saving: false});
+                rowDrafts.set(id, {original, values: {...original, aliases: [...original.aliases]}, pendingAlias: "", errors: {}, touched: {}, feedback: "", saving: false});
             }
             return rowDrafts.get(id);
         };
@@ -300,6 +292,7 @@
                 actions.append(manage);
             }
             manage.title = 'Manage aliases'; manage.setAttribute('aria-label', 'Manage aliases');
+            manage.textContent = id === NEW_UNIT_ID ? '+ Manage aliases' : '+';
             const values = editing ? draft.values.aliases : unit.aliases || [];
             const signature = JSON.stringify(values);
             if (aliases.dataset.aliases !== signature) {
@@ -333,8 +326,8 @@
             if (name && category) {
                 name.disabled = category.disabled = draft.saving;
                 category.title = registry.categories.find(item => item.key === draft.values.category)?.label || '';
-                setFieldError(name, row.querySelector('[data-unit-row-name-error]'), errors.canonical_name);
-                setFieldError(category, row.querySelector('[data-unit-row-category-error]'), errors.category);
+                setFieldError(name, row.querySelector('[data-unit-row-name-error]'), id !== NEW_UNIT_ID || draft.touched.canonical_name ? errors.canonical_name : '');
+                setFieldError(category, row.querySelector('[data-unit-row-category-error]'), id !== NEW_UNIT_ID || draft.touched.category ? errors.category : '');
             } else {
                 row.querySelector('[data-unit-row-name-error]').hidden = true;
                 row.querySelector('[data-unit-row-category-error]').hidden = true;
@@ -344,7 +337,8 @@
             const save = row.querySelector('[data-unit-row-save]');
             save.disabled = mutationPending || orderPending || (editorUnitId === id && aiSuggestionPending) || !dirty
                 || Boolean(errors.canonical_name || errors.category || Object.keys(errors.aliases).length);
-            save.textContent = draft.saving ? 'Saving...' : 'Save';
+            save.textContent = draft.saving ? 'Saving...' : id === NEW_UNIT_ID ? 'Add' : 'Save';
+            save.setAttribute('aria-label', id === NEW_UNIT_ID ? 'Add unit' : `Save ${unitById(id).name}`);
             row.querySelector('[data-unit-row-cancel]').disabled = draft.saving;
             const feedback = row.querySelector('[data-unit-row-status]');
             const aliasErrors = [...new Set(Object.values(errors.aliases))].join(' ');
@@ -366,9 +360,10 @@
         const releaseInlineRow = () => {
             if (!inlineUnitId) return true;
             const id = inlineUnitId;
-            if (rowHasEdits(id)) {
+            if (id === NEW_UNIT_ID || rowHasEdits(id)) {
                 const draft = rowDraft(id);
-                draft.feedback = `Save or cancel changes to ${unitById(id).name} before editing another unit.`;
+                draft.feedback = id === NEW_UNIT_ID ? 'Add or cancel the new unit before editing another unit.'
+                    : `Save or cancel changes to ${unitById(id).name} before editing another unit.`;
                 syncRowState(rowFor(id));
                 rowFor(id).querySelector('[data-unit-row-name]').focus({preventScroll: true});
                 return false;
@@ -381,7 +376,6 @@
             id = String(id);
             if (mutationPending || orderPending) return false;
             if (inlineUnitId && inlineUnitId !== id && !releaseInlineRow()) return false;
-            if (!form.hidden && !editorUnitId && !closeEditor({restoreFocus: false})) return false;
             inlineUnitId = id;
             inlineField = field;
             syncOrderControls();
@@ -396,32 +390,19 @@
             return true;
         };
 
-        const syncEditingContext = unit => {
-            form.classList.toggle('is-alias-popover', Boolean(unit));
-            if (unit) form.setAttribute('role', 'dialog');
-            else form.removeAttribute('role');
-            form.querySelector(".unit-master-editor-grid").hidden = Boolean(unit);
-            saveButton.hidden = Boolean(unit);
-            cancelButton.textContent = unit ? "Close aliases" : "Cancel";
-            editorPermissions.textContent = unit
-                ? "Use the row’s Save or Cancel for all alias changes."
-                : "Choose a canonical name, category, and accepted aliases.";
-        };
-
         const editorValues = (includePending = false) => ({
-            canonical_name: editorUnitId ? rowDraft(editorUnitId).values.canonical_name : cleanText(nameInput.value),
-            category: editorUnitId ? rowDraft(editorUnitId).values.category : categorySelect.value,
+            canonical_name: editorUnitId ? rowDraft(editorUnitId).values.canonical_name : '',
+            category: editorUnitId ? rowDraft(editorUnitId).values.category : '',
             aliases: [...editorAliases, ...(includePending && cleanText(aliasInput.value) ? [cleanText(aliasInput.value)] : [])],
         });
         const editorIsDirty = () => Boolean(originalDraft && (
             unitDraftSignature(editorValues()) !== unitDraftSignature(originalDraft) || cleanText(aliasInput.value)
         ));
-        const editorValidation = () => {
-            if (editorUnitId) return rowValidation(editorUnitId);
-            const local = validateUnitDraft(editorValues(true), registry, editorUnitId);
-            return { ...local, ...serverErrors, aliases: { ...local.aliases, ...(serverErrors.aliases || {}) } };
-        };
+        const editorValidation = () => editorUnitId ? rowValidation(editorUnitId) : {aliases: {}};
         const syncEditorState = () => {
+            // Alias chips can wrap the row at narrow widths. Suppress native scroll
+            // anchoring while reflecting those draft changes in the table.
+            const restoreScroll = editorUnitId && !form.hidden ? captureEditorScroll(rowFor(editorUnitId)) : null;
             if (editorUnitId && !form.hidden) {
                 const draft = rowDraft(editorUnitId);
                 if (JSON.stringify(draft.values.aliases) !== JSON.stringify(editorAliases) || draft.pendingAlias !== aliasInput.value) {
@@ -432,20 +413,14 @@
                 draft.pendingAlias = aliasInput.value;
             }
             const errors = editorValidation();
-            const invalid = Boolean(errors.canonical_name || errors.category || Object.keys(errors.aliases).length);
             const dirty = editorIsDirty();
             const busy = mutationPending || aiSuggestionPending || orderPending;
             form.setAttribute("aria-busy", String(mutationPending || aiSuggestionPending));
             form.classList.toggle("is-dirty", dirty);
-            saveButton.disabled = busy || !dirty || invalid;
-            suggestButton.disabled = busy || !unitKey(editorValues().canonical_name);
-            [nameInput, aliasInput, aliasAddButton].forEach(control => { control.disabled = mutationPending || orderPending; });
-            categorySelect.disabled = busy;
-            categoryUI.refresh(categorySelect);
+            suggestButton.disabled = busy || !unitKey(editorValues().canonical_name) || Boolean(errors.canonical_name || errors.category);
+            [aliasInput, aliasAddButton].forEach(control => { control.disabled = mutationPending || orderPending; });
             cancelButton.disabled = orderPending || (mutationPending && (!editorUnitId || rowDraft(editorUnitId).saving));
             aliasChips.querySelectorAll("button").forEach(button => { button.disabled = mutationPending || orderPending; });
-            setFieldError(nameInput, nameError, showValidation ? errors.canonical_name : "");
-            setFieldError(categorySelect, categoryError, showValidation ? errors.category : "");
             setFieldError(aliasInput, aliasError, showValidation ? [...new Set(Object.values(errors.aliases))].join(" ") : "");
             editorAliasErrors = errors.aliases;
             Array.from(aliasChips.children).forEach((chip, index) => {
@@ -464,10 +439,11 @@
             if (aliasPreview.textContent !== preview) aliasPreview.textContent = preview;
             if (editorUnitId && !form.hidden) syncRowState(rowFor(editorUnitId));
             refreshSuggestions();
+            restoreScroll?.();
             positionAliasPopover();
         };
 
-        // Keep the expanded editor at the same viewport position when rows are rebuilt.
+        // Preserve the active row and scroll containers while registry groups change.
         const captureEditorScroll = (anchor = form) => {
             const top = anchor.getBoundingClientRect().top;
             const scrollers = [];
@@ -499,7 +475,6 @@
                 remove.setAttribute("aria-label", `Remove alias ${alias}`);
                 remove.addEventListener("click", () => {
                     editorAliases.splice(index, 1);
-                    serverErrors = {};
                     showValidation = true;
                     renderAliasChips();
                     setEditorFeedback("");
@@ -793,6 +768,14 @@
             categoryControl.setAttribute('aria-describedby', categoryError.id);
             category.append(categoryControl, categoryError);
             row.append(createOrderCell(unit, index + 1), name, aliases, category, usage, sourceBadge, action);
+            if (unit.id === NEW_UNIT_ID) {
+                row.id = 'unitMasterDraft';
+                row.dataset.unitNewDraft = '';
+                row.querySelector('.unit-master-order-cell').textContent = 'New';
+                nameControl.setAttribute('aria-label', 'Canonical name for new unit');
+                categoryControl.dataset.categoryLabel = 'Category for new unit';
+                action.querySelector('[data-unit-row-cancel]').setAttribute('aria-label', 'Cancel new unit');
+            }
             return row;
         };
 
@@ -837,6 +820,7 @@
                 });
             });
             addButtons.forEach(button => { button.disabled = orderPending || mutationPending; });
+            syncRowState(rowFor(NEW_UNIT_ID));
             importButton.disabled = orderPending || mutationPending;
             syncEditorState();
         };
@@ -890,12 +874,6 @@
             rowDropTarget = null;
         };
 
-        const parkEditor = () => {
-            if (form.parentElement !== editorHome.parentElement || form.nextElementSibling !== editorHome) {
-                editorHome.before(form);
-            }
-        };
-
         const syncCategoryGroups = () => {
             const groups = new Map([...categoryList.querySelectorAll('[data-unit-master-category]')].map(group => [group.dataset.category, group]));
             registry.categories.forEach((category, index) => {
@@ -926,7 +904,6 @@
                     delete draft.errors.category;
                 }
             }
-            if (categorySelect.value === result.deleted_category_id) categorySelect.value = result.reassign_to || registry.categories[0].key;
             const oldGroups = syncCategoryGroups();
             registry.units.forEach(unit => {
                 const row = rowFor(unit.id);
@@ -943,7 +920,6 @@
         };
 
         const renderRegistry = () => {
-            parkEditor();
             syncCategoryGroups();
             root.querySelectorAll("[data-unit-master-category]").forEach(category => {
                 const rows = category.querySelector("[data-unit-master-category-rows]");
@@ -1203,128 +1179,92 @@
             }
         };
 
-        const focusEditorName = () => {
-            const target = editorUnitId ? aliasInput : nameInput;
-            const rect = target.getBoundingClientRect();
-            try {
-                target.focus({ preventScroll: true });
-            } catch (_error) {
-                target.focus();
+        const openNewUnit = trigger => {
+            if (orderPending || mutationPending) return;
+            if (rowFor(NEW_UNIT_ID)) {
+                rowFor(NEW_UNIT_ID).querySelector('[data-unit-row-name]').focus({preventScroll: true});
+                return;
             }
-            if (!editorUnitId && (rect.top < 0 || rect.bottom > window.innerHeight)) {
-                nameInput.scrollIntoView({ block: "nearest", inline: "nearest" });
-            }
+            if (!releaseInlineRow()) return;
+            const restoreScroll = captureEditorScroll(trigger);
+            draftTrigger = trigger;
+            inlineUnitId = NEW_UNIT_ID;
+            inlineField = 'name';
+            const bottom = addFooter.contains(trigger);
+            const home = bottom ? addFooter : draftHome;
+            home.hidden = false;
+            home.classList.add('is-drafting');
+            if (bottom) trigger.hidden = true;
+            home.append(createUnitRow(newUnit, 0));
+            addButtons.forEach(button => button.setAttribute('aria-expanded', 'true'));
+            syncOrderControls();
+            restoreScroll();
+            rowFor(NEW_UNIT_ID).querySelector('[data-unit-row-name]').focus({preventScroll: true});
         };
 
-        const openEditor = (unit = null, trigger = null) => {
-            if (orderPending || mutationPending) return;
-            if (unit ? !activateInlineRow(unit.id, 'name', false) : !releaseInlineRow()) return;
+        const removeNewUnit = () => {
+            rowFor(NEW_UNIT_ID)?.remove();
+            rowDrafts.delete(NEW_UNIT_ID);
+            draftHome.hidden = true;
+            draftHome.classList.remove('is-drafting');
+            addFooter.classList.remove('is-drafting');
+            addButtons.forEach(button => { button.hidden = false; button.setAttribute('aria-expanded', 'false'); });
+        };
+
+        const openEditor = (unit, trigger) => {
+            if (!unit || orderPending || mutationPending || !activateInlineRow(unit.id, 'name', false)) return;
             if (!form.hidden) {
-                if (editorUnitId === String(unit?.id || "")) {
-                    returnFocus?.setAttribute('aria-expanded', 'false');
-                    returnFocus = trigger || returnFocus;
-                    returnFocus?.setAttribute('aria-expanded', 'true');
-                    focusEditorName();
-                    return;
-                }
-                if (!closeEditor({ restoreFocus: false })) { focusEditorName(); return; }
+                if (editorUnitId === String(unit.id)) { aliasInput.focus({preventScroll: true}); return; }
+                if (!closeEditor({restoreFocus: false})) return;
             }
             resetSuggestions();
-            returnFocus = trigger || document.activeElement;
-            editorUnitId = unit ? String(unit.id) : "";
-            editorAliases = unit ? [...rowDraft(unit.id).values.aliases] : [];
-            editorTitle.textContent = unit ? `Aliases for ${unit.name}` : "Add Unit";
-            editorKicker.textContent = unit?.seeded ? "System-seeded" : unit ? "User-created" : "New workspace unit";
-            editorUsage.hidden = !unit;
-            const count = Number(unit?.recipe_count || 0);
-            editorUsage.textContent = `Used in ${count} recipe${count === 1 ? "" : "s"}`;
-            editorImpact.hidden = !unit;
-            syncEditingContext(unit);
-            saveButtonLabel = unit ? "Save changes" : "Add Unit";
-            saveButton.textContent = saveButtonLabel;
-            nameInput.value = unit?.name || "";
-            categorySelect.value = unit?.category || "count_package";
-            aliasInput.value = unit ? rowDraft(unit.id).pendingAlias : "";
-            originalDraft = unit ? rowDraft(unit.id).original : editorValues();
+            returnFocus = trigger;
+            editorUnitId = String(unit.id);
+            editorAliases = [...rowDraft(unit.id).values.aliases];
+            editorTitle.textContent = `Aliases for ${rowDraft(unit.id).values.canonical_name || 'new unit'}`;
+            editorPermissions.textContent = `Use the row’s ${unit.id === NEW_UNIT_ID ? 'Add' : 'Save'} or Cancel for all alias changes.`;
+            aliasInput.value = rowDraft(unit.id).pendingAlias;
+            originalDraft = rowDraft(unit.id).original;
             showValidation = false;
-            setAiPending(false);
             clearErrors();
-            renderAliasChips();
-            parkEditor();
             form.hidden = false;
-            if (unit) {
-                form.setAttribute('popover', 'manual');
-                form.showPopover();
-            }
-            form.classList.toggle("is-editing", Boolean(unit));
-            addButtons.forEach(button => button.setAttribute("aria-expanded", String(!unit)));
-            if (trigger) trigger.setAttribute("aria-expanded", "true");
+            form.showPopover();
+            trigger.setAttribute('aria-expanded', 'true');
             syncOrderControls();
             positionAliasPopover();
-            focusEditorName();
+            aliasInput.focus({preventScroll: true});
         };
 
-        const closeEditor = ({ restoreFocus = true, discard = false } = {}) => {
-            if (orderPending || (mutationPending && (!editorUnitId || rowDraft(editorUnitId).saving))) return false;
-            if (!editorUnitId && !discard && !form.hidden && editorIsDirty() && !window.confirm("Discard unsaved changes to this unit?")) return false;
+        const closeEditor = ({restoreFocus = true, discard = false} = {}) => {
+            if (form.hidden) return true;
+            if (orderPending || (mutationPending && rowDraft(editorUnitId).saving)) return false;
             const restoreScroll = captureEditorScroll(returnFocus?.isConnected ? returnFocus : form);
             resetSuggestions();
-            const closingId = editorUnitId;
-            if (closingId && !discard) syncEditorState();
-            if (originalDraft) {
-                nameInput.value = originalDraft.canonical_name;
-                categorySelect.value = originalDraft.category;
-                editorAliases = [...originalDraft.aliases];
-            }
-            aliasInput.value = "";
+            if (!discard) syncEditorState();
             if (form.matches(':popover-open')) form.hidePopover();
-            form.removeAttribute('popover');
             form.removeAttribute('style');
             form.hidden = true;
+            editorUnitId = '';
+            originalDraft = null;
+            editorAliases = [];
+            aliasInput.value = '';
             clearErrors();
-            syncEditorState();
-            form.classList.remove("is-editing");
-            form.classList.remove('is-alias-popover');
-            parkEditor();
-            editorUnitId = "";
-            if (closingId && discard) resetRow(closingId);
-            addButtons.forEach(button => button.setAttribute("aria-expanded", "false"));
-            returnFocus?.setAttribute("aria-expanded", "false");
+            returnFocus?.setAttribute('aria-expanded', 'false');
             applySearch();
-            const focusTarget = returnFocus?.isConnected && returnFocus.getClientRects().length ? returnFocus : search;
-            if (restoreFocus) {
-                try {
-                    focusTarget.focus({ preventScroll: true });
-                } catch (_error) {
-                    focusTarget.focus();
-                }
-            }
+            if (restoreFocus && returnFocus?.isConnected) returnFocus.focus({preventScroll: true});
             restoreScroll();
             returnFocus = null;
             return true;
         };
 
-        const applyServerErrors = payload => {
-            serverErrors = payload.errors || {};
-            showValidation = true;
-            syncEditorState();
-            setEditorFeedback(payload.error || "Unable to save this unit.");
-            const firstInvalid = firstInvalidControl();
-            if (firstInvalid) firstInvalid.focus({ preventScroll: true });
-        };
-
         const suggestUnitDetails = async () => {
             if (mutationPending || orderPending || aiSuggestionPending) return;
             const canonicalName = cleanText(editorValues().canonical_name);
-            if (!canonicalName) {
-                setFieldError(nameInput, nameError, "Enter a canonical name before asking AI for suggestions.");
-                nameInput.focus();
-                return;
-            }
+            if (!canonicalName || suggestButton.disabled) return;
 
             const pendingAlias = cleanText(aliasInput.value);
             const payload = {
-                unit_id: editorUnitId,
+                unit_id: editorUnitId === NEW_UNIT_ID ? '' : editorUnitId,
                 canonical_name: canonicalName,
                 category: editorValues().category,
                 aliases: [...editorAliases, ...(pendingAlias ? [pendingAlias] : [])],
@@ -1347,7 +1287,7 @@
                 if (!response.ok || !result.ok) {
                     suggestions.hidden = true;
                     setAiPending(false);
-                    applyServerErrors(result);
+                    setEditorFeedback(result.error || 'Unable to suggest aliases. Try again.');
                     return;
                 }
 
@@ -1385,13 +1325,14 @@
             mutationPending = true;
             syncOrderControls();
             try {
-                const response = await fetch(root.dataset.updateUrlTemplate.replace('__UNIT_ID__', encodeURIComponent(id)), {
-                    method: 'PUT', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'fetch'},
+                const response = await fetch(id === NEW_UNIT_ID ? root.dataset.createUrl : root.dataset.updateUrlTemplate.replace('__UNIT_ID__', encodeURIComponent(id)), {
+                    method: id === NEW_UNIT_ID ? 'POST' : 'PUT', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'fetch'},
                     body: JSON.stringify(payload),
                 });
                 const result = await response.json().catch(() => ({}));
                 if (!response.ok || !result.ok) {
                     draft.errors = result.errors || {};
+                    draft.touched = {canonical_name: true, category: true};
                     draft.feedback = result.error || 'Unable to save this unit. Try again.';
                     draft.feedbackType = 'error';
                     return;
@@ -1405,24 +1346,26 @@
                 if (!form.hidden && editorUnitId === id) {
                     resetSuggestions();
                     if (form.matches(':popover-open')) form.hidePopover();
-                    form.removeAttribute('popover');
                     form.removeAttribute('style');
                     form.hidden = true;
-                    form.classList.remove('is-editing', 'is-alias-popover');
                     editorUnitId = '';
                     originalDraft = null;
                     aliasInput.value = '';
                     returnFocus = null;
                 }
+                const savedId = id === NEW_UNIT_ID ? String(result.unit_id) : id;
+                const addReturn = draftTrigger;
+                if (id === NEW_UNIT_ID) { removeNewUnit(); draftTrigger = null; }
                 rowDrafts.delete(id);
                 inlineUnitId = '';
+                mutationPending = false;
                 updateRegistry(result.registry);
-                const savedDraft = rowDraft(id);
+                const savedDraft = rowDraft(savedId);
                 savedDraft.feedback = 'Saved';
                 savedDraft.feedbackType = 'success';
-                syncRowState(rowFor(id));
+                syncRowState(rowFor(savedId));
                 restoreScroll();
-                const focusTarget = activeId && activeId !== id && activeSelector ? rowFor(activeId)?.querySelector(activeSelector)
+                const focusTarget = id === NEW_UNIT_ID ? addReturn : activeId && activeId !== id && activeSelector ? rowFor(activeId)?.querySelector(activeSelector)
                     : active.isConnected && !active.disabled && active.getClientRects().length ? active : rowFor(id)?.querySelector(`[data-unit-row-activate="${inlineField}"]`);
                 const visibleTarget = focusTarget?.getClientRects().length ? focusTarget : search;
                 visibleTarget.focus({preventScroll: true});
@@ -1434,6 +1377,12 @@
                 draft.saving = false;
                 mutationPending = false;
                 syncOrderControls();
+                if (row.isConnected && draft.feedbackType === 'error') {
+                    const invalid = row.querySelector('[aria-invalid="true"]');
+                    const target = invalid || row.querySelector(Object.keys(draft.errors.aliases || {}).length
+                        ? '[data-unit-row-alias="add"]' : '[data-unit-row-save]');
+                    target.focus({preventScroll: true});
+                }
             }
         };
 
@@ -1441,87 +1390,20 @@
             if (rowDraft(id).saving) return;
             const row = rowFor(id), restoreScroll = captureEditorScroll(row);
             if (!form.hidden && editorUnitId === String(id)) closeEditor({discard: true, restoreFocus: false});
-            else resetRow(id);
+            const focusTarget = id === NEW_UNIT_ID ? draftTrigger : null;
             inlineUnitId = '';
-            syncOrderControls();
-            if (restoreFocus) row.querySelector(`[data-unit-row-activate="${inlineField}"]`).focus({preventScroll: true});
+            if (id === NEW_UNIT_ID) { removeNewUnit(); draftTrigger = null; }
+            else resetRow(id);
             applySearch();
+            if (restoreFocus) (focusTarget || row.querySelector(`[data-unit-row-activate="${inlineField}"]`)).focus({preventScroll: true});
             restoreScroll();
-        };
-
-        const saveUnit = async event => {
-            event.preventDefault();
-            if (editorUnitId) return saveRow(editorUnitId);
-            if (orderPending || mutationPending || aiSuggestionPending) return;
-            const restoreScroll = captureEditorScroll(returnFocus?.isConnected ? returnFocus : form);
-            showValidation = true;
-            syncEditorState();
-            if (saveButton.disabled) return;
-            if (cleanText(aliasInput.value) && !addPendingAlias()) return;
-            clearErrors();
-            const payload = {
-                canonical_name: cleanText(nameInput.value),
-                category: categorySelect.value,
-                aliases: [...editorAliases],
-            };
-            const url = editorUnitId
-                ? root.dataset.updateUrlTemplate.replace("__UNIT_ID__", encodeURIComponent(editorUnitId))
-                : root.dataset.createUrl;
-            mutationPending = true;
-            syncOrderControls();
-            saveButton.disabled = true;
-            saveButton.textContent = "Saving…";
-            setEditorFeedback("Saving changes…", "pending");
-            let saved = false;
-            try {
-                const response = await fetch(url, {
-                    method: editorUnitId ? "PUT" : "POST",
-                    headers: { "Content-Type": "application/json", "X-Requested-With": "fetch" },
-                    body: JSON.stringify(payload),
-                });
-                const result = await response.json().catch(() => ({}));
-                if (!response.ok || !result.ok) {
-                    applyServerErrors(result);
-                    return;
-                }
-                const savedId = String(result.unit_id || editorUnitId);
-                // Rebuild only after the transaction succeeds; draft category changes
-                // never move the row or alter the saved usage data.
-                form.hidden = true;
-                form.classList.remove("is-editing");
-                updateRegistry(result.registry);
-                editorUnitId = "";
-                originalDraft = null;
-                aliasInput.value = "";
-                addButtons.forEach(button => button.setAttribute("aria-expanded", "false"));
-                const row = root.querySelector(`[data-unit-master-row][data-unit-id="${CSS.escape(savedId)}"]`);
-                returnFocus = row?.querySelector("[data-unit-master-edit-button]");
-                saved = true;
-                setStatus(result.message || "Changes saved.", "success");
-            } catch (error) {
-                setEditorFeedback("The unit could not be saved. Check your connection and try again.");
-                console.error("Unable to save unit.", error);
-            } finally {
-                mutationPending = false;
-                syncOrderControls();
-                saveButton.textContent = saveButtonLabel;
-                if (saved) {
-                    restoreScroll();
-                    const focusTarget = returnFocus?.getClientRects().length ? returnFocus : search;
-                    focusTarget.focus({ preventScroll: true });
-                    returnFocus = null;
-                } else {
-                    firstInvalidControl()?.focus({ preventScroll: true });
-                }
-            }
         };
 
         categoryUI = window.createUnitCategoryUI({root, getRegistry: () => registry,
             applyRegistry: updateCategories, announce: message => setStatus(message, 'success', true)});
-        categorySelect = categoryUI.enhance(categorySelect);
 
         addButtons.forEach(button => {
-            button.addEventListener("click", event => openEditor(null, event.currentTarget));
+            button.addEventListener("click", event => openNewUnit(event.currentTarget));
         });
         const changeRowField = event => {
             const name = event.target.matches('[data-unit-row-name]');
@@ -1529,15 +1411,16 @@
             const row = event.target.closest('[data-unit-master-row]'), id = row.dataset.unitId, draft = rowDraft(id);
             const key = name ? 'canonical_name' : 'category';
             draft.values[key] = event.target.value;
+            draft.touched[key] = true;
             if (!form.hidden && editorUnitId === id) { resetSuggestions(); setEditorFeedback(''); }
             delete draft.errors[key];
             draft.feedback = ''; draft.feedbackType = '';
             syncRowState(row);
             if (!form.hidden && editorUnitId === id) syncEditorState();
         };
-        categoryList.addEventListener('input', changeRowField);
-        categoryList.addEventListener('change', changeRowField);
-        categoryList.addEventListener("click", event => {
+        root.addEventListener('input', changeRowField);
+        root.addEventListener('change', changeRowField);
+        root.addEventListener("click", event => {
             const aliasControl = event.target.closest('[data-unit-row-alias]');
             if (aliasControl) {
                 openEditor(unitById(aliasControl.closest('[data-unit-master-row]').dataset.unitId), aliasControl);
@@ -1568,7 +1451,7 @@
             if (!button) return;
             activateInlineRow(button.dataset.unitId);
         });
-        categoryList.addEventListener("keydown", event => {
+        root.addEventListener("keydown", event => {
             if (event.target.closest('.is-inline-editing') && event.key === 'Escape') {
                 event.preventDefault(); cancelRow(event.target.closest('[data-unit-master-row]').dataset.unitId); return;
             }
@@ -1642,17 +1525,13 @@
                 addPendingAlias();
             }
         });
-        cancelButton.addEventListener("click", () => closeEditor({ discard: !editorUnitId }));
+        cancelButton.addEventListener("click", () => closeEditor());
         form.addEventListener("input", event => {
-            if (![nameInput, categorySelect, aliasInput].includes(event.target)) return;
+            if (event.target !== aliasInput) return;
             showValidation = true;
-            if (event.target === nameInput) delete serverErrors.canonical_name;
-            if (event.target === categorySelect) delete serverErrors.category;
-            if (event.target === nameInput || event.target === categorySelect) resetSuggestions();
             setEditorFeedback("");
             syncEditorState();
         });
-        categorySelect.addEventListener("change", () => { delete serverErrors.category; resetSuggestions(); showValidation = true; syncEditorState(); });
         window.addEventListener("beforeunload", event => {
             if (mutationPending || [...rowDrafts.keys()].some(rowIsDirty) || (!form.hidden && editorIsDirty())) { event.preventDefault(); event.returnValue = ""; }
         });
@@ -1723,7 +1602,6 @@
                     const next = createUsageCell(unit);
                     previous.replaceWith(next);
                     if (returningHere) usageReturnFocus = next.querySelector('button') || row.querySelector('[data-unit-master-edit-button]');
-                    if (!form.hidden && editorUnitId === String(unit.id)) editorUsage.textContent = `Used in ${unit.recipe_count} recipe${unit.recipe_count === 1 ? "" : "s"}`;
                 });
                 if (usageDialog.open && usageReturnFocus) {
                     await openUsage(unitById(usageReturnFocus.dataset.unitId), usageReturnFocus);
@@ -1731,7 +1609,7 @@
             } catch (_) { /* The next usage open retries through the normal error state. */ }
         };
         window.addEventListener("focus", refreshUsageCounts);
-        form.addEventListener("submit", saveUnit);
+        form.addEventListener("submit", event => { event.preventDefault(); addPendingAlias(); });
         let previousSearch = search.value;
         search.addEventListener("input", () => {
             const current = unitById(editorUnitId);
@@ -1746,7 +1624,7 @@
         importPanel.hidden = !browserUnits.length || importDismissed;
         importButton.addEventListener("click", async () => {
             if (orderPending || mutationPending) return;
-            if (!form.hidden && !closeEditor()) return;
+            if (!releaseInlineRow()) return;
             mutationPending = true;
             syncOrderControls();
             importButton.disabled = true;
