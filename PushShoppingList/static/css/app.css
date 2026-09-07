@@ -71165,11 +71165,17 @@ body.is-resizing-store-section-master-column * {
     padding: 0;
 }
 
+.type-master-page .type-master-registry-category {
+    border-color: var(--app-border-subtle);
+    background: transparent;
+}
+
 .type-master-registry-category .unit-master-table-head {
     position: sticky;
     z-index: 20;
     top: calc(-1 * var(--app-content-padding-block-start));
-    background: var(--app-surface);
+    border-bottom-color: var(--app-border-subtle);
+    background: transparent;
 }
 
 .type-master-row-name-field {
@@ -71418,6 +71424,90 @@ body.is-resizing-store-section-master-column * {
     }
 }
 
+/* Types reuse the rendered Units row and field states without changing their grid. */
+.type-master-page .type-master-table .unit-master-row {
+    border-bottom-color: var(--app-border-subtle);
+    background: transparent;
+    box-shadow: none;
+    transition: opacity 140ms ease;
+}
+
+.type-master-page .type-master-table .unit-master-row > [role="cell"] {
+    background: transparent;
+}
+
+.type-master-page .type-master-table .unit-master-row:is(
+    .is-selected, .is-inline-editing, .is-dirty, .is-mobile-expanded,
+    .type-master-create-row, :has([data-type-master-row-name]:focus)
+) {
+    box-shadow: inset 2px 0 0 color-mix(in srgb, var(--app-primary-hover) 60%, transparent);
+}
+
+.type-master-page .type-master-table .unit-master-row :is(
+    [data-type-master-row-name], [data-type-master-create-name], .type-master-name-display
+) {
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+}
+
+/* Paint the row once so the fill also covers column gaps and row padding. */
+@media (hover: hover) {
+    .type-master-page .type-master-table .unit-master-row:hover {
+        background: var(--app-primary-soft);
+    }
+
+    .type-master-page .type-master-table .unit-master-row :is(
+        [data-type-master-row-name], [data-type-master-create-name], .type-master-name-display
+    ):hover:where(:not(:disabled)) {
+        border-color: var(--app-border);
+    }
+}
+
+.type-master-page .type-master-table .unit-master-row:has(:focus-visible) {
+    outline: 2px solid var(--app-primary-hover);
+    outline-offset: -2px;
+}
+
+.type-master-page .type-master-table .unit-master-row :is(button, input):focus-visible,
+.type-master-page .type-master-table .unit-master-row :is(
+    [data-type-master-row-name], [data-type-master-create-name], .type-master-name-display
+):focus {
+    outline: 2px solid var(--app-primary-hover);
+    outline-offset: 2px;
+}
+
+.type-master-page .type-master-table .unit-master-row :is(
+    [data-type-master-row-name], [data-type-master-create-name], .type-master-name-display
+):focus {
+    border-color: var(--app-primary-hover);
+}
+
+.type-master-page .type-master-table .unit-master-row
+    :is([data-type-master-row-name], [data-type-master-create-name])[aria-invalid="true"] {
+    border-color: var(--app-danger);
+}
+
+@media (hover: none) {
+    .type-master-page .type-master-table .unit-master-row:active {
+        background: var(--app-primary-soft);
+    }
+}
+
+@media (forced-colors: active) {
+    .type-master-page .type-master-table .unit-master-row:is(
+        .is-selected, .is-inline-editing, .is-dirty, .is-mobile-expanded, .type-master-create-row
+    ) {
+        outline: 1px solid Highlight;
+        outline-offset: -1px;
+    }
+
+    .type-master-page .type-master-table .unit-master-row:has(:focus-visible) {
+        outline: 2px solid Highlight;
+        outline-offset: -2px;
+    }
+}
+
 /* Types use the same compact phone disclosure rows as Units. */
 .type-master-page :is(.type-master-name-display, .type-master-details-toggle, .type-master-row-cancel) { display: none; }
 
@@ -71518,9 +71608,7 @@ body.is-resizing-store-section-master-column * {
     .type-master-page .type-master-table .type-master-row-actions > button { min-height: 44px; }
     .type-master-page .type-master-table .type-master-row-actions > .type-master-row-delete { grid-column: 1 / -1; }
     .type-master-page .type-master-table .type-master-row-error { grid-area: 4 / 1 / auto / -1; }
-    .type-master-page .type-master-table :is(button, input):focus-visible { outline: 2px solid var(--app-primary-hover); outline-offset: -2px; }
-    .type-master-page .type-master-table [data-type-master-row-name]:focus { border-color: var(--app-primary-hover); }
-    .type-master-page .type-master-table [data-type-master-row-name][aria-invalid="true"] { border-color: var(--app-danger); }
+    .type-master-page .type-master-table .unit-master-row:has(:focus-visible) { outline-width: 1px; }
     .type-master-page .type-master-table > .type-master-create-row { gap: 8px; border-top: 1px solid var(--app-border); }
     .type-master-page .type-master-create-row > :is(.type-master-order-cell, .unit-master-usage) { display: none; }
     .type-master-page .type-master-table [data-type-master-create-name] { border-color: var(--app-border); background: var(--app-bg-soft); }
