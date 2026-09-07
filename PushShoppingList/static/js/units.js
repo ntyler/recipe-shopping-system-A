@@ -87,6 +87,7 @@
     function initUnitMasterPage() {
         const root = document.querySelector("[data-unit-master-page]");
         if (!root) return;
+        const phoneLayout = window.matchMedia('(max-width: 600px)');
 
         let registry = parseRegistry();
         // This ID exists only in local draft state, never in the saved registry.
@@ -1359,7 +1360,8 @@
                 const focusTarget = id === NEW_UNIT_ID ? addReturn : activeId === id && activeSelector === '[data-unit-row-save]' ? rowFor(id)?.querySelector('[data-unit-row-save]')
                     : activeId && activeId !== id && activeSelector ? rowFor(activeId)?.querySelector(activeSelector)
                     : active.isConnected && !active.disabled && active.getClientRects().length ? active : rowFor(id)?.querySelector(`[data-unit-row-activate="${inlineField}"]`);
-                const visibleTarget = focusTarget?.getClientRects().length ? focusTarget : search;
+                const visibleTarget = focusTarget?.getClientRects().length ? focusTarget
+                    : rowFor(savedId)?.querySelector('[data-unit-row-activate="name"]') || search;
                 if (visibleTarget.matches('[data-unit-row-save]') && visibleTarget.disabled) {
                     // A native disabled Save cannot receive focus; return to its inline name.
                     rowFor(savedId)?.querySelector('[data-unit-row-activate="name"]')?.focus({preventScroll: true});
@@ -1455,6 +1457,10 @@
                 openUsage(unitById(usageButton.dataset.unitId), usageButton);
                 return;
             }
+            if (phoneLayout.matches && selectedRow && !event.target.closest('input, select, textarea, a, button:not([data-unit-master-drag-handle])')) {
+                // The handle expands tap-sized move controls without opening the keyboard.
+                activateInlineRow(selectedRow.dataset.unitId, 'name', !event.target.closest('[data-unit-master-drag-handle]'));
+            }
         });
         root.addEventListener("keydown", event => {
             if (event.target.closest('.is-inline-editing') && event.key === 'Escape') {
@@ -1469,6 +1475,66 @@
                 : rows.indexOf(row) + (event.key === "ArrowUp" ? -1 : 1);
             moveRowTo(row, target, handle);
         });
+        // Native HTML drag is retained for desktop; phone handles also accept touch drags.
+        let touchOrder = null, touchOrderFrame = 0, suppressOrderTap = false;
+        const updateTouchOrder = () => {
+            if (!touchOrder?.moving) return;
+            const {row, x, y, scroller} = touchOrder;
+            const navTop = document.querySelector('.app-mobile-bottom-nav')?.getBoundingClientRect().top || innerHeight;
+            const top = scroller === document.scrollingElement ? 0 : scroller.getBoundingClientRect().top;
+            const delta = y < top + 48 ? -12 : y > navTop - 48 ? 12 : 0;
+            if (delta) scroller.scrollTop += delta;
+            clearRowDropState();
+            row.classList.add('is-row-dragging');
+            const target = document.elementFromPoint(x, y)?.closest('[data-unit-master-row]');
+            if (target && target !== row && target.parentElement === row.parentElement) {
+                const bounds = target.getBoundingClientRect();
+                rowDropTarget = target;
+                rowDropAfter = y > bounds.top + bounds.height / 2;
+                target.classList.add(rowDropAfter ? 'is-row-drop-after' : 'is-row-drop-before');
+            }
+            touchOrderFrame = requestAnimationFrame(updateTouchOrder);
+        };
+        categoryList.addEventListener('pointerdown', event => {
+            const handle = event.target.closest('[data-unit-master-drag-handle]');
+            if (!phoneLayout.matches || event.pointerType !== 'touch' || !event.isPrimary || !handle) return;
+            const row = handle.closest('[data-unit-master-row]');
+            if (reorderIsBlocked(row)) return;
+            let scroller = row.parentElement;
+            while (scroller && !(scroller.scrollHeight > scroller.clientHeight && /auto|scroll/.test(getComputedStyle(scroller).overflowY))) scroller = scroller.parentElement;
+            touchOrder = {handle, row, id: event.pointerId, startY: event.clientY, x: event.clientX, y: event.clientY, moving: false, scroller: scroller || document.scrollingElement};
+            handle.setPointerCapture(event.pointerId);
+        });
+        categoryList.addEventListener('pointermove', event => {
+            if (!touchOrder || event.pointerId !== touchOrder.id) return;
+            touchOrder.x = event.clientX; touchOrder.y = event.clientY;
+            if (!touchOrder.moving && Math.abs(event.clientY - touchOrder.startY) > 8) {
+                touchOrder.moving = true;
+                updateTouchOrder();
+            }
+        });
+        const finishTouchOrder = event => {
+            if (!touchOrder || event.pointerId !== touchOrder.id) return;
+            const {row, handle, moving} = touchOrder;
+            touchOrder = null;
+            cancelAnimationFrame(touchOrderFrame);
+            const rows = categoryRows(row.parentElement);
+            let target = rowDropTarget ? rows.indexOf(rowDropTarget) + (rowDropAfter ? 1 : 0) : -1;
+            if (rows.indexOf(row) < target) target -= 1;
+            clearRowDropState();
+            if (moving) {
+                suppressOrderTap = true;
+                setTimeout(() => { suppressOrderTap = false; }, 400);
+                if (event.type === 'pointerup' && target >= 0) moveRowTo(row, target, handle);
+            }
+        };
+        categoryList.addEventListener('pointerup', finishTouchOrder);
+        categoryList.addEventListener('pointercancel', finishTouchOrder);
+        categoryList.addEventListener('click', event => {
+            if (suppressOrderTap && event.target.closest('[data-unit-master-drag-handle]')) {
+                event.preventDefault(); event.stopPropagation(); suppressOrderTap = false;
+            }
+        }, true);
         categoryList.addEventListener("dragstart", event => {
             const handle = event.target.closest("[data-unit-master-drag-handle]");
             if (!handle) return; // Do not consume text selection or native input dragging.

@@ -52,6 +52,11 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
         const initialTypeStyle = await metrics(typeSave);
         for (const width of [1920, 1440, 1100, 390, 320]) {
             await page.setViewportSize({width, height: 1080}); await types.setViewportSize({width, height: 1080});
+            if (width <= 600) {
+                assert(await save.isHidden(), 'Phone actions appear only when the row is editing');
+                assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+                continue;
+            }
             const actual = await metrics(save), expected = await metrics(typeSave);
             assert.deepEqual(actual.style, expected.style, `Types Save styles at ${width}px`);
             assert.equal(actual.height, expected.height, `Save height at ${width}px`);

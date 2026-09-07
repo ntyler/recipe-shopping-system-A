@@ -83599,3 +83599,147 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     .unit-master-page--registry-v2 .unit-master-action-cell :is([data-unit-row-save], [data-unit-row-cancel]) { grid-row: 2; }
     .unit-master-page--registry-v2 .unit-master-row-status { top: 100%; }
 }
+
+/* Phone list: identity, aliases, then category/usage. Tablet tables stay unchanged. */
+@media (max-width: 600px) {
+    .app-content.unit-master-app-content {
+        padding-bottom: calc(176px + env(safe-area-inset-bottom));
+        scroll-padding-bottom: calc(176px + env(safe-area-inset-bottom));
+    }
+
+    .unit-master-page--registry-v2 .unit-master-category-list { margin: 12px 8px 8px; }
+    .unit-master-page--registry-v2 .unit-master-draft-table { margin-inline: 8px; }
+    .unit-master-page--registry-v2 .unit-master-category > header { padding: 10px; }
+    .unit-master-page--registry-v2 .unit-master-category > header > span { flex-shrink: 0; }
+
+    .unit-master-page--registry-v2 .unit-master-row {
+        grid-template-columns: 72px minmax(0, 1fr) auto;
+        gap: 4px 6px;
+        min-height: 0;
+        padding: 8px 10px;
+        scroll-margin-bottom: 12px;
+    }
+
+    .unit-master-page--registry-v2 .unit-master-row > [data-mobile-label]::before { content: none; }
+    .unit-master-page--registry-v2 .unit-master-row > .unit-master-order-cell { grid-area: 1 / 1; }
+    .unit-master-page--registry-v2 .unit-master-row > .unit-master-name-cell { grid-area: 1 / 2; }
+    .unit-master-page--registry-v2 .unit-master-row > .unit-master-source-badge {
+        grid-area: 1 / 3;
+        justify-self: end;
+        max-width: 66px;
+        padding: 3px 5px;
+        font-size: 10px;
+        text-align: center;
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+
+    .unit-master-page--registry-v2 .unit-master-row > .unit-master-aliases {
+        --unit-alias-control-size: 44px;
+        grid-area: 2 / 1 / auto / -1;
+        gap: 4px 6px;
+    }
+
+    .unit-master-page--registry-v2 .unit-master-row > .unit-master-category-cell { grid-area: 3 / 1 / auto / 3; }
+    .unit-master-page--registry-v2 .unit-master-row > .unit-master-usage {
+        grid-area: 3 / 3;
+        justify-content: flex-end;
+        text-align: right;
+    }
+
+    .unit-master-page--registry-v2 .unit-master-row :is(.unit-master-inline-value, [data-unit-row-name], [data-unit-row-category]) {
+        height: auto;
+        min-height: 44px;
+        padding: 6px 4px;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        line-height: 1.35;
+    }
+
+    .unit-master-page--registry-v2 .unit-master-name-cell { font-size: 14px; }
+    .unit-master-page--registry-v2 .unit-master-row [data-unit-row-name] { height: 44px; font-size: 16px; }
+    .unit-master-page--registry-v2 .unit-master-row :is([data-unit-row-activate="category"], [data-unit-row-category]) { padding-right: 22px; font-size: 12px; }
+    .unit-master-page--registry-v2 .unit-master-category-cell::after { top: 18px; bottom: auto; opacity: 1; }
+    .unit-master-page--registry-v2 .master-data-registry-table .unit-master-usage-button { min-height: 44px !important; min-width: 44px; margin: 0; justify-content: flex-end; }
+    .unit-master-page--registry-v2 .master-data-registry-table .unit-master-usage-empty { display: inline-flex; align-items: center; gap: 3px; min-height: 44px; margin: 0; }
+    .unit-master-page--registry-v2 .unit-master-usage-empty::after { content: 'recipes'; }
+
+    .unit-master-page--registry-v2 .unit-master-row .store-section-master-order {
+        grid-template-columns: 44px 24px;
+        gap: 4px;
+        width: auto;
+        height: 44px;
+    }
+
+    .unit-master-page--registry-v2 .master-data-registry-table .unit-master-row .store-section-master-order > button {
+        width: 44px;
+        min-width: 44px;
+        height: 44px;
+        min-height: 44px;
+        padding: 0;
+        margin: 0;
+    }
+
+    .unit-master-page--registry-v2 .unit-master-row .store-section-master-drag-handle { grid-column: 1; touch-action: none; }
+    .unit-master-page--registry-v2 .unit-master-row .store-section-master-order-step { grid-area: 1 / 2; width: 24px; min-width: 24px; height: 24px; min-height: 24px; font-size: 10px; }
+    .unit-master-page--registry-v2 .unit-master-row .store-section-master-order > [data-unit-master-order-action] { display: none; }
+
+    /* Editing expands this unit, keeping the name input comfortably full width. */
+    .unit-master-page--registry-v2 .unit-master-row.is-inline-editing > .unit-master-order-cell { grid-column: 1 / 3; }
+    .unit-master-page--registry-v2 .unit-master-row.is-inline-editing > .unit-master-name-cell { grid-area: 2 / 1 / auto / -1; }
+    .unit-master-page--registry-v2 .unit-master-row.is-inline-editing > .unit-master-aliases { grid-row: 3; }
+    .unit-master-page--registry-v2 .unit-master-row.is-inline-editing > :is(.unit-master-category-cell, .unit-master-usage) { grid-row: 4; }
+    .unit-master-page--registry-v2 .unit-master-row.is-inline-editing .store-section-master-order { grid-template-columns: 44px 24px 44px 44px; }
+    .unit-master-page--registry-v2 .master-data-registry-table .unit-master-row.is-inline-editing .store-section-master-order > [data-unit-master-order-action] { display: inline-flex; opacity: 1; pointer-events: auto; transform: none; }
+    .unit-master-page--registry-v2 .unit-master-row.is-inline-editing [data-unit-master-order-action="up"] { grid-area: 1 / 3; }
+    .unit-master-page--registry-v2 .unit-master-row.is-inline-editing [data-unit-master-order-action="down"] { grid-area: 1 / 4; }
+    .unit-master-page--registry-v2 .master-data-registry-table .unit-master-row.is-inline-editing .store-section-master-order > [data-unit-master-order-action]:disabled { opacity: .28; }
+
+    .unit-master-page--registry-v2 .unit-master-row > .master-data-row-actions { display: none; }
+    .unit-master-page--registry-v2 .unit-master-row.is-inline-editing > .master-data-row-actions {
+        display: grid;
+        grid-area: 5 / 1 / auto / -1;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 4px 8px;
+        width: 100%;
+        min-height: 0;
+        padding: 4px 0 0;
+    }
+
+    .unit-master-page--registry-v2 .master-data-registry-table .unit-master-row .master-data-row-actions > :is([data-unit-row-save], [data-unit-row-cancel]) {
+        grid-row: 1;
+        min-height: 44px;
+        height: 44px;
+        padding: 6px 10px;
+        font-size: 12px;
+    }
+
+    .unit-master-page--registry-v2 .unit-master-row-status {
+        position: static;
+        grid-column: 1 / -1;
+        font-size: 11px;
+        line-height: 1.4;
+        overflow-wrap: anywhere;
+    }
+
+    .unit-master-page--registry-v2 .unit-master-row-status.is-alias-error { position: static; }
+    .unit-master-page--registry-v2 .unit-master-row :is([data-unit-row-name-error], [data-unit-row-category-error]) {
+        position: static;
+        display: block;
+        width: auto;
+        max-width: 100%;
+        margin-top: 4px;
+        padding: 2px 4px;
+        border: 0;
+        background: transparent;
+        font-size: 12px;
+    }
+
+    .unit-master-page--registry-v2 .unit-master-row:has(:focus-visible) { outline-width: 1px; }
+    .unit-master-page--registry-v2 .unit-master-row :is(button, input):active { outline: 1px solid var(--app-primary-hover); outline-offset: -1px; }
+    .unit-master-page--registry-v2 .unit-master-alias-actions button { color: var(--app-primary-hover); font-size: 20px; }
+    .unit-master-page--registry-v2 [data-unit-new-draft] .unit-master-alias-actions button { min-height: 44px; max-height: none; }
+    .unit-master-page--registry-v2 .unit-master-add-shortcut { min-height: 44px; }
+    .unit-master-page--registry-v2 .unit-master-alias-popover :is(button, input) { min-height: 44px; }
+    .unit-category-menu button { min-height: 44px; }
+}

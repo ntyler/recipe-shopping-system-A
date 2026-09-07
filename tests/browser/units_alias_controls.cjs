@@ -136,7 +136,12 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
                         && panel.x + panel.width <= viewport.width - 11
                         && panel.y + panel.height <= viewport.height - 11, detail);
                     assert(await form.evaluate(e => e.scrollWidth <= e.clientWidth + 1), `${kind} at ${width}/${zoom}: popover content fits without horizontal scrolling`);
-                    assert(Math.abs((await row.boundingBox()).height - restingHeight) < .1);
+                    if (await page.evaluate(() => innerWidth > 600)) {
+                        assert(Math.abs((await row.boundingBox()).height - restingHeight) < .1);
+                    } else {
+                        assert(await row.locator('[data-unit-row-cancel]').isVisible());
+                        assert((await row.boundingBox()).height >= restingHeight);
+                    }
                     assert.match(await form.locator('[data-unit-master-editor-title]').innerText(), new RegExp(`layout ${kind}`));
                     if (kind==='zero' && zoom===1 && width===1440) {
                         await input.fill('temporary alias'); await input.press('Enter');
