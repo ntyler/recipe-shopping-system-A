@@ -56,6 +56,8 @@
 
         let registry = parseRegistry();
         const rowDrafts = new Map();
+        const phoneLayout = window.matchMedia("(max-width: 760px)");
+        const expandedCategoryIds = new Set();
         let usageReturnFocus = null;
         let usageRequestToken = 0;
         let activeIconTarget = null;
@@ -277,6 +279,54 @@
             error: row.querySelector("[data-cuisine-category-master-row-error]"),
         });
 
+        const syncRowDisclosure = row => {
+            const toggle = row.querySelector("[data-cuisine-category-master-details-toggle]");
+            if (!toggle) return;
+            const expanded = expandedCategoryIds.has(row.dataset.categoryId);
+            const name = cleanText(rowControls(row).name.value) || "Cuisine category";
+            row.classList.toggle("is-mobile-expanded", expanded);
+            toggle.setAttribute("aria-expanded", String(expanded));
+            toggle.setAttribute("aria-label", `${expanded ? "Hide" : "Show"} details for ${name}`);
+        };
+
+        const addRowDisclosure = row => {
+            const toggle = document.createElement("button");
+            toggle.type = "button";
+            toggle.className = "cuisine-category-master-details-toggle";
+            toggle.dataset.cuisineCategoryMasterDetailsToggle = "";
+            toggle.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 9 5 5 5-5"></path></svg>';
+
+            const order = document.createElement("div");
+            order.className = "cuisine-category-master-mobile-order";
+            order.dataset.mobileLabel = "Order";
+            order.setAttribute("role", "group");
+            order.setAttribute("aria-label", "Cuisine category order");
+            row.querySelectorAll("[data-cuisine-category-master-order-action]").forEach(button => {
+                const control = button.cloneNode(true);
+                const label = document.createElement("span");
+                label.textContent = control.dataset.cuisineCategoryMasterOrderAction === "up"
+                    ? "Move up" : "Move down";
+                control.append(label);
+                order.append(control);
+            });
+            row.append(toggle, order);
+
+            const details = [
+                ".cuisine-category-master-row-abbreviation-field",
+                ".unit-master-usage",
+                ".unit-master-source-badge",
+                ".cuisine-category-master-row-actions",
+                ".cuisine-category-master-mobile-order",
+            ].map((selector, index) => {
+                const field = row.querySelector(selector);
+                field.id = `${rowControls(row).error.id}-detail-${index}`;
+                field.dataset.cuisineCategoryMasterDetail = "";
+                return field.id;
+            });
+            row.querySelector(".unit-master-usage").dataset.mobileLabel = "Used in";
+            toggle.setAttribute("aria-controls", details.join(" "));
+        };
+
         const setRowErrors = (row, errors = {}, fallback = "") => {
             const controls = rowControls(row);
             const message = errorMessage(errors, fallback);
@@ -347,6 +397,10 @@
             ].filter(Boolean).join(" ");
             row.dataset.cuisineCategoryMasterIconValue = normalized.icon;
             setRowErrors(row, errors, draft.feedback);
+            if (phoneLayout.matches && (dirty || Object.keys(errors).length || draft.feedback)) {
+                expandedCategoryIds.add(row.dataset.categoryId);
+            }
+            syncRowDisclosure(row);
             if (row.isConnected) updateRowOrderControls();
         };
 
@@ -589,6 +643,7 @@
                 actionCell,
                 rowError,
             );
+            addRowDisclosure(row);
             syncRowState(row);
             return row;
         };
@@ -650,7 +705,10 @@
             const resetIds = new Set(resetCategoryIds.map(String));
             const nextIds = new Set(nextCategories.map(item => String(item.id)));
             Array.from(rowDrafts.keys()).forEach(categoryId => {
-                if (!nextIds.has(categoryId)) rowDrafts.delete(categoryId);
+                if (!nextIds.has(categoryId)) {
+                    rowDrafts.delete(categoryId);
+                    expandedCategoryIds.delete(categoryId);
+                }
             });
             nextCategories.forEach(item => {
                 const categoryId = String(item.id);
@@ -1164,9 +1222,12 @@
             updateRowOrderControls();
 
             const opposite = direction < 0 ? "down" : "up";
+            const orderScope = phoneLayout.matches
+                ? row.querySelector(".cuisine-category-master-mobile-order")
+                : row;
             const focusTarget = !submitter.disabled
                 ? submitter
-                : row.querySelector(
+                : orderScope.querySelector(
                     `[data-cuisine-category-master-order-action="${opposite}"]:not(:disabled)`,
                 ) || row.querySelector("[data-cuisine-category-master-drag-handle]");
             focusTarget?.focus({ preventScroll: true });
@@ -1726,6 +1787,17 @@
         });
 
         root.addEventListener("click", event => {
+            const detailsToggle = event.target.closest(
+                "[data-cuisine-category-master-details-toggle]",
+            );
+            if (detailsToggle) {
+                const row = detailsToggle.closest("[data-cuisine-category-master-row]");
+                const id = row.dataset.categoryId;
+                if (expandedCategoryIds.has(id)) expandedCategoryIds.delete(id);
+                else expandedCategoryIds.add(id);
+                syncRowDisclosure(row);
+                return;
+            }
             const orderAction = event.target.closest(
                 "[data-cuisine-category-master-order-action]",
             );
