@@ -413,19 +413,20 @@ def test_units_page_exposes_accessible_inline_editor_and_import_offer(
     assert len(rows) == len(expected)
     for row in rows:
         unit = expected[row['data-unit-id']]
-        name = row.select_one('[data-unit-row-name]')
-        category = row.select_one('[data-unit-row-category]')
-        assert name.name == 'input' and name['type'] == 'text' and name['value'] == unit['name']
-        assert category.name == 'select'
-        assert [option['value'] for option in category.select('option')] == [key for key, _ in master_data.UNIT_REGISTRY_CATEGORIES]
-        assert category.select_one('option[selected]')['value'] == unit['category']
+        name = row.select_one('[data-unit-row-activate="name"]')
+        category = row.select_one('[data-unit-row-activate="category"]')
+        assert name.name == category.name == 'button'
+        assert name.get_text(strip=True) == unit['name']
+        assert category.get_text(strip=True) == dict(master_data.UNIT_REGISTRY_CATEGORIES)[unit['category']]
+        assert category['aria-haspopup'] == 'listbox'
         for control in (name, category):
             assert not any(control.has_attr(attr) for attr in ('disabled', 'readonly', 'hidden'))
             assert control.get('aria-label')
-            assert soup.find(id=control['aria-describedby']) is not None
+        assert row.select_one('input, select') is None
         assert row.select_one('[data-unit-row-save]').has_attr('disabled')
-        assert row.select_one('[data-unit-row-cancel]').has_attr('disabled')
-        assert row.select_one('[data-unit-master-edit-button]').get_text(strip=True) == 'Edit aliases'
+        assert row.select_one('[data-unit-row-save]').has_attr('hidden')
+        assert row.select_one('[data-unit-row-cancel]').has_attr('hidden')
+        assert row.select_one('[data-unit-master-edit-button]').get_text(strip=True) == 'Edit unit'
     assert not soup.select("[data-unit-master-category-readonly]")
     category_select = form.select_one("[data-unit-master-category-select]")
     assert category_select.get("aria-describedby") == "unitCategoryHelp unitCategoryError"
@@ -615,7 +616,7 @@ def test_units_page_renders_clickable_recipe_counts_and_usage_dialog(
     teaspoon_row = next(
         row
         for row in soup.select("[data-unit-master-row]")
-        if row.select_one("[data-unit-row-name]")["value"] == "teaspoon"
+        if row.select_one('[data-unit-row-activate="name"]').get_text(strip=True) == "teaspoon"
     )
     usage_button = teaspoon_row.select_one("[data-unit-master-usage-button]")
     assert usage_button is not None

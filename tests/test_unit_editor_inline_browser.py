@@ -1,4 +1,4 @@
-"""Real Chromium coverage for per-row drafts; opt in with an installed Playwright module."""
+"""Real Chromium coverage for click-activated inline editing; opt in with an installed Playwright module."""
 import json
 import os
 import shutil
@@ -13,7 +13,7 @@ from test_unit_registry_management import unit_registry_app, sign_in
 from test_unit_edit_usage_flow import seed_usage, reference_measurements
 
 
-def test_unit_rows_are_editable_without_opening_an_editor(unit_registry_app):
+def test_unit_cells_activate_real_controls_on_click(unit_registry_app):
     node = shutil.which('node')
     module = os.environ.get('AI_PANTRY_PLAYWRIGHT_MODULE', 'playwright')
     if not node or subprocess.run([node, '-e', 'require.resolve(process.argv[1])', module], capture_output=True).returncode:

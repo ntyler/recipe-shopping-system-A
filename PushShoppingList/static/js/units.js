@@ -90,6 +90,8 @@
 
         let registry = parseRegistry();
         const rowDrafts = new Map();
+        let inlineUnitId = "";
+        let inlineField = "name";
         let editorUnitId = "";
         let editorAliases = [];
         let editorAliasErrors = {};
@@ -210,23 +212,69 @@
             const remote = rowDraft(id).errors;
             return {...local, ...remote, aliases: {...local.aliases, ...(remote.aliases || {})}};
         };
+        const renderRowFields = row => {
+            const id = row.dataset.unitId, unit = unitById(id), draft = rowDraft(id);
+            const editing = inlineUnitId === id;
+            row.classList.toggle('is-inline-editing', editing);
+            for (const field of ['name', 'category']) {
+                const cell = row.querySelector(`[data-unit-master-${field}-cell]`);
+                const previous = cell.querySelector(`[data-unit-row-${field}], [data-unit-row-activate]`);
+                if (previous && previous.matches(`[data-unit-row-${field}]`) === editing) continue;
+                const control = document.createElement(editing ? field === 'name' ? 'input' : 'select' : 'button');
+                const label = field === 'name' ? `canonical name for ${unit.name}` : `category for ${unit.name}`;
+                if (editing) {
+                    control.dataset[field === 'name' ? 'unitRowName' : 'unitRowCategory'] = '';
+                    control.setAttribute('aria-label', label);
+                    control.setAttribute('aria-describedby', `unitRow${field === 'name' ? 'Name' : 'Category'}Error-${id}`);
+                    if (field === 'name') {
+                        control.type = 'text'; control.maxLength = 60; control.autocomplete = 'off'; control.required = true;
+                        control.value = draft.values.canonical_name;
+                    } else {
+                        registry.categories.forEach(item => control.add(new Option(item.label, item.key)));
+                        control.value = draft.values.category;
+                    }
+                } else {
+                    control.type = 'button'; control.className = 'unit-master-inline-value';
+                    control.dataset.unitRowActivate = field;
+                    control.setAttribute('aria-label', `Edit ${label}`);
+                    if (field === 'category') control.setAttribute('aria-haspopup', 'listbox');
+                    control.textContent = field === 'name' ? unit.name : registry.categories.find(item => item.key === unit.category)?.label || unit.category;
+                }
+                if (previous) previous.replaceWith(control);
+                else cell.prepend(control);
+            }
+            const edit = row.querySelector('[data-unit-master-edit-button]');
+            const destination = row.querySelector(editing ? '.unit-master-aliases' : '.unit-master-action-cell');
+            if (edit.parentElement !== destination) destination.prepend(edit);
+            edit.className = editing ? 'unit-master-alias-details' : 'unit-master-edit-button';
+            edit.textContent = editing ? 'Edit aliases' : 'Edit unit';
+            edit.setAttribute('aria-label', `${editing ? 'Edit aliases for' : 'Edit unit'} ${unit.name}`);
+            row.querySelector('[data-unit-row-save]').hidden = !editing;
+            row.querySelector('[data-unit-row-cancel]').hidden = !editing;
+        };
         const syncRowState = row => {
             if (!row) return;
+            renderRowFields(row);
             const id = row.dataset.unitId, draft = rowDraft(id), errors = rowValidation(id);
             const dirty = rowIsDirty(id);
             const name = row.querySelector('[data-unit-row-name]'), category = row.querySelector('[data-unit-row-category]');
             // Seeded status never gates editing. Only the row being submitted is busy.
-            name.disabled = category.disabled = draft.saving;
-            category.title = registry.categories.find(item => item.key === draft.values.category)?.label || '';
-            setFieldError(name, row.querySelector('[data-unit-row-name-error]'), errors.canonical_name);
-            setFieldError(category, row.querySelector('[data-unit-row-category-error]'), errors.category);
+            if (name && category) {
+                name.disabled = category.disabled = draft.saving;
+                category.title = registry.categories.find(item => item.key === draft.values.category)?.label || '';
+                setFieldError(name, row.querySelector('[data-unit-row-name-error]'), errors.canonical_name);
+                setFieldError(category, row.querySelector('[data-unit-row-category-error]'), errors.category);
+            } else {
+                row.querySelector('[data-unit-row-name-error]').hidden = true;
+                row.querySelector('[data-unit-row-category-error]').hidden = true;
+            }
             row.classList.toggle('is-dirty', dirty);
             row.setAttribute('aria-busy', String(draft.saving));
             const save = row.querySelector('[data-unit-row-save]');
             save.disabled = mutationPending || orderPending || (editorUnitId === id && aiSuggestionPending) || !dirty
                 || Boolean(errors.canonical_name || errors.category || Object.keys(errors.aliases).length);
             save.textContent = draft.saving ? 'Saving...' : 'Save';
-            row.querySelector('[data-unit-row-cancel]').disabled = draft.saving || !rowHasEdits(id);
+            row.querySelector('[data-unit-row-cancel]').disabled = draft.saving;
             const feedback = row.querySelector('[data-unit-row-status]');
             const aliasErrors = [...new Set(Object.values(errors.aliases))].join(' ');
             feedback.textContent = aliasErrors || draft.feedback || (dirty ? 'Unsaved changes' : '');
@@ -237,9 +285,45 @@
             rowDrafts.delete(String(id));
             const draft = rowDraft(id), row = rowFor(id);
             if (!row) return;
-            row.querySelector('[data-unit-row-name]').value = draft.values.canonical_name;
-            row.querySelector('[data-unit-row-category]').value = draft.values.category;
+            if (row.querySelector('[data-unit-row-name]')) row.querySelector('[data-unit-row-name]').value = draft.values.canonical_name;
+            if (row.querySelector('[data-unit-row-category]')) row.querySelector('[data-unit-row-category]').value = draft.values.category;
             syncRowState(row);
+        };
+
+        const releaseInlineRow = () => {
+            if (!inlineUnitId) return true;
+            const id = inlineUnitId;
+            if (rowHasEdits(id)) {
+                const draft = rowDraft(id);
+                draft.feedback = `Save or cancel changes to ${unitById(id).name} before editing another unit.`;
+                syncRowState(rowFor(id));
+                rowFor(id).querySelector('[data-unit-row-name]').focus({preventScroll: true});
+                return false;
+            }
+            cancelRow(id, false);
+            return true;
+        };
+
+        const activateInlineRow = (id, field = 'name', focus = true) => {
+            id = String(id);
+            if (mutationPending || orderPending) return false;
+            if (inlineUnitId && inlineUnitId !== id && !releaseInlineRow()) return false;
+            if (!form.hidden && !editorUnitId && !closeEditor({restoreFocus: false})) return false;
+            inlineUnitId = id;
+            inlineField = field;
+            syncOrderControls();
+            if (focus) {
+                const control = rowFor(id).querySelector(`[data-unit-row-${field}]`);
+                control.focus({preventScroll: true});
+                if (field === 'name') control.setSelectionRange(control.value.length, control.value.length);
+                else {
+                    // Called synchronously from a trusted button click (also Enter/Space).
+                    // The first click both creates the select and opens its native menu.
+                    try { control.showPicker(); }
+                    catch (_) { /* Older browsers keep a focused, enabled native select. */ }
+                }
+            }
+            return true;
         };
 
         const syncEditingContext = unit => {
@@ -598,7 +682,7 @@
                 category.querySelectorAll("[data-unit-master-row]").forEach(row => {
                     // Keep the active editor and its row together while filtering.
                     const visible = !query || unitKey(row.dataset.unitMasterSearchValue).includes(query)
-                        || (!form.hidden && row.dataset.unitId === editorUnitId);
+                        || row.dataset.unitId === inlineUnitId || (!form.hidden && row.dataset.unitId === editorUnitId);
                     row.hidden = !visible;
                     if (visible) categoryCount += 1;
                 });
@@ -612,7 +696,7 @@
         };
 
         const categoryRows = container => Array.from(container.querySelectorAll("[data-unit-master-row]"));
-        const reorderIsBlocked = () => orderPending || mutationPending || !form.hidden || Boolean(unitKey(search.value));
+        const reorderIsBlocked = () => orderPending || mutationPending || Boolean(inlineUnitId) || !form.hidden || Boolean(unitKey(search.value));
         const syncOrderControls = () => {
             const blocked = reorderIsBlocked();
             root.querySelectorAll("[data-unit-master-category-rows]").forEach(container => {
@@ -975,6 +1059,7 @@
 
         const openEditor = (unit = null, trigger = null) => {
             if (orderPending || mutationPending) return;
+            if (unit ? !activateInlineRow(unit.id, 'name', false) : !releaseInlineRow()) return;
             if (!form.hidden) {
                 if (editorUnitId === String(unit?.id || "")) { focusEditorName(); return; }
                 if (!closeEditor({ restoreFocus: false })) { focusEditorName(); return; }
@@ -1158,6 +1243,7 @@
                     returnFocus = null;
                 }
                 rowDrafts.delete(id);
+                inlineUnitId = '';
                 updateRegistry(result.registry);
                 const savedDraft = rowDraft(id);
                 savedDraft.feedback = 'Saved';
@@ -1165,7 +1251,7 @@
                 syncRowState(rowFor(id));
                 restoreScroll();
                 const focusTarget = activeId && activeId !== id && activeSelector ? rowFor(activeId)?.querySelector(activeSelector)
-                    : active.isConnected && !active.disabled && active.getClientRects().length ? active : rowFor(id)?.querySelector('[data-unit-row-name]');
+                    : active.isConnected && !active.disabled && active.getClientRects().length ? active : rowFor(id)?.querySelector(`[data-unit-row-activate="${inlineField}"]`);
                 const visibleTarget = focusTarget?.getClientRects().length ? focusTarget : search;
                 visibleTarget.focus({preventScroll: true});
                 if (selection && activeId !== id) visibleTarget.setSelectionRange(...selection);
@@ -1179,12 +1265,15 @@
             }
         };
 
-        const cancelRow = id => {
+        const cancelRow = (id, restoreFocus = true) => {
             if (rowDraft(id).saving) return;
             const row = rowFor(id), restoreScroll = captureEditorScroll(row);
             if (!form.hidden && editorUnitId === String(id)) closeEditor({discard: true, restoreFocus: false});
             else resetRow(id);
-            row.querySelector('[data-unit-row-name]').focus({preventScroll: true});
+            inlineUnitId = '';
+            syncOrderControls();
+            if (restoreFocus) row.querySelector(`[data-unit-row-activate="${inlineField}"]`).focus({preventScroll: true});
+            applySearch();
             restoreScroll();
         };
 
@@ -1272,6 +1361,11 @@
         categoryList.addEventListener('input', changeRowField);
         categoryList.addEventListener('change', changeRowField);
         categoryList.addEventListener("click", event => {
+            const activate = event.target.closest('[data-unit-row-activate]');
+            if (activate) {
+                activateInlineRow(activate.closest('[data-unit-master-row]').dataset.unitId, activate.dataset.unitRowActivate);
+                return;
+            }
             const save = event.target.closest('[data-unit-row-save]');
             if (save) { saveRow(save.closest('[data-unit-master-row]').dataset.unitId); return; }
             const cancel = event.target.closest('[data-unit-row-cancel]');
@@ -1293,7 +1387,7 @@
             openEditor(unitById(button.dataset.unitId), button);
         });
         categoryList.addEventListener("keydown", event => {
-            if (event.target.matches('[data-unit-row-name], [data-unit-row-category]') && event.key === 'Escape') {
+            if (event.target.closest('.is-inline-editing') && event.key === 'Escape') {
                 event.preventDefault(); cancelRow(event.target.closest('[data-unit-master-row]').dataset.unitId); return;
             }
             const handle = event.target.closest("[data-unit-master-drag-handle]");
@@ -1307,7 +1401,8 @@
         });
         categoryList.addEventListener("dragstart", event => {
             const handle = event.target.closest("[data-unit-master-drag-handle]");
-            if (!handle || reorderIsBlocked()) { event.preventDefault(); return; }
+            if (!handle) return; // Do not consume text selection or native input dragging.
+            if (reorderIsBlocked()) { event.preventDefault(); return; }
             draggedRow = handle.closest("[data-unit-master-row]");
             draggedRow.classList.add("is-row-dragging");
             event.dataTransfer.effectAllowed = "move";
@@ -1459,9 +1554,13 @@
             importPanel.hidden = true;
         });
 
-        // Keep the finished server-rendered rows and controls through startup.
-        // Adopt any typing or autofill that happened while the deferred script loaded.
-        categoryList.querySelectorAll('[data-unit-row-name], [data-unit-row-category]').forEach(target => changeRowField({target}));
+        // A long-running local server can retain a cached Jinja template while serving
+        // the latest JS. Upgrade old static or always-input rows before binding state.
+        // Delegation is on the stable category list, so rebuilt rows remain interactive.
+        if (root.dataset.unitRowInteraction !== 'click-to-edit') {
+            renderRegistry();
+            root.dataset.unitRowInteraction = 'click-to-edit';
+        }
         renderStats();
         applySearch();
     }

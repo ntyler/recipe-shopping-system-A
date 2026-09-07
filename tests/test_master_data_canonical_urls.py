@@ -201,7 +201,7 @@ def test_units_page_renders_the_persistent_registry_and_unit_editor(
         row.select_one(".unit-master-source-badge").get_text(strip=True)
         for row in built_in_rows
     } == {"Built-in"}
-    assert {row.select_one("input[data-unit-row-name]")["value"] for row in built_in_rows} >= {
+    assert {row.select_one('[data-unit-row-activate="name"]').get_text(strip=True) for row in built_in_rows} >= {
         "teaspoon",
         "cup",
         "gram",
