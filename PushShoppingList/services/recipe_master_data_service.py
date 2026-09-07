@@ -11,6 +11,7 @@ from datetime import datetime
 from pathlib import Path
 
 from PushShoppingList.services import storage_service
+from PushShoppingList.services import unit_category_service
 from PushShoppingList.services.ingredient_unit_service import canonical_unit_aliases
 from PushShoppingList.services.ingredient_unit_service import canonical_unit_options
 from PushShoppingList.services.ingredient_unit_service import canonical_unit
@@ -1239,6 +1240,7 @@ def ensure_recipe_master_schema(connection=None):
         """
     )
     migrate_workspace_unit_order(connection)
+    unit_category_service.ensure_schema(connection)
     connection.execute(
         """
         CREATE TABLE IF NOT EXISTS workspace_unit_aliases (
@@ -1951,10 +1953,7 @@ def _workspace_unit_registry_payload_from_connection(connection, user_id):
     return {
         "units": units,
         "aliases": aliases,
-        "categories": [
-            {"key": key, "label": label}
-            for key, label in UNIT_REGISTRY_CATEGORIES
-        ],
+        "categories": unit_category_service.read_categories(connection, user_id, units),
     }
 
 
@@ -1989,10 +1988,7 @@ def default_workspace_unit_registry_payload():
     return {
         "units": units,
         "aliases": aliases,
-        "categories": [
-            {"key": key, "label": label}
-            for key, label in UNIT_REGISTRY_CATEGORIES
-        ],
+        "categories": unit_category_service.default_categories(units),
     }
 
 
@@ -2243,6 +2239,7 @@ def read_workspace_unit_registry(user_id=None):
 
 
 def _seed_workspace_unit_registry(connection, user_id):
+    unit_category_service.seed_categories(connection, user_id)
     marker = connection.execute(
         "SELECT seed_version FROM workspace_unit_registry_seeds WHERE user_id = ?",
         (user_id,),
@@ -2354,7 +2351,12 @@ def workspace_unit_registry_with_usage(user_id=None):
 
 def _unit_registry_validation(connection, user_id, values, unit_id=""):
     canonical_name = clean_unit_registry_text(values.get("canonical_name") or values.get("name"))
-    category = unit_registry_key(values.get("category")).replace(" ", "_")
+    category = str(values.get("category") or "").strip()
+    # Preserve the legacy API's normalized built-in keys while keeping new
+    # workspace category IDs opaque and independent of their display names.
+    legacy_category = unit_registry_key(category).replace(" ", "_")
+    if legacy_category in UNIT_REGISTRY_CATEGORY_KEYS:
+        category = legacy_category
     raw_aliases = values.get("aliases", [])
     if not isinstance(raw_aliases, list):
         raw_aliases = []
@@ -2368,8 +2370,9 @@ def _unit_registry_validation(connection, user_id, values, unit_id=""):
     canonical_key = unit_registry_key(canonical_name)
     if canonical_name and not canonical_key:
         errors["canonical_name"] = "Enter a canonical name with letters or numbers."
-    if category not in UNIT_REGISTRY_CATEGORY_KEYS:
-        errors["category"] = "Choose one of the system-managed unit categories."
+    category_ids = {c["id"] for c in unit_category_service.read_categories(connection, user_id)}
+    if category not in category_ids:
+        errors["category"] = "Choose a unit category."
 
     aliases = []
     alias_keys = set()

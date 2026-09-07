@@ -99,6 +99,9 @@
         let saveButtonLabel = "Add Unit";
         let aiSuggestionPending = false;
         let suggestionRequestToken = 0;
+        let suggestionController = null;
+        let suggestedAliases = [];
+        const selectedAliases = new Set();
         let usageRequestToken = 0;
         let usageReturnFocus = null;
         let usageScrollState = [];
@@ -110,6 +113,7 @@
         let originalDraft = null;
         let serverErrors = {};
         let showValidation = false;
+        let categoryUI;
 
         const source = document.getElementById("ingredientUnitConfig");
         const status = root.querySelector("[data-unit-master-status]");
@@ -121,7 +125,9 @@
         const addButtons = Array.from(root.querySelectorAll("[data-unit-master-add-button]"));
         const countLabel = root.querySelector("[data-unit-master-count-label]");
         const nameInput = root.querySelector("[data-unit-master-name]");
-        const categorySelect = root.querySelector("[data-unit-master-category-select]");
+        let categorySelect = root.querySelector("[data-unit-master-category-select]");
+        const categoryTemplate = categoryList.querySelector('[data-unit-master-category]').cloneNode(true);
+        categoryTemplate.querySelector('[data-unit-master-category-rows]').replaceChildren();
         const firstInvalidControl = () => [nameInput, categorySelect, aliasInput].find(control => control.getAttribute("aria-invalid") === "true");
         const aliasInput = root.querySelector("[data-unit-master-alias-input]");
         const aliasChips = root.querySelector("[data-unit-master-alias-chips]");
@@ -129,6 +135,20 @@
         const suggestButton = root.querySelector("[data-unit-master-ai-suggest]");
         const suggestButtonLabel = root.querySelector("[data-unit-master-ai-suggest-label]");
         const aliasAddButton = root.querySelector("[data-unit-master-alias-add]");
+        // Upgrade a cached server template as well as freshly rendered markup.
+        let suggestions = root.querySelector('[data-unit-alias-suggestions]');
+        if (!suggestions) {
+            suggestions = document.createElement('section');
+            suggestions.className = 'unit-master-alias-suggestions';
+            suggestions.dataset.unitAliasSuggestions = '';
+            suggestions.setAttribute('aria-label', 'Suggested aliases');
+            suggestions.hidden = true;
+            suggestions.innerHTML = '<p data-unit-alias-suggestion-status role="status" aria-live="polite"></p><div class="unit-master-suggestion-chips" data-unit-alias-suggestion-chips role="group" aria-label="Select suggested aliases"></div><button type="button" data-unit-alias-add-selected disabled>Add selected</button>';
+            form.querySelector('footer').before(suggestions);
+        }
+        const suggestionStatus = root.querySelector('[data-unit-alias-suggestion-status]');
+        const suggestionChips = root.querySelector('[data-unit-alias-suggestion-chips]');
+        const addSelected = root.querySelector('[data-unit-alias-add-selected]');
         const editorTitle = root.querySelector("[data-unit-master-editor-title]");
         const editorKicker = root.querySelector("[data-unit-master-editor-kicker]");
         const editorFeedback = root.querySelector("[data-unit-master-editor-feedback]");
@@ -219,8 +239,14 @@
             for (const field of ['name', 'category']) {
                 const cell = row.querySelector(`[data-unit-master-${field}-cell]`);
                 const previous = cell.querySelector(`[data-unit-row-${field}], [data-unit-row-activate]`);
-                if (previous && previous.matches(`[data-unit-row-${field}]`) === editing) continue;
-                const control = document.createElement(editing ? field === 'name' ? 'input' : 'select' : 'button');
+                if (previous && previous.matches(`[data-unit-row-${field}]`) === editing) {
+                    if (field === 'category') {
+                        if (editing) { previous.value = draft.values.category; categoryUI.refresh(previous); }
+                        else previous.textContent = registry.categories.find(item => item.key === unit.category)?.label || unit.category;
+                    }
+                    continue;
+                }
+                const control = document.createElement(editing && field === 'name' ? 'input' : 'button');
                 const label = field === 'name' ? `canonical name for ${unit.name}` : `category for ${unit.name}`;
                 if (editing) {
                     control.dataset[field === 'name' ? 'unitRowName' : 'unitRowCategory'] = '';
@@ -230,25 +256,54 @@
                         control.type = 'text'; control.maxLength = 60; control.autocomplete = 'off'; control.required = true;
                         control.value = draft.values.canonical_name;
                     } else {
-                        registry.categories.forEach(item => control.add(new Option(item.label, item.key)));
                         control.value = draft.values.category;
+                        categoryUI.enhance(control);
                     }
                 } else {
                     control.type = 'button'; control.className = 'unit-master-inline-value';
                     control.dataset.unitRowActivate = field;
                     control.setAttribute('aria-label', `Edit ${label}`);
-                    if (field === 'category') control.setAttribute('aria-haspopup', 'listbox');
+                    if (field === 'category') control.setAttribute('aria-haspopup', 'menu');
                     control.textContent = field === 'name' ? unit.name : registry.categories.find(item => item.key === unit.category)?.label || unit.category;
                 }
                 if (previous) previous.replaceWith(control);
                 else cell.prepend(control);
             }
             const edit = row.querySelector('[data-unit-master-edit-button]');
-            const destination = row.querySelector(editing ? '.unit-master-aliases' : '.unit-master-action-cell');
+            const destination = row.querySelector('.unit-master-action-cell');
             if (edit.parentElement !== destination) destination.prepend(edit);
-            edit.className = editing ? 'unit-master-alias-details' : 'unit-master-edit-button';
-            edit.textContent = editing ? 'Edit aliases' : 'Edit unit';
-            edit.setAttribute('aria-label', `${editing ? 'Edit aliases for' : 'Edit unit'} ${unit.name}`);
+            edit.className = 'unit-master-edit-button';
+            edit.textContent = 'Edit unit';
+            edit.setAttribute('aria-label', `Edit unit ${unit.name}`);
+            edit.removeAttribute('aria-controls'); edit.removeAttribute('aria-expanded');
+            edit.hidden = editing;
+            const aliases = row.querySelector('.unit-master-aliases');
+            let actions = aliases.querySelector('.unit-master-alias-actions');
+            if (!actions) {
+                actions = document.createElement('span');
+                actions.className = 'unit-master-alias-actions';
+                for (const [mode, label, icon] of [['add', 'Add alias', '+'], ['suggest', 'Suggest aliases', '✨']]) {
+                    const button = document.createElement('button');
+                    button.type = 'button'; button.dataset.unitRowAlias = mode; button.textContent = icon;
+                    button.title = label; button.setAttribute('aria-label', label);
+                    button.setAttribute('aria-haspopup', 'dialog'); button.setAttribute('aria-controls', form.id);
+                    actions.append(button);
+                }
+                aliases.append(actions);
+            }
+            const values = editing ? draft.values.aliases : unit.aliases || [];
+            const signature = JSON.stringify(values);
+            if (aliases.dataset.aliases !== signature) {
+                aliases.querySelectorAll(':scope > code, :scope > span:not(.unit-master-alias-actions)').forEach(chip => chip.remove());
+                values.forEach(alias => {
+                    const chip = document.createElement('code'); chip.textContent = alias; aliases.insertBefore(chip, actions);
+                });
+                aliases.dataset.aliases = signature;
+            }
+            actions.querySelectorAll('button').forEach(button => {
+                button.disabled = mutationPending || orderPending;
+                button.setAttribute('aria-expanded', String(!form.hidden && editorUnitId === id && returnFocus === button));
+            });
             row.querySelector('[data-unit-row-save]').hidden = !editing;
             row.querySelector('[data-unit-row-cancel]').hidden = !editing;
         };
@@ -277,7 +332,9 @@
             row.querySelector('[data-unit-row-cancel]').disabled = draft.saving;
             const feedback = row.querySelector('[data-unit-row-status]');
             const aliasErrors = [...new Set(Object.values(errors.aliases))].join(' ');
-            feedback.textContent = aliasErrors || draft.feedback || (dirty ? 'Unsaved changes' : '');
+            feedback.textContent = aliasErrors ? 'Check aliases' : draft.feedback || (dirty ? 'Unsaved changes' : '');
+            feedback.title = aliasErrors;
+            feedback.classList.toggle('is-alias-error', Boolean(aliasErrors));
             feedback.hidden = !feedback.textContent;
             feedback.classList.toggle('is-error', Boolean(aliasErrors || draft.feedbackType === 'error'));
         };
@@ -317,22 +374,21 @@
                 control.focus({preventScroll: true});
                 if (field === 'name') control.setSelectionRange(control.value.length, control.value.length);
                 else {
-                    // Called synchronously from a trusted button click (also Enter/Space).
-                    // The first click both creates the select and opens its native menu.
-                    try { control.showPicker(); }
-                    catch (_) { /* Older browsers keep a focused, enabled native select. */ }
+                    categoryUI.openMenu(control);
                 }
             }
             return true;
         };
 
         const syncEditingContext = unit => {
+            form.classList.toggle('is-alias-popover', Boolean(unit));
+            if (unit) form.setAttribute('role', 'dialog');
+            else form.removeAttribute('role');
             form.querySelector(".unit-master-editor-grid").hidden = Boolean(unit);
             saveButton.hidden = Boolean(unit);
             cancelButton.textContent = unit ? "Close aliases" : "Cancel";
             editorPermissions.textContent = unit
-                ? "Edit name and category in the row, and aliases here. Use the row's Save or Cancel for all changes. The previous name remains an alias."
-                    + (unit.seeded ? " System-seeded units cannot be deleted." : "")
+                ? "Use the row’s Save or Cancel for all alias changes."
                 : "Choose a canonical name, category, and accepted aliases.";
         };
 
@@ -367,10 +423,11 @@
             form.classList.toggle("is-dirty", dirty);
             saveButton.disabled = busy || !dirty || invalid;
             suggestButton.disabled = busy || !unitKey(editorValues().canonical_name);
-            [nameInput, aliasInput, aliasAddButton].forEach(control => { control.disabled = busy; });
+            [nameInput, aliasInput, aliasAddButton].forEach(control => { control.disabled = mutationPending || orderPending; });
             categorySelect.disabled = busy;
+            categoryUI.refresh(categorySelect);
             cancelButton.disabled = orderPending || (mutationPending && (!editorUnitId || rowDraft(editorUnitId).saving));
-            aliasChips.querySelectorAll("button").forEach(button => { button.disabled = busy; });
+            aliasChips.querySelectorAll("button").forEach(button => { button.disabled = mutationPending || orderPending; });
             setFieldError(nameInput, nameError, showValidation ? errors.canonical_name : "");
             setFieldError(categorySelect, categoryError, showValidation ? errors.category : "");
             setFieldError(aliasInput, aliasError, showValidation ? [...new Set(Object.values(errors.aliases))].join(" ") : "");
@@ -382,13 +439,16 @@
             });
             const nextStatus = mutationPending ? "Saving changes…" : dirty ? "Unsaved changes" : "";
             if (dirtyStatus.textContent !== nextStatus) dirtyStatus.textContent = nextStatus;
-            const aliases = editorValues(true).aliases.filter((_, index) => !errors.aliases[index]).slice(0, 2);
+            const aliases = (cleanText(aliasInput.value) && !localAliasError(cleanText(aliasInput.value))
+                ? [cleanText(aliasInput.value)] : editorValues().aliases.filter((_, index) => !errors.aliases[index])).slice(0, 2);
             const name = cleanText(editorValues().canonical_name);
             const preview = name ? aliases.length
                 ? `${aliases.map(alias => `“${alias}”`).join(" and ")} will normalize to “${name}”.`
                 : `“${name}” is accepted as the canonical unit.` : "";
             if (aliasPreview.textContent !== preview) aliasPreview.textContent = preview;
             if (editorUnitId && !form.hidden) syncRowState(rowFor(editorUnitId));
+            refreshSuggestions();
+            positionAliasPopover();
         };
 
         // Keep the expanded editor at the same viewport position when rows are rebuilt.
@@ -440,8 +500,71 @@
             return validateUnitDraft({ ...editorValues(), aliases: [...editorAliases, alias] }, registry, editorUnitId).aliases[editorAliases.length] || "";
         };
 
+        const resetSuggestions = () => {
+            suggestionRequestToken += 1;
+            suggestionController?.abort();
+            suggestionController = null;
+            aiSuggestionPending = false;
+            suggestedAliases = [];
+            selectedAliases.clear();
+            suggestions.hidden = true;
+            suggestionChips.replaceChildren();
+            suggestButtonLabel.textContent = 'Suggest aliases';
+        };
+
+        const refreshSuggestions = () => {
+            const seen = new Set(editorValues(true).aliases.map(unitKey));
+            suggestedAliases = suggestedAliases.filter(alias => {
+                const key = unitKey(alias);
+                if (seen.has(key) || localAliasError(alias)) { selectedAliases.delete(alias); return false; }
+                seen.add(key); return true;
+            });
+            const signature = JSON.stringify(suggestedAliases);
+            if (suggestionChips.dataset.aliases !== signature) {
+                suggestionChips.replaceChildren(...suggestedAliases.map(alias => {
+                    const chip = document.createElement('button');
+                    chip.type = 'button'; chip.textContent = alias;
+                    chip.setAttribute('aria-label', alias);
+                    chip.addEventListener('click', () => {
+                        if (selectedAliases.has(alias)) selectedAliases.delete(alias); else selectedAliases.add(alias);
+                        refreshSuggestions();
+                    });
+                    return chip;
+                }));
+                suggestionChips.dataset.aliases = signature;
+            }
+            [...suggestionChips.children].forEach((chip, index) => {
+                chip.setAttribute('aria-pressed', String(selectedAliases.has(suggestedAliases[index])));
+                chip.disabled = mutationPending || orderPending || aiSuggestionPending;
+            });
+            addSelected.disabled = !selectedAliases.size || mutationPending || orderPending || aiSuggestionPending;
+            addSelected.hidden = !suggestedAliases.length;
+            if (!suggestions.hidden) suggestionStatus.textContent = aiSuggestionPending
+                ? 'Suggesting aliases…' : suggestedAliases.length
+                    ? 'Choose aliases to add to this draft.' : 'No new aliases to suggest.';
+        };
+
+        // Fixed top-layer placement avoids clipped category containers and scroll jumps.
+        const positionAliasPopover = () => {
+            if (!editorUnitId || form.hidden) return;
+            const cell = rowFor(editorUnitId)?.querySelector('.unit-master-aliases');
+            if (!cell) return;
+            const rect = cell.getBoundingClientRect(), viewport = window.visualViewport;
+            const left = (viewport?.offsetLeft || 0) + 12, top = (viewport?.offsetTop || 0) + 12;
+            const width = viewport?.width || innerWidth, height = viewport?.height || innerHeight;
+            const right = left + width - 24, bottom = top + height - 24;
+            form.style.width = `${Math.min(360, width - 24)}px`;
+            form.style.maxHeight = `${height - 24}px`;
+            const panel = form.getBoundingClientRect();
+            const below = bottom - rect.bottom - 6, above = rect.top - top - 6;
+            let y = rect.bottom + 6;
+            if (panel.height > below && above > below) y = rect.top - panel.height - 6;
+            form.style.left = `${Math.max(left, Math.min(rect.left, right - panel.width))}px`;
+            form.style.top = `${Math.max(top, Math.min(y, bottom - panel.height))}px`;
+        };
+
         const addPendingAlias = () => {
-            if (mutationPending || orderPending || aiSuggestionPending) return false;
+            if (mutationPending || orderPending) return false;
             const alias = cleanText(aliasInput.value);
             if (!alias) { aliasInput.focus({ preventScroll: true }); return false; }
             const error = localAliasError(alias);
@@ -470,7 +593,7 @@
                 registry.units.reduce((total, unit) => total + (Array.isArray(unit.aliases) ? unit.aliases.length : 0), 0),
             );
             root.querySelector("[data-unit-master-category-count]").textContent = String(
-                new Set(registry.units.map(unit => unit.category)).size,
+                registry.categories.length,
             );
         };
 
@@ -655,15 +778,11 @@
             category.className = "unit-master-category-cell";
             category.setAttribute("role", "cell");
             category.dataset.mobileLabel = "Category";
-            const categoryControl = document.createElement('select');
+            const categoryControl = document.createElement('button');
             categoryControl.dataset.unitRowCategory = '';
             categoryControl.setAttribute('aria-label', `Category for ${unit.name}`);
-            for (const item of registry.categories) {
-                const option = document.createElement('option');
-                option.value = item.key; option.textContent = item.label;
-                categoryControl.appendChild(option);
-            }
             categoryControl.value = draft.values.category;
+            categoryUI.enhance(categoryControl);
             const categoryError = document.createElement('small');
             categoryError.id = `unitRowCategoryError-${unit.id}`;
             categoryError.className = 'unit-master-field-error'; categoryError.dataset.unitRowCategoryError = '';
@@ -721,8 +840,6 @@
         const placeRows = (container, rows) => {
             rows.forEach(row => {
                 container.appendChild(row);
-                // Keep an open editor and its unsaved aliases with the unit.
-                if (!form.hidden && editorUnitId === row.dataset.unitId) container.appendChild(form);
             });
         };
         const moveRowTo = async (row, targetIndex, trigger) => {
@@ -776,8 +893,55 @@
             }
         };
 
+        const syncCategoryGroups = () => {
+            const groups = new Map([...categoryList.querySelectorAll('[data-unit-master-category]')].map(group => [group.dataset.category, group]));
+            registry.categories.forEach((category, index) => {
+                const group = groups.get(category.key) || categoryTemplate.cloneNode(true);
+                group.dataset.category = category.key;
+                const heading = group.querySelector('h3');
+                heading.id = `unitCategory-${category.key}`; heading.textContent = category.label;
+                group.setAttribute('aria-labelledby', heading.id);
+                group.querySelector('[role="table"]').setAttribute('aria-label', `${category.label} units`);
+                if (categoryList.children[index] !== group) categoryList.insertBefore(group, categoryList.children[index] || null);
+            });
+            return groups;
+        };
+
+        // Category-only mutations retain the existing row, inputs, alias editor and
+        // draft objects. Only labels, group placement and deleted category IDs change.
+        const updateCategories = (nextRegistry, result) => {
+            const anchor = inlineUnitId ? rowFor(inlineUnitId) : !form.hidden ? form : categoryList;
+            const restoreScroll = captureEditorScroll(anchor);
+            const focused = document.activeElement;
+            registry = nextRegistry; source.textContent = JSON.stringify(registry);
+            if (typeof recipeIngredientUnitRegistryCache !== 'undefined') recipeIngredientUnitRegistryCache = null;
+            for (const [id, draft] of rowDrafts) {
+                const saved = unitById(id);
+                if (saved) draft.original.category = saved.category;
+                if (draft.values.category === result.deleted_category_id) {
+                    draft.values.category = result.reassign_to || saved?.category || registry.categories[0].key;
+                    delete draft.errors.category;
+                }
+            }
+            if (categorySelect.value === result.deleted_category_id) categorySelect.value = result.reassign_to || registry.categories[0].key;
+            const oldGroups = syncCategoryGroups();
+            registry.units.forEach(unit => {
+                const row = rowFor(unit.id);
+                const group = categoryList.querySelector(`[data-category="${CSS.escape(unit.category)}"] [data-unit-master-category-rows]`);
+                if (row && group && row.parentElement !== group) {
+                    group.append(row);
+                }
+            });
+            for (const [key, group] of oldGroups) {
+                if (!registry.categories.some(c => c.key === key)) group.remove();
+            }
+            categoryUI.refreshAll(); renderStats(); applySearch();
+            focused?.focus({preventScroll: true}); restoreScroll();
+        };
+
         const renderRegistry = () => {
             parkEditor();
+            syncCategoryGroups();
             root.querySelectorAll("[data-unit-master-category]").forEach(category => {
                 const rows = category.querySelector("[data-unit-master-category-rows]");
                 const units = registry.units.filter(unit => unit.category === category.dataset.category);
@@ -786,9 +950,8 @@
             if (!form.hidden && editorUnitId) {
                 const row = rowFor(editorUnitId);
                 if (row) {
-                    row.after(form);
-                    returnFocus = row.querySelector('[data-unit-master-edit-button]');
-                    returnFocus.setAttribute('aria-expanded', 'true');
+                    returnFocus = row.querySelector('[data-unit-row-alias="add"]');
+                    returnFocus?.setAttribute('aria-expanded', 'true');
                 }
             }
             renderStats();
@@ -1040,13 +1203,6 @@
         const focusEditorName = () => {
             const target = editorUnitId ? aliasInput : nameInput;
             const rect = target.getBoundingClientRect();
-            // Preserve the table's scroll position. If the expanded field is below
-            // the viewport or covered by mobile navigation, keep focus on Edit;
-            // Tab then enters the editor and scrolls the field into view normally.
-            if (editorUnitId && document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2) !== target) {
-                returnFocus?.focus({ preventScroll: true });
-                return;
-            }
             try {
                 target.focus({ preventScroll: true });
             } catch (_error) {
@@ -1057,14 +1213,21 @@
             }
         };
 
-        const openEditor = (unit = null, trigger = null) => {
+        const openEditor = (unit = null, trigger = null, mode = 'add') => {
             if (orderPending || mutationPending) return;
             if (unit ? !activateInlineRow(unit.id, 'name', false) : !releaseInlineRow()) return;
             if (!form.hidden) {
-                if (editorUnitId === String(unit?.id || "")) { focusEditorName(); return; }
+                if (editorUnitId === String(unit?.id || "")) {
+                    returnFocus?.setAttribute('aria-expanded', 'false');
+                    returnFocus = trigger || returnFocus;
+                    returnFocus?.setAttribute('aria-expanded', 'true');
+                    focusEditorName();
+                    if (mode === 'suggest') suggestUnitDetails();
+                    return;
+                }
                 if (!closeEditor({ restoreFocus: false })) { focusEditorName(); return; }
             }
-            suggestionRequestToken += 1;
+            resetSuggestions();
             returnFocus = trigger || document.activeElement;
             editorUnitId = unit ? String(unit.id) : "";
             editorAliases = unit ? [...rowDraft(unit.id).values.aliases] : [];
@@ -1085,28 +1248,26 @@
             setAiPending(false);
             clearErrors();
             renderAliasChips();
-            const row = unit
-                ? root.querySelector(`[data-unit-master-row][data-unit-id="${CSS.escape(String(unit.id))}"]`)
-                : null;
-            if (row) {
-                row.insertAdjacentElement("afterend", form);
-            } else {
-                editorHome.before(form);
-            }
+            parkEditor();
             form.hidden = false;
+            if (unit) {
+                form.setAttribute('popover', 'manual');
+                form.showPopover();
+            }
             form.classList.toggle("is-editing", Boolean(unit));
             addButtons.forEach(button => button.setAttribute("aria-expanded", String(!unit)));
             if (trigger) trigger.setAttribute("aria-expanded", "true");
             syncOrderControls();
-            requestAnimationFrame(focusEditorName);
+            positionAliasPopover();
+            focusEditorName();
+            if (mode === 'suggest') suggestUnitDetails();
         };
 
         const closeEditor = ({ restoreFocus = true, discard = false } = {}) => {
             if (orderPending || (mutationPending && (!editorUnitId || rowDraft(editorUnitId).saving))) return false;
             if (!editorUnitId && !discard && !form.hidden && editorIsDirty() && !window.confirm("Discard unsaved changes to this unit?")) return false;
             const restoreScroll = captureEditorScroll(returnFocus?.isConnected ? returnFocus : form);
-            suggestionRequestToken += 1;
-            aiSuggestionPending = false;
+            resetSuggestions();
             const closingId = editorUnitId;
             if (closingId && !discard) syncEditorState();
             if (originalDraft) {
@@ -1115,10 +1276,14 @@
                 editorAliases = [...originalDraft.aliases];
             }
             aliasInput.value = "";
+            if (form.matches(':popover-open')) form.hidePopover();
+            form.removeAttribute('popover');
+            form.removeAttribute('style');
             form.hidden = true;
             clearErrors();
             syncEditorState();
             form.classList.remove("is-editing");
+            form.classList.remove('is-alias-popover');
             parkEditor();
             editorUnitId = "";
             if (closingId && discard) resetRow(closingId);
@@ -1163,38 +1328,41 @@
                 category: editorValues().category,
                 aliases: [...editorAliases, ...(pendingAlias ? [pendingAlias] : [])],
             };
-            clearErrors();
+            resetSuggestions();
             const requestToken = ++suggestionRequestToken;
+            suggestionController = new AbortController();
+            suggestions.hidden = false;
             setAiPending(true);
-            setEditorFeedback("AI is suggesting aliases for this measurement.", "pending");
+            setEditorFeedback('');
             try {
                 const response = await fetch(root.dataset.suggestUrl, {
                     method: "POST",
                     headers: { "Content-Type": "application/json", "X-Requested-With": "fetch" },
                     body: JSON.stringify(payload),
+                    signal: suggestionController.signal,
                 });
                 const result = await response.json().catch(() => ({}));
                 if (requestToken !== suggestionRequestToken || form.hidden) return;
                 if (!response.ok || !result.ok) {
+                    suggestions.hidden = true;
                     setAiPending(false);
                     applyServerErrors(result);
                     return;
                 }
 
                 const suggestion = result.suggestion || {};
-                editorAliases = Array.isArray(suggestion.aliases)
+                suggestedAliases = Array.isArray(suggestion.aliases)
                     ? suggestion.aliases.map(cleanText).filter(Boolean)
-                    : [...editorAliases];
-                aliasInput.value = "";
-                renderAliasChips();
+                    : [];
                 showValidation = true;
                 const warnings = Array.isArray(result.warnings) ? result.warnings.filter(Boolean) : [];
                 setEditorFeedback(
-                    [result.message || "Aliases suggested. Review before saving.", ...warnings].join(" "),
+                    warnings.join(" "),
                     warnings.length ? "warning" : "success",
                 );
             } catch (error) {
                 if (requestToken !== suggestionRequestToken) return;
+                suggestions.hidden = true;
                 setEditorFeedback("AI suggestions are unavailable right now. Your entered values were not changed.");
                 console.error("Unable to suggest unit details.", error);
             } finally {
@@ -1234,9 +1402,12 @@
                 const selection = activeSelector === '[data-unit-row-name]' ? [active.selectionStart, active.selectionEnd] : null;
                 const restoreScroll = captureEditorScroll(active.closest('[data-unit-master-row]') || row);
                 if (!form.hidden && editorUnitId === id) {
-                    suggestionRequestToken += 1;
+                    resetSuggestions();
+                    if (form.matches(':popover-open')) form.hidePopover();
+                    form.removeAttribute('popover');
+                    form.removeAttribute('style');
                     form.hidden = true;
-                    form.classList.remove('is-editing');
+                    form.classList.remove('is-editing', 'is-alias-popover');
                     editorUnitId = '';
                     originalDraft = null;
                     aliasInput.value = '';
@@ -1344,6 +1515,10 @@
             }
         };
 
+        categoryUI = window.createUnitCategoryUI({root, getRegistry: () => registry,
+            applyRegistry: updateCategories, announce: message => setStatus(message, 'success', true)});
+        categorySelect = categoryUI.enhance(categorySelect);
+
         addButtons.forEach(button => {
             button.addEventListener("click", event => openEditor(null, event.currentTarget));
         });
@@ -1353,6 +1528,7 @@
             const row = event.target.closest('[data-unit-master-row]'), id = row.dataset.unitId, draft = rowDraft(id);
             const key = name ? 'canonical_name' : 'category';
             draft.values[key] = event.target.value;
+            if (!form.hidden && editorUnitId === id) { resetSuggestions(); setEditorFeedback(''); }
             delete draft.errors[key];
             draft.feedback = ''; draft.feedbackType = '';
             syncRowState(row);
@@ -1361,6 +1537,11 @@
         categoryList.addEventListener('input', changeRowField);
         categoryList.addEventListener('change', changeRowField);
         categoryList.addEventListener("click", event => {
+            const aliasControl = event.target.closest('[data-unit-row-alias]');
+            if (aliasControl) {
+                openEditor(unitById(aliasControl.closest('[data-unit-master-row]').dataset.unitId), aliasControl, aliasControl.dataset.unitRowAlias);
+                return;
+            }
             const activate = event.target.closest('[data-unit-row-activate]');
             if (activate) {
                 activateInlineRow(activate.closest('[data-unit-master-row]').dataset.unitId, activate.dataset.unitRowActivate);
@@ -1384,7 +1565,7 @@
             }
             const button = event.target.closest("[data-unit-master-edit-button]");
             if (!button) return;
-            openEditor(unitById(button.dataset.unitId), button);
+            activateInlineRow(button.dataset.unitId);
         });
         categoryList.addEventListener("keydown", event => {
             if (event.target.closest('.is-inline-editing') && event.key === 'Escape') {
@@ -1442,6 +1623,18 @@
         });
         aliasAddButton.addEventListener("click", addPendingAlias);
         suggestButton.addEventListener("click", suggestUnitDetails);
+        addSelected.addEventListener('click', () => {
+            if (addSelected.disabled) return;
+            refreshSuggestions();
+            const additions = suggestedAliases.filter(alias => selectedAliases.has(alias));
+            editorAliases.push(...additions);
+            selectedAliases.clear();
+            renderAliasChips();
+            showValidation = true;
+            syncEditorState();
+            setEditorFeedback(`${additions.length} alias${additions.length === 1 ? '' : 'es'} added to the draft.`, 'success');
+            aliasInput.focus({preventScroll: true});
+        });
         aliasInput.addEventListener("keydown", event => {
             if (event.key === "Enter" || event.key === ",") {
                 event.preventDefault();
@@ -1454,19 +1647,49 @@
             showValidation = true;
             if (event.target === nameInput) delete serverErrors.canonical_name;
             if (event.target === categorySelect) delete serverErrors.category;
+            if (event.target === nameInput || event.target === categorySelect) resetSuggestions();
             setEditorFeedback("");
             syncEditorState();
         });
-        categorySelect.addEventListener("change", () => { delete serverErrors.category; showValidation = true; syncEditorState(); });
+        categorySelect.addEventListener("change", () => { delete serverErrors.category; resetSuggestions(); showValidation = true; syncEditorState(); });
         window.addEventListener("beforeunload", event => {
             if (mutationPending || [...rowDrafts.keys()].some(rowIsDirty) || (!form.hidden && editorIsDirty())) { event.preventDefault(); event.returnValue = ""; }
         });
         form.addEventListener("keydown", event => {
             if (form.hidden) return;
+            if (editorUnitId && event.key === 'Tab') {
+                const controls = [...form.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled)')].filter(control => control.getClientRects().length);
+                if (event.shiftKey && event.target === controls[0]) {
+                    event.preventDefault(); closeEditor();
+                } else if (!event.shiftKey && event.target === controls.at(-1)) {
+                    event.preventDefault();
+                    const row = rowFor(editorUnitId);
+                    closeEditor({restoreFocus: false});
+                    row.querySelector('[data-unit-row-category]').focus({preventScroll: true});
+                }
+            }
             if (event.key !== "Escape") return;
             event.preventDefault();
+            event.stopPropagation();
             closeEditor();
         });
+        document.addEventListener('pointerdown', event => {
+            if (!editorUnitId || form.hidden || form.contains(event.target) || event.target.closest('[data-unit-row-alias]')) return;
+            closeEditor({restoreFocus: !event.target.closest('button, input, select, textarea, a[href], [tabindex]')});
+        });
+        document.addEventListener('focusin', event => {
+            if (!editorUnitId || form.hidden || form.contains(event.target) || event.target.closest('[data-unit-row-alias]')) return;
+            closeEditor({restoreFocus: false});
+        });
+        document.addEventListener('keydown', event => {
+            if (event.key !== 'Escape' || event.defaultPrevented || !editorUnitId || form.hidden) return;
+            event.preventDefault(); event.stopPropagation(); closeEditor();
+        }, true);
+        window.addEventListener('resize', positionAliasPopover);
+        document.addEventListener('scroll', positionAliasPopover, true);
+        window.visualViewport?.addEventListener('resize', positionAliasPopover);
+        window.visualViewport?.addEventListener('scroll', positionAliasPopover);
+        new ResizeObserver(positionAliasPopover).observe(form);
         root.querySelectorAll("[data-unit-master-usage-close]").forEach(button => {
             button.addEventListener("click", closeUsage);
         });

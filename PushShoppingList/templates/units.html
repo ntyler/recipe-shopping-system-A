@@ -18,6 +18,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
              data-unit-master-page
              data-unit-row-interaction="click-to-edit"
              data-create-url="{{ master_data.create_url }}"
+             data-categories-url="{{ master_data.categories_url }}"
              data-update-url-template="{{ master_data.update_url_template }}"
              data-usage-url-template="{{ master_data.usage_url_template }}"
              data-import-url="{{ master_data.import_url }}"
@@ -151,13 +152,15 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                         <div class="unit-master-aliases" role="cell" data-mobile-label="Accepted aliases">
                                             {% for alias in unit.aliases %}
                                                 <code>{{ alias }}</code>
-                                            {% else %}
-                                                <span>Canonical name only</span>
                                             {% endfor %}
+                                            <span class="unit-master-alias-actions">
+                                                <button type="button" data-unit-row-alias="add" aria-label="Add alias" title="Add alias" aria-haspopup="dialog" aria-controls="unitMasterInlineEditor" aria-expanded="false">+</button>
+                                                <button type="button" data-unit-row-alias="suggest" aria-label="Suggest aliases" title="Suggest aliases" aria-haspopup="dialog" aria-controls="unitMasterInlineEditor" aria-expanded="false">&#10024;</button>
+                                            </span>
                                         </div>
                                         <div class="unit-master-category-cell" role="cell" data-mobile-label="Category" data-unit-master-category-cell>
                                             <button type="button" class="unit-master-inline-value" data-unit-row-activate="category"
-                                                aria-haspopup="listbox" aria-label="Edit category for {{ unit.name }}">{{ category.label }}</button>
+                                                aria-haspopup="menu" aria-label="Edit category for {{ unit.name }}">{{ category.label }}</button>
                                             <small id="unitRowCategoryError-{{ unit.id }}" class="unit-master-field-error" data-unit-row-category-error aria-live="polite" hidden></small>
                                         </div>
                                         <div class="unit-master-usage" role="cell" data-mobile-label="Used in">
@@ -184,7 +187,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                         </span>
                                         <div class="unit-master-action-cell" role="cell">
                                             <button type="button" class="unit-master-edit-button" data-unit-master-edit-button data-unit-id="{{ unit.id }}"
-                                                aria-controls="unitMasterInlineEditor" aria-expanded="false" aria-label="Edit unit {{ unit.name }}">Edit unit</button>
+                                                aria-label="Edit unit {{ unit.name }}">Edit unit</button>
                                             <button type="button" class="unit-master-edit-button" data-unit-row-save aria-label="Save {{ unit.name }}" disabled hidden>Save</button>
                                             <button type="button" class="unit-master-edit-button" data-unit-row-cancel aria-label="Cancel changes to {{ unit.name }}" hidden>Cancel</button>
                                             <small class="unit-master-row-status" data-unit-row-status role="status" aria-live="polite" hidden></small>
@@ -261,6 +264,12 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
 
                 {{ accepted_alias_editor('unit-master', 'unitAlias') }}
 
+                <section class="unit-master-alias-suggestions" data-unit-alias-suggestions aria-label="Suggested aliases" hidden>
+                    <p data-unit-alias-suggestion-status role="status" aria-live="polite"></p>
+                    <div class="unit-master-suggestion-chips" data-unit-alias-suggestion-chips role="group" aria-label="Select suggested aliases"></div>
+                    <button type="button" data-unit-alias-add-selected disabled>Add selected</button>
+                </section>
+
                 <footer>
                     <div class="unit-master-editor-state">
                         <span data-unit-master-dirty-status role="status" aria-live="polite"></span>
@@ -283,6 +292,41 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
             </div>
         </section>
 
+        <dialog class="unit-category-dialog" data-category-editor aria-labelledby="unitCategoryEditorTitle">
+            <form data-category-form novalidate>
+                <h2 id="unitCategoryEditorTitle">Add category</h2>
+                <div data-category-fields>
+                    <label for="unitCategoryName">Category name</label>
+                    <input id="unitCategoryName" name="name" maxlength="60" autocomplete="off" required aria-describedby="unitCategoryNameError">
+                    <small id="unitCategoryNameError" class="unit-master-field-error" aria-live="polite" hidden></small>
+                    <label for="unitCategoryDescription">Description <span>(optional)</span></label>
+                    <textarea id="unitCategoryDescription" name="description" maxlength="300" rows="2" aria-describedby="unitCategoryDescriptionError"></textarea>
+                    <small id="unitCategoryDescriptionError" class="unit-master-field-error" aria-live="polite" hidden></small>
+                </div>
+                <div data-category-delete-fields hidden>
+                    <p data-category-delete-context></p>
+                    <label for="unitCategoryReassign">Reassign units to</label>
+                    <select id="unitCategoryReassign" aria-describedby="unitCategoryMutationError"></select>
+                </div>
+                <p id="unitCategoryMutationError" role="alert" hidden></p>
+                <footer>
+                    <button type="button" class="secondary" data-category-editor-cancel>Cancel</button>
+                    <button type="submit" data-category-submit>Add Category</button>
+                </footer>
+            </form>
+        </dialog>
+        <dialog class="unit-category-dialog unit-category-manager" data-category-manager aria-labelledby="unitCategoryManagerTitle" aria-describedby="unitCategoryManagerHelp">
+            <header>
+                <h2 id="unitCategoryManagerTitle">Manage categories</h2>
+                <p id="unitCategoryManagerHelp">Set the order used in category menus and the Units page. Required categories can be renamed but cannot be deleted.</p>
+            </header>
+            <div data-category-manager-list></div>
+            <p data-category-manager-status role="status" aria-live="polite"></p>
+            <footer>
+                <button type="button" class="secondary" data-category-manager-add>+ Add category</button>
+                <button type="button" data-category-manager-close>Done</button>
+            </footer>
+        </dialog>
         <dialog id="unitMasterUsageDialog"
                 class="unit-master-usage-dialog master-data-usage-dialog"
                 data-unit-master-usage-dialog
@@ -317,5 +361,6 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
 {% endblock %}
 
 {% block app_scripts %}
+<script src="{{ url_for('static', filename='js/unit_categories.js', v=unit_categories_js_version) }}" defer></script>
 <script src="{{ url_for('static', filename='js/units.js', v=units_js_version) }}" defer></script>
 {% endblock %}

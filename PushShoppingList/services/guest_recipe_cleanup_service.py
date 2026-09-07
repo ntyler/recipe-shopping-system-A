@@ -64,6 +64,7 @@ OWNER_SCOPED_TABLES = (
     "workspace_unit_aliases",
     "workspace_unit_registry_seeds",
     "workspace_units",
+    "workspace_unit_categories",
 )
 
 
@@ -114,6 +115,7 @@ DELETE_ORDER = (
     "workspace_unit_aliases",
     "workspace_unit_registry_seeds",
     "workspace_units",
+    "workspace_unit_categories",
     "workspace_ingredient_type_registry_seeds",
     "workspace_ingredient_types",
     "workspace_cuisine_category_registry_seeds",

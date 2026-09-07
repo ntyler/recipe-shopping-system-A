@@ -26,10 +26,13 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
         const screenshot = async filename => { if (artifacts) { fs.mkdirSync(artifacts, { recursive: true }); await page.screenshot({ path: path.join(artifacts, filename) }); } };
         const openCategory = async (r, key = null) => {
             if (key) await display(r, 'category').press(key); else await display(r, 'category').click();
-            // Check the actual browser popup, not just a showPicker spy or a hidden select.
-            await page.waitForFunction(() => document.querySelector('[data-unit-row-category]')?.matches(':open'));
+            await page.locator('#unitCategoryMenu').waitFor({state: 'visible'});
             assert(await category(r).isEnabled());
-            assert(await category(r).evaluate(e => e === document.activeElement));
+            assert(await page.locator('#unitCategoryMenu [aria-checked="true"]').evaluate(e => e === document.activeElement));
+        };
+        const selectCategory = async (control, key) => {
+            await control.click();
+            await page.locator(`#unitCategoryMenu [data-category-id="${key}"]`).click();
         };
         let releaseScript;
         const gate = new Promise(resolve => releaseScript = resolve);
@@ -38,10 +41,9 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
         await display(a()).waitFor();
         assert.equal(await page.title(), 'Units');
         assert.equal(await page.locator('[data-unit-master-row] input, [data-unit-master-row] select').count(), 0);
-        await page.evaluate(() => document.fonts.ready);
         const height = (await a().boundingBox()).height;
         assert.equal(height, 68);
-        releaseScript(); await navigation;
+        releaseScript(); await navigation; await page.evaluate(() => document.fonts.ready);
         assert.equal((await a().boundingBox()).height, height);
         assert.equal(await page.locator('[data-unit-master-row]').count(), 35);
         await screenshot('units-click-rest.png');
@@ -63,8 +65,10 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
             const r = row(unit.id);
             await display(r).click();
             assert.equal(await name(r).inputValue(), unit.name); assert(await name(r).isEnabled());
-            assert(await category(r).isEnabled()); assert.equal(await category(r).inputValue(), unit.category);
-            assert.deepEqual(await category(r).locator('option').evaluateAll(options => options.map(o => o.value)), registry.categories.map(c => c.key));
+            assert(await category(r).isEnabled()); assert.equal(await category(r).evaluate(e => e.value), unit.category);
+            await category(r).click();
+            assert.deepEqual(await page.locator('#unitCategoryMenu [role="menuitemradio"]').evaluateAll(options => options.map(o => o.dataset.categoryId)), registry.categories.map(c => c.key));
+            await page.keyboard.press('Escape');
             assert.equal(await page.locator('.is-inline-editing').count(), 1);
             await cancel(r).click();
         }
@@ -72,7 +76,8 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
         // Keyboard activation, normal focus navigation, and Escape cancellation.
         await display(a()).focus(); await page.keyboard.press('Enter');
         assert(await name(a()).evaluate(e => e === document.activeElement));
-        await page.keyboard.press('Tab'); assert(await a().locator('[data-unit-master-edit-button]').evaluate(e => e === document.activeElement));
+        await page.keyboard.press('Tab'); assert(await a().locator('[data-unit-row-alias="add"]').evaluate(e => e === document.activeElement));
+        await page.keyboard.press('Tab'); assert(await a().locator('[data-unit-row-alias="suggest"]').evaluate(e => e === document.activeElement));
         await page.keyboard.press('Tab'); assert(await category(a()).evaluate(e => e === document.activeElement));
         await page.keyboard.press('Escape'); assert.equal(await name(a()).count(), 0);
         await display(a()).press('Space'); assert(await name(a()).evaluate(e => e === document.activeElement));
@@ -92,7 +97,7 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
 
         // First click opens the category menu; keyboard selection commits locally only.
         await openCategory(a()); await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter');
-        assert.equal(await category(a()).inputValue(), 'weight'); assert.equal(await group(a()), 'volume');
+        assert.equal(await category(a()).evaluate(e => e.value), 'weight'); assert.equal(await group(a()), 'volume');
         assert.equal(writes.length, 0); assert(await save(a()).isEnabled());
         assert.equal((await a().boundingBox()).height, height);
         const scroll = await page.locator('#appContent').evaluate(e => e.scrollTop);
@@ -112,8 +117,8 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
         }
         await page.reload(); assert.equal(await display(a()).innerText(), 'teaspoon'); assert.equal(await group(a()), 'weight');
 
-        // Expanded aliases share the active row's draft and single Save/Cancel workflow.
-        await a().locator('[data-unit-master-edit-button]').click();
+        // The alias popover shares the active row's draft and single Save/Cancel workflow.
+        await a().locator('[data-unit-row-alias="add"]').click();
         assert(await name(a()).isEnabled()); assert(await form.isVisible());
         assert.equal(await form.locator('[data-unit-master-name]:visible, [data-unit-master-category-select]:visible').count(), 0);
         await alias.fill('TBSP'); assert(await save(a()).isDisabled());
@@ -121,12 +126,12 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
         await page.route('**/api/master-data/units/suggest', route => route.fulfill({ json: { ok: true, suggestion: { canonical_name: 'BAD AI NAME', category: 'optional', aliases: ['tsp', 'tsps', 'teaspoons', 'tea measure'] } } }), { times: 1 });
         await form.locator('[data-unit-master-ai-suggest]').click();
         await form.getByRole('button', { name: 'Remove alias tea measure', exact: true }).waitFor();
-        assert.equal(await name(a()).inputValue(), 'teaspoon'); assert.equal(await category(a()).inputValue(), 'weight');
+        assert.equal(await name(a()).inputValue(), 'teaspoon'); assert.equal(await category(a()).evaluate(e => e.value), 'weight');
         await form.getByRole('button', { name: 'Close aliases', exact: true }).click();
         await name(a()).fill('measuring teaspoon'); await save(a()).click(); await display(a()).waitFor();
         assert.equal(await display(a()).innerText(), 'measuring teaspoon'); assert.match(await a().locator('.unit-master-aliases').innerText(), /tea measure/);
-        await a().locator('[data-unit-master-edit-button]').click(); await alias.fill('canceled alias');
-        await name(a()).fill('canceled name'); await category(a()).selectOption('optional'); await cancel(a()).click();
+        await a().locator('[data-unit-row-alias="add"]').click(); await alias.fill('canceled alias');
+        await name(a()).fill('canceled name'); await selectCategory(category(a()), 'optional'); await cancel(a()).click();
         assert(await form.isHidden()); assert.equal(await display(a()).innerText(), 'measuring teaspoon'); assert.equal(await group(a()), 'weight');
 
         await display(a()).click(); await name(a()).fill('server conflict draft');
@@ -146,7 +151,7 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
         await a().locator('[data-unit-master-drag-handle]').dragTo(row('weight_gram'), { targetPosition: { x: 50, y: 60 } }); assert((await ordered).ok());
         await display(a()).click(); await name(a()).fill('desktop draft'); await screenshot('units-click-edit.png'); await cancel(a()).click();
         await page.setViewportSize({ width: 390, height: 844 }); await display(a()).click();
-        await name(a()).fill('mobile draft'); await category(a()).selectOption('volume');
+        await name(a()).fill('mobile draft'); await selectCategory(category(a()), 'volume');
         assert(await save(a()).isEnabled()); assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
         const saveBox = await save(a()).boundingBox(), cancelBox = await cancel(a()).boundingBox();
         assert(saveBox.x + saveBox.width <= cancelBox.x); assert.equal(saveBox.y, cancelBox.y);
@@ -157,6 +162,7 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
         await page.route('**/admin/master-data/units', async route => {
             const response = await route.fetch();
             const html = (await response.text()).replace('data-unit-row-interaction="click-to-edit"', '')
+                .replace(/<section class="unit-master-alias-suggestions"[\s\S]*?<\/section>/, '')
                 .replace(/<button[^>]*data-unit-row-activate="(name|category)"[^>]*>([^<]*)<\/button>/g, '<span>$2</span>');
             assert(!html.includes('data-unit-row-activate='));
             await route.fulfill({ response, body: html });
@@ -166,10 +172,10 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
         await openCategory(a()); await page.keyboard.press('Escape'); await cancel(a()).click();
         await page.reload(); assert.equal(await display(a()).innerText(), 'measuring teaspoon'); assert.equal(await group(a()), 'weight');
         await page.locator('[data-unit-master-add-button]').first().click();
-        await form.locator('[data-unit-master-name]').fill('test scoop'); await form.locator('[data-unit-master-category-select]').selectOption('volume');
+        await form.locator('[data-unit-master-name]').fill('test scoop'); await selectCategory(form.locator('[data-unit-master-category-select]'), 'volume');
         await form.locator('[data-unit-master-save]').click(); await form.waitFor({ state: 'hidden' });
         assert.equal(await page.locator('[data-unit-master-row]').count(), 36);
         assert.deepEqual(errors, []);
-        console.log('PASS real click/focus/typing, native category popup, all seeded rows, Enter/Space/Tab/Escape, Save/Cancel, single-row guard, conflicts, aliases/AI, category order/counts, saved references, refresh, reorder, mobile, cached static template recovery, Add Unit, console');
+        console.log('PASS real click/focus/typing, category menu, all seeded rows, Enter/Space/Tab/Escape, Save/Cancel, single-row guard, conflicts, aliases/AI, category order/counts, saved references, refresh, reorder, mobile, cached static template recovery, Add Unit, console');
     } finally { await browser.close(); }
 })().catch(error => { console.error(String(error.message).split('Call log:')[0]); console.error(String(error.stack || '').split('\n').filter(line => /^\s+at /.test(line)).slice(0, 6).join('\n')); process.exitCode = 1; });

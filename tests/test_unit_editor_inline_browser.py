@@ -13,7 +13,8 @@ from test_unit_registry_management import unit_registry_app, sign_in
 from test_unit_edit_usage_flow import seed_usage, reference_measurements
 
 
-def test_unit_cells_activate_real_controls_on_click(unit_registry_app):
+@pytest.mark.parametrize('script', ['units_inline.cjs', 'unit_categories.cjs', 'units_alias_popover.cjs'])
+def test_unit_cells_activate_real_controls_on_click(unit_registry_app, script):
     node = shutil.which('node')
     module = os.environ.get('AI_PANTRY_PLAYWRIGHT_MODULE', 'playwright')
     if not node or subprocess.run([node, '-e', 'require.resolve(process.argv[1])', module], capture_output=True).returncode:
@@ -29,8 +30,8 @@ def test_unit_cells_activate_real_controls_on_click(unit_registry_app):
     thread.start()
     try:
         result = subprocess.run(
-            [node, str(Path(__file__).parent / 'browser' / 'units_inline.cjs'), module, f'http://127.0.0.1:{server.server_port}'],
-            input=json.dumps(browser_cookie), capture_output=True, text=True, timeout=120,
+            [node, str(Path(__file__).parent / 'browser' / script), module, f'http://127.0.0.1:{server.server_port}'],
+            input=json.dumps(browser_cookie), capture_output=True, text=True, timeout=180,
         )
         assert result.returncode == 0, result.stdout + result.stderr
     finally:

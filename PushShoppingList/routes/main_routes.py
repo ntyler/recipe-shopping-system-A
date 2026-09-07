@@ -1739,9 +1739,10 @@ def unit_master_data_context(scope_info):
         "seeded_count": sum(1 for unit in registry["units"] if unit.get("seeded")),
         "custom_count": sum(1 for unit in registry["units"] if not unit.get("seeded")),
         "alias_count": sum(len(unit.get("aliases", [])) for unit in registry["units"]),
-        "category_count": len({unit["category"] for unit in registry["units"]}),
+        "category_count": len(registry["categories"]),
         "category_options": registry.get("categories", []),
         "create_url": url_for("main_bp.master_data_units_api_route"),
+        "categories_url": url_for("main_bp.master_data_unit_categories_api_route"),
         "update_url_template": url_for(
             "main_bp.master_data_unit_api_route",
             unit_id="__UNIT_ID__",
@@ -1795,6 +1796,7 @@ def master_data_units_route():
         app_css_version=static_asset_version("css/app.css"),
         app_js_version=static_asset_version("js/app.js"),
         units_js_version=static_asset_version("js/units.js"),
+        unit_categories_js_version=static_asset_version("js/unit_categories.js"),
     )
 
 
@@ -1818,6 +1820,23 @@ def master_data_units_api_route():
         result["registry"] = recipe_master_data.workspace_unit_registry_with_usage(
             workspace_user_id
         )
+    status = int(result.pop("status", 201 if result.get("created") else 200))
+    return jsonify(result), status
+
+
+@main_bp.route("/api/master-data/unit-categories", methods=["POST"])
+@main_bp.route("/api/master-data/unit-categories/<category_id>", methods=["PUT", "PATCH", "DELETE"])
+def master_data_unit_categories_api_route(category_id=""):
+    from PushShoppingList.services import unit_category_service
+
+    workspace_user_id = recipe_master_data.scoped_recipe_user_id()
+    payload = request.get_json(silent=True) or {}
+    action = "delete" if request.method == "DELETE" else (
+        payload.get("action", "save") if isinstance(payload, dict) else "save")
+    result = unit_category_service.mutate_category(
+        payload, category_id, action=action, user_id=workspace_user_id)
+    if result.get("ok"):
+        result["registry"] = recipe_master_data.workspace_unit_registry_with_usage(workspace_user_id)
     status = int(result.pop("status", 201 if result.get("created") else 200))
     return jsonify(result), status
 

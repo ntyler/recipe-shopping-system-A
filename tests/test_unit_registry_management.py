@@ -332,7 +332,7 @@ def test_collisions_and_repeated_submissions_do_not_create_duplicates(
         )
         assert invented_category.status_code == 422
         assert invented_category.get_json()["errors"]["category"] == (
-            "Choose one of the system-managed unit categories."
+            "Choose a unit category."
         )
 
 
@@ -418,7 +418,7 @@ def test_units_page_exposes_accessible_inline_editor_and_import_offer(
         assert name.name == category.name == 'button'
         assert name.get_text(strip=True) == unit['name']
         assert category.get_text(strip=True) == dict(master_data.UNIT_REGISTRY_CATEGORIES)[unit['category']]
-        assert category['aria-haspopup'] == 'listbox'
+        assert category['aria-haspopup'] == 'menu'
         for control in (name, category):
             assert not any(control.has_attr(attr) for attr in ('disabled', 'readonly', 'hidden'))
             assert control.get('aria-label')
@@ -473,7 +473,11 @@ def test_units_page_exposes_accessible_inline_editor_and_import_offer(
     assert 'form.hidden = false;' in script
     assert all(button.get("aria-controls") == "unitMasterInlineEditor"
                and button.get("aria-expanded") == "false"
-               for button in soup.select("[data-unit-master-edit-button]"))
+               and button.get("aria-haspopup") == "dialog"
+               and button.get("aria-label") == button.get("title")
+               for button in soup.select("[data-unit-row-alias]"))
+    assert len(soup.select('[data-unit-row-alias="add"]')) == 35
+    assert len(soup.select('[data-unit-row-alias="suggest"]')) == 35
 
 
 def test_unit_usage_counts_distinct_recipes_and_lists_matching_lines(
