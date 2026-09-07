@@ -82916,10 +82916,18 @@ body.recipe-edit-standalone-page #recipeEditIngredients
 .unit-master-page--registry-v2 .master-data-registry-category {
     overflow: clip;
     background: transparent;
+    /* Instructions uses this same structural token through --recipe-editor-border. */
+    border-color: var(--app-border-subtle);
+}
+
+.unit-master-page--registry-v2 .unit-master-category > header,
+.unit-master-page--registry-v2 .unit-master-row {
+    border-bottom-color: var(--app-border-subtle);
 }
 
 .unit-master-page--registry-v2 .master-data-registry-table .unit-master-table-head {
     border-radius: 0;
+    border-bottom-color: var(--app-border-subtle);
 }
 
 .unit-master-page--registry-v2 .unit-master-row {

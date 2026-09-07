@@ -50,12 +50,12 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
         assert(accepted.includes('tbsp'));
         assert.equal(await cell.locator('.unit-master-alias-actions').evaluate(e => getComputedStyle(e).opacity), '1');
         assert(await add.isVisible()); assert(await add.isEnabled());
-        const restingBackground = await add.evaluate(e => getComputedStyle(e).backgroundColor);
+        const restingBorder = await add.evaluate(e => getComputedStyle(e).borderColor);
         await add.hover();
-        await page.waitForFunction(background => {
+        await page.waitForFunction(border => {
             const control = document.querySelector('[data-unit-id="volume_tablespoon"] [data-unit-row-alias="add"]');
-            return getComputedStyle(control).backgroundColor !== background;
-        }, restingBackground);
+            return getComputedStyle(control).borderColor !== border;
+        }, restingBorder);
         await page.mouse.move(0, 0);
         assert.equal(await cell.locator('[data-unit-row-alias]').count(),1);
         assert.equal(await page.locator('[data-unit-row-alias="suggest"]').count(),0);

@@ -57,7 +57,7 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
             assert.equal(await page.locator('[data-unit-master-row]').count(), 38);
             assert.equal(await page.locator('[data-unit-row-save]:visible').count(), 0);
             await reveal(unit);
-            const compact = await geometry(unit);
+            const compact = await geometry(row('volume_tablespoon'));
             assert(compact.row.height <= 180, `Compact resting card at ${width}px: ${compact.row.height}`);
             assert.equal(compact.background, 'rgba(0, 0, 0, 0)');
             const [orderCell, nameCell, aliasesCell, categoryCell, usageCell, sourceCell] = compact.cells;
@@ -141,6 +141,31 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
             await handle(unit).tap(); await up.tap(); await save(unit).tap(); await display(unit).waitFor();
             const orderAfter = (await registry()).units.filter(u => u.category === 'volume').map(u => u.id);
             assert.equal(orderAfter.indexOf('volume_teaspoon'), orderBefore.indexOf('volume_teaspoon') - 1);
+
+            // Real touch pointer dragging uses the same draft/cancel ordering path.
+            const volumeRows = page.locator('[data-category="volume"] [data-unit-master-row]');
+            const dragId = await volumeRows.nth(0).getAttribute('data-unit-id');
+            const dragRow = row(dragId);
+            await reveal(dragRow);
+            const start = await handle(dragRow).boundingBox(), end = await volumeRows.nth(1).boundingBox();
+            const touch = await context.newCDPSession(page);
+            await touch.send('Input.dispatchTouchEvent', {type: 'touchStart', touchPoints: [{x: start.x + 22, y: start.y + 22, id: 1}]});
+            await touch.send('Input.dispatchTouchEvent', {type: 'touchMove', touchPoints: [{x: start.x + 22, y: end.y + end.height - 12, id: 1}]});
+            await page.waitForFunction(() => document.querySelector('.is-row-drop-after'));
+            await touch.send('Input.dispatchTouchEvent', {type: 'touchEnd', touchPoints: []});
+            await save(dragRow).waitFor({state: 'visible'});
+            assert.equal(await volumeRows.nth(1).getAttribute('data-unit-id'), dragId);
+            assert(await save(dragRow).isEnabled());
+            await cancel(dragRow).tap();
+            assert.equal(await volumeRows.nth(0).getAttribute('data-unit-id'), dragId);
+            await touch.detach();
+
+            await reveal(unit); await unit.locator('[data-unit-master-usage-button]').tap();
+            const usage = page.locator('[data-unit-master-usage-dialog]');
+            await usage.waitFor({state: 'visible'});
+            assert(await usage.getByRole('link').count() > 0);
+            await usage.locator('[data-unit-master-usage-close]').first().tap();
+            assert(await usage.isHidden());
 
             // Final category, last card, footer Add, and the draft can clear the fixed navigation.
             const bottom = page.locator('[data-unit-master-add-button]').last();
