@@ -13,8 +13,7 @@ from test_unit_registry_management import unit_registry_app, sign_in
 from test_unit_edit_usage_flow import seed_usage, reference_measurements
 
 
-@pytest.mark.parametrize('script', ['units_inline.cjs', 'unit_categories.cjs', 'units_alias_popover.cjs', 'units_alias_controls.cjs', 'units_new_draft.cjs', 'units_save_actions.cjs', 'units_mobile.cjs'])
-def test_unit_cells_activate_real_controls_on_click(unit_registry_app, script):
+def run_registry_browser(unit_registry_app, script):
     node = shutil.which('node')
     module = os.environ.get('AI_PANTRY_PLAYWRIGHT_MODULE', 'playwright')
     if not node or subprocess.run([node, '-e', 'require.resolve(process.argv[1])', module], capture_output=True).returncode:
@@ -39,7 +38,28 @@ def test_unit_cells_activate_real_controls_on_click(unit_registry_app, script):
         server.server_close()
         thread.join(timeout=5)
     after = reference_measurements()
+    return before, after
+
+
+@pytest.mark.parametrize('script', ['units_inline.cjs', 'unit_categories.cjs', 'units_alias_popover.cjs', 'units_alias_controls.cjs', 'units_new_draft.cjs', 'units_save_actions.cjs', 'units_mobile.cjs'])
+def test_unit_cells_activate_real_controls_on_click(unit_registry_app, script):
+    before, after = run_registry_browser(unit_registry_app, script)
     for table, rows in before.items():
         assert len(rows) == len(after[table])
         for old, new in zip(rows, after[table]):
             assert {k: v for k, v in old.items() if k != 'unit'} == {k: v for k, v in new.items() if k != 'unit'}
+
+
+def test_types_phone_disclosures_preserve_recipe_references(unit_registry_app):
+    before, after = run_registry_browser(unit_registry_app, 'types_mobile.cjs')
+
+    def recipe_fields(row):
+        # Renaming and restoring a Type rewrites metadata and its update timestamp.
+        fields = {key: value for key, value in row.items() if key != 'updated_at'}
+        if fields.get('metadata_json'):
+            fields['metadata_json'] = json.loads(fields['metadata_json'])
+        return fields
+
+    for table, rows in before.items():
+        assert len(rows) == len(after[table])
+        assert [recipe_fields(row) for row in rows] == [recipe_fields(row) for row in after[table]]

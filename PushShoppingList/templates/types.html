@@ -3,7 +3,7 @@
 {% set app_shell_mode = "route" %}
 {% set app_active_nav_item = "settings" %}
 {% set app_search_id = "typesGlobalSearch" %}
-{% set app_content_class = "master-data-app-content" %}
+{% set app_content_class = "master-data-app-content type-master-app-content" %}
 
 {% block app_body_attributes %}
 data-user-id="{{ master_data.viewer_user_id }}"
@@ -176,6 +176,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                                 data-type-id="{{ type.id }}"
                                                 aria-label="Save {{ type.name }}"
                                                 disabled>Save</button>
+                                        <button type="button" class="type-master-row-cancel" data-type-master-row-cancel>Cancel</button>
                                         {% if type.custom %}
                                             <button type="button"
                                                     class="danger type-master-row-delete"
@@ -189,6 +190,12 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                          role="alert"
                                          data-type-master-row-error
                                          hidden></div>
+                                    <button type="button" class="type-master-name-display" data-type-master-row-summary
+                                            aria-expanded="false" aria-label="Show details for {{ type.name }}">{{ type.name }}</button>
+                                    <button type="button" class="type-master-details-toggle" data-type-master-row-toggle
+                                            aria-expanded="false" aria-label="Show details for {{ type.name }}">
+                                        {{ shell.svg_icon("chevron-down") }}
+                                    </button>
                                 </div>
                             {% endfor %}
                         </div>

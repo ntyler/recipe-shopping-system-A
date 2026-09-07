@@ -56,6 +56,8 @@
         let rowDropTarget = null;
         let rowDropAfter = false;
         const drafts = new Map();
+        const phoneLayout = window.matchMedia('(max-width: 600px)');
+        const expandedTypeIds = new Set();
 
         const source = document.getElementById("ingredientTypeConfig");
         const status = root.querySelector("[data-type-master-status]");
@@ -171,6 +173,51 @@
             error: row.querySelector("[data-type-master-row-error]"),
         });
 
+        const syncDisclosure = (row, draft) => {
+            const id = row.dataset.typeId;
+            let summary = row.querySelector('[data-type-master-row-summary]');
+            let toggle = row.querySelector('[data-type-master-row-toggle]');
+            if (!summary) {
+                summary = document.createElement('button');
+                summary.type = 'button';
+                summary.className = 'type-master-name-display';
+                summary.dataset.typeMasterRowSummary = '';
+                row.append(summary);
+            }
+            if (!toggle) {
+                toggle = document.createElement('button');
+                toggle.type = 'button';
+                toggle.className = 'type-master-details-toggle';
+                toggle.dataset.typeMasterRowToggle = '';
+                toggle.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"></path></svg>';
+                row.append(toggle);
+            }
+            const actions = row.querySelector('.type-master-row-actions');
+            if (!actions.querySelector('[data-type-master-row-cancel]')) {
+                const cancel = document.createElement('button');
+                cancel.type = 'button';
+                cancel.className = 'type-master-row-cancel';
+                cancel.dataset.typeMasterRowCancel = '';
+                cancel.textContent = 'Cancel';
+                actions.insertBefore(cancel, actions.querySelector('[data-type-master-row-delete]'));
+            }
+            actions.querySelector('[data-type-master-row-cancel]').disabled = draft.saving || draft.deleting;
+            const details = ['.type-master-row-name-field', '.unit-master-source-badge', '.type-master-row-actions'].map((selector, index) => {
+                const cell = row.querySelector(selector);
+                cell.id = `typeDetails-${id}-${index}`;
+                return cell.id;
+            }).join(' ');
+            const expanded = expandedTypeIds.has(id);
+            const name = cleanText(draft.name) || draft.originalName;
+            row.classList.toggle('is-mobile-expanded', expanded);
+            summary.textContent = name;
+            for (const control of [summary, toggle]) {
+                control.setAttribute('aria-expanded', String(expanded));
+                control.setAttribute('aria-controls', details);
+                control.setAttribute('aria-label', `${expanded ? 'Hide' : 'Show'} details for ${name}${draftIsDirty(draft) ? ', unsaved changes' : ''}`);
+            }
+        };
+
         const syncRowState = row => {
             const item = typeById(row?.dataset.typeId);
             if (!item) return;
@@ -178,6 +225,8 @@
             const controls = rowControls(row);
             const message = draft.errors.name || draft.feedback || "";
             const dirty = draftIsDirty(draft);
+            if (phoneLayout.matches && message) expandedTypeIds.add(String(item.id));
+            syncDisclosure(row, draft);
             row.classList.toggle("is-dirty", dirty);
             row.classList.toggle("is-saving", draft.saving);
             row.classList.toggle("has-error", Boolean(message));
@@ -193,6 +242,21 @@
             }
             controls.error.textContent = message;
             controls.error.hidden = !message;
+        };
+
+        const setRowExpanded = (row, expanded) => {
+            if (expanded) expandedTypeIds.add(row.dataset.typeId);
+            else expandedTypeIds.delete(row.dataset.typeId);
+            syncRowState(row);
+        };
+
+        const cancelTypeRow = row => {
+            const item = typeById(row?.dataset.typeId);
+            if (!item || ensureDraft(item).saving || ensureDraft(item).deleting) return;
+            drafts.delete(String(item.id));
+            rowControls(row).name.value = ensureDraft(item).name;
+            syncRowState(row);
+            applySearch();
         };
 
         const createOrderCell = (item, position) => {
@@ -359,6 +423,7 @@
             Array.from(drafts.keys()).forEach(id => {
                 if (!liveIds.has(id)) drafts.delete(id);
             });
+            expandedTypeIds.forEach(id => { if (!liveIds.has(id)) expandedTypeIds.delete(id); });
             rows.replaceChildren(...registry.types.map(createTypeRow));
             renderStats();
             applySearch();
@@ -883,16 +948,21 @@
                 event.preventDefault();
                 saveTypeRow(row);
             } else if (event.key === "Escape") {
-                const item = typeById(row?.dataset.typeId);
-                if (!item) return;
-                drafts.delete(String(item.id));
-                const draft = ensureDraft(item);
-                rowControls(row).name.value = draft.name;
-                syncRowState(row);
-                applySearch();
+                cancelTypeRow(row);
             }
         });
         root.addEventListener("click", event => {
+            const row = event.target.closest('[data-type-master-row]');
+            if (phoneLayout.matches && row && (event.target.closest('[data-type-master-row-summary], [data-type-master-row-toggle]') || event.target === row)) {
+                setRowExpanded(row, !row.classList.contains('is-mobile-expanded'));
+                return;
+            }
+            if (event.target.closest('[data-type-master-row-cancel]')) {
+                cancelTypeRow(row);
+                setRowExpanded(row, false);
+                row.querySelector('[data-type-master-row-toggle]').focus({preventScroll: true});
+                return;
+            }
             const orderAction = event.target.closest("[data-type-master-order-action]");
             if (orderAction) {
                 const row = orderAction.closest("[data-type-master-row]");
@@ -914,9 +984,63 @@
             if (usage) openUsage(typeById(usage.dataset.typeId), usage);
         });
 
+        // Phone dragging shares the existing persisted-order operation with desktop.
+        let touchOrder = null, touchOrderFrame = 0;
+        const updateTouchOrder = () => {
+            if (!touchOrder?.moving) return;
+            const {row, x, y, scroller} = touchOrder;
+            const top = scroller.getBoundingClientRect().top;
+            const bottom = Math.min(scroller.getBoundingClientRect().bottom, window.innerHeight - bottomViewportInset());
+            if (y < top + 48) scroller.scrollTop -= 12;
+            else if (y > bottom - 48) scroller.scrollTop += 12;
+            clearRowDropState();
+            row.classList.add('is-row-dragging');
+            const target = document.elementFromPoint(x, y)?.closest('[data-type-master-row]');
+            if (target && target !== row && rows.contains(target)) {
+                const bounds = target.getBoundingClientRect();
+                rowDropTarget = target;
+                rowDropAfter = y > bounds.top + bounds.height / 2;
+                target.classList.add(rowDropAfter ? 'is-row-drop-after' : 'is-row-drop-before');
+            }
+            touchOrderFrame = requestAnimationFrame(updateTouchOrder);
+        };
+        rows.addEventListener('pointerdown', event => {
+            const handle = event.target.closest('[data-type-master-drag-handle]');
+            if (!phoneLayout.matches || event.pointerType !== 'touch' || !event.isPrimary || !handle || reorderIsBlocked()) return;
+            event.preventDefault();
+            const row = handle.closest('[data-type-master-row]');
+            const scroller = root.closest('.app-content') || document.scrollingElement;
+            touchOrder = {row, handle, scroller, id: event.pointerId, startY: event.clientY, x: event.clientX, y: event.clientY, moving: false};
+            handle.setPointerCapture(event.pointerId);
+        });
+        rows.addEventListener('pointermove', event => {
+            if (!touchOrder || event.pointerId !== touchOrder.id) return;
+            touchOrder.x = event.clientX;
+            touchOrder.y = event.clientY;
+            if (!touchOrder.moving && Math.abs(event.clientY - touchOrder.startY) > 8) {
+                touchOrder.moving = true;
+                updateTouchOrder();
+            }
+        });
+        const finishTouchOrder = event => {
+            if (!touchOrder || event.pointerId !== touchOrder.id) return;
+            const {row, handle, moving} = touchOrder;
+            touchOrder = null;
+            cancelAnimationFrame(touchOrderFrame);
+            if (handle.hasPointerCapture(event.pointerId)) handle.releasePointerCapture(event.pointerId);
+            const currentRows = typeRows();
+            let target = rowDropTarget ? currentRows.indexOf(rowDropTarget) + (rowDropAfter ? 1 : 0) : -1;
+            if (currentRows.indexOf(row) < target) target -= 1;
+            clearRowDropState();
+            if (moving && event.type === 'pointerup' && target >= 0) moveRowTo(row, target, handle);
+        };
+        rows.addEventListener('pointerup', finishTouchOrder);
+        rows.addEventListener('pointercancel', finishTouchOrder);
+        rows.addEventListener('lostpointercapture', finishTouchOrder);
+
         rows.addEventListener("dragstart", event => {
             const handle = event.target.closest("[data-type-master-drag-handle]");
-            if (!handle || reorderIsBlocked()) {
+            if (!handle || touchOrder || reorderIsBlocked()) {
                 event.preventDefault();
                 return;
             }
