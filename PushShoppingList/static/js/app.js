@@ -48502,10 +48502,14 @@ function initStoreSectionMasterTable() {
                 "[data-store-section-master-mobile-details]",
             );
             if (!detailsPanel) return;
+            const recipeUsage = row.querySelector(
+                '[data-store-section-master-usage-kind="recipes"]',
+            );
 
             if (desktop) {
                 setMobileDetailsExpanded(row, false);
                 row.setAttribute("role", "row");
+                if (recipeUsage) cellFor(row, "usage")?.append(recipeUsage);
                 desktopColumns.forEach((key, index) => {
                     const cell = cellFor(row, key);
                     if (!cell) return;
@@ -48530,6 +48534,7 @@ function initStoreSectionMasterTable() {
                 cell.removeAttribute("aria-colindex");
                 row.append(cell);
             });
+            if (recipeUsage) row.append(recipeUsage);
             if (detailsToggle) row.append(detailsToggle);
             detailColumns.forEach(key => {
                 const cell = cellFor(row, key);
