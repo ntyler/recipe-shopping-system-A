@@ -9,6 +9,7 @@ from datetime import datetime
 from datetime import timezone
 from fractions import Fraction
 from urllib.parse import parse_qsl
+from urllib.parse import quote
 from urllib.parse import urlparse
 
 import requests
@@ -1848,6 +1849,7 @@ def master_data_unit_references_route(unit_id):
         unit_id,
         user_id=workspace_user_id,
         limit=int_query_arg("limit", 100, minimum=1, maximum=500),
+        offset=int_query_arg("offset", 0, minimum=0),
     )
     if not result.get("unit"):
         return jsonify({
@@ -1859,6 +1861,11 @@ def master_data_unit_references_route(unit_id):
     for reference in result.get("references", []):
         recipe_url = recipe_master_data.clean_text(reference.get("recipe_url"))
         reference["edit_url"] = recipe_edit_page_url(recipe_url) if recipe_url else ""
+        for match in reference.get("matches", []):
+            match["edit_url"] = (
+                reference["edit_url"] + "#unit-usage=" + quote(json.dumps(match["editor_target"]), safe="")
+                if reference["edit_url"] else ""
+            )
         cover_image = (
             reference.get("cover_image")
             if isinstance(reference.get("cover_image"), dict)

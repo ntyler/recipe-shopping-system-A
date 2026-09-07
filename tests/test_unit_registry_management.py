@@ -132,13 +132,13 @@ def test_edit_custom_name_and_add_remove_aliases_updates_normalization(
             f"/api/master-data/units/{unit_id}",
             json={
                 "canonical_name": "measuring scoop",
-                "category": "volume",
+                "category": "count_package",
                 "aliases": ["scoops", "ms"],
             },
         )
         assert edited.status_code == 200
         unit = unit_named(edited.get_json()["registry"], "measuring scoop")
-        assert unit["category"] == "volume"
+        assert unit["category"] == "count_package"
         assert set(unit["aliases"]) == {"scoop", "scoops", "ms"}
         assert "scoopful" not in edited.get_json()["registry"]["aliases"]
 
@@ -156,14 +156,15 @@ def test_edit_custom_name_and_add_remove_aliases_updates_normalization(
             f"/api/master-data/units/{unit_id}",
             json={
                 "canonical_name": "measuring scoop",
-                "category": "volume",
+                "category": "count_package",
                 "aliases": ["ms"],
             },
         ).get_json()
         assert unit_named(removed["registry"], "measuring scoop")["aliases"] == ["ms"]
 
 
-def test_seeded_category_is_editable_but_unit_cannot_be_deleted(unit_registry_app):
+def test_seeded_category_is_readonly_and_unit_cannot_be_deleted(unit_registry_app):
+    master_data.ensure_workspace_unit_registry('user-a')
     with unit_registry_app.test_client() as client:
         sign_in(client, "user-a")
         original = unit_named(registry_for(client), "teaspoon")
@@ -172,14 +173,10 @@ def test_seeded_category_is_editable_but_unit_cannot_be_deleted(unit_registry_ap
             json={"canonical_name": original["name"], "category": "count_package",
                   "aliases": original["aliases"]},
         )
-        assert edited.status_code == 200
-        saved = unit_named(edited.get_json()["registry"], "teaspoon")
-        assert saved["category"] == "count_package"
-        assert saved["seeded"] is True
-        assert saved["aliases"] == original["aliases"]
-        assert saved["id"] == original["id"]
+        assert edited.status_code == 422
+        assert "category" in edited.get_json()["errors"]
         assert client.delete(f'/api/master-data/units/{original["id"]}').status_code == 405
-        assert unit_named(registry_for(client), "teaspoon") == saved
+        assert unit_named(registry_for(client), "teaspoon") == original
 
 
 def test_edit_seeded_unit_keeps_stable_id_and_migrates_recipe_references(
@@ -419,7 +416,7 @@ def test_units_page_exposes_accessible_inline_editor_and_import_offer(
     assert form.select_one("[data-unit-master-alias-chips]") is not None
     assert form.select_one("[data-unit-master-save]").has_attr("disabled")
     assert form.select_one("[data-unit-master-editor-usage]") is not None
-    assert "every recipe" in form.select_one("[data-unit-master-editor-impact]").get_text()
+    assert "Quantities and the measurement stay the same" in form.select_one("[data-unit-master-editor-impact]").get_text()
     assert form.select_one("[data-unit-master-name]").has_attr("required")
     assert "unitEditorPermissions" in form.select_one("[data-unit-master-name]")["aria-describedby"]
     assert "unitAliasPreview" in form.select_one("[data-unit-master-alias-input]")["aria-describedby"]
@@ -429,7 +426,7 @@ def test_units_page_exposes_accessible_inline_editor_and_import_offer(
     ai_button = form.select_one("[data-unit-master-ai-suggest]")
     assert ai_button is not None
     assert ai_button.get("aria-describedby") == "unitAiAssistHelp"
-    assert "Review suggestions before saving" in form.select_one("#unitAiAssistHelp").get_text(" ", strip=True)
+    assert "Review aliases before saving" in form.select_one("#unitAiAssistHelp").get_text(" ", strip=True)
     assert soup.select_one("[data-unit-master-page]")["data-suggest-url"] == (
         "/api/master-data/units/suggest"
     )
@@ -577,12 +574,13 @@ def test_units_page_renders_clickable_recipe_counts_and_usage_dialog(
     soup = BeautifulSoup(response.get_data(as_text=True), "html.parser")
     headers = [
         header.get_text(" ", strip=True)
-        for header in soup.select(".unit-master-table-head [role='columnheader']")[:6]
+        for header in soup.select(".unit-master-table-head [role='columnheader']")[:7]
     ]
     assert headers == [
         "Order",
         "Canonical name",
         "Accepted aliases",
+        "Category",
         "Used in",
         "Source",
         "Action",
@@ -619,7 +617,7 @@ def test_unit_inline_editor_uses_compact_registry_styles_and_contextual_save_lab
     ]
 
     assert "width: 24px;" in alias_button_rules
-    assert 'saveButtonLabel = unit ? "Save Changes" : "Add Unit";' in script
+    assert 'saveButtonLabel = unit ? "Save changes" : "Add Unit";' in script
     assert 'saveButton.textContent = saveButtonLabel;' in script
     assert ".unit-master-page--registry-v2 .unit-master-category-list" in css
     assert "grid-template-columns: minmax(0, 1fr);" in css
@@ -656,7 +654,7 @@ def test_unit_registry_uses_readable_type_at_normal_browser_zoom():
     assert "font-size: 12px;" in source_badge_rules
 
 
-def test_ai_suggestion_populates_valid_details_without_persisting(
+def test_ai_suggestion_returns_only_aliases_without_persisting(
     unit_registry_app,
     monkeypatch,
 ):
@@ -693,9 +691,7 @@ def test_ai_suggestion_populates_valid_details_without_persisting(
     payload = response.get_json()
     assert payload["ok"] is True
     assert payload["suggestion"] == {
-        "canonical_name": "serving scoop",
-        "category": "volume",
-        "aliases": ["scoopful", "ss", "scoops", "scoop"],
+        "aliases": ["scoopful", "ss", "scoops", "serving scoop"],
     }
     assert any('Ignored "cup"' in warning for warning in payload["warnings"])
     assert len(after["units"]) == len(before["units"])
@@ -734,9 +730,9 @@ def test_ai_suggestion_keeps_entered_name_when_ai_canonical_collides(
 
     assert response.status_code == 200
     payload = response.get_json()
-    assert payload["suggestion"]["canonical_name"] == "scoop"
+    assert set(payload["suggestion"]) == {"aliases"}
     assert payload["suggestion"]["aliases"] == ["scp"]
-    assert any("canonical name already used" in warning for warning in payload["warnings"])
+    assert any("cups" in warning for warning in payload["warnings"])
 
 
 def test_ai_suggestion_collision_filter_is_workspace_scoped(

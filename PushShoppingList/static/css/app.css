@@ -83040,7 +83040,7 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     .unit-master-page--registry-v2 .unit-master-table-head,
     .unit-master-page--registry-v2 .unit-master-row {
         display: grid;
-        grid-template-columns: 116px minmax(0, .7fr) minmax(0, 1.22fr) 150px 128px 160px;
+        grid-template-columns: 116px minmax(0, .7fr) minmax(0, 1.22fr) 110px 150px 128px 160px;
         column-gap: 12px;
         row-gap: 8px;
     }
@@ -83054,7 +83054,7 @@ body.recipe-edit-standalone-page #recipeEditIngredients
 @media (min-width: 761px) and (max-width: 1180px) {
     .unit-master-page--registry-v2 .unit-master-table-head,
     .unit-master-page--registry-v2 .unit-master-row {
-        grid-template-columns: 96px minmax(0, .7fr) minmax(0, 1.22fr) 100px 100px 120px;
+        grid-template-columns: 96px minmax(0, .7fr) minmax(0, 1.22fr) 82px 100px 100px 120px;
         column-gap: 8px;
         padding-inline: 10px;
     }
@@ -83472,3 +83472,11 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     .master-data-usage-dialog .unit-master-usage-results { min-height: 0; }
     .master-data-usage-dialog .unit-master-usage-dialog-shell > :is(header, footer) { padding-block: 10px; }
 }
+
+/* Units retain their measurement category while names and aliases are edited. */
+.unit-master-page--registry-v2 .unit-master-category-cell { color: var(--app-muted); font-size: 11px; overflow-wrap: anywhere; }
+.unit-master-page--registry-v2 .unit-master-readonly-context { min-height: 38px; display: flex; align-items: center; font-weight: 700; }
+.unit-master-page--registry-v2 .unit-master-source-context { color: var(--app-muted); font-size: 11px; }
+.unit-master-page--registry-v2 .unit-master-action-cell { grid-template-columns: minmax(0, 90px); }
+.unit-master-usage-match-edit { justify-self: start; color: var(--app-primary-hover); font-size: 11px; font-weight: 700; }
+.unit-master-usage-match-edit:is(:hover, :focus-visible) { text-decoration: underline; }

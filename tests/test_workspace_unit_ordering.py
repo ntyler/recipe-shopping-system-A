@@ -41,7 +41,7 @@ def test_category_order_persists_and_preserves_fields_and_other_groups(unit_regi
         for category in html.select('[data-unit-master-category]'):
             rows = category.select('[data-unit-master-row]')
             assert [int(r.select_one('[data-unit-master-order-number]').text) for r in rows] == list(range(1, len(rows)+1))
-            assert category.select_one('[role="table"]')['aria-colcount'] == '6'
+            assert category.select_one('[role="table"]')['aria-colcount'] == '7'
             assert rows[0].select_one('[data-unit-master-order-action="up"]').has_attr('disabled')
             assert rows[-1].select_one('[data-unit-master-order-action="down"]').has_attr('disabled')
             assert rows[0].select_one('[data-unit-master-drag-handle]')['aria-keyshortcuts'] == 'ArrowUp ArrowDown Home End'
@@ -53,7 +53,7 @@ def test_category_order_persists_and_preserves_fields_and_other_groups(unit_regi
     assert group(json.loads(result.stdout))[0]['id'] == 'volume_cup'
 
 
-def test_append_and_category_edit_keep_category_positions(unit_registry_app):
+def test_append_and_rename_keep_positions_and_category_is_locked(unit_registry_app):
     md.ensure_workspace_unit_registry('user-a')
     md.move_workspace_unit('weight_gram', 1, 'user-a')
     result = md.save_workspace_unit({'canonical_name':'scoop', 'category':'volume', 'aliases':['scoops']}, user_id='user-a')
@@ -63,9 +63,12 @@ def test_append_and_category_edit_keep_category_positions(unit_registry_app):
     result = md.save_workspace_unit({'canonical_name':'measure', 'category':'volume', 'aliases':['measures']}, unit_id, 'user-a')
     assert group(result['registry'])[0]['id'] == unit_id
     result = md.save_workspace_unit({'canonical_name':'measure', 'category':'weight', 'aliases':['measures']}, unit_id, 'user-a')
-    assert group(result['registry'], 'weight')[-1]['id'] == unit_id
-    assert group(result['registry'], 'weight')[-1]['sort_order'] == 4
-    assert len(group(result['registry'])) == 9
+    assert result['status'] == 422 and not result['ok']
+    registry = md.read_workspace_unit_registry('user-a')
+    assert group(registry)[0]['id'] == unit_id
+    assert len(group(registry)) == 10
+    assert len(group(registry, 'weight')) == 4
+
 
 
 @pytest.mark.parametrize('position', [None, True, 1.2, [], {}, '', '1.5', 'bad'])

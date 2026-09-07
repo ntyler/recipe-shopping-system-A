@@ -13544,7 +13544,8 @@ def test_recipe_menu_edit_links_to_standalone_editor_page():
     assert "data-recipe-edit-page=\"true\"" in standalone_page
     assert "data-recipe-edit-url=\"{{ recipe_url }}\"" in standalone_page
     assert "consumeRecipeEditPendingAction(recipeUrl)" in standalone_page
-    assert "openRecipeEditor({ dataset: { recipeUrl } }, pendingOptions);" in standalone_page
+    assert "openRecipeEditor({ dataset: { recipeUrl } }, pendingOptions).then(" in standalone_page
+    assert "openRecipeIngredientUsageTarget(window.location.hash)" in standalone_page
     assert "await waitForNextPaint();" in script
     assert "scheduleRecipeImageProgressPoll(750);" in script
     assert "document.body.dataset.recipeEditPage" in script

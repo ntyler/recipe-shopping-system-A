@@ -98,6 +98,7 @@
         let suggestionRequestToken = 0;
         let usageRequestToken = 0;
         let usageReturnFocus = null;
+        let usageScrollState = [];
         let orderPending = false;
         let mutationPending = false;
         let draggedRow = null;
@@ -167,7 +168,7 @@
 
         const setAiPending = pending => {
             aiSuggestionPending = Boolean(pending);
-            suggestButtonLabel.textContent = aiSuggestionPending ? "Suggesting…" : "Suggest details";
+            suggestButtonLabel.textContent = aiSuggestionPending ? "Suggesting…" : "Suggest aliases";
             syncEditorState();
         };
 
@@ -182,6 +183,23 @@
         };
 
         const unitById = unitId => registry.units.find(unit => String(unit.id) === String(unitId)) || null;
+
+        const syncReadOnlyContext = unit => {
+            categorySelect.hidden = Boolean(unit);
+            categorySelect.disabled = Boolean(unit);
+            const context = root.querySelector("[data-unit-master-category-readonly]");
+            context.hidden = !unit;
+            context.textContent = registry.categories.find(item => item.key === unit?.category)?.label || "";
+            root.querySelector("[data-unit-master-category-help]").textContent = unit
+                ? "Read-only. Editing a unit does not redefine its measurement."
+                : "Choose the closest culinary group for this new unit.";
+            root.querySelector("[data-unit-master-source-context]").hidden = !unit;
+            root.querySelector("[data-unit-master-source-readonly]").textContent = unit?.seeded ? "System-seeded" : "User-created";
+            editorPermissions.textContent = unit
+                ? "Edit the canonical name and accepted aliases. The previous name remains an alias. Change recipe ingredients through Used in."
+                    + (unit.seeded ? " System-seeded units cannot be deleted." : "")
+                : "Choose a canonical name, category, and accepted aliases.";
+        };
 
         const editorValues = (includePending = false) => ({
             canonical_name: cleanText(nameInput.value),
@@ -204,7 +222,8 @@
             form.classList.toggle("is-dirty", dirty);
             saveButton.disabled = busy || !dirty || invalid;
             suggestButton.disabled = busy || !unitKey(nameInput.value);
-            [nameInput, categorySelect, aliasInput, aliasAddButton].forEach(control => { control.disabled = busy; });
+            [nameInput, aliasInput, aliasAddButton].forEach(control => { control.disabled = busy; });
+            categorySelect.disabled = busy || Boolean(editorUnitId);
             cancelButton.disabled = mutationPending || orderPending;
             aliasChips.querySelectorAll("button").forEach(button => { button.disabled = busy; });
             setFieldError(nameInput, nameError, showValidation ? errors.canonical_name : "");
@@ -449,15 +468,20 @@
             edit.className = "unit-master-edit-button";
             edit.dataset.unitMasterEditButton = "";
             edit.dataset.unitId = unit.id;
-            edit.textContent = "Edit";
-            edit.setAttribute("aria-label", `Edit ${unit.name}`);
+            edit.textContent = "Edit unit";
+            edit.setAttribute("aria-label", `Edit unit ${unit.name}`);
             edit.setAttribute("aria-controls", "unitMasterInlineEditor");
             edit.setAttribute("aria-expanded", "false");
             const action = document.createElement("div");
             action.className = "unit-master-action-cell";
             action.setAttribute("role", "cell");
             action.appendChild(edit);
-            row.append(createOrderCell(unit, index + 1), name, aliases, usage, sourceBadge, action);
+            const category = document.createElement("span");
+            category.className = "unit-master-category-cell";
+            category.setAttribute("role", "cell");
+            category.dataset.mobileLabel = "Category";
+            category.textContent = registry.categories.find(item => item.key === unit.category)?.label || unit.category;
+            row.append(createOrderCell(unit, index + 1), name, aliases, category, usage, sourceBadge, action);
             return row;
         };
 
@@ -617,6 +641,16 @@
                 meta.textContent = details.join(" · ");
                 item.appendChild(meta);
             }
+            if (match.edit_url) {
+                const edit = document.createElement("a");
+                edit.className = "unit-master-usage-match-edit";
+                edit.href = match.edit_url;
+                edit.target = "_blank";
+                edit.rel = "noopener noreferrer";
+                edit.textContent = "Edit ingredient";
+                edit.setAttribute("aria-label", `Edit ingredient ${match.ingredient_name || "entry"} in recipe`);
+                item.appendChild(edit);
+            }
             return item;
         };
 
@@ -731,21 +765,41 @@
             }
         };
 
+        const restoreUsageContext = () => {
+            usageScrollState.forEach(({element, overflow, padding, top, left}) => {
+                element.style.overflow = overflow; element.style.paddingRight = padding;
+                element.scrollTop = top; element.scrollLeft = left;
+            });
+            usageScrollState = [];
+            if (usageReturnFocus?.isConnected) usageReturnFocus.focus({preventScroll: true});
+            usageReturnFocus = null;
+        };
+
         const closeUsage = () => {
             usageRequestToken += 1;
             if (usageDialog.open) usageDialog.close();
+            restoreUsageContext();
         };
 
         const openUsage = async (unit, trigger) => {
             if (!unit || !usageDialog) return;
-            usageReturnFocus = trigger || document.activeElement;
+            if (!usageDialog.open) usageReturnFocus = trigger || document.activeElement;
             usageTitle.textContent = `Recipes using ${unit.name}`;
-            const aliases = Array.isArray(unit.aliases) ? unit.aliases : [];
-            usageContext.textContent = aliases.length
-                ? `Connections include ${unit.name} and its accepted aliases: ${aliases.join(", ")}.`
-                : `Connections include ingredient lines normalized to ${unit.name}.`;
+            usageContext.textContent = "Usage is calculated from saved recipe ingredients. Edit an ingredient in its recipe to change its amount or unit, then save the recipe.";
             setUsageState("Loading connected recipes…");
-            if (!usageDialog.open) usageDialog.showModal();
+            if (!usageDialog.open) {
+                usageScrollState = [...new Set([document.documentElement, document.body, document.getElementById("appContent")])].filter(Boolean).map(element => {
+                    const state = {element, overflow: element.style.overflow, padding: element.style.paddingRight, top: element.scrollTop, left: element.scrollLeft};
+                    const width = element.clientWidth;
+                    const padding = parseFloat(getComputedStyle(element).paddingRight) || 0;
+                    element.style.overflow = "hidden";
+                    if (element.clientWidth > width) element.style.paddingRight = `${padding + element.clientWidth - width}px`;
+                    return state;
+                });
+                usageDialog.showModal();
+                usageDialog.querySelector('[data-unit-master-usage-close]').focus({preventScroll: true});
+                usageScrollState.forEach(({element, top, left}) => { element.scrollTop = top; element.scrollLeft = left; });
+            }
 
             const requestToken = ++usageRequestToken;
             const referenceUrl = root.dataset.usageUrlTemplate.replace(
@@ -759,11 +813,24 @@
                         "X-Requested-With": "fetch",
                     },
                 });
-                const data = await response.json().catch(() => ({}));
+                let data = await response.json().catch(() => ({}));
                 if (requestToken !== usageRequestToken || !usageDialog.open) return;
                 if (!response.ok || data.ok === false) {
                     setUsageState(data.error || "Connected recipes could not be loaded.", "error");
                     return;
+                }
+                let offset = 0;
+                while (data.next_offset != null) {
+                    const next = Number(data.next_offset);
+                    if (!Number.isInteger(next) || next <= offset) throw new Error("Invalid usage page.");
+                    offset = next;
+                    const url = new URL(referenceUrl, window.location.href);
+                    url.searchParams.set("offset", String(offset));
+                    const nextResponse = await fetch(url, {headers: {Accept: "application/json", "X-Requested-With": "fetch"}});
+                    const page = await nextResponse.json();
+                    if (requestToken !== usageRequestToken || !usageDialog.open) return;
+                    if (!nextResponse.ok || page.ok === false) throw new Error("Unable to load remaining recipes.");
+                    data = {...page, references: [...data.references, ...page.references]};
                 }
                 renderUsageReferences(data);
             } catch (error) {
@@ -801,10 +868,8 @@
             const count = Number(unit?.recipe_count || 0);
             editorUsage.textContent = `Used in ${count} recipe${count === 1 ? "" : "s"}`;
             editorImpact.hidden = !unit;
-            editorPermissions.textContent = unit?.seeded
-                ? "You may change the canonical name, category, and aliases. System-seeded units cannot be deleted."
-                : "Choose a canonical name, category, and accepted aliases. Names and aliases are matched case-insensitively.";
-            saveButtonLabel = unit ? "Save Changes" : "Add Unit";
+            syncReadOnlyContext(unit);
+            saveButtonLabel = unit ? "Save changes" : "Add Unit";
             saveButton.textContent = saveButtonLabel;
             nameInput.value = unit?.name || "";
             categorySelect.value = unit?.category || "count_package";
@@ -891,7 +956,7 @@
             clearErrors();
             const requestToken = ++suggestionRequestToken;
             setAiPending(true);
-            setEditorFeedback("AI is reviewing the unit name and possible aliases.", "pending");
+            setEditorFeedback("AI is suggesting aliases for this measurement.", "pending");
             try {
                 const response = await fetch(root.dataset.suggestUrl, {
                     method: "POST",
@@ -907,10 +972,6 @@
                 }
 
                 const suggestion = result.suggestion || {};
-                nameInput.value = cleanText(suggestion.canonical_name) || canonicalName;
-                if (registry.categories.some(category => category.key === suggestion.category)) {
-                    categorySelect.value = suggestion.category;
-                }
                 editorAliases = Array.isArray(suggestion.aliases)
                     ? suggestion.aliases.map(cleanText).filter(Boolean)
                     : [...editorAliases];
@@ -919,7 +980,7 @@
                 showValidation = true;
                 const warnings = Array.isArray(result.warnings) ? result.warnings.filter(Boolean) : [];
                 setEditorFeedback(
-                    [result.message || "Unit details suggested. Review before saving.", ...warnings].join(" "),
+                    [result.message || "Aliases suggested. Review before saving.", ...warnings].join(" "),
                     warnings.length ? "warning" : "success",
                 );
             } catch (error) {
@@ -977,6 +1038,7 @@
                 returnFocus.setAttribute("aria-expanded", "true");
                 nameInput.value = unit.name;
                 categorySelect.value = unit.category;
+                syncReadOnlyContext(unit);
                 editorAliases = [...unit.aliases];
                 aliasInput.value = "";
                 originalDraft = editorValues();
@@ -988,7 +1050,7 @@
                 editorImpact.hidden = false;
                 form.classList.add("is-editing");
                 addButtons.forEach(button => button.setAttribute("aria-expanded", "false"));
-                saveButtonLabel = "Save Changes";
+                saveButtonLabel = "Save changes";
                 renderAliasChips();
                 saved = true;
                 const outsideSearch = unitKey(search.value) && !unitKey(row.dataset.unitMasterSearchValue).includes(unitKey(search.value));
@@ -1118,9 +1180,35 @@
             if (event.target === usageDialog) closeUsage();
         });
         usageDialog.addEventListener("close", () => {
-            if (usageReturnFocus && usageReturnFocus.isConnected) usageReturnFocus.focus();
-            usageReturnFocus = null;
+            if (!usageDialog.open) restoreUsageContext();
         });
+
+        // Returning from a recipe editor refreshes calculated counts without replacing a unit draft.
+        const refreshUsageCounts = async () => {
+            if (mutationPending || document.visibilityState === "hidden") return;
+            try {
+                const response = await fetch(root.dataset.createUrl, {headers: {Accept: "application/json"}});
+                const data = await response.json();
+                if (!response.ok || !data.ok || mutationPending) return;
+                (data.registry?.units || []).forEach(saved => {
+                    const unit = unitById(saved.id);
+                    if (!unit) return;
+                    unit.recipe_count = saved.recipe_count;
+                    const row = root.querySelector(`[data-unit-master-row][data-unit-id="${CSS.escape(String(unit.id))}"]`);
+                    const previous = row?.querySelector('.unit-master-usage');
+                    if (!previous) return;
+                    const returningHere = previous.contains(usageReturnFocus);
+                    const next = createUsageCell(unit);
+                    previous.replaceWith(next);
+                    if (returningHere) usageReturnFocus = next.querySelector('button') || row.querySelector('[data-unit-master-edit-button]');
+                    if (!form.hidden && editorUnitId === String(unit.id)) editorUsage.textContent = `Used in ${unit.recipe_count} recipe${unit.recipe_count === 1 ? "" : "s"}`;
+                });
+                if (usageDialog.open && usageReturnFocus) {
+                    await openUsage(unitById(usageReturnFocus.dataset.unitId), usageReturnFocus);
+                }
+            } catch (_) { /* The next usage open retries through the normal error state. */ }
+        };
+        window.addEventListener("focus", refreshUsageCounts);
         form.addEventListener("submit", saveUnit);
         let previousSearch = search.value;
         search.addEventListener("input", () => {

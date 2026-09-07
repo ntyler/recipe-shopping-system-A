@@ -33,7 +33,11 @@ window.addEventListener("DOMContentLoaded", () => {
         const pendingOptions = typeof consumeRecipeEditPendingAction === "function"
             ? consumeRecipeEditPendingAction(recipeUrl)
             : {};
-        openRecipeEditor({ dataset: { recipeUrl } }, pendingOptions);
+        openRecipeEditor({ dataset: { recipeUrl } }, pendingOptions).then(() => {
+            if (typeof openRecipeIngredientUsageTarget === "function") {
+                openRecipeIngredientUsageTarget(window.location.hash);
+            }
+        });
     }
 });
 </script>

@@ -1996,7 +1996,7 @@ def default_workspace_unit_registry_payload():
     }
 
 
-def workspace_unit_recipe_references(unit_id, user_id=None, limit=100):
+def workspace_unit_recipe_references(unit_id, user_id=None, limit=100, offset=0):
     user_id = str(user_id or scoped_recipe_user_id()).strip()
     unit_id = str(unit_id or "").strip()
     try:
@@ -2004,6 +2004,7 @@ def workspace_unit_recipe_references(unit_id, user_id=None, limit=100):
     except (TypeError, ValueError):
         limit = 100
 
+    offset = bounded_master_offset(offset)
     registry = default_workspace_unit_registry_payload()
     ingredient_rows = []
     option_rows = []
@@ -2074,6 +2075,9 @@ def workspace_unit_recipe_references(unit_id, user_id=None, limit=100):
                     r.original_recipe_text,
                     r.optional,
                     r.sort_order,
+                    ROW_NUMBER() OVER (PARTITION BY r.recipe_id ORDER BY r.sort_order, r.id) - 1 AS parent_index,
+                    r.raw_name AS reference_name,
+                    '' AS option_id,
                     '' AS option_label,
                     '' AS requirement_label,
                     '' AS option_type
@@ -2102,6 +2106,12 @@ def workspace_unit_recipe_references(unit_id, user_id=None, limit=100):
                     item.original_recipe_text,
                     item.optional,
                     item.sort_order,
+                    (SELECT COUNT(*) FROM recipe_ingredient_requirements prior
+                      WHERE prior.user_id = requirement.user_id AND prior.recipe_id = requirement.recipe_id
+                        AND (prior.sort_order < requirement.sort_order
+                             OR (prior.sort_order = requirement.sort_order AND prior.id < requirement.id))) AS parent_index,
+                    item.raw_name AS reference_name,
+                    option.option_id,
                     option.label AS option_label,
                     requirement.label AS requirement_label,
                     option.option_type AS option_type
@@ -2185,6 +2195,12 @@ def workspace_unit_recipe_references(unit_id, user_id=None, limit=100):
         reference["matches"].append({
             "id": int(row["id"] or 0),
             "kind": clean_text(row["reference_kind"]),
+            "editor_target": {
+                "parent_index": int(row["parent_index"] or 0),
+                "names": list({ingredient_name, clean_text(row["reference_name"])} - {""}),
+                "option_id": clean_text(row["option_id"]) if option_type != "original" else "",
+                "component_index": int(row["sort_order"] or 0),
+            },
             "ingredient_line": ingredient_line or ingredient_name or "Ingredient line",
             "ingredient_name": ingredient_name,
             "matched_as": matched_as,
@@ -2199,10 +2215,11 @@ def workspace_unit_recipe_references(unit_id, user_id=None, limit=100):
     references = list(references_by_recipe.values())
     return {
         "unit": unit,
-        "references": references[:limit],
+        "references": references[offset:offset + limit],
         "total": len(references),
         "total_reference_count": total_reference_count,
         "limit": limit,
+        "next_offset": offset + limit if offset + limit < len(references) else None,
     }
 
 
@@ -2476,6 +2493,10 @@ def validate_workspace_unit_candidate(values, unit_id="", user_id=None):
             for table_name in ("workspace_units", "workspace_unit_aliases")
         ):
             connection = None
+        if connection is not None and not connection.execute(
+            "SELECT 1 FROM workspace_units WHERE user_id = ? LIMIT 1", (user_id,),
+        ).fetchone():
+            connection = None
         if unit_id:
             if connection is None:
                 existing = next(
@@ -2566,11 +2587,37 @@ def move_workspace_unit(unit_id, position, user_id=None):
     }
 
 
+def _preserve_workspace_unit_references(connection, user_id, unit_id, name):
+    """Pin legacy text references before aliases change; never change amounts."""
+    registry = _workspace_unit_registry_payload_from_connection(connection, user_id)
+    unit_ids = {unit["id"] for unit in registry["units"]}
+    keys = {unit_registry_key(value): unit["id"] for unit in registry["units"]
+            for value in [unit["name"], *unit["aliases"]]}
+    rows = connection.execute(
+        "SELECT id, unit, unit_id, unit_raw FROM recipe_ingredients WHERE user_id = ?", (user_id,),
+    ).fetchall()
+    option_rows = connection.execute(
+        """SELECT item.id, item.unit, item.unit_id, item.unit_raw
+             FROM recipe_ingredient_option_items item
+             JOIN recipe_ingredient_options option ON option.id = item.option_id
+             JOIN recipe_ingredient_requirements requirement ON requirement.id = option.requirement_id
+            WHERE requirement.user_id = ?""", (user_id,),
+    ).fetchall()
+    for table, references in (("recipe_ingredients", rows), ("recipe_ingredient_option_items", option_rows)):
+        connection.executemany(
+            f"UPDATE {table} SET unit = ?, unit_id = ? WHERE id = ?",
+            [(name, unit_id, row["id"]) for row in references
+             if _workspace_unit_id_for_reference(row, unit_ids, keys) == unit_id],
+        )
+
+
 def save_workspace_unit(values, unit_id="", user_id=None):
     """Create or edit one scoped unit in a duplicate-safe transaction."""
     user_id = str(user_id or scoped_recipe_user_id()).strip()
     unit_id = str(unit_id or "").strip()
     values = values if isinstance(values, dict) else {}
+    if any(field in values for field in ("recipe_count", "usage_count", "used_in", "references", "quantity", "conversion_factor")):
+        return {"ok": False, "status": 422, "error": "Recipe usage and quantities must be changed through the recipe ingredient editor."}
     with recipe_master_connection(user_id=user_id) as connection:
         _seed_workspace_unit_registry(connection, user_id)
         existing = None
@@ -2585,6 +2632,12 @@ def save_workspace_unit(values, unit_id="", user_id=None):
             ).fetchone()
             if not existing:
                 return {"ok": False, "status": 404, "error": "Unit not found."}
+
+        if existing:
+            if "category" in values and values["category"] != existing["category"]:
+                return {"ok": False, "status": 422, "error": "Category is read-only for existing units.",
+                        "errors": {"category": "Renaming a unit cannot redefine its measurement category."}}
+            values = {**values, "category": existing["category"]}
 
         validated = _unit_registry_validation(
             connection,
@@ -2632,15 +2685,9 @@ def save_workspace_unit(values, unit_id="", user_id=None):
 
         timestamp = utc_now_iso()
         previous_name = str(existing["name"]) if existing else ""
-        previous_keys = {unit_registry_key(previous_name)} if previous_name else set()
         if existing:
-            previous_keys.update(_workspace_unit_alias_keys(connection, user_id, unit_id))
+            _preserve_workspace_unit_references(connection, user_id, unit_id, validated["canonical_name"])
             sort_order = existing["sort_order"]
-            if existing["category"] != validated["category"]:
-                sort_order = connection.execute(
-                    "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM workspace_units "
-                    "WHERE user_id = ? AND category = ?", (user_id, validated["category"]),
-                ).fetchone()[0]
             connection.execute(
                 """
                 UPDATE workspace_units
@@ -2715,39 +2762,6 @@ def save_workspace_unit(values, unit_id="", user_id=None):
                     timestamp,
                 ),
             )
-
-        if existing and previous_name != validated["canonical_name"]:
-            rows = connection.execute(
-                """
-                SELECT id, unit, unit_id FROM recipe_ingredients
-                 WHERE user_id = ? AND (unit_id = ? OR unit_id IS NULL OR unit_id = '')
-                """,
-                (user_id, unit_id),
-            ).fetchall()
-            for row in rows:
-                if str(row["unit_id"] or "") == unit_id or unit_registry_key(row["unit"]) in previous_keys:
-                    connection.execute(
-                        "UPDATE recipe_ingredients SET unit = ?, unit_id = ? WHERE id = ?",
-                        (validated["canonical_name"], unit_id, int(row["id"])),
-                    )
-            option_rows = connection.execute(
-                """
-                SELECT item.id, item.unit, item.unit_id
-                  FROM recipe_ingredient_option_items item
-                  JOIN recipe_ingredient_options option ON option.id = item.option_id
-                  JOIN recipe_ingredient_requirements requirement
-                    ON requirement.id = option.requirement_id
-                 WHERE requirement.user_id = ?
-                   AND (item.unit_id = ? OR item.unit_id IS NULL OR item.unit_id = '')
-                """,
-                (user_id, unit_id),
-            ).fetchall()
-            for row in option_rows:
-                if str(row["unit_id"] or "") == unit_id or unit_registry_key(row["unit"]) in previous_keys:
-                    connection.execute(
-                        "UPDATE recipe_ingredient_option_items SET unit = ?, unit_id = ? WHERE id = ?",
-                        (validated["canonical_name"], unit_id, int(row["id"])),
-                    )
 
         payload = _workspace_unit_registry_payload_from_connection(connection, user_id)
 

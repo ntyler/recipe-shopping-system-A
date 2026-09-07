@@ -44838,6 +44838,40 @@ function closeRecipeEditAiAnalysis(options = {}) {
     return false;
 }
 
+// Unit usage links open the existing ingredient editor without changing recipe data.
+// Verify the saved row context before opening; a stale link must not edit another item.
+function openRecipeIngredientUsageTarget(hash) {
+    if (!String(hash).startsWith("#unit-usage=")) return false;
+    let target;
+    try { target = JSON.parse(decodeURIComponent(hash.slice("#unit-usage=".length))); }
+    catch (_) { return false; }
+    if (!target || !Number.isInteger(target.parent_index) || target.parent_index < 0 || !Array.isArray(target.names)) return false;
+    const key = value => String(value || "").trim().toLowerCase();
+    const names = new Set(target.names.map(key).filter(Boolean));
+    const row = recipeEditIngredientRows()[target.parent_index];
+    const matchesName = element => names.has(key(fieldValuesFromRow(element).ingredient));
+    let optionRow = null;
+    if (row && target.option_id) {
+        const options = [...row.querySelectorAll('[data-substitution-option-row]')];
+        const candidates = options.filter(element => (
+            fieldValuesFromRow(element).alternative_id === target.option_id && matchesName(element)
+        ));
+        optionRow = candidates.find(element => Number(fieldValuesFromRow(element).alternative_component_order || 0) === target.component_index)
+            || (candidates.length === 1 ? candidates[0] : null);
+    }
+    if (!row || (target.option_id ? !optionRow : !matchesName(row))) {
+        setRecipeEditActiveTab("ingredients", {focus: false});
+        setRecipeEditStatus("This ingredient entry has changed. Select the current ingredient to edit it.", true);
+        return false;
+    }
+    setRecipeEditActiveTab("ingredients", {focus: false});
+    setRecipeIngredientsCollapsed(false);
+    row.scrollIntoView({block: "center", behavior: "instant"});
+    if (optionRow) openRecipeIngredientOptionModal(optionRow, {optionRow});
+    else setRecipeIngredientEditMode(row, true);
+    return true;
+}
+
 function focusRecipeAiQualityIngredient(index, field = "ingredient") {
     setRecipeEditActiveTab("ingredients", { focus: false });
     const rows = Array.from(document.querySelectorAll("#recipeEditIngredients .recipe-edit-ingredient-row"));

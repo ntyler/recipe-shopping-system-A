@@ -101,11 +101,12 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                             <h3 id="unitCategory-{{ category.key }}">{{ category.label }}</h3>
                             <span data-unit-master-category-count-label>{{ category.units | length }} units</span>
                         </header>
-                        <div class="unit-master-table master-data-registry-table" role="table" aria-colcount="6" aria-label="{{ category.label }} units">
+                        <div class="unit-master-table master-data-registry-table" role="table" aria-colcount="7" aria-label="{{ category.label }} units">
                             <div class="unit-master-table-head" role="row">
                                 <span role="columnheader">Order</span>
                                 <span role="columnheader">Canonical name</span>
                                 <span role="columnheader">Accepted aliases</span>
+                                <span role="columnheader">Category</span>
                                 <span role="columnheader">Used in</span>
                                 <span role="columnheader">Source</span>
                                 <span role="columnheader">Action</span>
@@ -149,6 +150,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                                 <span>Canonical name only</span>
                                             {% endfor %}
                                         </div>
+                                        <span class="unit-master-category-cell" role="cell" data-mobile-label="Category">{{ category.label }}</span>
                                         <div class="unit-master-usage" role="cell" data-mobile-label="Used in">
                                             {% if unit.recipe_count %}
                                                 <button type="button"
@@ -178,7 +180,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                                     data-unit-id="{{ unit.id }}"
                                                     aria-controls="unitMasterInlineEditor"
                                                     aria-expanded="false"
-                                                    aria-label="Edit {{ unit.name }}">Edit</button>
+                                                    aria-label="Edit unit {{ unit.name }}">Edit unit</button>
                                         </div>
                                     </div>
                                 {% endfor %}
@@ -201,7 +203,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                         <p class="unit-master-editor-context" data-unit-master-editor-context>
                             <span data-unit-master-editor-kicker>New workspace unit</span>
                             <span data-unit-master-editor-usage hidden></span>
-                            <span data-unit-master-editor-impact hidden>Changes affect every recipe using this canonical unit.</span>
+                            <span data-unit-master-editor-impact hidden>Name and alias changes apply wherever this unit is used. Quantities and the measurement stay the same.</span>
                         </p>
                         <p class="unit-master-editor-permissions" id="unitEditorPermissions" data-unit-master-editor-permissions>Choose a canonical name, category, and accepted aliases.</p>
                     </div>
@@ -219,34 +221,36 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                aria-describedby="unitEditorPermissions unitCanonicalError">
                         <small class="unit-master-field-error" id="unitCanonicalError" data-unit-master-name-error aria-live="polite" hidden></small>
                     </label>
-                    <label class="unit-master-field">
+                    <div class="unit-master-field">
                         <span class="unit-master-field-label">
                             <span id="unitCategoryLabel">Category</span>
                         </span>
+                        <span class="unit-master-readonly-context" data-unit-master-category-readonly hidden></span>
                         <select data-unit-master-category-select aria-labelledby="unitCategoryLabel" aria-describedby="unitCategoryHelp unitCategoryError">
                             {% for category in master_data.category_options %}
                                 <option value="{{ category.key }}">{{ category.label }}</option>
                             {% endfor %}
                         </select>
-                        <small class="unit-master-field-help" id="unitCategoryHelp">
+                        <small class="unit-master-field-help" id="unitCategoryHelp" data-unit-master-category-help>
                             Choose the closest culinary group for this unit.
                         </small>
                         <small class="unit-master-field-error" id="unitCategoryError" data-unit-master-category-error aria-live="polite" hidden></small>
-                    </label>
+                        <span class="unit-master-source-context" data-unit-master-source-context hidden>Source: <strong data-unit-master-source-readonly></strong></span>
+                    </div>
                 </div>
 
                 <section class="unit-master-ai-assist" aria-labelledby="unitAiAssistTitle">
                     <div>
                         <span>AI assist</span>
-                        <strong id="unitAiAssistTitle">Suggest unit details</strong>
-                        <p id="unitAiAssistHelp">Refine the name, category, and aliases. Review suggestions before saving.</p>
+                        <strong id="unitAiAssistTitle">Suggest aliases</strong>
+                        <p id="unitAiAssistHelp">Suggest spelling variants for this same measurement. Review aliases before saving; AI does not change the name, category, or recipe usage.</p>
                     </div>
                     <button type="button"
                             class="secondary unit-master-ai-suggest"
                             data-unit-master-ai-suggest
                             aria-describedby="unitAiAssistHelp">
                         <span aria-hidden="true">&#10024;</span>
-                        <span data-unit-master-ai-suggest-label>Suggest details</span>
+                        <span data-unit-master-ai-suggest-label>Suggest aliases</span>
                     </button>
                 </section>
 
@@ -275,7 +279,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
         </section>
 
         <dialog id="unitMasterUsageDialog"
-                class="unit-master-usage-dialog"
+                class="unit-master-usage-dialog master-data-usage-dialog"
                 data-unit-master-usage-dialog
                 aria-labelledby="unitMasterUsageTitle"
                 aria-describedby="unitMasterUsageContext">
@@ -296,7 +300,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                 <div class="unit-master-usage-dialog-summary" data-unit-master-usage-summary></div>
                 <div class="unit-master-usage-results"
                      data-unit-master-usage-results
-                     role="region"
+                     role="region" aria-label="Recipe ingredient references" tabindex="0"
                      aria-live="polite"></div>
                 <footer>
                     <span>Recipe links open in a new tab.</span>

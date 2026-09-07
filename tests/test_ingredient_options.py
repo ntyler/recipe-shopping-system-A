@@ -1471,7 +1471,11 @@ def test_choice_expansion_state_survives_repopulation_without_reopening_collapse
         script.index("function recipeIngredientChoiceExpansionStateKeys"):
         script.index("function initializeRecipeIngredientRequiredChoice")
     ]
-    harness = stable_id + state_helpers + r"""
+    expansion_helper = script[
+        script.index("function recipeIngredientExpansionIsOpen("):
+        script.index("function clearRecipeIngredientGroupedExpansionState(")
+    ]
+    harness = stable_id + state_helpers + expansion_helper + r"""
 function makeRow(expansionId, {
     initialized = false,
     expanded = false,
@@ -1496,7 +1500,7 @@ function makeRow(expansionId, {
                 : {recipeIngredientPersistedIndex: String(persistedIndex)}),
         },
         fields,
-        panel: {hidden: !expanded},
+        recipeIngredientSubstitutionPanel: {hidden: !expanded},
         recipeIngredientActiveExpansionId: expanded ? expansionId : "",
         disclosure,
         classList: {
@@ -1532,7 +1536,9 @@ let rows = [
 const recipeEditExpandedIngredientIds = new Set([expandedId]);
 function recipeEditIngredientRows() { return rows; }
 function ensureRecipeIngredientExpansionId(row) { return row.dataset.ingredientExpansionId; }
-function recipeIngredientSubstitutionContainer(row) { return row.panel; }
+const recipeEditIngredientColumnView = {groupByStoreSection:false};
+function recipeIngredientExpansionIdForControl(row) { return row.dataset.ingredientExpansionId; }
+function recipeIngredientSubstitutionContainer(row) { return row.recipeIngredientSubstitutionPanel; }
 function recipeIngredientDirectField(row, fieldName) { return row.fields[fieldName] || null; }
 
 const captured = captureRecipeIngredientChoiceExpansionState();

@@ -217,7 +217,7 @@ def test_units_page_renders_the_persistent_registry_and_unit_editor(
     )
     assert 'LEGACY_CUSTOM_UNITS_KEY = "recipeIngredientCustomUnits"' in units_script
     assert "legacyUnitNames" in units_script
-    assert 'fetch(root.dataset.createUrl' not in units_script
+    assert 'window.addEventListener("focus", refreshUsageCounts)' in units_script
     assert "const saveUnit = async event =>" in units_script
     assert "updateRegistry(result.registry)" in units_script
     assert 'unit.seeded ? "Built-in" : "User-created"' in units_script
