@@ -83608,33 +83608,41 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     .unit-master-page--registry-v2 .unit-master-row-status { top: 100%; }
 }
 
-/* Phone list: identity, aliases, then category/usage. Tablet tables stay unchanged. */
+.unit-master-page--registry-v2 .unit-master-details-toggle { display: none; }
+
+/* Phone disclosure rows use the Store Sections spacing; tablet/desktop stay unchanged. */
 @media (max-width: 600px) {
     .app-content.unit-master-app-content {
         padding-bottom: calc(176px + env(safe-area-inset-bottom));
         scroll-padding-bottom: calc(176px + env(safe-area-inset-bottom));
     }
 
-    .unit-master-page--registry-v2 .unit-master-category-list { margin: 12px 8px 8px; }
+    .unit-master-page--registry-v2 .unit-master-category-list { margin: 12px 10px 10px; }
+    .unit-master-page--registry-v2 .unit-master-category { border-color: var(--app-border); }
+    .unit-master-page--registry-v2 .unit-master-category > header { border-bottom-color: var(--app-border); }
     .unit-master-page--registry-v2 .unit-master-draft-table { margin-inline: 8px; }
     .unit-master-page--registry-v2 .unit-master-category > header { padding: 10px; }
     .unit-master-page--registry-v2 .unit-master-category > header > span { flex-shrink: 0; }
 
     .unit-master-page--registry-v2 .unit-master-row {
-        grid-template-columns: 72px minmax(0, 1fr) auto;
-        gap: 4px 6px;
-        min-height: 0;
-        padding: 8px 10px;
+        grid-template-columns: 68px minmax(0, 1fr) auto 44px;
+        gap: 0;
+        min-height: 69px;
+        padding: 12px;
+        border-bottom-color: var(--app-border);
         scroll-margin-bottom: 12px;
     }
 
+    .unit-master-page--registry-v2 .unit-master-row:is(:hover, .is-selected, .is-inline-editing, .is-dirty, .is-mobile-expanded) { background: transparent; box-shadow: none; }
+    .unit-master-page--registry-v2 .unit-master-row.is-pressed { background: var(--app-primary-soft); }
     .unit-master-page--registry-v2 .unit-master-row > [data-mobile-label]::before { content: none; }
     .unit-master-page--registry-v2 .unit-master-row > .unit-master-order-cell { grid-area: 1 / 1; }
     .unit-master-page--registry-v2 .unit-master-row > .unit-master-name-cell { grid-area: 1 / 2; }
+    .unit-master-page--registry-v2 .unit-master-row > :is(.unit-master-aliases, .unit-master-category-cell, .unit-master-source-badge, .master-data-row-actions) { display: none; }
     .unit-master-page--registry-v2 .unit-master-row > .unit-master-source-badge {
-        grid-area: 1 / 3;
-        justify-self: end;
-        max-width: 66px;
+        grid-area: 4 / 1 / auto / 3;
+        justify-self: start;
+        max-width: 100%;
         padding: 3px 5px;
         font-size: 10px;
         text-align: center;
@@ -83646,13 +83654,17 @@ body.recipe-edit-standalone-page #recipeEditIngredients
         --unit-alias-control-size: 44px;
         grid-area: 2 / 1 / auto / -1;
         gap: 4px 6px;
+        margin: 8px -12px 0;
+        padding: 9px 12px 0;
+        border-top: 1px solid var(--app-border);
     }
 
-    .unit-master-page--registry-v2 .unit-master-row > .unit-master-category-cell { grid-area: 3 / 1 / auto / 3; }
+    .unit-master-page--registry-v2 .unit-master-row > .unit-master-category-cell { grid-area: 3 / 1 / auto / -1; }
     .unit-master-page--registry-v2 .unit-master-row > .unit-master-usage {
-        grid-area: 3 / 3;
+        grid-area: 1 / 3;
         justify-content: flex-end;
         text-align: right;
+        white-space: nowrap;
     }
 
     .unit-master-page--registry-v2 .unit-master-row :is(.unit-master-inline-value, [data-unit-row-name], [data-unit-row-category]) {
@@ -83664,17 +83676,20 @@ body.recipe-edit-standalone-page #recipeEditIngredients
         line-height: 1.35;
     }
 
-    .unit-master-page--registry-v2 .unit-master-name-cell { font-size: 14px; }
+    .unit-master-page--registry-v2 .unit-master-name-cell { font-size: 16px; font-weight: 400; }
+    .unit-master-page--registry-v2 .unit-master-row:not(.is-mobile-expanded) [data-unit-row-activate="name"] { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .unit-master-page--registry-v2 .unit-master-row [data-unit-row-name] { height: 44px; font-size: 16px; }
     .unit-master-page--registry-v2 .unit-master-row :is([data-unit-row-activate="category"], [data-unit-row-category]) { padding-right: 22px; font-size: 12px; }
     .unit-master-page--registry-v2 .unit-master-category-cell::after { top: 18px; bottom: auto; opacity: 1; }
     .unit-master-page--registry-v2 .master-data-registry-table .unit-master-usage-button { min-height: 44px !important; min-width: 44px; margin: 0; justify-content: flex-end; }
     .unit-master-page--registry-v2 .master-data-registry-table .unit-master-usage-empty { display: inline-flex; align-items: center; gap: 3px; min-height: 44px; margin: 0; }
     .unit-master-page--registry-v2 .unit-master-usage-empty::after { content: 'recipes'; }
+    .unit-master-page--registry-v2 .unit-master-row:not(.is-mobile-expanded) .unit-master-usage { padding-left: 6px; }
+    .unit-master-page--registry-v2 .unit-master-row:not(.is-mobile-expanded) .unit-master-usage :is(button, span, strong) { font-size: 10px; }
 
     .unit-master-page--registry-v2 .unit-master-row .store-section-master-order {
         grid-template-columns: 44px 24px;
-        gap: 4px;
+        gap: 0;
         width: auto;
         height: 44px;
     }
@@ -83692,19 +83707,29 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     .unit-master-page--registry-v2 .unit-master-row .store-section-master-order-step { grid-area: 1 / 2; width: 24px; min-width: 24px; height: 24px; min-height: 24px; font-size: 10px; }
     .unit-master-page--registry-v2 .unit-master-row .store-section-master-order > [data-unit-master-order-action] { display: none; }
 
-    /* Editing expands this unit, keeping the name input comfortably full width. */
-    .unit-master-page--registry-v2 .unit-master-row.is-inline-editing > .unit-master-order-cell { grid-column: 1 / 3; }
-    .unit-master-page--registry-v2 .unit-master-row.is-inline-editing > .unit-master-name-cell { grid-area: 2 / 1 / auto / -1; }
-    .unit-master-page--registry-v2 .unit-master-row.is-inline-editing > .unit-master-aliases { grid-row: 3; }
-    .unit-master-page--registry-v2 .unit-master-row.is-inline-editing > :is(.unit-master-category-cell, .unit-master-usage) { grid-row: 4; }
-    .unit-master-page--registry-v2 .unit-master-row.is-inline-editing .store-section-master-order { grid-template-columns: 44px 24px 44px 44px; }
-    .unit-master-page--registry-v2 .master-data-registry-table .unit-master-row.is-inline-editing .store-section-master-order > [data-unit-master-order-action] { display: inline-flex; opacity: 1; pointer-events: auto; transform: none; }
-    .unit-master-page--registry-v2 .unit-master-row.is-inline-editing [data-unit-master-order-action="up"] { grid-area: 1 / 3; }
-    .unit-master-page--registry-v2 .unit-master-row.is-inline-editing [data-unit-master-order-action="down"] { grid-area: 1 / 4; }
-    .unit-master-page--registry-v2 .master-data-registry-table .unit-master-row.is-inline-editing .store-section-master-order > [data-unit-master-order-action]:disabled { opacity: .28; }
-
-    .unit-master-page--registry-v2 .unit-master-row > .master-data-row-actions { display: none; }
-    .unit-master-page--registry-v2 .unit-master-row.is-inline-editing > .master-data-row-actions {
+    .unit-master-page--registry-v2 .unit-master-details-toggle {
+        display: grid;
+        grid-area: 1 / 4;
+        place-items: center;
+        justify-self: end;
+        width: 44px;
+        height: 44px;
+        min-height: 44px;
+        margin: 0;
+        padding: 0;
+        border-color: transparent;
+        background: transparent;
+        color: var(--app-muted);
+    }
+    .unit-master-details-toggle > svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform 140ms ease; }
+    .unit-master-details-toggle[aria-expanded="true"] > svg { transform: rotate(180deg); }
+    .unit-master-page--registry-v2 [data-unit-new-draft] > .unit-master-details-toggle { visibility: hidden; }
+    .unit-master-page--registry-v2 .unit-master-row.is-mobile-expanded > .unit-master-name-cell { grid-column: 2 / 4; }
+    .unit-master-page--registry-v2 .unit-master-row.is-mobile-expanded > .unit-master-aliases { display: flex; }
+    .unit-master-page--registry-v2 .unit-master-row.is-mobile-expanded > .unit-master-category-cell { display: block; }
+    .unit-master-page--registry-v2 .unit-master-row.is-mobile-expanded > .unit-master-source-badge { display: inline-flex; }
+    .unit-master-page--registry-v2 .unit-master-row.is-mobile-expanded > .unit-master-usage { display: flex; grid-area: 4 / 3 / auto / -1; }
+    .unit-master-page--registry-v2 .unit-master-row.is-mobile-expanded:is(.has-edits, [data-unit-new-draft]) > .master-data-row-actions {
         display: grid;
         grid-area: 5 / 1 / auto / -1;
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -83750,4 +83775,9 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     .unit-master-page--registry-v2 .unit-master-add-shortcut { min-height: 44px; }
     .unit-master-page--registry-v2 .unit-master-alias-popover :is(button, input) { min-height: 44px; }
     .unit-category-menu button { min-height: 44px; }
+}
+
+@media (max-width: 389px) {
+    .unit-master-page--registry-v2 .unit-master-row:not(.is-mobile-expanded) > .unit-master-usage { display: none; }
+    .unit-master-page--registry-v2 .unit-master-row:not(.is-mobile-expanded) > .unit-master-name-cell { grid-column: 2 / 4; }
 }

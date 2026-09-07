@@ -135,6 +135,7 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
 
         // Mobile keyboard and Cancel remain in the shared action slots.
         await page.setViewportSize({width: 390, height: 844});
+        await row.locator('[data-unit-row-toggle]').click();
         await display.click(); await name.fill('mobile teaspoon draft');
         await name.evaluate(e => e.scrollIntoView({block: 'center'}));
         assert(await save.isEnabled()); assert(await cancel.isVisible());

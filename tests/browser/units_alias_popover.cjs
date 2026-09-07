@@ -132,7 +132,7 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
         // Cancel/close/switch while a response is delayed; stale work cannot reopen or leak.
         gate = new Promise(resolve => release = resolve);
         await openManage(); await suggest.click(); await form.getByText('Suggesting aliases…', {exact:true}).waitFor();
-        await input.press('Escape'); await cancel.click();
+        await input.press('Escape'); await row.locator('[data-unit-row-name]').press('Escape');
 
         await page.route('**/api/master-data/units/suggest', route => route.fulfill({json:{ok:true,suggestion:{aliases:['fresh suggestion']}}}), {times:1});
         await openManage(); await suggest.click(); await chips.getByRole('button', {name:'fresh suggestion',exact:true}).waitFor();
@@ -180,7 +180,7 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
         }
         await page.setViewportSize({width:1440,height:900}); await openManage();
         await page.setViewportSize({width:320,height:480}); await insideViewport();
-        await input.press('Escape'); await cancel.click();
+        await input.press('Escape'); await row.locator('[data-unit-row-name]').press('Escape');
         assert.equal(writes.length, 1); assert.deepEqual(errors, []);
         // Existing servers can cache the old two-button markup with current JS.
         await page.route('**/admin/master-data/units', async route => {

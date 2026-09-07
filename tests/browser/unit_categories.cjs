@@ -168,6 +168,7 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
 
         // Mobile layout, Escape cancellation and deletion of an unused category.
         await page.setViewportSize({width: 390, height: 844});
+        await row.locator('[data-unit-row-toggle]').click();
         await row.locator('[data-unit-row-activate="category"]').click(); await page.keyboard.press('Escape');
         await menuAction(picker, '+ Add category'); await catName.fill('Unused'); await saveCategory();
         await picker.click(); await menu.getByRole('menuitemradio', {name: 'Weight', exact: true}).click();
@@ -181,7 +182,7 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
         assert(!(await registry()).categories.some(c => c.label === 'Canceled' || c.label === 'Unused'));
 
         // Overflowing menus reveal the selected option and reset typeahead on reopen.
-        await row.locator('[data-unit-row-cancel]').click();
+        await row.locator('[data-unit-row-name]').press('Escape');
         let lastCategory;
         for (let index = 1; index <= 12; index++) {
             const response = await context.request.post(base + '/api/master-data/unit-categories', {

@@ -47,10 +47,16 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
         const form = page.locator('[data-unit-master-form]');
         const input = form.locator('[data-unit-master-alias-input]');
         const shot = async filename => { if (artifacts) { fs.mkdirSync(artifacts, {recursive:true}); await page.screenshot({path:path.join(artifacts, filename)}); } };
-        // Every row opens aliases directly from rest, without activating an edit field.
+        const revealDetails = async row => {
+            if (await page.evaluate(() => innerWidth <= 600) && await row.locator('[data-unit-row-toggle]').getAttribute('aria-expanded') === 'false') {
+                await row.locator('[data-unit-row-toggle]').click();
+            }
+        };
+        // Every row opens aliases from rest (after disclosure on phones).
         for (const width of [1440,390]) {
             await page.setViewportSize({width,height:900});
             for (const row of await page.locator('[data-unit-master-row]').all()) {
+                await revealDetails(row);
                 const manage = row.getByRole('button', {name:'Manage aliases',exact:true});
                 await manage.evaluate(e => e.scrollIntoView({block:'center'}));
                 await page.mouse.move(0,0);
@@ -60,7 +66,7 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
                 await manage.click(); assert(await form.isVisible());
                 assert(await form.getByRole('button', {name:'Suggest aliases',exact:true}).isVisible());
                 await input.press('Escape');
-                await row.locator('[data-unit-row-cancel]').click();
+                await row.locator('[data-unit-row-name]').press('Escape');
                 assert(await manage.isVisible()); assert(await manage.isEnabled());
             }
         }
@@ -76,6 +82,7 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
                 assert(Math.abs(await page.evaluate(() => innerWidth) - width / zoom) <= 1);
                 for (const [kind, aliases, id] of fixtures) {
                     const row = page.locator(`[data-unit-master-row][data-unit-id="${id}"]`);
+                    await revealDetails(row);
                     const restingHeight = (await row.boundingBox()).height;
                     assert(await row.locator('[data-unit-row-alias="add"]').isVisible());
                     assert(await row.locator('[data-unit-row-alias="add"]').isEnabled());
@@ -139,7 +146,7 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
                     if (await page.evaluate(() => innerWidth > 600)) {
                         assert(Math.abs((await row.boundingBox()).height - restingHeight) < .1);
                     } else {
-                        assert(await row.locator('[data-unit-row-cancel]').isVisible());
+                        assert(await row.locator('[data-unit-row-cancel]').isHidden());
                         assert((await row.boundingBox()).height >= restingHeight);
                     }
                     assert.match(await form.locator('[data-unit-master-editor-title]').innerText(), new RegExp(`layout ${kind}`));
@@ -161,7 +168,7 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
                         await form.getByText('No new aliases to suggest.',{exact:true}).waitFor();
                         await input.press('Escape');
                     }
-                    await row.locator('[data-unit-row-cancel]').click(); cases++;
+                    await row.locator('[data-unit-row-name]').press('Escape'); cases++;
                 }
             }
         }

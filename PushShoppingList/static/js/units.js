@@ -221,6 +221,37 @@
             const draft = rowDraft(id);
             return draft.position !== null || JSON.stringify(draft.values) !== JSON.stringify(draft.original) || Boolean(draft.pendingAlias);
         };
+        const expandedUnitIds = new Set();
+        const syncDisclosure = row => {
+            const id = row.dataset.unitId;
+            let toggle = row.querySelector('[data-unit-row-toggle]');
+            if (!toggle) {
+                toggle = document.createElement('button');
+                toggle.type = 'button';
+                toggle.className = 'unit-master-details-toggle';
+                toggle.dataset.unitRowToggle = '';
+                toggle.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"></path></svg>';
+                row.append(toggle);
+            }
+            const details = ['aliases', 'category-cell', 'usage', 'source-badge', 'action-cell'].map(field => {
+                const cell = row.querySelector(`.unit-master-${field}`);
+                cell.id = `unitDetails-${id}-${field}`;
+                return cell.id;
+            });
+            const expanded = id === NEW_UNIT_ID || expandedUnitIds.has(id);
+            row.classList.toggle('is-mobile-expanded', expanded);
+            toggle.setAttribute('aria-expanded', String(expanded));
+            toggle.setAttribute('aria-controls', details.join(' '));
+            toggle.setAttribute('aria-label', `${expanded ? 'Hide' : 'Show'} details for ${rowDraft(id).values.canonical_name || 'new unit'}`);
+        };
+        const setRowExpanded = (row, expanded) => {
+            if (!row || row.dataset.unitId === NEW_UNIT_ID) return;
+            const id = row.dataset.unitId;
+            if (!expanded && editorUnitId === id && !form.hidden) closeEditor({restoreFocus: false});
+            if (expanded) expandedUnitIds.add(id);
+            else expandedUnitIds.delete(id);
+            syncRowState(row);
+        };
         const rowValidation = id => {
             const local = validateUnitDraft(rowValues(id), registry, id);
             const remote = rowDraft(id).errors;
@@ -228,7 +259,8 @@
         };
         const renderRowFields = row => {
             const id = row.dataset.unitId, unit = unitById(id), draft = rowDraft(id);
-            const editing = inlineUnitId === id;
+            syncDisclosure(row);
+            const editing = inlineUnitId === id && (!phoneLayout.matches || row.classList.contains('is-mobile-expanded'));
             row.classList.toggle('is-inline-editing', editing);
             for (const field of ['name', 'category']) {
                 const cell = row.querySelector(`[data-unit-master-${field}-cell]`);
@@ -236,7 +268,7 @@
                 if (previous && previous.matches(`[data-unit-row-${field}]`) === editing) {
                     if (field === 'category') {
                         if (editing) { previous.value = draft.values.category; categoryUI.refresh(previous); }
-                        else previous.textContent = registry.categories.find(item => item.key === unit.category)?.label || unit.category;
+                        else previous.textContent = registry.categories.find(item => item.key === draft.values.category)?.label || draft.values.category;
                     }
                     continue;
                 }
@@ -258,10 +290,17 @@
                     control.dataset.unitRowActivate = field;
                     control.setAttribute('aria-label', `Edit ${label}`);
                     if (field === 'category') control.setAttribute('aria-haspopup', 'menu');
-                    control.textContent = field === 'name' ? unit.name : registry.categories.find(item => item.key === unit.category)?.label || unit.category;
+                    control.textContent = field === 'name' ? draft.values.canonical_name : registry.categories.find(item => item.key === draft.values.category)?.label || draft.values.category;
+                    control.title = control.textContent;
                 }
                 if (previous) previous.replaceWith(control);
                 else cell.prepend(control);
+            }
+            const nameDisplay = row.querySelector('[data-unit-row-activate="name"]');
+            if (nameDisplay) {
+                nameDisplay.title = draft.values.canonical_name;
+                const collapsed = phoneLayout.matches && !row.classList.contains('is-mobile-expanded');
+                nameDisplay.setAttribute('aria-label', collapsed ? `Show details for ${draft.values.canonical_name}` : `Edit canonical name for ${draft.values.canonical_name}`);
             }
             const aliases = row.querySelector('.unit-master-aliases');
             let chipList = aliases.querySelector('.unit-master-alias-chip-list');
@@ -287,7 +326,7 @@
             }
             manage.title = 'Manage aliases'; manage.setAttribute('aria-label', 'Manage aliases');
             manage.textContent = id === NEW_UNIT_ID ? '+ Manage aliases' : '+';
-            const values = editing ? draft.values.aliases : unit.aliases || [];
+            const values = draft.values.aliases;
             const signature = JSON.stringify(values);
             if (aliases.dataset.aliases !== signature) {
                 // Upgrade cached markup without removing the separate action group.
@@ -326,6 +365,7 @@
                 row.querySelector('[data-unit-row-category-error]').hidden = true;
             }
             row.classList.toggle('is-dirty', dirty);
+            row.classList.toggle('has-edits', rowHasEdits(id));
             row.setAttribute('aria-busy', String(draft.saving));
             const save = row.querySelector('[data-unit-row-save]');
             save.disabled = mutationPending || orderPending || (editorUnitId === id && aiSuggestionPending) || !dirty
@@ -360,6 +400,7 @@
                 draft.feedback = id === NEW_UNIT_ID ? 'Add or cancel first' : 'Save or cancel first';
                 setStatus(`Save or cancel changes to ${unitById(id).name || 'the new unit'} before editing another unit.`, 'info', true);
                 syncRowState(rowFor(id));
+                if (phoneLayout.matches) setRowExpanded(rowFor(id), true);
                 rowFor(id).querySelector('[data-unit-row-name]').focus({preventScroll: true});
                 return false;
             }
@@ -383,11 +424,12 @@
             if (selectedUnitId === id) selectedUnitId = '';
         };
 
-        const activateInlineRow = (id, field = 'name', focus = true) => {
+        const activateInlineRow = (id, field = 'name', focus = true, expand = true) => {
             id = String(id);
             if (mutationPending || orderPending) return false;
             if (inlineUnitId && inlineUnitId !== id && !releaseInlineRow()) return false;
             inlineUnitId = id;
+            if (phoneLayout.matches && expand) expandedUnitIds.add(id);
             selectRow(id);
             inlineField = field;
             syncOrderControls();
@@ -840,7 +882,7 @@
             const previous = categoryRows(container);
             const current = previous.indexOf(row);
             const target = Math.max(0, Math.min(previous.length - 1, targetIndex));
-            if (current === target || !activateInlineRow(row.dataset.unitId, 'name', false)) return;
+            if (current === target || !activateInlineRow(row.dataset.unitId, 'name', false, false)) return;
             const restoreScroll = captureEditorScroll(container);
             const ordered = [...previous];
             ordered.splice(target, 0, ordered.splice(current, 1)[0]);
@@ -1428,6 +1470,17 @@
             const row = event.target.closest('[data-unit-master-row]');
             if (row) selectRow(row.dataset.unitId);
         });
+        let pressedRow = null;
+        const clearPressedRow = () => { pressedRow?.classList.remove('is-pressed'); pressedRow = null; };
+        root.addEventListener('pointerdown', event => {
+            clearPressedRow();
+            if (!phoneLayout.matches) return;
+            pressedRow = event.target.closest('[data-unit-master-row]');
+            pressedRow?.classList.add('is-pressed');
+        });
+        document.addEventListener('pointerup', clearPressedRow);
+        document.addEventListener('pointercancel', clearPressedRow);
+        window.addEventListener('blur', clearPressedRow);
         root.addEventListener("click", event => {
             const selectedRow = event.target.closest('[data-unit-master-row]');
             if (selectedRow) selectRow(selectedRow.dataset.unitId);
@@ -1438,6 +1491,10 @@
             }
             const activate = event.target.closest('[data-unit-row-activate]');
             if (activate) {
+                if (phoneLayout.matches && !selectedRow.classList.contains('is-mobile-expanded')) {
+                    setRowExpanded(selectedRow, true);
+                    return;
+                }
                 activateInlineRow(activate.closest('[data-unit-master-row]').dataset.unitId, activate.dataset.unitRowActivate);
                 return;
             }
@@ -1457,9 +1514,12 @@
                 openUsage(unitById(usageButton.dataset.unitId), usageButton);
                 return;
             }
-            if (phoneLayout.matches && selectedRow && !event.target.closest('input, select, textarea, a, button:not([data-unit-master-drag-handle])')) {
-                // The handle expands tap-sized move controls without opening the keyboard.
-                activateInlineRow(selectedRow.dataset.unitId, 'name', !event.target.closest('[data-unit-master-drag-handle]'));
+            if (phoneLayout.matches && selectedRow && (event.target.closest('[data-unit-row-toggle]')
+                || !event.target.closest('input, select, textarea, a, button, [role="menu"]'))) {
+                // Only the summary background toggles; details and their controls stay independent.
+                if (event.target.closest('[data-unit-row-toggle], .unit-master-order-cell, .unit-master-name-cell') || event.target === selectedRow) {
+                    setRowExpanded(selectedRow, !selectedRow.classList.contains('is-mobile-expanded'));
+                }
             }
         });
         root.addEventListener("keydown", event => {
@@ -1500,6 +1560,7 @@
             if (!phoneLayout.matches || event.pointerType !== 'touch' || !event.isPrimary || !handle) return;
             const row = handle.closest('[data-unit-master-row]');
             if (reorderIsBlocked(row)) return;
+            event.preventDefault();
             let scroller = row.parentElement;
             while (scroller && !(scroller.scrollHeight > scroller.clientHeight && /auto|scroll/.test(getComputedStyle(scroller).overflowY))) scroller = scroller.parentElement;
             touchOrder = {handle, row, id: event.pointerId, startY: event.clientY, x: event.clientX, y: event.clientY, moving: false, scroller: scroller || document.scrollingElement};
@@ -1517,6 +1578,7 @@
             if (!touchOrder || event.pointerId !== touchOrder.id) return;
             const {row, handle, moving} = touchOrder;
             touchOrder = null;
+            if (handle.hasPointerCapture(event.pointerId)) handle.releasePointerCapture(event.pointerId);
             cancelAnimationFrame(touchOrderFrame);
             const rows = categoryRows(row.parentElement);
             let target = rowDropTarget ? rows.indexOf(rowDropTarget) + (rowDropAfter ? 1 : 0) : -1;
@@ -1637,6 +1699,10 @@
             event.preventDefault(); event.stopPropagation(); closeEditor();
         }, true);
         window.addEventListener('resize', positionAliasPopover);
+        phoneLayout.addEventListener('change', () => {
+            if (phoneLayout.matches && inlineUnitId) expandedUnitIds.add(inlineUnitId);
+            syncOrderControls();
+        });
         document.addEventListener('scroll', positionAliasPopover, true);
         window.visualViewport?.addEventListener('resize', positionAliasPopover);
         window.visualViewport?.addEventListener('scroll', positionAliasPopover);
@@ -1672,6 +1738,7 @@
                     const returningHere = previous.contains(usageReturnFocus);
                     const next = createUsageCell(unit);
                     previous.replaceWith(next);
+                    syncDisclosure(row);
                     if (returningHere) usageReturnFocus = next.querySelector('button') || row.querySelector('[data-unit-row-activate="name"]');
                 });
                 if (usageDialog.open && usageReturnFocus) {
