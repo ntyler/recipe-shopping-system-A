@@ -54,9 +54,14 @@ def test_editor_uses_shared_alias_component_and_real_scoped_context(editor_app):
         assert form.select_one('[data-ingredient-editor-image-remove]')
         assert not form.select('[data-unit-master-ai-suggest]')
         row = soup.select_one('[data-ingredient-master-row]')
-        assert row.select_one('[data-ingredient-row-edit]')['aria-controls'] == form['id']
-        assert not row.select_one('[popover]').select('[data-ingredient-row-edit]')
-        assert not row.select('input[type="text"]')
+        assert row.select_one('[data-ingredient-row-alias]')['aria-controls'] == form['id']
+        assert not row.select('[data-ingredient-row-edit]')
+        name = row.select_one('[data-ingredient-row-name]')
+        assert name['type'] == 'text' and not name.has_attr('disabled') and not name.has_attr('readonly')
+        assert not row.select_one('[data-ingredient-row-section]').has_attr('disabled')
+        assert row.select_one('[data-ingredient-row-save]').has_attr('disabled')
+        assert not row.select('input[type="number"]')
+        assert len(row.select(':scope > td')) == 7
         assert row.select_one('[data-master-merge-open]')
         context = client.get(f'/api/master-data/ingredients/{record["id"]}/editor').json
         assert context['record']['name'] == record['name']

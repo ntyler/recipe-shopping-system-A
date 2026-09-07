@@ -20,7 +20,7 @@ def test_ingredient_page_name_and_controls_preserve_existing_endpoints(monkeypat
     assert soup.select_one('.master-data-tabs [aria-current="page"]').get_text(strip=True) == 'Ingredient'
     assert soup.select_one('.master-data-home-link').text == 'Account'
     table = soup.select_one('table[aria-label="Ingredient"]')
-    assert [th.text for th in table.select('thead th')] == ['Order', 'Item', 'Aliases', 'Store Section', 'Used In', 'Action']
+    assert [th.text for th in table.select('thead th')] == ['Order', 'Item', 'Aliases', 'Store Section', 'Used In', 'Save', 'More']
     assert 'master-data-registry-category' in table.parent['class']
     filters = soup.select_one('.ingredient-master-registry .master-data-filter-form')
     assert filters['action'] == '/admin/master-data/ingredients'

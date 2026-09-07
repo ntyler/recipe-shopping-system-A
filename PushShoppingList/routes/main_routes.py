@@ -1572,7 +1572,7 @@ def master_data_context(record_type, scope_info=None):
         "group_by_store_section": bool(record_type == "ingredients" and not store_section),
         "group_by_equipment_section": bool(record_type == "equipment"),
         "table_column_count": (
-            6
+            7
             if record_type == "ingredients"
             else 5
             if record_type == "equipment" and scope_info["scope"] == "all"

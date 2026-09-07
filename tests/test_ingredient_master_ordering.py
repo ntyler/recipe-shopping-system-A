@@ -109,18 +109,18 @@ def test_all_write_paths_append_move_and_remove_atomically(registry):
     assert [row['sort_order'] for row in stored(database)] == [0,1]
 
 
-def test_routes_filter_partial_groups_and_expose_six_columns(registry):
+def test_routes_filter_partial_groups_and_expose_seven_columns(registry):
     app, database = registry
     with app.test_client() as client:
         sign_in(client, 'user-a')
         for query, enabled in [('sort=manual_order', True),('sort=name_asc',False),('sort=manual_order&search=Tomato',False),('sort=manual_order&limit=1',False)]:
             soup = BeautifulSoup(client.get('/admin/master-data/ingredients?'+query).data, 'html.parser')
-            assert [th.text for th in soup.select('.master-data-ingredients-table thead th')] == ['Order','Item','Aliases','Store Section','Used In','Action']
+            assert [th.text for th in soup.select('.master-data-ingredients-table thead th')] == ['Order','Item','Aliases','Store Section','Used In','Save','More']
             first = soup.select_one('[data-ingredient-master-row]')
             assert first['data-order-enabled'] == str(enabled).lower()
             assert first.select_one('[data-ingredient-order-handle]')['aria-disabled'] == str(not enabled).lower()
             assert not soup.select('[data-master-store-section-panel]')
-            assert first.select_one('[data-ingredient-row-edit]')
+            assert first.select_one('[data-ingredient-row-name]')
             assert first.select_one('[data-ingredient-row-save]').has_attr('disabled')
             assert first.select_one('time[datetime]')
         soup = BeautifulSoup(client.get('/admin/master-data/ingredients?sort=manual_order&store_section=PRODUCE').data, 'html.parser')

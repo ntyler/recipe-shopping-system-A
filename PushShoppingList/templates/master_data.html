@@ -328,9 +328,9 @@
             <div class="unit-master-aliases ingredient-aliases" data-ingredient-aliases role="group" aria-label="Aliases for {{ row.name }}">
                 <span class="unit-master-alias-chip-list" data-ingredient-alias-list>
                 {% for alias in row.aliases %}<code data-ingredient-alias="{{ alias }}">{{ alias }}</code>{% endfor %}
-                <span data-ingredient-alias-empty {% if row.aliases %}hidden{% endif %}>No aliases</span>
+                <span class="unit-master-no-aliases" data-ingredient-alias-empty {% if row.aliases %}hidden{% endif %}>No aliases</span>
                 </span>
-                <span class="unit-master-alias-actions"><button type="button" data-ingredient-row-alias aria-label="Manage aliases" title="Manage aliases" aria-haspopup="dialog" aria-expanded="false" aria-controls="ingredientMasterInlineEditor">+</button></span>
+                <span class="unit-master-alias-actions"><button type="button" data-ingredient-row-alias="add" aria-label="Manage aliases" title="Manage aliases" aria-haspopup="dialog" aria-expanded="false" aria-controls="ingredientMasterInlineEditor">+</button></span>
             </div>
         </td>
         <td class="ingredient-section-cell" data-label="Store Section">
@@ -351,16 +351,16 @@
             </button>
             {% else %}<span class="unit-master-usage-empty master-data-usage-empty" aria-label="{{ row.name }} is unused; no recipes currently reference it">Unused</span>{% endif %}
         </td>
-        <td class="ingredient-action-cell" data-label="Action">
-            <div class="ingredient-row-actions">
-                <button type="button" class="unit-master-edit-button" data-ingredient-row-save disabled>Save</button>
-                <button type="button" class="unit-master-edit-button" data-ingredient-row-cancel hidden>Cancel</button>
-                <button type="button" class="ingredient-row-more-button" popovertarget="ingredientMore-{{ row.id }}" aria-label="More actions and details for {{ row.name }}">&hellip;</button>
-            </div>
+        <td class="ingredient-action-cell" data-label="Save">
+            <button type="button" class="unit-master-edit-button" data-ingredient-row-save disabled>Save</button>
             <span id="ingredientRowStatus-{{ row.id }}" class="ingredient-row-status" data-ingredient-row-status role="status" aria-live="polite"></span>
             <button type="button" class="unit-master-edit-button" data-ingredient-row-retry hidden>Retry validation</button>
+        </td>
+        <td class="ingredient-more-cell" data-label="More">
+            <button type="button" class="ingredient-row-more-button" popovertarget="ingredientMore-{{ row.id }}" aria-label="More actions and details for {{ row.name }}">&hellip;</button>
             <div class="ingredient-row-more" id="ingredientMore-{{ row.id }}" popover>
                 <strong>{{ row.name }}</strong>
+                <button type="button" class="secondary" data-ingredient-row-cancel hidden>Cancel changes</button>
                 <span>Last Updated <time datetime="{{ row.updated_at }}" title="{{ row.updated_at }}">{{ row.updated_at_label }}</time></span>
                 <span>Name {{ row.ingredient_name_usage_count }} &middot; Buy As {{ row.buy_as_usage_count }}</span>
                 <button type="button" class="secondary" data-ingredient-row-image aria-haspopup="dialog" aria-controls="ingredientMasterInlineEditor">Manage image</button>
@@ -1391,10 +1391,10 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
             {% if master_data.rows %}
                 <div class="master-data-table-wrap unit-master-category master-data-registry-category">
                     <table aria-label="Ingredient" class="master-data-table master-data-registry-table {% if master_data.record_type == 'ingredients' %}master-data-ingredients-table{% elif master_data.record_type == 'equipment' %}master-data-equipment-table{% endif %}{% if master_data.scope == 'all' %} master-data-table--show-user{% endif %}{% if master_data.store_section %} master-data-table--section-filtered{% endif %}">
-                    <colgroup><col class="ingredient-col-order"><col class="ingredient-col-item"><col class="ingredient-col-aliases"><col class="ingredient-col-section"><col class="ingredient-col-usage"><col class="ingredient-col-action"></colgroup>
+                    <colgroup><col class="ingredient-col-order"><col class="ingredient-col-item"><col class="ingredient-col-aliases"><col class="ingredient-col-section"><col class="ingredient-col-usage"><col class="ingredient-col-action"><col class="ingredient-col-more"></colgroup>
                     <thead><tr>
                         <th scope="col">Order</th><th scope="col">Item</th><th scope="col">Aliases</th>
-                        <th scope="col">Store Section</th><th scope="col">Used In</th><th scope="col">Action</th>
+                        <th scope="col">Store Section</th><th scope="col">Used In</th><th scope="col">Save</th><th scope="col">More</th>
                     </tr></thead>
                     <tbody>
                         {% if master_data.row_groups %}

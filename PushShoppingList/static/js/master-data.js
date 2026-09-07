@@ -1164,6 +1164,7 @@
     let ingredientEditorErrors = {};
     let ingredientEditorToken = 0;
     let ingredientSaving = false;
+    let ingredientAliasAnchor = null;
 
     function ingredientText(value) { return String(value || '').trim().replace(/\s+/g, ' '); }
     function ingredientKey(value) { return ingredientText(value).toLowerCase(); }
@@ -1199,10 +1200,10 @@
     function ingredientAliases(row) { return Array.from(row.querySelectorAll('[data-ingredient-alias]'), chip => chip.dataset.ingredientAlias); }
     function ingredientRowValues(row) {
         if (row === ingredientEditingRow) {
-            const name = ingredientText(ingredientEditorControl('name').value);
+            const name = ingredientText(row.querySelector('[data-ingredient-row-name]').value);
             return {
                 name, normalized_name: name === row.ingredientOriginal.name ? row.ingredientOriginal.normalized_name : ingredientKey(name),
-                store_section: ingredientEditorControl('section').value,
+                store_section: row.querySelector('[data-ingredient-row-section]').value,
                 aliases: [...ingredientEditorAliases].sort(), image_url: ingredientImageUrl,
             };
         }
@@ -1226,6 +1227,8 @@
             const output = ingredientEditorControl('feedback');
             output.textContent = message; output.hidden = !message;
             output.dataset.status = error ? 'error' : 'success';
+            const status = row.querySelector('[data-ingredient-row-status]');
+            status.textContent = message; status.classList.toggle('is-error', error);
             return;
         }
         const status = document.querySelector('[data-ingredient-registry-status]');
@@ -1238,6 +1241,12 @@
             if (message) input.setAttribute('aria-invalid', 'true'); else input.removeAttribute('aria-invalid');
         }
         output.textContent = message || ''; output.hidden = !message;
+        if (ingredientEditingRow && ['name', 'section'].includes(key)) {
+            const control = ingredientEditingRow.querySelector(`[data-ingredient-row-${key}]`);
+            const error = ingredientEditingRow.querySelector(`[data-ingredient-row-${key}-error]`);
+            if (message) control.setAttribute('aria-invalid', 'true'); else control.removeAttribute('aria-invalid');
+            error.textContent = message || ''; error.hidden = !message;
+        }
     }
     function ingredientValidation() {
         if (!ingredientEditingRow || !ingredientEditorContext) return {aliases: {}};
@@ -1279,14 +1288,14 @@
         }
         ingredientRows().forEach(row => {
             const editing = row === ingredientEditingRow;
-            row.classList.toggle('is-editing', editing);
+            row.classList.toggle('is-editing', editing && (dirty || !form.hidden));
             row.classList.toggle('is-dirty', editing && dirty);
             row.querySelectorAll('button, input, select').forEach(control => { control.disabled = ingredientMutationPending; });
-            const edit = row.querySelector('[data-ingredient-row-edit]');
-            edit.hidden = editing; edit.setAttribute('aria-expanded', String(editing));
             const save = row.querySelector('[data-ingredient-row-save]');
-            save.hidden = !editing; save.disabled = busy || !ingredientEditorContext || !dirty || Boolean(invalid);
+            save.disabled = !editing || busy || !ingredientEditorContext || !dirty || Boolean(invalid);
             save.textContent = ingredientSaving && editing ? 'Saving…' : 'Save';
+            row.querySelector('[data-ingredient-row-cancel]').hidden = !editing || !dirty;
+            row.querySelector('[data-ingredient-row-retry]').hidden = !editing || ingredientEditorControl('retry').hidden;
             row.querySelector('[data-master-merge-open]').disabled = ingredientMutationPending || ingredientImagePending || dirty;
             const blocked = ingredientMutationPending || row.dataset.orderEnabled !== 'true';
             const handle = row.querySelector('[data-ingredient-order-handle]');
@@ -1294,6 +1303,8 @@
             row.querySelector('[data-ingredient-order-action="up"]').disabled = blocked || Number(row.dataset.sortOrder) === 0;
             row.querySelector('[data-ingredient-order-action="down"]').disabled = blocked || Number(row.dataset.sortOrder) >= Number(row.dataset.sectionCount) - 1;
         });
+        if (ingredientEditingRow) renderIngredientRowAliases(ingredientEditingRow, ingredientEditorAliases);
+        if (ingredientAliasAnchor) window.MasterDataAliasEditor.positionPopover(form, ingredientAliasAnchor);
     }
     function captureIngredientScroll(anchor) {
         const top = anchor.getBoundingClientRect().top;
@@ -1308,7 +1319,9 @@
         };
     }
     function parkIngredientEditor() {
+        closeIngredientAliases({restoreFocus: false});
         const form = ingredientEditorControl('form');
+        form.hidden = true;
         ingredientEditorControl('home').before(form);
         ingredientEditorRow?.remove(); ingredientEditorRow = null;
     }
@@ -1316,9 +1329,52 @@
         const form = ingredientEditorControl('form');
         ingredientEditorRow?.remove();
         ingredientEditorRow = document.createElement('tr'); ingredientEditorRow.dataset.ingredientEditorRow = '';
-        const cell = document.createElement('td'); cell.colSpan = 6;
+        const cell = document.createElement('td'); cell.colSpan = 7;
         cell.append(form); ingredientEditorRow.append(cell); row.after(ingredientEditorRow);
         form.hidden = false;
+    }
+    function renderIngredientRowAliases(row, aliases) {
+        const list = row.querySelector('[data-ingredient-alias-list]');
+        if (JSON.stringify(ingredientAliases(row)) === JSON.stringify(aliases)) return;
+        list.replaceChildren(...aliases.map(alias => {
+            const chip = document.createElement('code'); chip.dataset.ingredientAlias = alias; chip.textContent = alias; return chip;
+        }));
+        if (!aliases.length) {
+            const empty = document.createElement('span'); empty.className = 'unit-master-no-aliases';
+            empty.dataset.ingredientAliasEmpty = ''; empty.textContent = 'No aliases'; list.append(empty);
+        }
+    }
+    function setIngredientEditorMode(aliases) {
+        const form = ingredientEditorControl('form');
+        form.classList.toggle('unit-master-alias-popover', aliases);
+        form.classList.toggle('unit-master-inline-editor', !aliases);
+        for (const selector of ['.unit-master-editor-context', '.unit-master-editor-grid', '.ingredient-editor-image-section']) {
+            form.querySelector(selector).hidden = aliases;
+        }
+        ingredientEditorControl('close-aliases').hidden = !aliases;
+        ingredientEditorControl('cancel').hidden = aliases;
+        ingredientEditorControl('save').hidden = aliases;
+        document.getElementById('ingredientEditorPermissions').textContent = aliases
+            ? 'Use the row’s Save or Cancel for all alias changes.' : 'You may change the name, Store Section, aliases, and image.';
+        ingredientEditorControl('title').textContent = `${aliases ? 'Aliases for' : 'Edit'} ${ingredientRowValues(ingredientEditingRow).name}`;
+    }
+    function openIngredientAliases(row, anchor) {
+        if (!editIngredientRow(row)) return;
+        parkIngredientEditor(); setIngredientEditorMode(true);
+        const form = ingredientEditorControl('form');
+        ingredientAliasAnchor = anchor;
+        form.setAttribute('role', 'dialog'); form.setAttribute('popover', 'manual'); form.hidden = false; form.showPopover();
+        anchor.setAttribute('aria-expanded', 'true'); syncIngredientRowControls();
+        if (!ingredientEditorLoading) ingredientEditorControl('alias-input').focus({preventScroll: true});
+    }
+    function closeIngredientAliases({restoreFocus = true} = {}) {
+        if (!ingredientAliasAnchor) return;
+        const anchor = ingredientAliasAnchor, form = ingredientEditorControl('form');
+        ingredientAliasAnchor = null;
+        if (form.matches(':popover-open')) form.hidePopover();
+        form.hidden = true; form.removeAttribute('popover'); form.removeAttribute('role'); form.removeAttribute('style');
+        anchor.setAttribute('aria-expanded', 'false');
+        if (restoreFocus && anchor.isConnected) anchor.focus({preventScroll: true});
     }
     function renderIngredientEditorAliases() {
         const container = ingredientEditorControl('alias-chips'); container.replaceChildren();
@@ -1346,6 +1402,10 @@
         renderStoreSectionMasterIconVisual(ingredientEditorControl('section-icon'), section?.icon || 'basket');
     }
     function fillIngredientEditor(values) {
+        if (ingredientEditingRow) {
+            ingredientEditingRow.querySelector('[data-ingredient-row-name]').value = values.name;
+            ingredientEditingRow.querySelector('[data-ingredient-row-section]').value = values.store_section;
+        }
         ingredientEditorControl('name').value = values.name;
         ingredientEditorControl('section').value = values.store_section;
         ingredientEditorAliases = [...values.aliases]; ingredientEditorControl('alias-input').value = '';
@@ -1363,11 +1423,16 @@
             if (requestToken !== ingredientEditorToken || row !== ingredientEditingRow) return;
             if (!response.ok || !context.ok) throw new Error(context.error || 'Ingredient details could not be loaded.');
             ingredientEditorContext = context;
+            // Loading validation must not overwrite keystrokes entered while the request was in flight.
+            const draft = ingredientRowValues(row), dirty = ingredientRowIsDirty(row);
+            const pendingAlias = ingredientEditorControl('alias-input').value;
+            const imageChange = ingredientImageChange;
             ingredientEditorControl('section').replaceChildren(...context.sections.map(section => new Option(section.display_name, section.section_key)));
             const record = context.record;
             row.ingredientOriginal = {name: record.name, normalized_name: record.normalized_name, store_section: record.store_section, aliases: record.aliases.slice().sort(), image_url: record.image_url};
-            fillIngredientEditor(row.ingredientOriginal);
-            ingredientEditorControl('title').textContent = `Edit ${record.name}`;
+            fillIngredientEditor(dirty ? draft : row.ingredientOriginal);
+            ingredientEditorControl('alias-input').value = pendingAlias; ingredientImageChange = imageChange;
+            ingredientEditorControl('title').textContent = `${ingredientAliasAnchor ? 'Aliases for' : 'Edit'} ${ingredientRowValues(row).name}`;
             ingredientEditorControl('source').textContent = record.source_label;
             ingredientEditorControl('usage').textContent = `Used in ${record.usage_count} recipe${record.usage_count === 1 ? '' : 's'}`;
             ingredientEditorControl('section').hidden = record.section_editable === false;
@@ -1381,24 +1446,24 @@
         } finally {
             if (requestToken === ingredientEditorToken) {
                 ingredientEditorLoading = false; syncIngredientRowControls();
-                ingredientEditorControl(ingredientEditorContext ? 'name' : 'retry').focus({preventScroll: true});
+                if (ingredientAliasAnchor && ingredientEditorContext) ingredientEditorControl('alias-input').focus({preventScroll: true});
             }
         }
     }
     function editIngredientRow(row) {
         if (ingredientMutationPending) return false;
-        if (ingredientEditingRow === row) { ingredientEditorControl('name').focus({preventScroll: true}); return true; }
+        if (ingredientEditingRow === row) return true;
         const restoreScroll = captureIngredientScroll(row);
         if (ingredientEditingRow && !cancelIngredientRow(ingredientEditingRow, {restoreFocus: false})) return false;
         const values = ingredientRowValues(row); row.ingredientOriginal = values; ingredientEditingRow = row;
         ingredientEditorContext = null; ingredientEditorErrors = {};
-        const sectionText = row.querySelector('.ingredient-section-summary > span:last-child').textContent;
+        const sectionText = row.querySelector('[data-ingredient-row-section] option:checked').textContent;
         ingredientEditorControl('section').replaceChildren(new Option(sectionText, values.store_section));
         fillIngredientEditor(values); ingredientEditorControl('section').hidden = false; ingredientEditorControl('section-readonly').hidden = true;
         ingredientEditorControl('title').textContent = `Edit ${values.name}`;
         ingredientEditorControl('source').textContent = row.dataset.sourceLabel;
         const count = Number(row.dataset.usageCount); ingredientEditorControl('usage').textContent = `Used in ${count} recipe${count === 1 ? '' : 's'}`;
-        ingredientFieldError('image', ''); attachIngredientEditor(row);
+        ingredientFieldError('image', '');
         restoreScroll();
         void loadIngredientEditor(row, ++ingredientEditorToken);
         return true;
@@ -1410,13 +1475,17 @@
         ingredientEditorAliases.push(value); input.value = ''; renderIngredientEditorAliases(); syncIngredientRowControls(); return true;
     }
     function cancelIngredientRow(row, {restoreFocus = true, discard = false} = {}) {
+        if (!row) return true;
         if (ingredientMutationPending) return false;
         if (!discard && ingredientRowIsDirty(row) && !window.confirm('Discard unsaved changes to this ingredient?')) return false;
         const restoreScroll = captureIngredientScroll(row);
         ingredientEditorToken++; ingredientEditorLoading = false; ingredientImagePending = false; ingredientEditorErrors = {};
-        fillIngredientEditor(row.ingredientOriginal); ingredientEditorControl('form').hidden = true; parkIngredientEditor();
+        fillIngredientEditor(row.ingredientOriginal); renderIngredientRowAliases(row, row.ingredientOriginal.aliases);
+        ingredientFieldError('name', ''); ingredientFieldError('section', ''); ingredientStatus('', false, row);
+        row.querySelector('[popover]').hidePopover();
+        ingredientEditorControl('form').hidden = true; parkIngredientEditor();
         ingredientEditingRow = null; ingredientEditorContext = null; syncIngredientRowControls();
-        if (restoreFocus) row.querySelector('[data-ingredient-row-edit]').focus({preventScroll: true});
+        if (restoreFocus) row.querySelector('[data-ingredient-row-name]').focus({preventScroll: true});
         restoreScroll(); return true;
     }
     async function prepareIngredientImage(file = null) {
@@ -1446,7 +1515,6 @@
         if (!row || row !== ingredientEditingRow || ingredientEditorControl('save').disabled) return;
         if (!addIngredientAlias()) return;
         const form = ingredientEditorControl('form'), restoreScroll = captureIngredientScroll(form);
-        const activeControl = document.activeElement;
         const values = ingredientRowValues(row), payload = {...values, redirect_url: window.location.href};
         delete payload.image_url; if (ingredientImageChange) payload.image = ingredientImageChange;
         ingredientMutationPending = true; ingredientSaving = true; row.classList.add('is-saving');
@@ -1462,23 +1530,19 @@
             saved = true; const record = result.result;
             row.ingredientOriginal = {name: record.name, normalized_name: record.normalized_name, store_section: record.store_section, aliases: record.aliases.slice().sort(), image_url: record.image_url};
             ingredientEditorErrors = {}; fillIngredientEditor(row.ingredientOriginal); ingredientEditorControl('title').textContent = `Edit ${record.name}`;
+            parkIngredientEditor(); ingredientEditingRow = null; ingredientEditorContext = null;
             await refreshMasterDataRecordResults();
-            if (ingredientEditingRow) {
-                const count = Number(ingredientEditingRow.dataset.usageCount); ingredientEditorControl('usage').textContent = `Used in ${count} recipe${count === 1 ? '' : 's'}`;
-                ingredientStatus(`${record.name} saved.`, false, ingredientEditingRow);
-            } else {
-                ingredientStatus(`${record.name} saved. It is outside the current results.`);
-                document.querySelector('[data-ingredient-registry-status]').classList.remove('sr-only');
-            }
+            ingredientStatus(`${record.name} saved.`);
         } catch (error) {
             ingredientStatus(saved ? 'Saved. The table could not refresh; reload the page to see the updated group.' : error.message || 'The ingredient could not be saved.', true, ingredientEditingRow);
         } finally {
             ingredientMutationPending = false; ingredientSaving = false; row.classList.remove('is-saving');
             ingredientEditorControl('save').textContent = 'Save Changes'; syncIngredientRowControls();
             if (saved) {
-                const focusTarget = ingredientEditingRow ? (activeControl.isConnected && !activeControl.disabled && activeControl.getClientRects().length ? activeControl : ingredientEditorControl('feedback')) : document.querySelector('.master-data-filter-form [name="search"]');
+                const focusTarget = document.querySelector(`[data-ingredient-master-row][data-master-record-id="${row.dataset.masterRecordId}"] [data-ingredient-row-name]`)
+                    || document.querySelector('.master-data-filter-form [name="search"]');
                 focusTarget?.focus({preventScroll: true}); restoreScroll();
-            } else form.querySelector('[aria-invalid="true"]')?.focus({preventScroll: true});
+            } else (row.querySelector('[aria-invalid="true"]') || form.querySelector('[aria-invalid="true"]'))?.focus({preventScroll: true});
         }
     }
     function ingredientSectionRows(row) {
@@ -1542,14 +1606,21 @@
         root.dataset.ingredientRegistryBound = 'true';
         const form = ingredientEditorControl('form');
         form.addEventListener('input', event => {
-            if (event.target === ingredientEditorControl('name')) delete ingredientEditorErrors.name;
+            if (event.target === ingredientEditorControl('name')) {
+                ingredientEditingRow.querySelector('[data-ingredient-row-name]').value = event.target.value;
+                delete ingredientEditorErrors.name;
+            }
             if (event.target === ingredientEditorControl('alias-input')) delete ingredientEditorErrors.aliases;
             if (event.target === ingredientEditorControl('section')) delete ingredientEditorErrors.section;
             ingredientStatus('', false, ingredientEditingRow); syncIngredientRowControls();
         });
-        ingredientEditorControl('section').addEventListener('change', () => { delete ingredientEditorErrors.section; syncIngredientSectionIcon(); syncIngredientRowControls(); });
+        ingredientEditorControl('section').addEventListener('change', () => {
+            ingredientEditingRow.querySelector('[data-ingredient-row-section]').value = ingredientEditorControl('section').value;
+            delete ingredientEditorErrors.section; syncIngredientSectionIcon(); syncIngredientRowControls();
+        });
         ingredientEditorControl('alias-add').addEventListener('click', () => { addIngredientAlias(); ingredientEditorControl('alias-input').focus({preventScroll: true}); });
-        ingredientEditorControl('cancel').addEventListener('click', () => cancelIngredientRow(ingredientEditingRow));
+        ingredientEditorControl('cancel').addEventListener('click', () => cancelIngredientRow(ingredientEditingRow, {discard: true}));
+        ingredientEditorControl('close-aliases').addEventListener('click', () => { closeIngredientAliases(); syncIngredientRowControls(); });
         ingredientEditorControl('retry').addEventListener('click', () => loadIngredientEditor(ingredientEditingRow, ++ingredientEditorToken));
         ingredientEditorControl('image-replace').addEventListener('click', () => ingredientEditorControl('image-file').click());
         ingredientEditorControl('image-file').addEventListener('change', event => { if (event.target.files[0]) void prepareIngredientImage(event.target.files[0]); });
@@ -1561,8 +1632,35 @@
         });
         form.addEventListener('keydown', event => {
             if (event.target === ingredientEditorControl('alias-input') && ['Enter', ','].includes(event.key)) { event.preventDefault(); addIngredientAlias(); }
-            else if (event.key === 'Escape') { event.preventDefault(); cancelIngredientRow(ingredientEditingRow); }
+            else if (event.key === 'Escape') {
+                event.preventDefault();
+                if (ingredientAliasAnchor) { closeIngredientAliases(); syncIngredientRowControls(); }
+                else cancelIngredientRow(ingredientEditingRow, {discard: true});
+            }
         });
+        const updateInlineValue = event => {
+            const control = event.target;
+            if (!control.matches('[data-ingredient-row-name], [data-ingredient-row-section]')) return;
+            const row = control.closest('[data-ingredient-master-row]'), value = control.value;
+            if (!editIngredientRow(row)) { control.value = row.ingredientOriginal[control.matches('[data-ingredient-row-name]') ? 'name' : 'store_section']; return; }
+            control.value = value;
+            const key = control.matches('[data-ingredient-row-name]') ? 'name' : 'section';
+            ingredientEditorControl(key).value = value; delete ingredientEditorErrors[key];
+            if (key === 'section') syncIngredientSectionIcon();
+            ingredientStatus('', false, row); syncIngredientRowControls();
+        };
+        root.addEventListener('input', updateInlineValue);
+        root.addEventListener('change', updateInlineValue);
+        document.addEventListener('pointerdown', event => {
+            if (ingredientAliasAnchor && !form.contains(event.target) && !ingredientAliasAnchor.contains(event.target)) {
+                closeIngredientAliases({restoreFocus: false}); syncIngredientRowControls();
+            }
+        });
+        const positionAliases = () => {
+            if (ingredientAliasAnchor) window.MasterDataAliasEditor.positionPopover(form, ingredientAliasAnchor);
+        };
+        window.addEventListener('resize', positionAliases);
+        document.addEventListener('scroll', positionAliases, true);
         root.addEventListener('submit', event => {
             if (event.target === form) { event.preventDefault(); void saveIngredientRow(ingredientEditingRow); }
             else if (event.target.matches('.master-data-filter-form') && ingredientRowIsDirty(ingredientEditingRow)) {
@@ -1571,8 +1669,14 @@
         });
         root.addEventListener('click', event => {
             const button = event.target.closest('button'), row = button?.closest('[data-ingredient-master-row]'); if (!row) return;
-            if (button.matches('[data-ingredient-row-edit]')) editIngredientRow(row);
+            if (button.matches('[data-ingredient-row-alias]')) openIngredientAliases(row, button);
+            else if (button.matches('[data-ingredient-row-image]') && editIngredientRow(row)) {
+                row.querySelector('[popover]').hidePopover(); parkIngredientEditor(); setIngredientEditorMode(false); attachIngredientEditor(row);
+                syncIngredientRowControls();
+            }
             else if (button.matches('[data-ingredient-row-save]')) { event.preventDefault(); void saveIngredientRow(row); }
+            else if (button.matches('[data-ingredient-row-cancel]')) cancelIngredientRow(row, {discard: true});
+            else if (button.matches('[data-ingredient-row-retry]')) void loadIngredientEditor(row, ++ingredientEditorToken);
             else if (button.matches('[data-ingredient-order-action]')) void moveIngredientRow(row, ingredientSectionRows(row).indexOf(row) + (button.dataset.ingredientOrderAction === 'up' ? -1 : 1), button);
             else if (button.matches('[data-master-merge-open]')) {
                 if (ingredientEditingRow && !ingredientRowIsDirty(ingredientEditingRow)) cancelIngredientRow(ingredientEditingRow, {restoreFocus: false});
@@ -1581,6 +1685,12 @@
         });
         root.addEventListener('keydown', event => {
             const row = event.target.closest('[data-ingredient-master-row]'); if (!row) return;
+            if (event.key === 'Escape' && row === ingredientEditingRow) {
+                event.preventDefault(); cancelIngredientRow(row, {discard: true}); return;
+            }
+            if (event.key === 'Enter' && event.target.matches('[data-ingredient-row-name]')) {
+                event.preventDefault(); void saveIngredientRow(row); return;
+            }
             if (event.target.matches('[data-ingredient-order-handle]') && ['ArrowUp','ArrowDown','Home','End'].includes(event.key)) {
                 event.preventDefault(); const rows = ingredientSectionRows(row);
                 const target = event.key === 'Home' ? 0 : event.key === 'End' ? rows.length - 1 : rows.indexOf(row) + (event.key === 'ArrowUp' ? -1 : 1);

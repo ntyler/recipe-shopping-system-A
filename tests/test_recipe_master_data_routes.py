@@ -424,7 +424,7 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert 'class="ingredient-item"' in all_html
     assert 'data-full-src="/static/generated/tomato.png"' in all_html
     assert all_html.index('class="master-data-thumbnail"') < all_html.index('value="Tomato"')
-    assert '<th scope="rowgroup" colspan="6">Produce</th>' in all_html
+    assert '<th scope="rowgroup" colspan="7">Produce</th>' in all_html
     assert '<th scope="col">User</th>' not in all_html
     assert 'class="ingredient-row-more"' in all_html
     assert 'name="normalized_name" value="tomato"' in all_html
@@ -485,7 +485,7 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert '<th scope="col">User</th>' not in filtered_html
     assert "master-data-table--show-user" not in filtered_html
     assert 'class="master-data-user-data-cell"' not in filtered_html
-    assert '<th scope="rowgroup" colspan="6">Spices</th>' in filtered_html
+    assert '<th scope="rowgroup" colspan="7">Spices</th>' in filtered_html
     assert equipment_response.status_code == 200
     assert 'data-equipment-master-registry' in equipment_html
     assert '<span>Workspace registry</span>' in equipment_html
@@ -1847,7 +1847,7 @@ def test_master_data_user_filter_aligns_with_filter_row():
 
 def test_master_data_row_editing_replaces_bulk_save():
     template = Path("PushShoppingList/templates/master_data.html").read_text(encoding="utf-8")
-    for marker in ("data-ingredient-row-edit", "data-ingredient-row-save",
+    for marker in ("data-ingredient-row-name", "data-ingredient-row-save",
                    "data-master-record-form", "update_ingredient_master_record_route"):
         assert marker in template
     assert 'partials/ingredient_inline_editor.html' in template
@@ -1948,7 +1948,7 @@ def test_master_data_mobile_layout_prioritizes_filters_and_results():
     assert "overflow-x: clip;" in css
 
 
-    assert "data-ingredient-row-edit" in template
+    assert "data-ingredient-row-name" in template
     assert "function initIngredientRegistry()" in script
 
 def test_equipment_registry_header_uses_the_units_surface_treatment():

@@ -31,7 +31,7 @@ def test_both_pages_use_one_shared_usage_modal_and_ingredient_editor_stays_separ
             if kind == 'ingredients':
                 editor = soup.select_one('[data-ingredient-editor-form]')
                 assert editor.has_attr('hidden') and editor['id'] != dialog['id']
-                assert soup.select_one('[data-ingredient-row-edit]')['aria-controls'] == editor['id']
+                assert soup.select_one('[data-ingredient-row-alias]')['aria-controls'] == editor['id']
 
 
 @pytest.mark.parametrize('kind', ['ingredients', 'equipment'])
