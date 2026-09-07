@@ -82915,6 +82915,7 @@ body.recipe-edit-standalone-page #recipeEditIngredients
 
 .unit-master-page--registry-v2 .master-data-registry-category {
     overflow: clip;
+    background: transparent;
 }
 
 .unit-master-page--registry-v2 .master-data-registry-table .unit-master-table-head {
@@ -82930,8 +82931,7 @@ body.recipe-edit-standalone-page #recipeEditIngredients
 }
 
 .unit-master-page--registry-v2 .unit-master-row:is(.is-selected, .is-inline-editing, .is-dirty) {
-    background: color-mix(in srgb, var(--app-primary-soft) 30%, transparent);
-    box-shadow: inset 3px 0 0 var(--app-primary-hover);
+    box-shadow: inset 2px 0 0 color-mix(in srgb, var(--app-primary-hover) 60%, transparent);
 }
 
 /* Only a hovering pointer gets the solid fill, across all seven cells. */
@@ -83477,7 +83477,7 @@ body.recipe-edit-standalone-page #recipeEditIngredients
 @media (hover: hover) {
     .unit-master-page--registry-v2 .unit-master-category-cell:has(> :is([data-unit-row-activate="category"], [data-unit-row-category]):hover)::after { opacity: 1; }
 }
-.unit-master-page--registry-v2 .unit-master-row :is([data-unit-row-name], [data-unit-row-category])[aria-invalid="true"] { border-color: var(--app-danger); }
+.unit-master-page--registry-v2 .unit-master-row :is([data-unit-row-name], [data-unit-row-category])[aria-invalid="true"]:is(:hover, :focus) { border-color: var(--app-danger); }
 .unit-master-page--registry-v2 .unit-master-row :is([data-unit-row-name], [data-unit-row-category])[aria-invalid="true"]:focus { outline-color: var(--app-danger); }
 .unit-master-page--registry-v2 .unit-master-row [hidden] { display: none !important; }
 .master-data-registry-table .master-data-row-actions { position: relative; }
@@ -83576,7 +83576,7 @@ body.recipe-edit-standalone-page #recipeEditIngredients
 .unit-master-page--registry-v2 .unit-master-draft-table[hidden],
 .unit-master-page--registry-v2 .unit-master-alias-popover [hidden],
 .unit-master-page--registry-v2 .unit-master-add-footer > [hidden] { display: none !important; }
-.unit-master-page--registry-v2 .unit-master-draft-table.is-drafting { padding: 0; border: 1px solid var(--app-border); border-radius: 7px; background: var(--app-surface); }
+.unit-master-page--registry-v2 .unit-master-draft-table.is-drafting { padding: 0; border: 1px solid var(--app-border); border-radius: 7px; background: transparent; }
 .unit-master-page--registry-v2 .unit-master-add-footer.is-drafting { margin-bottom: 16px; }
 .unit-master-page--registry-v2 [data-unit-new-draft] { border-bottom: 0; }
 .unit-master-page--registry-v2 [data-unit-new-draft] .unit-master-order-cell { color: var(--app-muted); font-size: 12px; }
