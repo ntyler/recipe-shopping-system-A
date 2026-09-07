@@ -278,6 +278,12 @@
             edit.removeAttribute('aria-controls'); edit.removeAttribute('aria-expanded');
             edit.hidden = editing;
             const aliases = row.querySelector('.unit-master-aliases');
+            let chipList = aliases.querySelector('.unit-master-alias-chip-list');
+            if (!chipList) {
+                chipList = document.createElement('span');
+                chipList.className = 'unit-master-alias-chip-list';
+                aliases.prepend(chipList);
+            }
             let actions = aliases.querySelector('.unit-master-alias-actions');
             if (!actions) {
                 actions = document.createElement('span');
@@ -294,10 +300,12 @@
             const values = editing ? draft.values.aliases : unit.aliases || [];
             const signature = JSON.stringify(values);
             if (aliases.dataset.aliases !== signature) {
-                aliases.querySelectorAll(':scope > code, :scope > span:not(.unit-master-alias-actions)').forEach(chip => chip.remove());
-                values.forEach(alias => {
-                    const chip = document.createElement('code'); chip.textContent = alias; aliases.insertBefore(chip, actions);
-                });
+                // Upgrade cached markup without removing the separate action group.
+                aliases.querySelectorAll(':scope > code, :scope > span:not(.unit-master-alias-actions):not(.unit-master-alias-chip-list)').forEach(chip => chip.remove());
+                chipList.replaceChildren(...values.map(alias => {
+                    const chip = document.createElement('code'); chip.textContent = alias; return chip;
+                }));
+                chipList.hidden = !values.length;
                 aliases.dataset.aliases = signature;
             }
             actions.querySelectorAll('button').forEach(button => {
@@ -734,17 +742,6 @@
             aliases.className = "unit-master-aliases";
             aliases.setAttribute("role", "cell");
             aliases.dataset.mobileLabel = "Accepted aliases";
-            if (unit.aliases?.length) {
-                unit.aliases.forEach(alias => {
-                    const code = document.createElement("code");
-                    code.textContent = alias;
-                    aliases.appendChild(code);
-                });
-            } else {
-                const empty = document.createElement("span");
-                empty.textContent = "Canonical name only";
-                aliases.appendChild(empty);
-            }
             const sourceBadge = document.createElement("span");
             sourceBadge.className = `unit-master-source-badge${unit.seeded ? "" : " user-created"}`;
             sourceBadge.setAttribute("role", "cell");
@@ -752,17 +749,15 @@
             const usage = createUsageCell(unit);
             const edit = document.createElement("button");
             edit.type = "button";
-            edit.className = "unit-master-alias-details";
+            edit.className = "unit-master-edit-button";
             edit.dataset.unitMasterEditButton = "";
             edit.dataset.unitId = unit.id;
-            edit.textContent = "Edit aliases";
-            edit.setAttribute("aria-label", `Edit aliases for ${unit.name}`);
-            edit.setAttribute("aria-controls", "unitMasterInlineEditor");
-            edit.setAttribute("aria-expanded", "false");
+            edit.textContent = "Edit unit";
+            edit.setAttribute("aria-label", `Edit unit ${unit.name}`);
             const action = document.createElement("div");
             action.className = "unit-master-action-cell";
             action.setAttribute("role", "cell");
-            aliases.appendChild(edit);
+            action.appendChild(edit);
             for (const [key, label, aria] of [['unitRowSave', 'Save', `Save ${unit.name}`], ['unitRowCancel', 'Cancel', `Cancel changes to ${unit.name}`]]) {
                 const button = document.createElement('button');
                 button.type = 'button'; button.className = 'unit-master-edit-button';

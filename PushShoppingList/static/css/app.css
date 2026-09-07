@@ -83500,11 +83500,13 @@ body.recipe-edit-standalone-page #recipeEditIngredients
 .unit-master-page--registry-v2 .unit-master-row-status { position: absolute; top: 34px; left: 0; font-size: 10px; line-height: 12px; color: var(--app-muted); }
 .unit-master-page--registry-v2 .unit-master-row-status.is-error { position: static; grid-column: 1 / -1; color: var(--app-danger); }
 .unit-master-page--registry-v2 .unit-master-row-status.is-alias-error { position: absolute; }
-.unit-master-page--registry-v2 .unit-master-aliases { align-items: center; gap: 4px; min-width: 0; }
-.unit-master-page--registry-v2 .unit-master-aliases code { max-width: 100%; overflow-wrap: anywhere; }
-.unit-master-page--registry-v2 .unit-master-alias-actions { display: inline-flex; flex: 0 0 auto; gap: 2px; opacity: 0; }
+.unit-master-page--registry-v2 .unit-master-aliases { --unit-alias-control-size: 32px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; overflow: visible; }
+.unit-master-page--registry-v2 .unit-master-alias-chip-list { display: flex; flex: 0 1 auto; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; max-width: 100%; overflow: visible; }
+.unit-master-page--registry-v2 .unit-master-alias-chip-list:empty { display: none; }
+.unit-master-page--registry-v2 .unit-master-aliases code { box-sizing: border-box; flex: 0 1 auto; min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.unit-master-page--registry-v2 .unit-master-alias-actions { display: inline-flex; flex-grow: 0; flex-shrink: 0; flex-basis: auto; flex-wrap: nowrap; align-items: center; gap: 4px; min-width: calc(2 * var(--unit-alias-control-size) + 4px); margin: 0; padding: 0; overflow: visible; opacity: 0; }
 .unit-master-page--registry-v2 .unit-master-row:is(:hover, :focus-within, .is-inline-editing) .unit-master-alias-actions { opacity: 1; }
-.unit-master-page--registry-v2 .unit-master-alias-actions button { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 26px; width: 26px; min-width: 26px; height: 26px; min-height: 26px; padding: 0; margin: 0; border: 1px solid transparent; border-radius: 5px; background: transparent; color: var(--app-muted); font-size: 15px; line-height: 1; cursor: pointer; }
+.unit-master-page--registry-v2 .unit-master-alias-actions button { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 var(--unit-alias-control-size); width: var(--unit-alias-control-size); min-width: var(--unit-alias-control-size); max-width: var(--unit-alias-control-size); height: var(--unit-alias-control-size); min-height: var(--unit-alias-control-size); max-height: var(--unit-alias-control-size); padding: 0; margin: 0; overflow: visible; border: 1px solid transparent; border-radius: 5px; background: transparent; color: var(--app-muted); font-size: 15px; line-height: 1; text-align: center; cursor: pointer; }
 .unit-master-page--registry-v2 .unit-master-alias-actions button:is(:hover, :focus-visible, [aria-expanded="true"]) { border-color: var(--app-border); background: var(--app-surface); color: var(--app-primary-hover); }
 .unit-master-page--registry-v2 .unit-master-alias-actions button:focus-visible { outline: 2px solid var(--app-primary-hover); outline-offset: 1px; }
 .unit-master-page--registry-v2 .unit-master-inline-editor.is-alias-popover { position: fixed; inset: auto; z-index: 100; box-sizing: border-box; width: min(360px, calc(100vw - 24px)); max-width: none; max-height: calc(100dvh - 24px); margin: 0; padding: 14px; gap: 10px; overflow: auto; overscroll-behavior: contain; border: 1px solid var(--app-border); border-radius: 10px; box-shadow: 0 10px 30px #0005; }
@@ -83527,7 +83529,7 @@ body.recipe-edit-standalone-page #recipeEditIngredients
 .unit-master-page--registry-v2 .unit-master-suggestion-chips [aria-pressed="true"]::before { content: '✓ '; }
 .unit-master-page--registry-v2 [data-unit-alias-add-selected] { justify-self: start; width: auto; min-height: 32px; padding: 6px 10px; font-size: 12px; }
 @media (hover: none) {
-    .unit-master-page--registry-v2 .unit-master-alias-actions button { width: 32px; height: 32px; flex-basis: 32px; }
+    .unit-master-page--registry-v2 .unit-master-aliases { --unit-alias-control-size: 36px; }
 }
 @media (max-width: 760px) {
     .unit-master-page--registry-v2 .unit-master-category-cell::after { top: auto; bottom: 17px; }
