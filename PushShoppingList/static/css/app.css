@@ -82929,8 +82929,8 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     transition: opacity 140ms ease;
 }
 
-.unit-master-page--registry-v2 .unit-master-row:hover {
-    background: color-mix(in srgb, var(--app-surface-soft) 66%, transparent);
+.unit-master-page--registry-v2 .unit-master-row:is(.is-selected, .is-inline-editing, .is-dirty) {
+    background: var(--app-primary-soft);
 }
 
 .unit-master-page--registry-v2 .unit-master-row > strong {
@@ -83436,21 +83436,15 @@ body.recipe-edit-standalone-page #recipeEditIngredients
 /* Real inline controls share the neutral master-data row treatment. */
 .unit-master-page--registry-v2 .unit-master-category-cell { color: var(--app-muted); font-size: 11px; overflow-wrap: anywhere; }
 .unit-master-page--registry-v2 .unit-master-name-cell { min-width: 0; font-size: 12px; font-weight: 750; overflow-wrap: anywhere; }
-.unit-master-page--registry-v2 .unit-master-row :is(.unit-master-inline-value, [data-unit-row-name], [data-unit-row-category]) { box-sizing: border-box; display: block; width: 100%; min-width: 0; height: 38px; min-height: 38px; margin: 0; padding: 7px 10px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--app-text-strong); font: inherit; pointer-events: auto; }
+.unit-master-page--registry-v2 .unit-master-row :is(.unit-master-inline-value, [data-unit-row-name], [data-unit-row-category]) { box-sizing: border-box; display: block; width: 100%; min-width: 0; height: 38px; min-height: 38px; margin: 0; padding: 7px 10px; border: 1px solid transparent; border-radius: 6px; background: transparent; box-shadow: none; color: var(--app-text-strong); font: inherit; pointer-events: auto; }
 .unit-master-page--registry-v2 .unit-master-inline-value { text-align: left; cursor: text; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.unit-master-page--registry-v2 [data-unit-row-activate="category"] { cursor: pointer; padding-right: 24px; }
-.unit-master-page--registry-v2 .unit-master-row:hover .unit-master-inline-value,
-.unit-master-page--registry-v2 .unit-master-inline-value:focus-visible,
-.unit-master-page--registry-v2 .is-inline-editing :is([data-unit-row-name], [data-unit-row-category]) { border-color: var(--app-border); background-color: var(--app-surface); }
-.unit-master-page--registry-v2 .unit-master-inline-value:focus-visible { outline: 2px solid var(--app-primary-hover); outline-offset: 1px; }
-.unit-master-page--registry-v2 .unit-master-row [data-unit-row-category] { appearance: none; background-image: none; padding-right: 24px; cursor: pointer; text-overflow: ellipsis; }
+.unit-master-page--registry-v2 .unit-master-row :is([data-unit-row-activate="category"], [data-unit-row-category]) { appearance: none; background-image: none; padding-right: 24px; cursor: pointer; text-overflow: ellipsis; }
+.unit-master-page--registry-v2 .unit-master-row :is(.unit-master-inline-value, [data-unit-row-name], [data-unit-row-category]):hover:where(:not(:disabled)) { border-color: var(--app-border); }
+.unit-master-page--registry-v2 .unit-master-row :is(.unit-master-inline-value, [data-unit-row-name], [data-unit-row-category]):focus-visible { border-color: var(--app-primary-hover); outline: 2px solid var(--app-primary-hover); outline-offset: -2px; }
 .unit-master-page--registry-v2 .unit-master-category-cell { position: relative; }
-.unit-master-page--registry-v2 .unit-master-category-cell::after { content: ''; position: absolute; right: 10px; top: 15px; width: 5px; height: 5px; border: solid var(--app-muted); border-width: 0 1px 1px 0; transform: rotate(45deg); opacity: 0; pointer-events: none; }
-.unit-master-page--registry-v2 .unit-master-row:is(:hover, :focus-within) .unit-master-category-cell::after { opacity: 1; }
-.unit-master-page--registry-v2 .unit-master-row:hover :is([data-unit-row-name], [data-unit-row-category]),
-.unit-master-page--registry-v2 .unit-master-row :is([data-unit-row-name], [data-unit-row-category]):is(:hover, :focus) { border-color: var(--app-border); background-color: var(--app-surface); }
-.unit-master-page--registry-v2 .unit-master-row :is([data-unit-row-name], [data-unit-row-category]):focus-visible { outline: 2px solid var(--app-primary-hover); outline-offset: 1px; }
-.unit-master-page--registry-v2 .unit-master-row [aria-invalid="true"] { border-color: var(--app-danger); }
+.unit-master-page--registry-v2 .unit-master-category-cell::after { content: ''; position: absolute; right: 10px; top: 15px; width: 5px; height: 5px; border: solid var(--app-muted); border-width: 0 1px 1px 0; transform: rotate(45deg); pointer-events: none; }
+.unit-master-page--registry-v2 .unit-master-row :is([data-unit-row-name], [data-unit-row-category])[aria-invalid="true"] { border-color: var(--app-danger); }
+.unit-master-page--registry-v2 .unit-master-row :is([data-unit-row-name], [data-unit-row-category])[aria-invalid="true"]:focus-visible { outline-color: var(--app-danger); }
 .unit-master-page--registry-v2 .unit-master-row [hidden] { display: none !important; }
 .master-data-registry-table .master-data-row-actions { position: relative; }
 .unit-master-page--registry-v2 .unit-master-action-cell [data-unit-row-save] { grid-column: 1; grid-row: 1; }
@@ -83567,4 +83561,7 @@ body.recipe-edit-standalone-page #recipeEditIngredients
 .unit-master-page--registry-v2 .unit-master-row:has([aria-invalid="true"]) { z-index: 1; }
 @media (max-width: 760px) {
     .unit-master-page--registry-v2 .unit-master-row > .master-data-row-actions { grid-column: 1 / -1; width: 100%; }
+    .unit-master-page--registry-v2 .unit-master-action-cell::before { grid-row: 1; }
+    .unit-master-page--registry-v2 .unit-master-action-cell :is([data-unit-row-save], [data-unit-row-cancel]) { grid-row: 2; }
+    .unit-master-page--registry-v2 .unit-master-row-status { top: 100%; }
 }

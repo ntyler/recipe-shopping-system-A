@@ -95,6 +95,7 @@
         let draftTrigger = null;
         const rowDrafts = new Map();
         let inlineUnitId = "";
+        let selectedUnitId = "";
         let inlineField = "name";
         let editorUnitId = "";
         let editorAliases = [];
@@ -365,11 +366,28 @@
             return true;
         };
 
+        const selectRow = id => {
+            // Tabbing past an unsaved row must not discard it or trap focus.
+            if (inlineUnitId && inlineUnitId !== id) {
+                if (mutationPending || orderPending || inlineUnitId === NEW_UNIT_ID || rowHasEdits(inlineUnitId)) return;
+                cancelRow(inlineUnitId, false);
+            }
+            rowFor(selectedUnitId)?.classList.remove('is-selected');
+            selectedUnitId = id;
+            rowFor(id)?.classList.add('is-selected');
+        };
+
+        const clearRowSelection = id => {
+            rowFor(id)?.classList.remove('is-selected');
+            if (selectedUnitId === id) selectedUnitId = '';
+        };
+
         const activateInlineRow = (id, field = 'name', focus = true) => {
             id = String(id);
             if (mutationPending || orderPending) return false;
             if (inlineUnitId && inlineUnitId !== id && !releaseInlineRow()) return false;
             inlineUnitId = id;
+            selectRow(id);
             inlineField = field;
             syncOrderControls();
             if (focus) {
@@ -1347,6 +1365,8 @@
                     rowFor(savedId)?.querySelector('[data-unit-row-activate="name"]')?.focus({preventScroll: true});
                 } else visibleTarget.focus({preventScroll: true});
                 if (selection && activeId !== id) visibleTarget.setSelectionRange(...selection);
+                // Restored focus stays accessible without reselecting the saved row.
+                clearRowSelection(savedId);
             } catch (_error) {
                 draft.feedback = 'Unable to save this unit. Check your connection and try again.';
                 draft.feedbackType = 'error';
@@ -1377,6 +1397,7 @@
             else resetRow(id);
             applySearch();
             if (restoreFocus) (focusTarget || row.querySelector(`[data-unit-row-activate="${inlineField}"]`)).focus({preventScroll: true});
+            clearRowSelection(id);
             restoreScroll();
         };
 
@@ -1401,7 +1422,13 @@
         };
         root.addEventListener('input', changeRowField);
         root.addEventListener('change', changeRowField);
+        root.addEventListener('focusin', event => {
+            const row = event.target.closest('[data-unit-master-row]');
+            if (row) selectRow(row.dataset.unitId);
+        });
         root.addEventListener("click", event => {
+            const selectedRow = event.target.closest('[data-unit-master-row]');
+            if (selectedRow) selectRow(selectedRow.dataset.unitId);
             const aliasControl = event.target.closest('[data-unit-row-alias]');
             if (aliasControl) {
                 openEditor(unitById(aliasControl.closest('[data-unit-master-row]').dataset.unitId), aliasControl);
