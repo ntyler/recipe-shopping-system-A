@@ -142,15 +142,33 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                                 </button>
                                             </div>
                                         </div>
-                                        <div class="unit-master-name-cell" role="cell" data-mobile-label="Canonical name" data-unit-master-name-cell><strong data-unit-master-cell-text>{{ unit.name }}</strong></div>
+                                        <div class="unit-master-name-cell" role="cell" data-mobile-label="Canonical name" data-unit-master-name-cell>
+                                            <input type="text" value="{{ unit.name }}" maxlength="60" autocomplete="off" required
+                                                data-unit-row-name aria-label="Canonical name for {{ unit.name }}" aria-describedby="unitRowNameError-{{ unit.id }}">
+                                            <small id="unitRowNameError-{{ unit.id }}" class="unit-master-field-error" data-unit-row-name-error aria-live="polite" hidden></small>
+                                        </div>
                                         <div class="unit-master-aliases" role="cell" data-mobile-label="Accepted aliases">
                                             {% for alias in unit.aliases %}
                                                 <code>{{ alias }}</code>
                                             {% else %}
                                                 <span>Canonical name only</span>
                                             {% endfor %}
+                                            <button type="button"
+                                                    class="unit-master-alias-details"
+                                                    data-unit-master-edit-button
+                                                    data-unit-id="{{ unit.id }}"
+                                                    aria-controls="unitMasterInlineEditor"
+                                                    aria-expanded="false"
+                                                    aria-label="Edit aliases for {{ unit.name }}">Edit aliases</button>
                                         </div>
-                                        <div class="unit-master-category-cell" role="cell" data-mobile-label="Category" data-unit-master-category-cell><span data-unit-master-cell-text>{{ category.label }}</span></div>
+                                        <div class="unit-master-category-cell" role="cell" data-mobile-label="Category" data-unit-master-category-cell>
+                                            <select data-unit-row-category aria-label="Category for {{ unit.name }}" aria-describedby="unitRowCategoryError-{{ unit.id }}">
+                                                {% for option in master_data.category_options %}
+                                                    <option value="{{ option.key }}" {% if option.key == unit.category %}selected{% endif %}>{{ option.label }}</option>
+                                                {% endfor %}
+                                            </select>
+                                            <small id="unitRowCategoryError-{{ unit.id }}" class="unit-master-field-error" data-unit-row-category-error aria-live="polite" hidden></small>
+                                        </div>
                                         <div class="unit-master-usage" role="cell" data-mobile-label="Used in">
                                             {% if unit.recipe_count %}
                                                 <button type="button"
@@ -174,13 +192,9 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                             {{ "Built-in" if unit.seeded else "User-created" }}
                                         </span>
                                         <div class="unit-master-action-cell" role="cell">
-                                            <button type="button"
-                                                    class="unit-master-edit-button"
-                                                    data-unit-master-edit-button
-                                                    data-unit-id="{{ unit.id }}"
-                                                    aria-controls="unitMasterInlineEditor"
-                                                    aria-expanded="false"
-                                                    aria-label="Edit unit {{ unit.name }}">Edit unit</button>
+                                            <button type="button" class="unit-master-edit-button" data-unit-row-save aria-label="Save {{ unit.name }}" disabled>Save</button>
+                                            <button type="button" class="unit-master-edit-button" data-unit-row-cancel aria-label="Cancel changes to {{ unit.name }}" disabled>Cancel</button>
+                                            <small class="unit-master-row-status" data-unit-row-status role="status" aria-live="polite" hidden></small>
                                         </div>
                                     </div>
                                 {% endfor %}

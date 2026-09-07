@@ -408,9 +408,24 @@ def test_units_page_exposes_accessible_inline_editor_and_import_offer(
         assert control.find_parent("form") == form
         assert not control.has_attr("disabled")
         assert not control.has_attr("readonly")
-    assert not soup.select("[data-unit-master-row] input, [data-unit-master-row] select")
-    assert soup.select_one("[data-unit-master-name-cell] [data-unit-master-cell-text]")
-    assert soup.select_one("[data-unit-master-category-cell] [data-unit-master-cell-text]")
+    expected = {unit['id']: unit for unit in master_data.default_workspace_unit_registry_payload()['units']}
+    rows = soup.select('[data-unit-master-row]')
+    assert len(rows) == len(expected)
+    for row in rows:
+        unit = expected[row['data-unit-id']]
+        name = row.select_one('[data-unit-row-name]')
+        category = row.select_one('[data-unit-row-category]')
+        assert name.name == 'input' and name['type'] == 'text' and name['value'] == unit['name']
+        assert category.name == 'select'
+        assert [option['value'] for option in category.select('option')] == [key for key, _ in master_data.UNIT_REGISTRY_CATEGORIES]
+        assert category.select_one('option[selected]')['value'] == unit['category']
+        for control in (name, category):
+            assert not any(control.has_attr(attr) for attr in ('disabled', 'readonly', 'hidden'))
+            assert control.get('aria-label')
+            assert soup.find(id=control['aria-describedby']) is not None
+        assert row.select_one('[data-unit-row-save]').has_attr('disabled')
+        assert row.select_one('[data-unit-row-cancel]').has_attr('disabled')
+        assert row.select_one('[data-unit-master-edit-button]').get_text(strip=True) == 'Edit aliases'
     assert not soup.select("[data-unit-master-category-readonly]")
     category_select = form.select_one("[data-unit-master-category-select]")
     assert category_select.get("aria-describedby") == "unitCategoryHelp unitCategoryError"
@@ -452,7 +467,7 @@ def test_units_page_exposes_accessible_inline_editor_and_import_offer(
     assert len(soup.select("[data-unit-master-edit-button]")) >= 30
 
     script = Path("PushShoppingList/static/js/units.js").read_text(encoding="utf-8")
-    assert 'nameInput.focus({ preventScroll: true });' in script
+    assert 'target.focus({ preventScroll: true });' in script
     assert 'nameInput.scrollIntoView({ block: "nearest", inline: "nearest" });' in script
     assert 'form.hidden = false;' in script
     assert all(button.get("aria-controls") == "unitMasterInlineEditor"
@@ -600,7 +615,7 @@ def test_units_page_renders_clickable_recipe_counts_and_usage_dialog(
     teaspoon_row = next(
         row
         for row in soup.select("[data-unit-master-row]")
-        if row.select_one("[data-unit-master-name-cell] strong").get_text(strip=True) == "teaspoon"
+        if row.select_one("[data-unit-row-name]")["value"] == "teaspoon"
     )
     usage_button = teaspoon_row.select_one("[data-unit-master-usage-button]")
     assert usage_button is not None
