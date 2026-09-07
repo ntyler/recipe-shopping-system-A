@@ -144,11 +144,11 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
         await page.locator('[data-unit-master-search]').fill(''); await cancel(a()).click();
 
         // Delegated clicks keep working after save, filter, and reorder rebuilds.
-        let ordered = page.waitForResponse(r => r.request().method() === 'PATCH' && r.url().endsWith('/units/volume_teaspoon'));
-        await a().locator('[data-unit-master-drag-handle]').press('Home'); assert((await ordered).ok());
+        let ordered = page.waitForResponse(r => r.request().method() === 'PUT' && r.url().endsWith('/units/volume_teaspoon'));
+        await a().locator('[data-unit-master-drag-handle]').press('Home'); await save(a()).click(); assert((await ordered).ok());
         await page.waitForFunction(() => document.querySelector('[data-unit-id="volume_teaspoon"] [data-unit-master-order-number]').textContent === '1');
-        ordered = page.waitForResponse(r => r.request().method() === 'PATCH' && r.url().endsWith('/units/volume_teaspoon'));
-        await a().locator('[data-unit-master-drag-handle]').dragTo(row('weight_gram'), { targetPosition: { x: 50, y: 60 } }); assert((await ordered).ok());
+        ordered = page.waitForResponse(r => r.request().method() === 'PUT' && r.url().endsWith('/units/volume_teaspoon'));
+        await a().locator('[data-unit-master-drag-handle]').dragTo(row('weight_gram'), { targetPosition: { x: 50, y: 60 } }); await save(a()).click(); assert((await ordered).ok());
         await display(a()).click(); await name(a()).fill('desktop draft'); await screenshot('units-click-edit.png'); await cancel(a()).click();
         await page.setViewportSize({ width: 390, height: 844 }); await display(a()).click();
         await name(a()).fill('mobile draft'); await selectCategory(category(a()), 'volume');

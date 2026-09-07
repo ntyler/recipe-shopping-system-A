@@ -423,9 +423,10 @@ def test_units_page_exposes_accessible_inline_editor_and_import_offer(
             assert control.get('aria-label')
         assert row.select_one('input, select') is None
         assert row.select_one('[data-unit-row-save]').has_attr('disabled')
-        assert row.select_one('[data-unit-row-save]').has_attr('hidden')
+        assert not row.select_one('[data-unit-row-save]').has_attr('hidden')
         assert row.select_one('[data-unit-row-cancel]').has_attr('hidden')
-        assert row.select_one('[data-unit-master-edit-button]').get_text(strip=True) == 'Edit unit'
+        assert row.select_one('[data-unit-row-save]').get_text(strip=True) == 'Save'
+        assert row.select_one('[data-unit-master-edit-button]') is None
     assert not soup.select("[data-unit-master-category-readonly]")
     assert form.select_one("[data-unit-master-alias-chips]") is not None
     assert "unitAliasPreview" in form.select_one("[data-unit-master-alias-input]")["aria-describedby"]
@@ -444,7 +445,7 @@ def test_units_page_exposes_accessible_inline_editor_and_import_offer(
     )
     assert soup.select_one(".unit-master-stats") is None
     assert soup.select_one(".unit-master-add-footer") is not None
-    assert len(soup.select("[data-unit-master-edit-button]")) >= 30
+    assert len(soup.select("[data-unit-row-save]")) == 35
 
     assert all(button.get("aria-controls") == "unitMasterInlineEditor"
                and button.get("aria-expanded") == "false"

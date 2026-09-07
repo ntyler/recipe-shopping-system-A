@@ -2548,13 +2548,37 @@ def _workspace_unit_alias_keys(connection, user_id, unit_id):
     }
 
 
+def _valid_workspace_unit_position(position):
+    return not isinstance(position, bool) and isinstance(position, (int, str)) and bool(
+        re.fullmatch(r"[+-]?\d+", str(position).strip())
+    )
+
+
+def _move_workspace_unit_in_category(connection, user_id, unit_id, category, position):
+    """Apply ordering inside the caller's transaction, alongside other unit fields."""
+    ordered_ids = [row["id"] for row in connection.execute(
+        "SELECT id FROM workspace_units WHERE user_id = ? AND category = ? "
+        "ORDER BY sort_order, normalized_name, id", (user_id, category),
+    )]
+    current = ordered_ids.index(unit_id)
+    target = max(0, min(len(ordered_ids) - 1, int(position) - 1))
+    changed = current != target
+    if changed:
+        ordered_ids.insert(target, ordered_ids.pop(current))
+        timestamp = utc_now_iso()
+        connection.executemany(
+            "UPDATE workspace_units SET sort_order = ?, updated_at = ? "
+            "WHERE user_id = ? AND category = ? AND id = ?",
+            [(index, timestamp, user_id, category, item_id) for index, item_id in enumerate(ordered_ids)],
+        )
+    return changed, target + 1
+
+
 def move_workspace_unit(unit_id, position, user_id=None):
     """Atomically move a unit to a one-based position in its own category."""
     user_id = str(user_id or scoped_recipe_user_id()).strip()
     unit_id = str(unit_id or "").strip()
-    if isinstance(position, bool) or not isinstance(position, (int, str)) or not re.fullmatch(
-        r"[+-]?\d+", str(position).strip()
-    ):
+    if not _valid_workspace_unit_position(position):
         return {"ok": False, "status": 400, "error": "A valid unit position is required."}
     with recipe_master_connection(user_id=user_id) as connection:
         _seed_workspace_unit_registry(connection, user_id)
@@ -2565,28 +2589,14 @@ def move_workspace_unit(unit_id, position, user_id=None):
         if not unit:
             return {"ok": False, "status": 404, "error": "Unit not found."}
         category = unit["category"]
-        ordered_ids = [row["id"] for row in connection.execute(
-            "SELECT id FROM workspace_units WHERE user_id = ? AND category = ? "
-            "ORDER BY sort_order, normalized_name, id", (user_id, category),
-        )]
-        current = ordered_ids.index(unit_id)
-        target = max(0, min(len(ordered_ids) - 1, int(position) - 1))
-        changed = current != target
-        if changed:
-            ordered_ids.insert(target, ordered_ids.pop(current))
-            timestamp = utc_now_iso()
-            connection.executemany(
-                "UPDATE workspace_units SET sort_order = ?, updated_at = ? "
-                "WHERE user_id = ? AND category = ? AND id = ?",
-                [(index, timestamp, user_id, category, item_id) for index, item_id in enumerate(ordered_ids)],
-            )
+        changed, saved_position = _move_workspace_unit_in_category(connection, user_id, unit_id, category, position)
     from PushShoppingList.services.ingredient_unit_service import clear_unit_registry_cache
 
     clear_unit_registry_cache()
     return {
         "ok": True, "changed": changed, "unit_id": unit_id,
-        "category": category, "position": target + 1,
-        "message": f"Unit moved to position {target + 1}.",
+        "category": category, "position": saved_position,
+        "message": f"Unit moved to position {saved_position}.",
     }
 
 
@@ -2621,6 +2631,9 @@ def save_workspace_unit(values, unit_id="", user_id=None):
     values = values if isinstance(values, dict) else {}
     if any(field in values for field in ("recipe_count", "usage_count", "used_in", "references", "quantity", "conversion_factor")):
         return {"ok": False, "status": 422, "error": "Recipe usage and quantities must be changed through the recipe ingredient editor."}
+    if "position" in values and not _valid_workspace_unit_position(values["position"]):
+        return {"ok": False, "status": 422, "error": "Correct the highlighted unit fields.",
+                "errors": {"position": "Choose a valid whole-number order position."}}
     with recipe_master_connection(user_id=user_id) as connection:
         _seed_workspace_unit_registry(connection, user_id)
         existing = None
@@ -2754,6 +2767,9 @@ def save_workspace_unit(values, unit_id="", user_id=None):
                     timestamp,
                 ),
             )
+
+        if "position" in values:
+            _move_workspace_unit_in_category(connection, user_id, unit_id, validated["category"], values["position"])
 
         aliases = list(validated["aliases"])
         if previous_name and unit_registry_key(previous_name) != validated["canonical_key"]:

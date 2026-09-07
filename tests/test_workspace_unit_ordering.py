@@ -73,6 +73,48 @@ def test_append_and_rename_keep_positions_and_category_change_appends(unit_regis
         assert [u['sort_order'] for u in group(registry, category)] == list(range(len(group(registry, category))))
 
 
+def test_save_unit_persists_fields_and_order_in_one_request(unit_registry_app):
+    with unit_registry_app.test_client() as client:
+        sign_in(client, 'user-a')
+        before = registry_for(client)
+        response = client.put('/api/master-data/units/volume_cup', json={
+            'canonical_name': 'measuring cup', 'category': 'weight',
+            'aliases': ['measure cup'], 'position': 2,
+        })
+        assert response.status_code == 200
+        registry = registry_for(client)
+        saved = group(registry, 'weight')[1]
+        assert saved['id'] == 'volume_cup'
+        assert saved['name'] == 'measuring cup'
+        assert saved['aliases'] == ['cup', 'measure cup']
+        for category in ('volume', 'weight'):
+            units = group(registry, category)
+            assert [unit['sort_order'] for unit in units] == list(range(len(units)))
+        assert len(registry['units']) == len(before['units'])
+
+
+@pytest.mark.parametrize('position', [None, True, 1.2, {}, 'bad'])
+def test_save_rejects_invalid_order_without_saving_other_fields(unit_registry_app, position):
+    md.ensure_workspace_unit_registry('user-a')
+    before = snapshot(md.recipe_master_db_path())
+    result = md.save_workspace_unit({'canonical_name': 'new cup name', 'category': 'weight',
+                                    'aliases': ['new cup alias'], 'position': position}, 'volume_cup', 'user-a')
+    assert not result['ok'] and 'position' in result['errors']
+    assert snapshot(md.recipe_master_db_path()) == before
+
+
+def test_save_order_and_fields_roll_back_together(unit_registry_app):
+    md.ensure_workspace_unit_registry('user-a')
+    before = snapshot(md.recipe_master_db_path())
+    with sqlite3.connect(md.recipe_master_db_path()) as db:
+        db.execute("CREATE TRIGGER fail_saved_order BEFORE UPDATE OF sort_order ON workspace_units "
+                   "WHEN NEW.id = 'volume_fluid_ounce' BEGIN SELECT RAISE(ABORT, 'injected failure'); END")
+    with pytest.raises(sqlite3.IntegrityError, match='injected failure'):
+        md.save_workspace_unit({'canonical_name': 'new cup name', 'category': 'volume',
+                                'aliases': ['new cup alias'], 'position': 1}, 'volume_cup', 'user-a')
+    assert snapshot(md.recipe_master_db_path()) == before
+
+
 
 @pytest.mark.parametrize('position', [None, True, 1.2, [], {}, '', '1.5', 'bad'])
 def test_invalid_position_is_rejected_without_changes(unit_registry_app, position):

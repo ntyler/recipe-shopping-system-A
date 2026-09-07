@@ -92,8 +92,8 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                     </span>
                 </label>
             </div>
-            <p id="unitMasterOrderHelp" class="sr-only">Drag units within their category, or focus a drag handle and use Arrow Up, Arrow Down, Home, or End. Order saves automatically. Clear the search to reorder.</p>
-            <div class="unit-master-draft-table" data-unit-draft-home role="table" aria-colcount="7" aria-label="New unit" hidden></div>
+            <p id="unitMasterOrderHelp" class="sr-only">Drag units within their category, or focus a drag handle and use Arrow Up, Arrow Down, Home, or End. Order is saved with the row. Choose Save to keep changes or press Escape to cancel. Clear the search to reorder.</p>
+            <div class="unit-master-draft-table master-data-registry-table" data-unit-draft-home role="table" aria-colcount="7" aria-label="New unit" hidden></div>
             <div class="unit-master-category-list" data-unit-master-category-list>
                 {% for category in master_data.categories %}
                     <section class="unit-master-category master-data-registry-category"
@@ -189,11 +189,9 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                         <span class="unit-master-source-badge{% if not unit.seeded %} user-created{% endif %}" role="cell">
                                             {{ "Built-in" if unit.seeded else "User-created" }}
                                         </span>
-                                        <div class="unit-master-action-cell" role="cell">
-                                            <button type="button" class="unit-master-edit-button" data-unit-master-edit-button data-unit-id="{{ unit.id }}"
-                                                aria-label="Edit unit {{ unit.name }}">Edit unit</button>
-                                            <button type="button" class="unit-master-edit-button" data-unit-row-save aria-label="Save {{ unit.name }}" disabled hidden>Save</button>
-                                            <button type="button" class="unit-master-edit-button" data-unit-row-cancel aria-label="Cancel changes to {{ unit.name }}" hidden>Cancel</button>
+                                        <div class="unit-master-action-cell master-data-row-actions" role="cell" data-mobile-label="Action">
+                                            <button type="button" class="master-data-row-save" data-unit-row-save aria-label="Save {{ unit.name }}" disabled>Save</button>
+                                            <button type="button" class="secondary" data-unit-row-cancel aria-label="Cancel changes to {{ unit.name }}" hidden>Cancel</button>
                                             <small class="unit-master-row-status" data-unit-row-status role="status" aria-live="polite" hidden></small>
                                         </div>
                                     </div>
@@ -235,7 +233,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                     <button type="button" class="secondary" data-unit-master-cancel>Close aliases</button>
                 </footer>
             </form>
-            <div class="unit-master-add-footer unit-master-draft-table" role="table" aria-colcount="7" aria-label="New unit">
+            <div class="unit-master-add-footer unit-master-draft-table master-data-registry-table" role="table" aria-colcount="7" aria-label="New unit">
                 <button type="button"
                         class="unit-master-add-shortcut"
                         aria-controls="unitMasterDraft"

@@ -206,7 +206,7 @@
             id = String(id);
             if (!rowDrafts.has(id)) {
                 const original = savedValues(unitById(id));
-                rowDrafts.set(id, {original, values: {...original, aliases: [...original.aliases]}, pendingAlias: "", errors: {}, touched: {}, feedback: "", saving: false});
+                rowDrafts.set(id, {original, values: {...original, aliases: [...original.aliases]}, position: null, pendingAlias: "", errors: {}, touched: {}, feedback: "", saving: false});
             }
             return rowDrafts.get(id);
         };
@@ -214,10 +214,10 @@
             const draft = rowDraft(id);
             return {...draft.values, aliases: [...draft.values.aliases, ...(cleanText(draft.pendingAlias) ? [cleanText(draft.pendingAlias)] : [])]};
         };
-        const rowIsDirty = id => unitDraftSignature(rowValues(id)) !== unitDraftSignature(rowDraft(id).original);
+        const rowIsDirty = id => rowDraft(id).position !== null || unitDraftSignature(rowValues(id)) !== unitDraftSignature(rowDraft(id).original);
         const rowHasEdits = id => {
             const draft = rowDraft(id);
-            return JSON.stringify(draft.values) !== JSON.stringify(draft.original) || Boolean(draft.pendingAlias);
+            return draft.position !== null || JSON.stringify(draft.values) !== JSON.stringify(draft.original) || Boolean(draft.pendingAlias);
         };
         const rowValidation = id => {
             const local = validateUnitDraft(rowValues(id), registry, id);
@@ -261,14 +261,6 @@
                 if (previous) previous.replaceWith(control);
                 else cell.prepend(control);
             }
-            const edit = row.querySelector('[data-unit-master-edit-button]');
-            const destination = row.querySelector('.unit-master-action-cell');
-            if (edit.parentElement !== destination) destination.prepend(edit);
-            edit.className = 'unit-master-edit-button';
-            edit.textContent = 'Edit unit';
-            edit.setAttribute('aria-label', `Edit unit ${unit.name}`);
-            edit.removeAttribute('aria-controls'); edit.removeAttribute('aria-expanded');
-            edit.hidden = editing;
             const aliases = row.querySelector('.unit-master-aliases');
             let chipList = aliases.querySelector('.unit-master-alias-chip-list');
             if (!chipList) {
@@ -313,7 +305,6 @@
                 button.disabled = mutationPending || orderPending;
                 button.setAttribute('aria-expanded', String(!form.hidden && editorUnitId === id && returnFocus === button));
             });
-            row.querySelector('[data-unit-row-save]').hidden = !editing;
             row.querySelector('[data-unit-row-cancel]').hidden = !editing;
         };
         const syncRowState = row => {
@@ -336,17 +327,19 @@
             row.setAttribute('aria-busy', String(draft.saving));
             const save = row.querySelector('[data-unit-row-save]');
             save.disabled = mutationPending || orderPending || (editorUnitId === id && aiSuggestionPending) || !dirty
-                || Boolean(errors.canonical_name || errors.category || Object.keys(errors.aliases).length);
+                || Boolean(errors.canonical_name || errors.category || errors.position || Object.keys(errors.aliases).length);
             save.textContent = draft.saving ? 'Saving...' : id === NEW_UNIT_ID ? 'Add' : 'Save';
             save.setAttribute('aria-label', id === NEW_UNIT_ID ? 'Add unit' : `Save ${unitById(id).name}`);
             row.querySelector('[data-unit-row-cancel]').disabled = draft.saving;
             const feedback = row.querySelector('[data-unit-row-status]');
             const aliasErrors = [...new Set(Object.values(errors.aliases))].join(' ');
-            feedback.textContent = aliasErrors ? 'Check aliases' : draft.feedback || (dirty ? 'Unsaved changes' : '');
-            feedback.title = aliasErrors;
+            const validationMessage = errors.canonical_name || errors.category || errors.position || aliasErrors;
+            feedback.textContent = dirty && validationMessage ? errors.canonical_name ? 'Check name' : errors.category ? 'Check category' : errors.position ? 'Check order' : 'Check aliases'
+                : draft.feedbackType === 'error' ? 'Could not save' : draft.feedback || (dirty ? 'Unsaved changes' : '');
+            feedback.title = validationMessage || draft.feedback;
             feedback.classList.toggle('is-alias-error', Boolean(aliasErrors));
             feedback.hidden = !feedback.textContent;
-            feedback.classList.toggle('is-error', Boolean(aliasErrors || draft.feedbackType === 'error'));
+            feedback.classList.toggle('is-error', Boolean(dirty && validationMessage || draft.feedbackType === 'error'));
         };
         const resetRow = id => {
             rowDrafts.delete(String(id));
@@ -362,8 +355,8 @@
             const id = inlineUnitId;
             if (id === NEW_UNIT_ID || rowHasEdits(id)) {
                 const draft = rowDraft(id);
-                draft.feedback = id === NEW_UNIT_ID ? 'Add or cancel the new unit before editing another unit.'
-                    : `Save or cancel changes to ${unitById(id).name} before editing another unit.`;
+                draft.feedback = id === NEW_UNIT_ID ? 'Add or cancel first' : 'Save or cancel first';
+                setStatus(`Save or cancel changes to ${unitById(id).name || 'the new unit'} before editing another unit.`, 'info', true);
                 syncRowState(rowFor(id));
                 rowFor(id).querySelector('[data-unit-row-name]').focus({preventScroll: true});
                 return false;
@@ -730,20 +723,13 @@
             sourceBadge.setAttribute("role", "cell");
             sourceBadge.textContent = unit.seeded ? "Built-in" : "User-created";
             const usage = createUsageCell(unit);
-            const edit = document.createElement("button");
-            edit.type = "button";
-            edit.className = "unit-master-edit-button";
-            edit.dataset.unitMasterEditButton = "";
-            edit.dataset.unitId = unit.id;
-            edit.textContent = "Edit unit";
-            edit.setAttribute("aria-label", `Edit unit ${unit.name}`);
             const action = document.createElement("div");
-            action.className = "unit-master-action-cell";
+            action.className = "unit-master-action-cell master-data-row-actions";
             action.setAttribute("role", "cell");
-            action.appendChild(edit);
+            action.dataset.mobileLabel = 'Action';
             for (const [key, label, aria] of [['unitRowSave', 'Save', `Save ${unit.name}`], ['unitRowCancel', 'Cancel', `Cancel changes to ${unit.name}`]]) {
                 const button = document.createElement('button');
-                button.type = 'button'; button.className = 'unit-master-edit-button';
+                button.type = 'button'; button.className = key === 'unitRowSave' ? 'master-data-row-save' : 'secondary';
                 button.dataset[key] = ''; button.textContent = label; button.disabled = true;
                 button.setAttribute('aria-label', aria); action.appendChild(button);
             }
@@ -801,12 +787,13 @@
         };
 
         const categoryRows = container => Array.from(container.querySelectorAll("[data-unit-master-row]"));
-        const reorderIsBlocked = () => orderPending || mutationPending || Boolean(inlineUnitId) || !form.hidden || Boolean(unitKey(search.value));
+        const reorderIsBlocked = row => orderPending || mutationPending || Boolean(unitKey(search.value))
+            || Boolean(inlineUnitId && inlineUnitId !== row?.dataset.unitId);
         const syncOrderControls = () => {
-            const blocked = reorderIsBlocked();
             root.querySelectorAll("[data-unit-master-category-rows]").forEach(container => {
                 const rows = categoryRows(container);
                 rows.forEach((row, index) => {
+                    const blocked = reorderIsBlocked(row);
                     const number = row.querySelector("[data-unit-master-order-number]");
                     number.textContent = String(index + 1);
                     number.setAttribute("aria-label", `Step ${index + 1}`);
@@ -815,7 +802,6 @@
                     handle.setAttribute("aria-disabled", String(blocked));
                     row.querySelector('[data-unit-master-order-action="up"]').disabled = blocked || index === 0;
                     row.querySelector('[data-unit-master-order-action="down"]').disabled = blocked || index === rows.length - 1;
-                    row.querySelector("[data-unit-master-edit-button]").disabled = orderPending || mutationPending;
                     syncRowState(row);
                 });
             });
@@ -829,45 +815,27 @@
                 container.appendChild(row);
             });
         };
-        const moveRowTo = async (row, targetIndex, trigger) => {
-            if (!row || reorderIsBlocked()) return;
-            const container = row.closest("[data-unit-master-category-rows]");
+        const moveRowTo = (row, targetIndex, trigger) => {
+            if (!row || reorderIsBlocked(row)) return;
+            const container = row.closest('[data-unit-master-category-rows]');
             const previous = categoryRows(container);
             const current = previous.indexOf(row);
             const target = Math.max(0, Math.min(previous.length - 1, targetIndex));
-            if (current === target) return;
+            if (current === target || !activateInlineRow(row.dataset.unitId, 'name', false)) return;
+            const restoreScroll = captureEditorScroll(container);
             const ordered = [...previous];
             ordered.splice(target, 0, ordered.splice(current, 1)[0]);
-            orderPending = true;
+            const draft = rowDraft(row.dataset.unitId);
+            const savedIndex = registry.units.filter(unit => unit.category === unitById(row.dataset.unitId).category)
+                .findIndex(unit => String(unit.id) === row.dataset.unitId);
+            draft.position = target === savedIndex ? null : target + 1;
+            delete draft.errors.position;
+            draft.feedback = ''; draft.feedbackType = '';
             placeRows(container, ordered);
             syncOrderControls();
-            // Announce without inserting a banner above the table during a drag.
-            setStatus("Saving unit order…", "info", true);
-            try {
-                const response = await fetch(root.dataset.updateUrlTemplate.replace("__UNIT_ID__", encodeURIComponent(row.dataset.unitId)), {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json", "X-Requested-With": "fetch" },
-                    body: JSON.stringify({ action: "move_to", position: target + 1 }),
-                });
-                const result = await response.json().catch(() => ({}));
-                if (!response.ok || !result.ok) throw new Error(result.error || "The unit order could not be saved.");
-                registry = result.registry;
-                source.textContent = JSON.stringify(registry);
-                const category = container.closest("[data-unit-master-category]").dataset.category;
-                const byId = new Map(previous.map(item => [item.dataset.unitId, item]));
-                const saved = registry.units.filter(unit => unit.category === category);
-                placeRows(container, saved.map((unit, index) => byId.get(String(unit.id)) || createUnitRow(unit, index)));
-                setStatus(result.message || "Unit order saved.", "success", true);
-            } catch (error) {
-                placeRows(container, previous);
-                status.classList.remove("sr-only");
-                setStatus(error.message || "The unit order could not be saved. Try again.", "error");
-            } finally {
-                orderPending = false;
-                applySearch();
-                const focusTarget = trigger?.disabled ? row.querySelector("[data-unit-master-drag-handle]") : trigger;
-                focusTarget?.focus({ preventScroll: true });
-            }
+            setStatus('Order changed. Save this row to keep it, or press Escape to cancel.', 'info', true);
+            (trigger?.disabled ? row.querySelector('[data-unit-master-drag-handle]') : trigger)?.focus({preventScroll: true});
+            restoreScroll();
         };
         const clearRowDropState = () => {
             categoryRows(categoryList).forEach(row => row.classList.remove("is-row-drop-before", "is-row-drop-after", "is-row-dragging"));
@@ -1317,9 +1285,11 @@
             if (!form.hidden && editorUnitId === id) syncEditorState();
             const row = rowFor(id), draft = rowDraft(id), errors = rowValidation(id);
             syncRowState(row);
-            if (!rowIsDirty(id) || errors.canonical_name || errors.category || Object.keys(errors.aliases).length) return;
+            if (!rowIsDirty(id) || errors.canonical_name || errors.category || errors.position || Object.keys(errors.aliases).length) return;
             const payload = rowValues(id);
+            if (draft.position !== null) payload.position = draft.position;
             payload.canonical_name = cleanText(payload.canonical_name);
+            const saveFocus = document.activeElement;
             draft.saving = true;
             draft.feedback = '';
             mutationPending = true;
@@ -1337,9 +1307,11 @@
                     draft.feedbackType = 'error';
                     return;
                 }
-                const active = document.activeElement;
+                const active = saveFocus;
                 const activeId = active.closest('[data-unit-master-row]')?.dataset.unitId;
-                const activeSelector = active.matches('[data-unit-row-name]') ? '[data-unit-row-name]'
+                const activeSelector = active.matches('[data-unit-row-save]') ? '[data-unit-row-save]'
+                    : active.matches('[data-unit-master-drag-handle]') ? '[data-unit-master-drag-handle]'
+                    : active.matches('[data-unit-row-name]') ? '[data-unit-row-name]'
                     : active.matches('[data-unit-row-category]') ? '[data-unit-row-category]' : null;
                 const selection = activeSelector === '[data-unit-row-name]' ? [active.selectionStart, active.selectionEnd] : null;
                 const restoreScroll = captureEditorScroll(active.closest('[data-unit-master-row]') || row);
@@ -1361,14 +1333,19 @@
                 mutationPending = false;
                 updateRegistry(result.registry);
                 const savedDraft = rowDraft(savedId);
+                setStatus(result.message || 'Unit saved.', 'success', true);
                 savedDraft.feedback = 'Saved';
                 savedDraft.feedbackType = 'success';
                 syncRowState(rowFor(savedId));
                 restoreScroll();
-                const focusTarget = id === NEW_UNIT_ID ? addReturn : activeId && activeId !== id && activeSelector ? rowFor(activeId)?.querySelector(activeSelector)
+                const focusTarget = id === NEW_UNIT_ID ? addReturn : activeId === id && activeSelector === '[data-unit-row-save]' ? rowFor(id)?.querySelector('[data-unit-row-save]')
+                    : activeId && activeId !== id && activeSelector ? rowFor(activeId)?.querySelector(activeSelector)
                     : active.isConnected && !active.disabled && active.getClientRects().length ? active : rowFor(id)?.querySelector(`[data-unit-row-activate="${inlineField}"]`);
                 const visibleTarget = focusTarget?.getClientRects().length ? focusTarget : search;
-                visibleTarget.focus({preventScroll: true});
+                if (visibleTarget.matches('[data-unit-row-save]') && visibleTarget.disabled) {
+                    // A native disabled Save cannot receive focus; return to its inline name.
+                    rowFor(savedId)?.querySelector('[data-unit-row-activate="name"]')?.focus({preventScroll: true});
+                } else visibleTarget.focus({preventScroll: true});
                 if (selection && activeId !== id) visibleTarget.setSelectionRange(...selection);
             } catch (_error) {
                 draft.feedback = 'Unable to save this unit. Check your connection and try again.';
@@ -1388,7 +1365,11 @@
 
         const cancelRow = (id, restoreFocus = true) => {
             if (rowDraft(id).saving) return;
-            const row = rowFor(id), restoreScroll = captureEditorScroll(row);
+            const row = rowFor(id), restoreScroll = captureEditorScroll(rowDraft(id).position !== null ? row.parentElement : row);
+            if (rowDraft(id).position !== null) {
+                const category = unitById(id).category;
+                placeRows(row.parentElement, registry.units.filter(unit => unit.category === category).map(unit => rowFor(unit.id)));
+            }
             if (!form.hidden && editorUnitId === String(id)) closeEditor({discard: true, restoreFocus: false});
             const focusTarget = id === NEW_UNIT_ID ? draftTrigger : null;
             inlineUnitId = '';
@@ -1447,9 +1428,6 @@
                 openUsage(unitById(usageButton.dataset.unitId), usageButton);
                 return;
             }
-            const button = event.target.closest("[data-unit-master-edit-button]");
-            if (!button) return;
-            activateInlineRow(button.dataset.unitId);
         });
         root.addEventListener("keydown", event => {
             if (event.target.closest('.is-inline-editing') && event.key === 'Escape') {
@@ -1467,7 +1445,7 @@
         categoryList.addEventListener("dragstart", event => {
             const handle = event.target.closest("[data-unit-master-drag-handle]");
             if (!handle) return; // Do not consume text selection or native input dragging.
-            if (reorderIsBlocked()) { event.preventDefault(); return; }
+            if (reorderIsBlocked(handle.closest('[data-unit-master-row]'))) { event.preventDefault(); return; }
             draggedRow = handle.closest("[data-unit-master-row]");
             draggedRow.classList.add("is-row-dragging");
             event.dataTransfer.effectAllowed = "move";
@@ -1478,7 +1456,7 @@
             event.preventDefault();
             clearRowDropState();
             const target = event.target.closest("[data-unit-master-row]");
-            if (reorderIsBlocked() || !target || target === draggedRow || target.parentElement !== draggedRow.parentElement) {
+            if (reorderIsBlocked(draggedRow) || !target || target === draggedRow || target.parentElement !== draggedRow.parentElement) {
                 event.dataTransfer.dropEffect = "none";
                 return;
             }
@@ -1492,7 +1470,7 @@
         categoryList.addEventListener("drop", event => {
             if (!draggedRow) return;
             event.preventDefault();
-            if (!rowDropTarget || reorderIsBlocked()) return;
+            if (!rowDropTarget || reorderIsBlocked(draggedRow)) return;
             const moving = draggedRow;
             const rows = categoryRows(moving.parentElement);
             let target = rows.indexOf(rowDropTarget) + (rowDropAfter ? 1 : 0);
@@ -1601,7 +1579,7 @@
                     const returningHere = previous.contains(usageReturnFocus);
                     const next = createUsageCell(unit);
                     previous.replaceWith(next);
-                    if (returningHere) usageReturnFocus = next.querySelector('button') || row.querySelector('[data-unit-master-edit-button]');
+                    if (returningHere) usageReturnFocus = next.querySelector('button') || row.querySelector('[data-unit-row-activate="name"]');
                 });
                 if (usageDialog.open && usageReturnFocus) {
                     await openUsage(unitById(usageReturnFocus.dataset.unitId), usageReturnFocus);
