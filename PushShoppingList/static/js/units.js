@@ -308,11 +308,16 @@
                 chipList.replaceChildren(...values.map(alias => {
                     const chip = document.createElement('code'); chip.textContent = alias; return chip;
                 }));
-                chipList.hidden = !values.length;
+                if (!values.length) {
+                    const empty = document.createElement('span');
+                    empty.className = 'unit-master-no-aliases'; empty.textContent = 'No aliases';
+                    chipList.append(empty);
+                }
+                chipList.hidden = false;
                 aliases.dataset.aliases = signature;
             }
             actions.querySelectorAll('button').forEach(button => {
-                button.disabled = !editing || mutationPending || orderPending;
+                button.disabled = mutationPending || orderPending;
                 button.setAttribute('aria-expanded', String(!form.hidden && editorUnitId === id && returnFocus === button));
             });
             row.querySelector('[data-unit-row-save]').hidden = !editing;

@@ -83505,11 +83505,10 @@ body.recipe-edit-standalone-page #recipeEditIngredients
 .unit-master-page--registry-v2 .unit-master-row-status.is-error { position: static; grid-column: 1 / -1; color: var(--app-danger); }
 .unit-master-page--registry-v2 .unit-master-row-status.is-alias-error { position: absolute; }
 .unit-master-page--registry-v2 .unit-master-aliases { --unit-alias-control-size: 32px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; overflow: visible; }
-.unit-master-page--registry-v2 .unit-master-alias-chip-list { display: flex; flex: 0 1 auto; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; max-width: 100%; overflow: visible; }
-.unit-master-page--registry-v2 .unit-master-alias-chip-list:empty { display: none; }
+.unit-master-page--registry-v2 .unit-master-alias-chip-list { display: contents; }
+.unit-master-page--registry-v2 .unit-master-no-aliases { color: var(--app-muted); font-size: 12px; white-space: nowrap; }
 .unit-master-page--registry-v2 .unit-master-aliases code { box-sizing: border-box; flex: 0 1 auto; min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
-.unit-master-page--registry-v2 .unit-master-alias-actions { display: inline-flex; flex-grow: 0; flex-shrink: 0; flex-basis: auto; flex-wrap: nowrap; align-items: center; min-width: var(--unit-alias-control-size); margin: 0; padding: 0; overflow: visible; visibility: hidden; opacity: 0; }
-.unit-master-page--registry-v2 .unit-master-row.is-inline-editing .unit-master-alias-actions { visibility: visible; opacity: 1; }
+.unit-master-page--registry-v2 .unit-master-alias-actions { display: inline-flex; flex-grow: 0; flex-shrink: 0; flex-basis: auto; flex-wrap: nowrap; align-items: center; min-width: var(--unit-alias-control-size); margin: 0; padding: 0; overflow: visible; }
 .unit-master-page--registry-v2 .unit-master-alias-actions button { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 var(--unit-alias-control-size); width: var(--unit-alias-control-size); min-width: var(--unit-alias-control-size); max-width: var(--unit-alias-control-size); height: var(--unit-alias-control-size); min-height: var(--unit-alias-control-size); max-height: var(--unit-alias-control-size); padding: 0; margin: 0; overflow: visible; border: 1px solid transparent; border-radius: 5px; background: transparent; color: var(--app-muted); font-size: 15px; line-height: 1; text-align: center; cursor: pointer; }
 .unit-master-page--registry-v2 .unit-master-alias-actions button:is(:hover, :focus-visible, [aria-expanded="true"]) { border-color: var(--app-border); background: var(--app-surface); color: var(--app-primary-hover); }
 .unit-master-page--registry-v2 .unit-master-alias-actions button:focus-visible { outline: 2px solid var(--app-primary-hover); outline-offset: 1px; }

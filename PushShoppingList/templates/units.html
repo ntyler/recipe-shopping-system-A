@@ -153,10 +153,12 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                             <span class="unit-master-alias-chip-list">
                                                 {% for alias in unit.aliases %}
                                                     <code>{{ alias }}</code>
+                                                {% else %}
+                                                    <span class="unit-master-no-aliases">No aliases</span>
                                                 {% endfor %}
                                             </span>
                                             <span class="unit-master-alias-actions">
-                                                <button type="button" data-unit-row-alias="add" aria-label="Manage aliases" title="Manage aliases" aria-haspopup="dialog" aria-controls="unitMasterInlineEditor" aria-expanded="false" disabled>+</button>
+                                                <button type="button" data-unit-row-alias="add" aria-label="Manage aliases" title="Manage aliases" aria-haspopup="dialog" aria-controls="unitMasterInlineEditor" aria-expanded="false">+</button>
                                             </span>
                                         </div>
                                         <div class="unit-master-category-cell" role="cell" data-mobile-label="Category" data-unit-master-category-cell>

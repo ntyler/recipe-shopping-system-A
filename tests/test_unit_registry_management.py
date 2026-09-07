@@ -475,9 +475,13 @@ def test_units_page_exposes_accessible_inline_editor_and_import_offer(
                and button.get("aria-expanded") == "false"
                and button.get("aria-haspopup") == "dialog"
                and button.get("aria-label") == button.get("title") == "Manage aliases"
+               and not button.has_attr("disabled")
                for button in soup.select("[data-unit-row-alias]"))
     assert len(soup.select('[data-unit-row-alias="add"]')) == 35
     assert not soup.select('[data-unit-row-alias="suggest"]')
+    for row in soup.select('[data-unit-master-row]'):
+        if not row.select('.unit-master-aliases code'):
+            assert row.select_one('.unit-master-no-aliases').get_text(strip=True) == 'No aliases'
 
 
 def test_unit_usage_counts_distinct_recipes_and_lists_matching_lines(

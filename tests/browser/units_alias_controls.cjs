@@ -47,6 +47,23 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
         const form = page.locator('[data-unit-master-form]');
         const input = form.locator('[data-unit-master-alias-input]');
         const shot = async filename => { if (artifacts) { fs.mkdirSync(artifacts, {recursive:true}); await page.screenshot({path:path.join(artifacts, filename)}); } };
+        // Every row opens aliases directly from rest, without activating an edit field.
+        for (const width of [1440,390]) {
+            await page.setViewportSize({width,height:900});
+            for (const row of await page.locator('[data-unit-master-row]').all()) {
+                const manage = row.getByRole('button', {name:'Manage aliases',exact:true});
+                await manage.evaluate(e => e.scrollIntoView({block:'center'}));
+                await page.mouse.move(0,0);
+                assert(await manage.isVisible()); assert(await manage.isEnabled());
+                assert.equal(await row.locator('[data-unit-row-name]').count(),0);
+                assert.equal(await row.locator('[data-unit-row-alias]').count(),1);
+                await manage.click(); assert(await form.isVisible());
+                assert(await form.getByRole('button', {name:'Suggest aliases',exact:true}).isVisible());
+                await input.press('Escape');
+                await row.locator('[data-unit-row-cancel]').click();
+                assert(await manage.isVisible()); assert(await manage.isEnabled());
+            }
+        }
         let cases = 0;
         for (const zoom of [1, 1.25, 1.5]) {
             await worker.evaluate(async ({base,zoom}) => {
@@ -60,12 +77,12 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
                 for (const [kind, aliases, id] of fixtures) {
                     const row = page.locator(`[data-unit-master-row][data-unit-id="${id}"]`);
                     const restingHeight = (await row.boundingBox()).height;
-                    assert(await row.locator('[data-unit-row-alias="add"]').isHidden());
-                    await row.locator('[data-unit-row-activate="name"]').click();
-                    assert(Math.abs((await row.boundingBox()).height - restingHeight) < .1, `${kind} at ${width}/${zoom}: editing preserves row height`);
+                    assert(await row.locator('[data-unit-row-alias="add"]').isVisible());
+                    assert(await row.locator('[data-unit-row-alias="add"]').isEnabled());
+                    if (!aliases.length) assert.equal(await row.locator('.unit-master-no-aliases').innerText(),'No aliases');
                     const actions = row.locator('.unit-master-alias-actions');
                     await actions.evaluate(e => e.scrollIntoView({block:'center',inline:'nearest'}));
-                    await page.mouse.move(0,0); // Editing keeps controls visible without hover.
+                    await page.mouse.move(0,0); // Controls stay visible without hover, focus, or editing.
                     const metrics = await row.locator('.unit-master-aliases').evaluate(cell => {
                         const box = e => { const r=e.getBoundingClientRect(); return {x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height}; };
                         const group = cell.querySelector('.unit-master-alias-actions');
@@ -103,6 +120,14 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
                             assert(chip.right<=button.x-5.5 || chip.bottom<=button.y-5.5 || chip.y>=button.bottom+5.5,detail);
                         }
                     }
+                    const lastChip = metrics.chips.at(-1);
+                    if (lastChip && metrics.cell.right - lastChip.right >= add.width + 6) {
+                        assert(Math.abs(add.x - lastChip.right - 6) < 1, `Manage follows the last chip when it fits: ${detail}`);
+                        assert(add.y < lastChip.bottom && add.bottom > lastChip.y, detail);
+                    }
+                    if (zoom===1 && [1440,390].includes(width) && ['zero','short','long'].includes(kind)) {
+                        await shot(`units-alias-visible-${kind}-${width}.png`);
+                    }
                     const addControl = row.locator('[data-unit-row-alias="add"]');
                     await addControl.click(); assert(await form.isVisible());
                     const panel = await form.boundingBox();
@@ -113,6 +138,13 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
                     assert(await form.evaluate(e => e.scrollWidth <= e.clientWidth + 1), `${kind} at ${width}/${zoom}: popover content fits without horizontal scrolling`);
                     assert(Math.abs((await row.boundingBox()).height - restingHeight) < .1);
                     assert.match(await form.locator('[data-unit-master-editor-title]').innerText(), new RegExp(`layout ${kind}`));
+                    if (kind==='zero' && zoom===1 && width===1440) {
+                        await input.fill('temporary alias'); await input.press('Enter');
+                        assert.equal(await row.locator('.unit-master-no-aliases').count(),0);
+                        await form.getByRole('button', {name:'Remove alias temporary alias',exact:true}).click();
+                        assert.equal(await row.locator('.unit-master-no-aliases').innerText(),'No aliases');
+                        assert(await row.locator('[data-unit-row-save]').isDisabled());
+                    }
                     await input.press('Escape'); assert(await addControl.evaluate(e=>e===document.activeElement));
                     if (kind==='long' && [1440,390].includes(width)) {
                         await shot(`units-alias-controls-${width}-${zoom*100}.png`);

@@ -23,7 +23,6 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
         const form = page.locator('[data-unit-master-form]');
         const suggest = form.getByRole('button', {name: 'Suggest aliases', exact: true});
         const openManage = async (target = row) => {
-            if (!await target.locator('[data-unit-row-name]').count()) await target.locator('[data-unit-row-activate="name"]').click();
             await target.getByRole('button', {name:'Manage aliases',exact:true}).click();
         };
         const input = form.locator('[data-unit-master-alias-input]');
@@ -49,9 +48,15 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
         const height = (await row.boundingBox()).height;
         const accepted = await cell.locator('code').allTextContents();
         assert(accepted.includes('tbsp'));
-        assert.equal(await cell.locator('.unit-master-alias-actions').evaluate(e => getComputedStyle(e).opacity), '0');
-        await row.hover();
-        assert(await add.isHidden()); assert(await add.isDisabled());
+        assert.equal(await cell.locator('.unit-master-alias-actions').evaluate(e => getComputedStyle(e).opacity), '1');
+        assert(await add.isVisible()); assert(await add.isEnabled());
+        const restingBackground = await add.evaluate(e => getComputedStyle(e).backgroundColor);
+        await add.hover();
+        await page.waitForFunction(background => {
+            const control = document.querySelector('[data-unit-id="volume_tablespoon"] [data-unit-row-alias="add"]');
+            return getComputedStyle(control).backgroundColor !== background;
+        }, restingBackground);
+        await page.mouse.move(0, 0);
         assert.equal(await cell.locator('[data-unit-row-alias]').count(),1);
         assert.equal(await page.locator('[data-unit-row-alias="suggest"]').count(),0);
         assert.equal(await add.getAttribute('title'), 'Manage aliases');
@@ -60,8 +65,9 @@ const artifacts = process.env.AI_PANTRY_BROWSER_ARTIFACTS;
         await shot('units-alias-rest.png');
 
         // Keyboard entry, unchanged layout/scroll, validation, normalization and draft chips.
-        await row.locator('[data-unit-row-activate="name"]').press('Enter');
+        await row.locator('[data-unit-row-activate="name"]').focus();
         await page.keyboard.press('Tab'); assert(await focused(add));
+        assert.equal(await row.locator('[data-unit-row-name]').count(), 0);
         assert.equal((await row.boundingBox()).height, height);
         const before = await scroll(); await add.press('Enter');
         assert(await focused(input)); assert.equal(await form.getAttribute('role'), 'dialog');
