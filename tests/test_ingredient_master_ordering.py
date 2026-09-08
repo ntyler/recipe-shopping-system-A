@@ -122,7 +122,7 @@ def test_routes_filter_partial_groups_and_expose_six_columns(registry):
             assert not soup.select('[data-master-store-section-panel]')
             assert first.select_one('[data-ingredient-row-name]')
             assert first.select_one('[data-ingredient-row-save]').has_attr('disabled')
-            assert first.select_one('time[datetime]')
+            assert first.select_one('.ingredient-action-cell [data-master-merge-open]')
         soup = BeautifulSoup(client.get('/admin/master-data/ingredients?sort=manual_order&store_section=PRODUCE').data, 'html.parser')
         assert not soup.select('.master-data-section-row')
         assert len(soup.select('[data-order-enabled="true"]')) == 3

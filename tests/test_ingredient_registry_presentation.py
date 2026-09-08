@@ -40,18 +40,17 @@ def test_ingredient_page_name_and_controls_preserve_existing_endpoints(monkeypat
     assert soup.select_one('#ingredientAliasManager').has_attr('hidden')
     assert table.select_one('.ingredient-action-cell [data-ingredient-row-cancel]').has_attr('hidden')
     assert soup.select_one('.ingredient-section-summary svg')
-    more = table.select_one('.ingredient-action-cell .ingredient-row-more[popover]')
-    assert more.select_one('time[datetime]')
-    assert 'Last Updated' in more.get_text(' ', strip=True)
-    assert more.select_one('[data-master-merge-open]')['aria-controls'] == 'masterDataIngredientMergeDialog'
+    assert not table.select('.ingredient-row-more, [popover], [popovertarget]')
     assert not table.select('[data-ingredient-row-image]')
     assert 'Manage Image' not in table.get_text(' ', strip=True)
     actions = table.select_one('.ingredient-action-cell .ingredient-row-actions')
     assert actions.select_one('[data-ingredient-row-save]')
     assert actions.select_one('[data-ingredient-row-cancel]')
-    assert actions.select_one('[popovertarget]')['popovertarget'] == more['id']
+    merge = actions.select_one('[data-master-merge-open]')
+    assert merge['aria-controls'] == 'masterDataIngredientMergeDialog'
+    assert merge.get_text(strip=True) == 'Merge duplicate…'
+    assert 'break recipe references' in merge['title']
     assert not table.select('[data-ingredient-row-delete]'), 'Referenced ingredients cannot be deleted'
-    assert not more.select('[data-ingredient-row-cancel], [data-ingredient-row-save]')
     assert table.select_one('[data-master-usage-button="ingredients"]')['aria-controls'] == 'masterDataUsageDialog'
     assert 'Ingredient Master Data' not in response.get_data(as_text=True)
 

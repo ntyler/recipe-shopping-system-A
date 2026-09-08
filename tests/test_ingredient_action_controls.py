@@ -87,8 +87,7 @@ const base = process.argv[2];
         const cancel = row.locator('[data-ingredient-row-cancel]');
         const remove = row.locator('[data-ingredient-row-delete]');
         const actionCell = row.locator('.ingredient-action-cell');
-        const more = actionCell.getByRole('button', {name: /More actions/});
-        const menu = actionCell.locator('.ingredient-row-more');
+        const mergeButton = actionCell.locator('[data-master-merge-open]');
         const state = async ({dirty, valid = true}) => {
             await page.waitForFunction(({id, dirty, valid}) => {
                 const row = document.querySelector(`[data-ingredient-master-row][data-master-record-id="${id}"]`);
@@ -121,18 +120,16 @@ const base = process.argv[2];
         await name.fill(' Disposable celery ');
         await state({dirty: false});
         await name.fill('Disposable celery');
-        await more.click();
-        assert(await menu.locator('[data-master-merge-open]').isEnabled());
-        assert(!/Manage Image/i.test(await menu.innerText()));
-        await capture('overflow');
-        await more.press('Escape');
+        assert.equal(await row.locator('.ingredient-row-more, [popover], [popovertarget]').count(), 0);
+        assert(await mergeButton.isEnabled());
+        assert(await mergeButton.isVisible());
+        assert.equal(await mergeButton.innerText(), 'Merge duplicate…');
+        assert(!/Manage Image/i.test(await actionCell.innerText()));
         await state({dirty: false});
 
         await name.fill('Fresh celery');
         await state({dirty: true});
-        await more.click();
-        assert(await menu.locator('[data-master-merge-open]').isDisabled());
-        await more.press('Escape');
+        assert(await mergeButton.isDisabled());
         await state({dirty: true});
         await capture('dirty');
         await cancel.click();
