@@ -83990,6 +83990,8 @@ body.recipe-edit-standalone-page #recipeEditIngredients
 .ingredient-master-page .ingredient-name-field { min-width: 0; flex: 1; }
 .ingredient-master-page :is(.ingredient-row-name, .ingredient-row-section) { box-sizing: border-box; display: block; width: 100%; min-width: 0; height: 38px; min-height: 38px; margin: 0; padding: 7px 10px; border: 1px solid transparent; border-radius: 6px; background: transparent; box-shadow: none; color: var(--app-text-strong); font: inherit; font-size: 12px; font-weight: 750; pointer-events: auto; }
 .ingredient-master-page .ingredient-row-section { appearance: none; background-image: none; cursor: pointer; text-overflow: ellipsis; }
+/* The closed field is transparent; Edge's native option menu needs an opaque surface. */
+.ingredient-master-page .ingredient-row-section option { background: var(--app-surface); color: var(--app-text-strong); }
 .ingredient-master-page .unit-master-inline-editor .ingredient-editor-control { border: 1px solid transparent; border-radius: 6px; background: transparent; box-shadow: none; }
 .ingredient-master-page :is(.ingredient-row-name, .ingredient-row-section, .ingredient-editor-control):hover:where(:not(:disabled)) { border-color: var(--app-border); }
 .ingredient-master-page :is(.ingredient-row-name, .ingredient-row-section, .ingredient-editor-control):focus { border-color: var(--app-primary-hover); outline: 2px solid var(--app-primary-hover); outline-offset: 2px; box-shadow: none; }
