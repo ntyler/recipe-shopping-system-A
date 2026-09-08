@@ -234,7 +234,7 @@
                 <button type="button" class="recipe-image-lightbox-close">Close</button>
                 <div class="recipe-image-lightbox-media">
                     <img id="recipeImageLightboxImage" alt="">
-                    <div class="master-data-lightbox-empty" hidden>No image</div>
+                    <div class="master-data-lightbox-empty" role="status" hidden>No image</div>
                     <div class="recipe-image-lightbox-actions" data-master-image-actions hidden>
                         <p data-master-image-status role="status" aria-live="polite"></p>
                         <div class="master-data-lightbox-buttons" role="group" aria-label="Ingredient image actions">
@@ -271,7 +271,14 @@
         });
         lightbox.querySelector('img').addEventListener('load', event => {
             const image = event.target;
+            delete image.dataset.failedSrc;
             lightbox.querySelector('.recipe-image-lightbox-media').style.setProperty('--image-ratio', image.naturalWidth / image.naturalHeight);
+            syncMasterDataLightboxImageState(lightbox);
+        });
+        lightbox.querySelector('img').addEventListener('error', event => {
+            const image = event.target;
+            image.dataset.failedSrc = image.getAttribute('src') || '';
+            syncMasterDataLightboxImageState(lightbox);
         });
         document.body.appendChild(lightbox);
 
@@ -299,10 +306,9 @@
         lightbox.ingredientRow = row;
         lightbox.querySelector('[role="dialog"]').setAttribute('aria-label', row ? `Image for ${row.dataset.recordName}` : 'Enlarged recipe image');
         lightbox.querySelector('.recipe-image-lightbox-media').style.setProperty('--image-ratio', image.naturalWidth && image.naturalHeight ? image.naturalWidth / image.naturalHeight : 1);
-        lightboxImage.hidden = false;
-        lightbox.querySelector('.master-data-lightbox-empty').hidden = true;
         lightboxImage.src = image.dataset.fullSrc || image.currentSrc || image.src;
         lightboxImage.alt = image.alt || "Recipe image";
+        syncMasterDataLightboxImageState(lightbox);
         lightbox.classList.add("open");
         lightbox.setAttribute("aria-hidden", "false");
         document.body.classList.add("image-lightbox-open");
@@ -332,9 +338,21 @@
         if (lightboxImage) {
             lightboxImage.removeAttribute("src");
             lightboxImage.alt = "";
+            delete lightboxImage.dataset.failedSrc;
         }
         if (lightbox.parentNode !== document.body) document.body.appendChild(lightbox);
         if (trigger?.isConnected) trigger.focus({preventScroll: true});
+    }
+
+    function syncMasterDataLightboxImageState(lightbox) {
+        const image = lightbox.querySelector('img');
+        const src = image.getAttribute('src');
+        const unavailable = Boolean(src && image.dataset.failedSrc === src);
+        image.hidden = !src || unavailable;
+        lightbox.querySelector('.recipe-image-lightbox-media').classList.toggle('has-image-placeholder', image.hidden);
+        const placeholder = lightbox.querySelector('.master-data-lightbox-empty');
+        placeholder.hidden = !image.hidden;
+        placeholder.textContent = unavailable ? 'Image unavailable' : 'No image';
     }
 
     // The lightbox is another view of the existing row draft and editor controls.
@@ -349,12 +367,11 @@
         if (!managing) return;
 
         const image = lightbox.querySelector('img');
-        image.hidden = !ingredientImageUrl;
-        lightbox.querySelector('.master-data-lightbox-empty').hidden = Boolean(ingredientImageUrl);
         if (ingredientImageUrl) {
             if (image.getAttribute('src') !== ingredientImageUrl) image.src = ingredientImageUrl;
         } else image.removeAttribute('src');
         image.alt = `${ingredientRowValues(row).name} image`;
+        syncMasterDataLightboxImageState(lightbox);
         toolbar.querySelectorAll('[data-master-image-action]').forEach(button => {
             button.disabled = ingredientEditorControl(`image-${button.dataset.masterImageAction}`).disabled;
         });
@@ -363,6 +380,7 @@
         retry.disabled = ingredientEditorControl('retry').disabled;
         const error = ingredientEditorControl('image-error').textContent;
         const status = toolbar.querySelector('[data-master-image-status]');
+        toolbar.classList.toggle('has-image-feedback', Boolean(ingredientEditorLoading || ingredientImagePending || error || !retry.hidden));
         status.textContent = ingredientEditorLoading ? 'Loading ingredient details…'
             : !retry.hidden ? ingredientEditorControl('feedback').textContent
             : error || (ingredientImagePending ? ingredientEditorControl('image-note').textContent

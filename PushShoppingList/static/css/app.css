@@ -9619,12 +9619,20 @@ body {
 
         .master-data-image-lightbox .recipe-image-lightbox-media {
             width: min(960px, calc(100vw - 32px), calc((100dvh - 32px) * var(--image-ratio, 1)));
-            container-type: inline-size;
+            aspect-ratio: var(--image-ratio, 1);
+            container-type: size;
+            grid-template: minmax(0, 1fr) / minmax(0, 1fr);
         }
 
         .master-data-image-lightbox .recipe-image-lightbox-media img {
             width: 100%;
+            height: 100%;
             box-sizing: border-box;
+        }
+
+        .master-data-image-lightbox .recipe-image-lightbox-media.has-image-placeholder {
+            width: min(480px, calc(100vw - 32px), calc(100dvh - 32px));
+            aspect-ratio: 1;
         }
 
         .master-data-image-lightbox [hidden] {
@@ -9635,7 +9643,8 @@ body {
             display: grid;
             place-items: center;
             width: 100%;
-            height: min(440px, calc(100dvh - 32px));
+            height: 100%;
+            box-sizing: border-box;
             border: 1px solid #5f665f;
             border-radius: 10px;
             background: #182021;
@@ -9646,6 +9655,9 @@ body {
             inset: auto 0 0;
             display: grid;
             max-width: none;
+            max-height: 50%;
+            box-sizing: border-box;
+            overflow: auto;
             justify-content: stretch;
             gap: 6px;
             padding: 24px 12px 12px;
@@ -9735,6 +9747,44 @@ body {
             .master-data-image-lightbox .recipe-image-lightbox-actions button {
                 max-width: none;
                 min-height: 32px;
+            }
+        }
+
+        /* Short, wide images need less chrome to keep the image visible. */
+        @container (max-height: 220px) {
+            .master-data-image-lightbox .recipe-image-lightbox-actions {
+                gap: 4px;
+                padding: 4px;
+                background: rgba(10, 14, 15, 0.86);
+            }
+
+            .master-data-image-lightbox .recipe-image-lightbox-actions:not(.has-image-feedback) [data-master-image-status] {
+                position: absolute;
+                width: 1px;
+                height: 1px;
+                overflow: hidden;
+                clip-path: inset(50%);
+                white-space: nowrap;
+            }
+
+            .master-data-lightbox-buttons {
+                gap: 4px;
+            }
+
+            .master-data-image-lightbox .recipe-image-lightbox-actions button {
+                min-height: 40px;
+                padding: 4px;
+            }
+        }
+
+        @container (max-height: 100px) {
+            .master-data-image-lightbox .recipe-image-lightbox-actions {
+                padding: 2px;
+            }
+
+            .master-data-image-lightbox .recipe-image-lightbox-actions button {
+                min-height: 32px;
+                font-size: 11px;
             }
         }
 

@@ -3,6 +3,7 @@ import base64
 from io import BytesIO
 import json
 import os
+from pathlib import Path
 import shutil
 import subprocess
 import threading
@@ -27,6 +28,14 @@ def test_ingredient_lightbox_reuses_pending_image_actions(editor_app, monkeypatc
     picture = BytesIO()
     Image.new("RGB", (800, 600), "#b95b32").save(picture, format="PNG")
     image_bytes = picture.getvalue()
+    responsive_images = []
+    for label, size in [("wide", (1600, 900)), ("panorama", (1600, 400)), ("portrait", (900, 1600))]:
+        picture = BytesIO()
+        Image.new("RGB", size, "#b95b32").save(picture, format="PNG")
+        responsive_images.append({
+            "label": label, "width": size[0], "height": size[1],
+            "image": base64.b64encode(picture.getvalue()).decode("ascii"),
+        })
     monkeypatch.setattr(images, "request_master_ingredient_image_bytes", lambda *_: image_bytes)
     original = tomato()
     with editor_app.test_client() as client:
@@ -36,7 +45,16 @@ def test_ingredient_lightbox_reuses_pending_image_actions(editor_app, monkeypatc
             "cookie": {"name": cookie.key, "value": cookie.value, "domain": "127.0.0.1", "path": "/"},
             "recordId": original["id"],
             "image": base64.b64encode(image_bytes).decode("ascii"),
+            "imageFolder": str(images.STEP_IMAGE_FOLDER),
+            "responsiveImages": responsive_images,
         }
+    if screenshot_folder := os.environ.get("AI_PANTRY_LIGHTBOX_SCREENSHOTS"):
+        screenshot_path = Path(screenshot_folder).resolve()
+        repository_path = Path(__file__).resolve().parents[1]
+        assert screenshot_path != repository_path and repository_path not in screenshot_path.parents, \
+            "Keep optional browser screenshots outside the repository"
+        screenshot_path.mkdir(parents=True, exist_ok=True)
+        options["screenshots"] = str(screenshot_path)
     server = make_server("127.0.0.1", 0, editor_app, threaded=True)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -70,16 +88,23 @@ const base = process.argv[2];
         await context.addCookies([options.cookie]);
         const page = await context.newPage();
         page.setDefaultTimeout(10000);
-        const pageErrors = [], saveRequests = [];
+        const pageErrors = [], consoleErrors = [], saveRequests = [];
+        const expectedResourceErrors = new Set();
         page.on('pageerror', error => pageErrors.push(error.message));
+        page.on('console', message => {
+            if (['warning', 'error'].includes(message.type())) consoleErrors.push({text: message.text(), url: message.location().url});
+        });
         page.on('request', request => {
             if (request.method() === 'POST' && new URL(request.url()).pathname === `/admin/master-data/ingredients/${options.recordId}`)
                 saveRequests.push(request.postDataJSON());
         });
         // The seeded image URL is a fixture reference, so serve its pixels locally.
         await page.route('**/static/generated/tomato.png', route => route.fulfill({contentType: 'image/png', body: Buffer.from(options.image, 'base64')}));
-        // Preview files belong to pytest's temporary folder, outside Flask static.
-        await page.route('**/static/generated/recipe_steps/master_ingredient_*.png', route => route.fulfill({contentType: 'image/png', body: Buffer.from(options.image, 'base64')}));
+        // Serve the real upload/generation output from pytest's isolated folder.
+        await page.route('**/static/generated/recipe_steps/master_ingredient_*.png', route => route.fulfill({
+            contentType: 'image/png',
+            path: require('node:path').join(options.imageFolder, require('node:path').basename(new URL(route.request().url()).pathname)),
+        }));
         await page.goto(`${base}/admin/master-data/ingredients?search=Tomato`);
         assert.equal(await page.title(), 'Ingredient');
         const row = page.locator(`[data-ingredient-master-row][data-master-record-id="${options.recordId}"]`);
@@ -106,6 +131,65 @@ const base = process.argv[2];
             await row.locator('[data-ingredient-row-cancel]').click();
             assert(await save.isDisabled());
         };
+        const capture = async name => {
+            if (options.screenshots) await page.screenshot({path: require('node:path').join(options.screenshots, `${name}.png`)});
+        };
+        const upload = async (name, buffer, expectedStatus = 200, waitForPixels = true) => {
+            await waitEnabled(replace);
+            const response = page.waitForResponse(response => response.request().method() === 'POST'
+                && new URL(response.url()).pathname === `/api/master-data/ingredients/${options.recordId}/image-preview`);
+            const chooser = page.waitForEvent('filechooser');
+            await replace.click();
+            await (await chooser).setFiles({name, mimeType: 'image/png', buffer});
+            const result = await response;
+            assert.equal(result.status(), expectedStatus);
+            await waitEnabled(replace);
+            if (expectedStatus === 200) {
+                const data = await result.json();
+                await page.waitForFunction(({src, waitForPixels}) => {
+                    const image = document.querySelector('#recipeImageLightboxImage');
+                    return image?.getAttribute('src') === src && (!waitForPixels || (image.complete && image.naturalWidth > 0));
+                }, {src: data.image_url, waitForPixels});
+                await waitEnabled(save);
+                return data.image_url;
+            }
+        };
+        const checkImageLayout = async (size, viewport, label) => {
+            const frame = await box.locator('.recipe-image-lightbox-media').boundingBox();
+            const image = await preview.isVisible() ? await preview.evaluate(image => {
+                const rect = image.getBoundingClientRect(), style = getComputedStyle(image);
+                const left = parseFloat(style.borderLeftWidth) + parseFloat(style.paddingLeft);
+                const right = parseFloat(style.borderRightWidth) + parseFloat(style.paddingRight);
+                const top = parseFloat(style.borderTopWidth) + parseFloat(style.paddingTop);
+                const bottom = parseFloat(style.borderBottomWidth) + parseFloat(style.paddingBottom);
+                return {x: rect.x + left, y: rect.y + top, width: rect.width - left - right, height: rect.height - top - bottom};
+            }) : frame;
+            const toolbar = await box.locator('[data-master-image-actions]').boundingBox();
+            const within = (inner, outer, message) => {
+                assert(inner && outer && inner.width > 0 && inner.height > 0, `${label}: ${message} is visible`);
+                assert(inner.x >= outer.x - 1 && inner.y >= outer.y - 1
+                    && inner.x + inner.width <= outer.x + outer.width + 1
+                    && inner.y + inner.height <= outer.y + outer.height + 1,
+                    `${label}: ${message} (${JSON.stringify(inner)}) stays inside ${JSON.stringify(outer)}`);
+            };
+            if (size) {
+                const dimensions = await preview.evaluate(image => ({width: image.naturalWidth, height: image.naturalHeight}));
+                assert.equal(dimensions.width / dimensions.height, size.width / size.height, `${label}: server preserves uploaded ratio`);
+                // A thin image border can leave up to two pixels of letterboxing.
+                assert(Math.abs(image.height - image.width * size.height / size.width) <= 2,
+                    `${label}: displayed image keeps its ${size.width}:${size.height} aspect ratio (${JSON.stringify(image)})`);
+            }
+            within(frame, {x: 0, y: 0, ...viewport}, 'Image frame fits viewport');
+            within(image, frame, 'Image fits frame');
+            within(toolbar, image, 'Toolbar stays on image');
+            assert(toolbar.height <= image.height / 2 + 1, `${label}: toolbar leaves at least half the image visible (${toolbar.height}/${image.height})`);
+            for (const action of [replace, generate, remove]) {
+                const bounds = await action.boundingBox();
+                within(bounds, image, `${await action.innerText()} button stays on image`);
+                within(bounds, toolbar, `${await action.innerText()} button stays in toolbar`);
+            }
+            within(await close.boundingBox(), {x: 0, y: 0, ...viewport}, 'Close is visible within viewport');
+        };
 
         await thumbnail.click();
         await box.waitFor({state: 'visible'});
@@ -114,6 +198,7 @@ const base = process.argv[2];
         assert.equal(await preview.getAttribute('src'), originalImage);
         assert(await page.locator('[data-ingredient-editor-form]').isHidden());
         assert(await save.isDisabled());
+        await capture('ingredient-lightbox-desktop');
         await close.press('Shift+Tab');
         assert(await focused(remove), 'Shift+Tab wraps to the final image action');
         await remove.press('Tab');
@@ -135,6 +220,41 @@ const base = process.argv[2];
         await close.press('Escape');
         assert(await box.isHidden());
         assert(await focused(thumbnail), 'Escape returns focus to the thumbnail');
+        await cancel();
+        assert.equal(await savedUrl(), originalImage);
+
+        // An invalid real upload reports the server error and permits a retry.
+        await thumbnail.click();
+        expectedResourceErrors.add(`${base}/api/master-data/ingredients/${options.recordId}/image-preview`);
+        await upload('invalid.png', Buffer.from('not an image'), 400);
+        await box.locator('[data-master-image-status]').filter({hasText: /valid.*image/i}).waitFor({state: 'visible'});
+        assert.equal(await preview.getAttribute('src'), originalImage);
+        assert.equal(await savedUrl(), originalImage);
+        assert(await save.isDisabled());
+        await upload('retry.png', Buffer.from(options.image, 'base64'));
+        assert(await box.locator('[data-master-image-status]').filter({hasText: /valid.*image/i}).isHidden());
+        assert.equal(await savedUrl(), originalImage, 'A successful retry is still only a draft');
+        await close.click();
+        await cancel();
+        assert.equal(await savedUrl(), originalImage);
+
+        // Missing preview pixels preserve a usable frame and allow Replace recovery.
+        const unavailableImage = route => route.fulfill({status: 404, body: 'Image unavailable'});
+        await page.route('**/static/generated/recipe_steps/master_ingredient_*.png', unavailableImage);
+        await thumbnail.click();
+        const unavailableUrl = await upload('unavailable.png', Buffer.from(options.image, 'base64'), 200, false);
+        expectedResourceErrors.add(`${base}${unavailableUrl}`);
+        await box.getByText('Image unavailable', {exact: true}).waitFor({state: 'visible'});
+        assert(await preview.isHidden());
+        await checkImageLayout(null, {width: 1280, height: 900}, 'Unavailable image');
+        for (const action of [replace, generate, remove]) assert(await action.isEnabled());
+        assert.equal(await savedUrl(), originalImage);
+        await capture('ingredient-lightbox-unavailable');
+        await page.unroute('**/static/generated/recipe_steps/master_ingredient_*.png', unavailableImage);
+        await upload('recovered.png', Buffer.from(options.image, 'base64'));
+        assert(await box.getByText('Image unavailable', {exact: true}).isHidden());
+        assert(await preview.isVisible());
+        await close.click();
         await cancel();
         assert.equal(await savedUrl(), originalImage);
 
@@ -203,19 +323,37 @@ const base = process.argv[2];
         assert.equal(saveRequests[0].image.action, 'replace');
         assert.equal(saveRequests[0].image_url, undefined);
 
-        // Narrow screens retain the overlay inside the displayed image frame.
-        await page.setViewportSize({width: 390, height: 844});
-        await thumbnail.click();
-        await waitEnabled(generate);
-        const frame = await box.locator('.recipe-image-lightbox-media').boundingBox();
-        const toolbar = await box.locator('[data-master-image-actions]').boundingBox();
-        assert(toolbar.x >= frame.x - 1 && toolbar.y >= frame.y - 1);
-        assert(toolbar.x + toolbar.width <= frame.x + frame.width + 1);
-        assert(toolbar.y + toolbar.height <= frame.y + frame.height + 1);
-        assert(toolbar.height < frame.height / 2, 'Toolbar leaves most of the image visible');
-        await close.press('Escape');
-        assert(await focused(thumbnail));
+        // Real uploads exercise wide, panoramic, and portrait image geometry,
+        // including the smaller phone and its landscape orientation.
+        for (const viewport of [{width: 390, height: 844}, {width: 320, height: 568}, {width: 844, height: 390}]) {
+            await page.setViewportSize(viewport);
+            for (const shape of options.responsiveImages) {
+                const label = `${viewport.width}x${viewport.height}-${shape.label}`;
+                await thumbnail.click();
+                await upload(`${shape.label}.png`, Buffer.from(shape.image, 'base64'));
+                await capture(`ingredient-lightbox-${label}`);
+                await checkImageLayout(shape, viewport, label);
+                assert.equal(await savedUrl(), generatedImage, `${label}: replacement remains pending`);
+                if (viewport.width === 320 && shape.label === 'panorama') {
+                    page.once('dialog', dialog => dialog.accept());
+                    await remove.click();
+                    await box.getByText('No image', {exact: true}).waitFor({state: 'visible'});
+                    assert(await preview.isHidden());
+                    await checkImageLayout(null, viewport, `${label}-removed`);
+                    await capture(`ingredient-lightbox-${label}-removed`);
+                    assert.equal(await savedUrl(), generatedImage, 'Removing a panoramic preview remains pending');
+                }
+                await close.press('Escape');
+                assert(await focused(thumbnail));
+                await cancel();
+                assert.equal(await savedUrl(), generatedImage, `${label}: cancellation preserves saved image`);
+                assert.equal(await thumbnail.getAttribute('src'), generatedImage, `${label}: cancellation restores thumbnail`);
+                assert.equal(saveRequests.length, 1, `${label}: no implicit saves`);
+            }
+        }
         assert.deepEqual(pageErrors, []);
+        assert.deepEqual(consoleErrors.filter(message => !(expectedResourceErrors.has(message.url)
+            && /Failed to load resource.*\b(?:400|404)\b/.test(message.text))), []);
         console.log(JSON.stringify({saveRequests: saveRequests.length, savedImage: generatedImage}));
     } finally {
         await browser.close();
