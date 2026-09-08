@@ -310,7 +310,8 @@
         <td class="ingredient-item-cell" data-label="Item">
             <div class="ingredient-item">
                 {% if row.image_url %}<img class="master-data-thumbnail" src="{{ row.image_url }}" data-full-src="{{ row.image_url }}" alt="{{ row.name }} image">
-                {% else %}<span class="master-data-no-image">No image</span>{% endif %}
+                {% else %}<button type="button" class="master-data-no-image" data-master-image-empty
+                                 aria-label="Manage image for {{ row.name }}" aria-haspopup="dialog" aria-controls="recipeImageLightbox">No image</button>{% endif %}
                 <div class="ingredient-name-field">
                     <input class="ingredient-row-name" data-ingredient-row-name value="{{ row.name }}" type="text" maxlength="160" autocomplete="off" required
                            aria-label="Canonical ingredient name for {{ row.name }}" aria-describedby="ingredientNameError-{{ row.id }}">

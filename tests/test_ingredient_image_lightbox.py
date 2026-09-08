@@ -13,6 +13,7 @@ import pytest
 from werkzeug.serving import make_server
 
 from PushShoppingList.services import recipe_master_image_service as images
+from PushShoppingList.services import recipe_master_data_service as md
 from test_ingredient_inline_editor import editor_app, tomato
 from test_recipe_master_data_routes import sign_in
 
@@ -38,12 +39,15 @@ def test_ingredient_lightbox_reuses_pending_image_actions(editor_app, monkeypatc
         })
     monkeypatch.setattr(images, "request_master_ingredient_image_bytes", lambda *_: image_bytes)
     original = tomato()
+    original_empty = md.master_record_for_name("ingredients", "user-a", "carrot")
+    assert not original_empty["image_url"]
     with editor_app.test_client() as client:
         sign_in(client, "user-a")
         cookie = client.get_cookie(editor_app.config["SESSION_COOKIE_NAME"])
         options = {
             "cookie": {"name": cookie.key, "value": cookie.value, "domain": "127.0.0.1", "path": "/"},
             "recordId": original["id"],
+            "emptyRecordId": original_empty["id"],
             "image": base64.b64encode(image_bytes).decode("ascii"),
             "imageFolder": str(images.STEP_IMAGE_FOLDER),
             "responsiveImages": responsive_images,
@@ -74,6 +78,8 @@ def test_ingredient_lightbox_reuses_pending_image_actions(editor_app, monkeypatc
     assert tomato()["image_url"] != original["image_url"]
     assert tomato()["name"] == original["name"]
     assert tomato()["store_section"] == original["store_section"]
+    assert result_data["emptySaveRequests"] == 2
+    assert md.master_record_for_name("ingredients", "user-a", "carrot")["image_url"] == ""
 
 
 _BROWSER_SCENARIO = r"""
@@ -88,7 +94,7 @@ const base = process.argv[2];
         await context.addCookies([options.cookie]);
         const page = await context.newPage();
         page.setDefaultTimeout(10000);
-        const pageErrors = [], consoleErrors = [], saveRequests = [];
+        const pageErrors = [], consoleErrors = [], saveRequests = [], emptySaveRequests = [];
         const expectedResourceErrors = new Set();
         page.on('pageerror', error => pageErrors.push(error.message));
         page.on('console', message => {
@@ -97,6 +103,8 @@ const base = process.argv[2];
         page.on('request', request => {
             if (request.method() === 'POST' && new URL(request.url()).pathname === `/admin/master-data/ingredients/${options.recordId}`)
                 saveRequests.push(request.postDataJSON());
+            if (request.method() === 'POST' && new URL(request.url()).pathname === `/admin/master-data/ingredients/${options.emptyRecordId}`)
+                emptySaveRequests.push(request.postDataJSON());
         });
         // The seeded image URL is a fixture reference, so serve its pixels locally.
         await page.route('**/static/generated/tomato.png', route => route.fulfill({contentType: 'image/png', body: Buffer.from(options.image, 'base64')}));
@@ -116,7 +124,7 @@ const base = process.argv[2];
         const replace = box.getByRole('button', {name: 'Replace Image', exact: true});
         const generate = box.getByRole('button', {name: 'Generate Image', exact: true});
         const remove = box.getByRole('button', {name: 'Remove Image', exact: true});
-        const savedUrl = () => page.request.get(`${base}/api/master-data/ingredients/${options.recordId}/editor`).then(response => response.json()).then(data => data.record.image_url);
+        const savedUrl = (id = options.recordId) => page.request.get(`${base}/api/master-data/ingredients/${id}/editor`).then(response => response.json()).then(data => data.record.image_url);
         const originalImage = await savedUrl();
         const focused = locator => locator.evaluate(element => document.activeElement === element);
         const waitEnabled = async locator => {
@@ -126,18 +134,18 @@ const base = process.argv[2];
                 await new Promise(resolve => setTimeout(resolve, 10));
             }
         };
-        const cancel = async () => {
-            await row.getByRole('button', {name: /More actions/}).click();
-            await row.locator('[data-ingredient-row-cancel]').click();
-            assert(await save.isDisabled());
+        const cancel = async (targetRow = row, targetSave = save) => {
+            await targetRow.getByRole('button', {name: /More actions/}).click();
+            await targetRow.locator('[data-ingredient-row-cancel]').click();
+            assert(await targetSave.isDisabled());
         };
         const capture = async name => {
             if (options.screenshots) await page.screenshot({path: require('node:path').join(options.screenshots, `${name}.png`)});
         };
-        const upload = async (name, buffer, expectedStatus = 200, waitForPixels = true) => {
+        const upload = async (name, buffer, expectedStatus = 200, waitForPixels = true, target = {id: options.recordId, save}) => {
             await waitEnabled(replace);
             const response = page.waitForResponse(response => response.request().method() === 'POST'
-                && new URL(response.url()).pathname === `/api/master-data/ingredients/${options.recordId}/image-preview`);
+                && new URL(response.url()).pathname === `/api/master-data/ingredients/${target.id}/image-preview`);
             const chooser = page.waitForEvent('filechooser');
             await replace.click();
             await (await chooser).setFiles({name, mimeType: 'image/png', buffer});
@@ -150,7 +158,7 @@ const base = process.argv[2];
                     const image = document.querySelector('#recipeImageLightboxImage');
                     return image?.getAttribute('src') === src && (!waitForPixels || (image.complete && image.naturalWidth > 0));
                 }, {src: data.image_url, waitForPixels});
-                await waitEnabled(save);
+                await waitEnabled(target.save);
                 return data.image_url;
             }
         };
@@ -351,10 +359,133 @@ const base = process.argv[2];
                 assert.equal(saveRequests.length, 1, `${label}: no implicit saves`);
             }
         }
+
+        // An ingredient that has never had an image uses the same management
+        // lightbox, including keyboard activation and Save-only persistence.
+        await page.setViewportSize({width: 1280, height: 900});
+        await page.goto(`${base}/admin/master-data/ingredients?search=Carrot`);
+        const emptyRow = page.locator(`[data-ingredient-master-row][data-master-record-id="${options.emptyRecordId}"]`);
+        const emptyTrigger = emptyRow.locator('[data-master-image-empty]');
+        const emptySave = emptyRow.locator('[data-ingredient-row-save]');
+        const emptyTarget = {id: options.emptyRecordId, save: emptySave};
+        const emptySavedUrl = () => savedUrl(options.emptyRecordId);
+        assert.equal(await emptySavedUrl(), '');
+        assert.equal(await emptyTrigger.evaluate(element => element.tagName), 'BUTTON');
+        assert.match(await emptyTrigger.getAttribute('aria-label'), /Carrot/i);
+        assert(await emptySave.isDisabled());
+        await emptyTrigger.click();
+        await box.waitFor({state: 'visible'});
+        await waitEnabled(generate);
+        assert(await focused(close));
+        assert(await preview.isHidden());
+        assert(await box.getByText('No image', {exact: true}).isVisible());
+        assert(await replace.isEnabled());
+        assert(await remove.isDisabled());
+        assert(await emptySave.isDisabled(), 'Opening an initially empty image does not create a draft');
+        await checkImageLayout(null, {width: 1280, height: 900}, 'Initially empty image');
+        await capture('ingredient-lightbox-initially-empty-desktop');
+        await close.press('Shift+Tab');
+        assert(await focused(generate), 'Focus skips disabled Remove and wraps to Generate');
+        await generate.press('Tab');
+        assert(await focused(close));
+        await close.click();
+        assert(await focused(emptyTrigger), 'Close restores focus to No image');
+        await emptyTrigger.press('Enter');
+        await box.waitFor({state: 'visible'});
+        await close.press('Escape');
+        assert(await box.isHidden());
+        assert(await focused(emptyTrigger), 'Escape restores focus to No image');
+        await emptyTrigger.press('Space');
+        await box.waitFor({state: 'visible'});
+        await box.click({position: {x: 1, y: 1}});
+        assert(await box.isHidden());
+        assert(await focused(emptyTrigger), 'Backdrop restores focus to No image');
+        assert(await emptySave.isDisabled());
+
+        await emptyTrigger.click();
+        await waitEnabled(generate);
+        await generate.click();
+        await waitEnabled(emptySave);
+        const emptyGeneratedImage = await preview.getAttribute('src');
+        assert(emptyGeneratedImage, 'Generate previews an image for an initially empty ingredient');
+        assert(await remove.isEnabled());
+        assert.equal(await emptySavedUrl(), '', 'Generation from No image remains pending');
+        await close.click();
+        assert(await focused(emptyTrigger));
+        assert.equal(await emptySavedUrl(), '', 'Closing the generated preview never saves');
+        await emptyTrigger.click();
+        assert.equal(await preview.getAttribute('src'), emptyGeneratedImage);
+        await close.click();
+        await cancel(emptyRow, emptySave);
+        assert.equal(await emptySavedUrl(), '');
+        assert(await emptyTrigger.isVisible());
+
+        await emptyTrigger.click();
+        assert(await box.getByText('No image', {exact: true}).isVisible(), 'Cancel restores the initial empty preview');
+        const emptyReplacement = await upload('carrot-replacement.png', Buffer.from(options.image, 'base64'), 200, true, emptyTarget);
+        assert.equal(await emptySavedUrl(), '', 'Replacing No image remains pending');
+        await close.click();
+        assert.equal(await emptySavedUrl(), '', 'Closing the replacement preview never saves');
+        await emptyTrigger.click();
+        assert.equal(await preview.getAttribute('src'), emptyReplacement);
+        await close.click();
+        await cancel(emptyRow, emptySave);
+        assert.equal(await emptySavedUrl(), '');
+        assert.equal(emptySaveRequests.length, 0, 'Neither preview nor Cancel implicitly saves an empty ingredient');
+
+        await page.setViewportSize({width: 320, height: 568});
+        await emptyTrigger.click();
+        await box.getByText('No image', {exact: true}).waitFor({state: 'visible'});
+        await checkImageLayout(null, {width: 320, height: 568}, 'Initially empty phone image');
+        await capture('ingredient-lightbox-initially-empty-phone');
+        await close.click();
+        await page.setViewportSize({width: 1280, height: 900});
+
+        await emptyTrigger.click();
+        const firstSavedImage = await upload('carrot-save.png', Buffer.from(options.image, 'base64'), 200, true, emptyTarget);
+        await close.click();
+        await emptySave.click();
+        await page.waitForFunction(({id, src}) => {
+            const row = document.querySelector(`[data-ingredient-master-row][data-master-record-id="${id}"]`);
+            return row?.querySelector('.master-data-thumbnail')?.getAttribute('src') === src && row.querySelector('[data-ingredient-row-save]').disabled;
+        }, {id: options.emptyRecordId, src: firstSavedImage});
+        assert.equal(await emptySavedUrl(), firstSavedImage, 'Row Save persists the first image');
+        assert.equal(await emptyTrigger.count(), 0);
+        const newlySavedThumbnail = emptyRow.locator('.master-data-thumbnail');
+        await newlySavedThumbnail.click();
+        await waitEnabled(remove);
+        page.once('dialog', dialog => dialog.dismiss());
+        await remove.click();
+        assert(await emptySave.isDisabled(), 'Dismissed removal confirmation leaves the new image unchanged');
+        page.once('dialog', dialog => dialog.accept());
+        await remove.click();
+        await box.getByText('No image', {exact: true}).waitFor({state: 'visible'});
+        await waitEnabled(emptySave);
+        assert.equal(await emptySavedUrl(), firstSavedImage, 'Removal of the first image remains pending');
+        await close.click();
+        assert(await focused(newlySavedThumbnail));
+        await emptySave.click();
+        await page.waitForFunction(id => {
+            const row = document.querySelector(`[data-ingredient-master-row][data-master-record-id="${id}"]`);
+            return row?.querySelector('button[data-master-image-empty]') && row.querySelector('[data-ingredient-row-save]').disabled;
+        }, options.emptyRecordId);
+        assert.equal(await emptySavedUrl(), '');
+        await emptyTrigger.click();
+        await box.getByText('No image', {exact: true}).waitFor({state: 'visible'});
+        await waitEnabled(generate);
+        assert(await replace.isEnabled());
+        assert(await remove.isDisabled());
+        assert(await emptySave.isDisabled());
+        await close.click();
+        assert(await focused(emptyTrigger), 'Saved removal restores an actionable No image button');
+        assert.equal(emptySaveRequests.length, 2);
+        assert.equal(emptySaveRequests[0].image.action, 'replace');
+        assert.equal(emptySaveRequests[1].image.action, 'remove');
+        assert.equal(saveRequests.length, 1);
         assert.deepEqual(pageErrors, []);
         assert.deepEqual(consoleErrors.filter(message => !(expectedResourceErrors.has(message.url)
             && /Failed to load resource.*\b(?:400|404)\b/.test(message.text))), []);
-        console.log(JSON.stringify({saveRequests: saveRequests.length, savedImage: generatedImage}));
+        console.log(JSON.stringify({saveRequests: saveRequests.length, savedImage: generatedImage, emptySaveRequests: emptySaveRequests.length}));
     } finally {
         await browser.close();
     }

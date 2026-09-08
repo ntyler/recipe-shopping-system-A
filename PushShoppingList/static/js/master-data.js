@@ -212,7 +212,7 @@
     }
 
     function masterDataLightboxImageSelector() {
-        return ".master-data-thumbnail[src], .master-data-reference-title-image[src]";
+        return ".master-data-thumbnail[src], .master-data-reference-title-image[src], [data-ingredient-master-row] .master-data-no-image";
     }
 
     function ensureMasterDataImageLightbox() {
@@ -286,11 +286,10 @@
     }
 
     function openMasterDataImageLightbox(image) {
-        if (!image || !(image.dataset.fullSrc || image.currentSrc || image.src)) {
-            return;
-        }
-
+        if (!image) return;
         const row = image.closest('[data-ingredient-master-row]');
+        const src = image.dataset.fullSrc || image.currentSrc || image.src;
+        if (!src && !row) return;
         if (row && !editIngredientRow(row)) return;
         closeIngredientAliases({restoreFocus: false});
         const lightbox = ensureMasterDataImageLightbox();
@@ -306,7 +305,8 @@
         lightbox.ingredientRow = row;
         lightbox.querySelector('[role="dialog"]').setAttribute('aria-label', row ? `Image for ${row.dataset.recordName}` : 'Enlarged recipe image');
         lightbox.querySelector('.recipe-image-lightbox-media').style.setProperty('--image-ratio', image.naturalWidth && image.naturalHeight ? image.naturalWidth / image.naturalHeight : 1);
-        lightboxImage.src = image.dataset.fullSrc || image.currentSrc || image.src;
+        if (src) lightboxImage.src = src;
+        else lightboxImage.removeAttribute('src');
         lightboxImage.alt = image.alt || "Recipe image";
         syncMasterDataLightboxImageState(lightbox);
         lightbox.classList.add("open");
@@ -396,7 +396,9 @@
         scope.querySelectorAll(masterDataLightboxImageSelector()).forEach((image) => {
             image.tabIndex = 0;
             image.setAttribute("role", "button");
-            image.setAttribute("aria-label", `Enlarge ${image.alt || "recipe image"}`);
+            image.setAttribute("aria-label", image.matches('.master-data-no-image')
+                ? `Manage image for ${image.closest('[data-ingredient-master-row]').dataset.recordName}`
+                : `Enlarge ${image.alt || "recipe image"}`);
             image.setAttribute('aria-haspopup', 'dialog');
             image.setAttribute('aria-controls', 'recipeImageLightbox');
         });

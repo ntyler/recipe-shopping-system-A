@@ -9447,6 +9447,7 @@ body {
         .recipe-step-image[src]:not([hidden]),
         .ai-pantry-inventory-thumbnail-image[src]:not([hidden]),
         .master-data-thumbnail[src],
+        .ingredient-master-page .master-data-no-image,
         .master-data-reference-title-image[src] {
             cursor: zoom-in;
         }
@@ -9455,6 +9456,7 @@ body {
         .recipe-step-image[src]:not([hidden]):focus-visible,
         .ai-pantry-inventory-thumbnail-image[src]:not([hidden]):focus-visible,
         .master-data-thumbnail[src]:focus-visible,
+        .ingredient-master-page .master-data-no-image:focus-visible,
         .master-data-reference-title-image[src]:focus-visible {
             outline: 2px solid #12d6c5;
             outline-offset: 3px;
@@ -27725,6 +27727,13 @@ img[data-deferred-src] {
             font-weight: 900;
             line-height: 1.1;
             text-align: center;
+        }
+
+        button.master-data-no-image {
+            margin: 0;
+            min-width: 0;
+            box-sizing: border-box;
+            font-family: inherit;
         }
 
         .master-data-aliases {
