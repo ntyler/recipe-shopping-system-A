@@ -9611,6 +9611,133 @@ body {
             }
         }
 
+        /* Ingredient management stays inside the enlarged image frame. */
+        .master-data-image-lightbox {
+            z-index: var(--app-layer-modal-panel, 20010);
+            background: rgba(0, 0, 0, 0.78);
+        }
+
+        .master-data-image-lightbox .recipe-image-lightbox-media {
+            width: min(960px, calc(100vw - 32px), calc((100dvh - 32px) * var(--image-ratio, 1)));
+            container-type: inline-size;
+        }
+
+        .master-data-image-lightbox .recipe-image-lightbox-media img {
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .master-data-image-lightbox [hidden] {
+            display: none;
+        }
+
+        .master-data-lightbox-empty {
+            display: grid;
+            place-items: center;
+            width: 100%;
+            height: min(440px, calc(100dvh - 32px));
+            border: 1px solid #5f665f;
+            border-radius: 10px;
+            background: #182021;
+            color: #d5dddd;
+        }
+
+        .master-data-image-lightbox .recipe-image-lightbox-actions {
+            inset: auto 0 0;
+            display: grid;
+            max-width: none;
+            justify-content: stretch;
+            gap: 6px;
+            padding: 24px 12px 12px;
+            border: 0;
+            border-radius: 0 0 10px 10px;
+            background: linear-gradient(transparent, rgba(10, 14, 15, 0.86) 24px);
+            box-shadow: none;
+            opacity: 1;
+            pointer-events: auto;
+            transform: none;
+            transition: none;
+        }
+
+        .master-data-image-lightbox.has-image-actions .recipe-image-lightbox-actions,
+        .master-data-image-lightbox.has-image-actions .recipe-image-lightbox-media:hover .recipe-image-lightbox-actions,
+        .master-data-image-lightbox.has-image-actions .recipe-image-lightbox-content:focus-within .recipe-image-lightbox-actions {
+            transform: none;
+        }
+
+        .master-data-image-lightbox [data-master-image-status] {
+            margin: 0;
+            color: #f0f3f3;
+            font-size: 12px;
+            line-height: 1.3;
+            text-align: center;
+            overflow-wrap: anywhere;
+        }
+
+        .master-data-lightbox-buttons {
+            display: flex;
+            gap: 6px;
+            justify-content: center;
+        }
+
+        .master-data-image-lightbox .recipe-image-lightbox-actions button {
+            flex: 1 1 0;
+            min-width: 0;
+            max-width: 160px;
+            min-height: 40px;
+            padding: 6px;
+            border-color: rgba(255, 255, 255, 0.3);
+            background: rgba(35, 41, 43, 0.9);
+            font-weight: 600;
+            white-space: normal;
+        }
+
+        .master-data-image-lightbox .recipe-image-lightbox-actions button:hover,
+        .master-data-image-lightbox .recipe-image-lightbox-actions button:focus-visible {
+            border-color: #b9c2c4;
+            background: #364043;
+        }
+
+        .master-data-image-lightbox .recipe-image-lightbox-actions button.is-remove {
+            color: #ffc1c5;
+            border-color: rgba(218, 125, 136, 0.55);
+        }
+
+        .master-data-image-lightbox .recipe-image-lightbox-actions button.is-remove:hover,
+        .master-data-image-lightbox .recipe-image-lightbox-actions button.is-remove:focus-visible {
+            background: #4a2930;
+        }
+
+        .master-data-image-lightbox button:focus-visible {
+            outline: 2px solid #fff;
+            outline-offset: 2px;
+        }
+
+        .master-data-image-lightbox .recipe-image-lightbox-close {
+            z-index: 3;
+        }
+
+        @container (max-width: 400px) {
+            .master-data-image-lightbox .recipe-image-lightbox-actions {
+                gap: 4px;
+                padding: 12px 8px 8px;
+                background: linear-gradient(transparent, rgba(10, 14, 15, 0.86) 12px);
+            }
+            .master-data-image-lightbox [data-master-image-status] {
+                font-size: 11px;
+            }
+        }
+
+        @container (max-width: 250px) {
+            .master-data-lightbox-buttons {
+                flex-direction: column;
+            }
+            .master-data-image-lightbox .recipe-image-lightbox-actions button {
+                max-width: none;
+                min-height: 32px;
+            }
+        }
+
         .recipe-url-summary-cover {
             width: min(280px, 100%);
         }
