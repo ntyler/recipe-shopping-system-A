@@ -23,6 +23,11 @@
 </script>
 {% endif %}
 {% endblock %}
+{% block app_styles %}
+{% if master_data.record_type == 'ingredients' %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/ingredient-mobile-rows.css', v=app_css_version) }}">
+{% endif %}
+{% endblock %}
 {% macro master_data_reference_url(row, master_data) -%}
     {{- url_for(
         'main_bp.master_data_record_references_route',
@@ -306,12 +311,17 @@
         data-source-label="{{ 'User-created' if row.user_id else 'Workspace ingredient' }}"
         data-order-url="{{ url_for('main_bp.reorder_ingredient_master_record_route', ingredient_id=row.id) }}"
         {% if not row.usage_count %}data-master-record-unused="true"{% endif %}>
-        <td class="ingredient-order-cell" data-label="Order">{{ registry_order(row.name, row.sort_order + 1, row.order_enabled, row.section_count) }}</td>
+        <td id="ingredientOrder-{{ row.id }}" class="ingredient-order-cell" data-label="Order">{{ registry_order(row.name, row.sort_order + 1, row.order_enabled, row.section_count) }}</td>
         <td class="ingredient-item-cell" data-label="Item">
             <div class="ingredient-item">
                 {% if row.image_url %}<img class="master-data-thumbnail" src="{{ row.image_url }}" data-full-src="{{ row.image_url }}" alt="{{ row.name }} image">
                 {% else %}<button type="button" class="master-data-no-image" data-master-image-empty
                                  aria-label="Manage image for {{ row.name }}" aria-haspopup="dialog" aria-controls="recipeImageLightbox">No image</button>{% endif %}
+                <button type="button" class="ingredient-mobile-row-toggle" data-ingredient-mobile-toggle
+                        aria-expanded="false" aria-label="Expand details for {{ row.name }}">
+                    <span data-ingredient-mobile-name>{{ row.name }}</span>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+                </button>
                 <div class="ingredient-name-field">
                     <input class="ingredient-row-name" data-ingredient-row-name value="{{ row.name }}" type="text" maxlength="160" autocomplete="off" required
                            aria-label="Canonical ingredient name for {{ row.name }}" aria-describedby="ingredientNameError-{{ row.id }}">
@@ -325,7 +335,7 @@
                 </form>
             </div>
         </td>
-        <td class="ingredient-aliases-cell" data-label="Aliases">
+        <td id="ingredientAliases-{{ row.id }}" class="ingredient-aliases-cell" data-label="Aliases">
             <div class="unit-master-aliases ingredient-aliases" data-ingredient-aliases role="group" aria-label="Aliases for {{ row.name }}">
                 <span class="unit-master-alias-chip-list" data-ingredient-alias-list>
                 {% for alias in row.aliases %}<code data-ingredient-alias="{{ alias }}" title="{{ alias }}">{{ alias }}</code>{% endfor %}
@@ -334,7 +344,7 @@
                 <span class="unit-master-alias-actions"><button type="button" data-ingredient-row-alias="add" aria-label="Manage aliases" title="Manage aliases" aria-haspopup="dialog" aria-expanded="false" aria-controls="ingredientAliasManager">+</button></span>
             </div>
         </td>
-        <td class="ingredient-section-cell" data-label="Store Section">
+        <td id="ingredientSection-{{ row.id }}" class="ingredient-section-cell" data-label="Store Section">
             <span class="ingredient-section-summary">
                 <span class="recipe-edit-store-section-icon" aria-hidden="true">{{ registry_section_icon(master_data.store_section_icons.get(row.store_section, 'basket')) }}</span>
                 <select class="ingredient-row-section" data-ingredient-row-section aria-label="Store Section for {{ row.name }}" aria-describedby="ingredientSectionError-{{ row.id }}">
@@ -352,7 +362,7 @@
             </button>
             {% else %}<span class="unit-master-usage-empty master-data-usage-empty" aria-label="{{ row.name }} is unused; no recipes currently reference it">Unused</span>{% endif %}
         </td>
-        <td class="ingredient-action-cell" data-label="Action">
+        <td id="ingredientActions-{{ row.id }}" class="ingredient-action-cell" data-label="Action">
             <div class="ingredient-row-actions">
                 <button type="button" class="unit-master-edit-button" data-ingredient-row-save aria-label="Save {{ row.name }}" disabled>Save</button>
                 <button type="button" class="unit-master-edit-button ingredient-row-cancel" data-ingredient-row-cancel aria-label="Cancel changes to {{ row.name }}" hidden>Cancel</button>
@@ -361,22 +371,16 @@
                         data-delete-url="{{ url_for('main_bp.delete_ingredient_master_record_route', ingredient_id=row.id) }}"
                         aria-label="Delete {{ row.name }}">Delete</button>
                 {% endif %}
-                <button type="button" class="ingredient-row-more-button" popovertarget="ingredientMore-{{ row.id }}" aria-label="More actions and details for {{ row.name }}">&hellip;</button>
-            </div>
-            <span id="ingredientRowStatus-{{ row.id }}" class="ingredient-row-status" data-ingredient-row-status role="status" aria-live="polite"></span>
-            <button type="button" class="unit-master-edit-button" data-ingredient-row-retry hidden>Retry validation</button>
-            <div class="ingredient-row-more" id="ingredientMore-{{ row.id }}" popover>
-                <strong>{{ row.name }}</strong>
-                <span>{{ 'User-created' if row.user_id else 'Workspace ingredient' }} &middot; Canonical name: {{ row.normalized_name }}</span>
-                <span>Last Updated <time datetime="{{ row.updated_at }}" title="{{ row.updated_at }}">{{ row.updated_at_label }}</time></span>
-                <span>Name references {{ row.ingredient_name_usage_count }} &middot; Buy As references {{ row.buy_as_usage_count }}</span>
-                {% if row.delete_blocked_reason %}<span data-ingredient-delete-reason>{{ row.delete_blocked_reason }}</span>{% endif %}
-                {% if master_data.scope == 'all' %}<span>{{ row.user_identity.display_name }} &middot; {{ row.user_identity.short_id }}</span>{% endif %}
-                <button type="button" class="master-data-merge-open" data-master-merge-open data-source-id="{{ row.id }}"
+                <button type="button" class="unit-master-edit-button ingredient-row-merge" data-master-merge-open data-source-id="{{ row.id }}"
+                        data-merge-blocked-reason="{{ row.merge_blocked_reason }}"
+                        title="{{ row.merge_blocked_reason or row.delete_blocked_reason or 'Merge into another ingredient and preserve recipe references.' }}"
+                        {% if not row.can_merge %}disabled{% endif %}
                         data-source-name="{{ row.name }}" data-source-normalized-name="{{ row.normalized_name }}" data-source-usage-count="{{ row.usage_count }}"
                         data-merge-options-url="{{ url_for('main_bp.ingredient_master_merge_options_route', ingredient_id=row.id, viewer_user_id=master_data.viewer_user_id or none) }}"
                         data-merge-url="{{ url_for('main_bp.merge_ingredient_master_record_route', ingredient_id=row.id) }}" aria-haspopup="dialog" aria-controls="masterDataIngredientMergeDialog">Merge duplicate&hellip;</button>
             </div>
+            <span id="ingredientRowStatus-{{ row.id }}" class="ingredient-row-status" data-ingredient-row-status role="status" aria-live="polite"></span>
+            <button type="button" class="unit-master-edit-button" data-ingredient-row-retry hidden>Retry validation</button>
         </td>
     </tr>
 
@@ -1514,4 +1518,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
 {% block app_scripts %}
 <script src="{{ url_for('static', filename='js/master-data-alias-editor.js', v=master_data_js_version) }}" defer></script>
 <script src="{{ url_for('static', filename='js/master-data.js', v=master_data_js_version) }}" defer></script>
+{% if master_data.record_type == 'ingredients' %}
+<script src="{{ url_for('static', filename='js/ingredient-mobile-rows.js', v=master_data_js_version) }}" defer></script>
+{% endif %}
 {% endblock %}

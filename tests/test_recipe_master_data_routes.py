@@ -426,7 +426,8 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert all_html.index('class="master-data-thumbnail"') < all_html.index('value="Tomato"')
     assert '<th scope="rowgroup" colspan="6">Produce</th>' in all_html
     assert '<th scope="col">User</th>' not in all_html
-    assert 'class="ingredient-row-more"' in all_html
+    assert 'ingredient-row-more' not in all_html
+    assert '<th scope="col">Action</th>' in all_html
     assert 'name="normalized_name" value="tomato"' in all_html
     assert 'data-ingredient-row-section' in all_html
     assert 'data-ingredient-editor-form' not in all_html

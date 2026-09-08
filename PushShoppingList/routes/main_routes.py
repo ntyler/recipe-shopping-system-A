@@ -1375,8 +1375,23 @@ def master_data_context(record_type, scope_info=None):
     rows = enrich_master_data_rows_with_users(rows, user_identities)
     if record_type == "ingredients":
         deletion_details = ingredient_deletion.ingredient_deletion_details(rows)
+        # Merge targets belong to the source workspace, regardless of the
+        # current search, section filter, or page of visible ingredients.
+        workspace_ingredient_counts = {
+            user_id: recipe_master_data.count_ingredients(user_id=user_id)
+            for user_id in {row["user_id"] for row in rows}
+        }
         for row in rows:
             row.update(deletion_details.get(int(row["id"]), {}))
+            if not is_admin and row["user_id"] != scope_info["current_scope_user_id"]:
+                row["merge_blocked_reason"] = "You can only merge ingredients in your workspace."
+            elif workspace_ingredient_counts[row["user_id"]] < 2:
+                row["merge_blocked_reason"] = (
+                    "Add another ingredient in this workspace before merging duplicates."
+                )
+            else:
+                row["merge_blocked_reason"] = ""
+            row["can_merge"] = not row["merge_blocked_reason"]
     available_users = [
         user_identities.get(str(user_id or "").strip()) or master_data_user_identity(user_id)
         for user_id in available_user_ids

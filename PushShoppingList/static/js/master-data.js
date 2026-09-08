@@ -1350,11 +1350,13 @@
     // Maintenance and merge workflows use the same unsaved-change guard.
     function changedStoreSectionForms() { return ingredientRows().filter(ingredientRowIsDirty).map(row => row.querySelector('form')); }
     function ingredientStatus(message, error = false, row = null) {
-        if (row === ingredientEditingRow && row) {
+        if (row) {
             const restoreScroll = captureIngredientScroll(row);
-            const output = ingredientEditorControl('feedback');
-            output.textContent = message; output.hidden = !message;
-            output.dataset.status = error ? 'error' : 'success';
+            if (row === ingredientEditingRow) {
+                const output = ingredientEditorControl('feedback');
+                output.textContent = message; output.hidden = !message;
+                output.dataset.status = error ? 'error' : 'success';
+            }
             const status = row.querySelector('[data-ingredient-row-status]');
             status.textContent = message; status.classList.toggle('is-error', error);
             restoreScroll();
@@ -1425,7 +1427,10 @@
                 remove.hidden = editing && dirty;
             }
             row.querySelector('[data-ingredient-row-retry]').hidden = !editing || ingredientEditorControl('retry').hidden;
-            row.querySelector('[data-master-merge-open]').disabled = ingredientMutationPending || ingredientImagePending || dirty;
+            const merge = row.querySelector('[data-master-merge-open]');
+            merge.disabled = Boolean(merge.dataset.mergeBlockedReason) || ingredientMutationPending || ingredientImagePending || dirty;
+            merge.title = merge.dataset.mergeBlockedReason || (dirty ? 'Save or cancel the current changes before merging.'
+                : ingredientMutationPending || ingredientImagePending ? 'Wait for the current ingredient operation to finish.' : merge.dataset.mergeTitle);
             const blocked = ingredientMutationPending || row.dataset.orderEnabled !== 'true';
             const handle = row.querySelector('[data-ingredient-order-handle]');
             handle.disabled = false; handle.draggable = !blocked; handle.setAttribute('aria-disabled', String(blocked));
@@ -1573,7 +1578,6 @@
         ingredientEditorToken++; ingredientEditorLoading = false; ingredientImagePending = false; ingredientEditorErrors = {};
         fillIngredientEditor(row.ingredientOriginal); renderIngredientRowAliases(row, row.ingredientOriginal.aliases);
         ingredientFieldError('name', ''); ingredientFieldError('section', ''); ingredientStatus('', false, row);
-        row.querySelector('[popover]').hidePopover();
         closeIngredientAliases({restoreFocus: false});
         if (ingredientOrderOriginal) placeIngredientRows(ingredientSectionRows(row), ingredientOrderOriginal);
         ingredientOrderOriginal = null; ingredientOrderChange = null;
@@ -1687,13 +1691,8 @@
             if (!response.ok || !result.ok) {
                 if (result.result?.can_delete === false) {
                     button.remove();
-                    const menu = row.querySelector('[popover]');
-                    const reason = row.querySelector('[data-ingredient-delete-reason]') || document.createElement('span');
-                    reason.dataset.ingredientDeleteReason = '';
-                    reason.textContent = result.result.delete_blocked_reason || result.message;
-                    menu.insertBefore(reason, menu.querySelector('[data-master-merge-open]'));
                 }
-                throw new Error(result.message || result.error || 'The ingredient could not be deleted.');
+                throw new Error(result.result?.delete_blocked_reason || result.message || result.error || 'The ingredient could not be deleted.');
             }
             deleted = true;
             row.remove();
@@ -1701,7 +1700,7 @@
             ingredientStatus(`${name} deleted.`);
         } catch (error) {
             if (deleted) ingredientRows().forEach(item => { item.dataset.orderEnabled = 'false'; });
-            ingredientStatus(deleted ? 'Deleted. The table could not refresh; reload the page to see the updated group.' : error.message || 'The ingredient could not be deleted.', true);
+            ingredientStatus(deleted ? 'Deleted. The table could not refresh; reload the page to see the updated group.' : error.message || 'The ingredient could not be deleted.', true, deleted ? null : row);
         } finally {
             ingredientMutationPending = false;
             button.textContent = 'Delete';
@@ -1777,8 +1776,8 @@
             initIngredientStoreSectionPicker(row);
             if (row.ingredientOriginal) return;
             row.ingredientOriginal = ingredientRowValues(row);
-            const menu = row.querySelector('[popover]');
-            menu.addEventListener('toggle', event => { if (event.newState === 'open') positionRecipeEditPopupMenu(menu, row.querySelector('[popovertarget]')); });
+            const merge = row.querySelector('[data-master-merge-open]');
+            merge.dataset.mergeTitle = merge.title;
         });
         syncIngredientRowControls();
         if (root.dataset.ingredientRegistryBound) return;
@@ -1842,16 +1841,11 @@
             else if (button.matches('[data-ingredient-order-action]')) void moveIngredientRow(row, ingredientSectionRows(row).indexOf(row) + (button.dataset.ingredientOrderAction === 'up' ? -1 : 1), button);
             else if (button.matches('[data-master-merge-open]')) {
                 if (ingredientEditingRow && !ingredientRowIsDirty(ingredientEditingRow)) cancelIngredientRow(ingredientEditingRow, {restoreFocus: false});
-                button.closest('[popover]')?.hidePopover();
             }
         });
         root.addEventListener('keydown', event => {
             if (event.defaultPrevented) return;
             const row = event.target.closest('[data-ingredient-master-row]'); if (!row) return;
-            if (event.key === 'Escape' && row.querySelector('[popover]').matches(':popover-open')) {
-                event.preventDefault(); row.querySelector('[popover]').hidePopover();
-                row.querySelector('[popovertarget]').focus({preventScroll: true}); return;
-            }
             if (event.key === 'Escape' && row === ingredientEditingRow) {
                 event.preventDefault(); cancelIngredientRow(row, {discard: true}); return;
             }
@@ -2134,7 +2128,7 @@
 
     function openMasterDataMergeDialog(button) {
         const els = masterDataMergeElements();
-        if (!button || !els.dialog || !els.form || !els.search) {
+        if (!button || button.disabled || !els.dialog || !els.form || !els.search) {
             return;
         }
         if (ingredientMutationPending || ingredientRowIsDirty(ingredientEditingRow)) {
@@ -2142,7 +2136,7 @@
             return;
         }
 
-        masterDataMergeReturnFocus = button.closest('[data-ingredient-master-row]')?.querySelector('[popovertarget]') || button;
+        masterDataMergeReturnFocus = button;
         els.form.action = text(button.dataset.mergeUrl);
         els.dialog.dataset.mergeOptionsUrl = text(button.dataset.mergeOptionsUrl);
         els.dialog.dataset.sourceUsageCount = text(button.dataset.sourceUsageCount || 0);

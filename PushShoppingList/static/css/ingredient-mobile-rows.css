@@ -1,0 +1,123 @@
+.ingredient-master-page .ingredient-mobile-row-toggle {
+    display: none;
+}
+
+@media (max-width: 760px) {
+    .ingredient-master-page.has-mobile-ingredient-rows .master-data-ingredients-table [data-ingredient-master-row] {
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        column-gap: 8px;
+    }
+
+    .ingredient-master-page.has-mobile-ingredient-rows .master-data-ingredients-table .ingredient-item-cell {
+        grid-area: 1 / 1;
+        padding: 4px 0;
+    }
+
+    .ingredient-master-page.has-mobile-ingredient-rows .master-data-ingredients-table .master-data-usage-cell {
+        grid-area: 1 / 2;
+        justify-self: end;
+        padding: 4px 0;
+    }
+
+    .ingredient-master-page.has-mobile-ingredient-rows .master-data-ingredients-table .master-data-usage-button {
+        min-height: 44px;
+    }
+
+    .ingredient-master-page.has-mobile-ingredient-rows .ingredient-mobile-row-toggle {
+        display: flex;
+        flex: 1 1 auto;
+        align-items: center;
+        justify-content: space-between;
+        gap: 4px;
+        min-width: 0;
+        min-height: 44px;
+        margin: 0;
+        padding: 6px 0;
+        border: 1px solid transparent;
+        border-radius: 7px;
+        background: transparent;
+        color: var(--app-text-strong);
+        font: inherit;
+        font-size: 16px;
+        font-weight: 750;
+        text-align: left;
+    }
+
+    .ingredient-mobile-row-toggle > span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .ingredient-mobile-row-toggle > svg {
+        flex: 0 0 18px;
+        width: 18px;
+        height: 18px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        color: var(--app-muted);
+    }
+
+    .ingredient-mobile-row-toggle[aria-expanded="true"] > svg {
+        transform: rotate(180deg);
+    }
+
+    .ingredient-master-page.has-mobile-ingredient-rows .master-data-ingredients-table [data-ingredient-master-row]:not(.is-mobile-expanded) > :is(.ingredient-order-cell, .ingredient-aliases-cell, .ingredient-section-cell, .ingredient-action-cell),
+    .ingredient-master-page.has-mobile-ingredient-rows [data-ingredient-master-row]:not(.is-mobile-expanded) .ingredient-name-field {
+        display: none;
+    }
+
+    .ingredient-master-page.has-mobile-ingredient-rows .master-data-ingredients-table [data-ingredient-master-row].is-mobile-expanded .ingredient-item-cell {
+        grid-area: 1 / 1 / auto / -1;
+    }
+
+    .ingredient-master-page.has-mobile-ingredient-rows [data-ingredient-master-row].is-mobile-expanded .ingredient-name-field {
+        order: 1;
+    }
+
+    .ingredient-master-page.has-mobile-ingredient-rows [data-ingredient-master-row].is-mobile-expanded .ingredient-mobile-row-toggle {
+        order: 2;
+        flex: 0 0 44px;
+        justify-content: center;
+        width: 44px;
+    }
+
+    .ingredient-master-page.has-mobile-ingredient-rows [data-ingredient-master-row].is-mobile-expanded .ingredient-mobile-row-toggle > span {
+        display: none;
+    }
+
+    .ingredient-master-page.has-mobile-ingredient-rows .master-data-ingredients-table [data-ingredient-master-row].is-mobile-expanded > .master-data-usage-cell {
+        grid-area: 2 / 1;
+        justify-self: start;
+    }
+
+    .ingredient-master-page.has-mobile-ingredient-rows .master-data-ingredients-table [data-ingredient-master-row].is-mobile-expanded > .ingredient-order-cell {
+        grid-area: 2 / 2;
+        justify-self: end;
+    }
+
+    .ingredient-master-page.has-mobile-ingredient-rows .master-data-ingredients-table [data-ingredient-master-row].is-mobile-expanded > .ingredient-aliases-cell {
+        grid-area: 3 / 1 / auto / -1;
+    }
+
+    .ingredient-master-page.has-mobile-ingredient-rows .master-data-ingredients-table [data-ingredient-master-row].is-mobile-expanded > .ingredient-section-cell {
+        grid-area: 4 / 1 / auto / -1;
+    }
+
+    .ingredient-master-page.has-mobile-ingredient-rows .master-data-ingredients-table [data-ingredient-master-row].is-mobile-expanded > .ingredient-action-cell {
+        grid-area: 5 / 1 / auto / -1;
+        padding-top: 10px;
+    }
+
+    .ingredient-master-page.has-mobile-ingredient-rows .ingredient-row-actions {
+        width: 100%;
+    }
+
+    .ingredient-master-page.has-mobile-ingredient-rows .ingredient-row-actions > button {
+        min-height: 44px;
+    }
+}

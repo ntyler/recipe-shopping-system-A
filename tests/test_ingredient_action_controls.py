@@ -11,7 +11,9 @@ from test_ingredient_inline_editor import editor_app, image_file, tomato
 from test_recipe_master_data_routes import sign_in
 
 
-@pytest.mark.parametrize("viewport", [{"width": 1280, "height": 900}, {"width": 390, "height": 844}], ids=["desktop", "phone"])
+@pytest.mark.parametrize("viewport", [
+    {"width": 1280, "height": 900}, {"width": 1181, "height": 900}, {"width": 390, "height": 844},
+], ids=["desktop", "tablet", "phone"])
 def test_ingredient_actions_track_valid_changes_and_confirm_eligible_deletion(editor_app, viewport):
     playwright_runtime()
     fixture_url = "https://example.com/unused-action-fixtures"
@@ -88,6 +90,7 @@ const base = process.argv[2];
         const remove = row.locator('[data-ingredient-row-delete]');
         const actionCell = row.locator('.ingredient-action-cell');
         const mergeButton = actionCell.locator('[data-master-merge-open]');
+        const mobileToggle = row.locator('[data-ingredient-mobile-toggle]');
         const state = async ({dirty, valid = true}) => {
             await page.waitForFunction(({id, dirty, valid}) => {
                 const row = document.querySelector(`[data-ingredient-master-row][data-master-record-id="${id}"]`);
@@ -104,6 +107,21 @@ const base = process.argv[2];
             if (options.screenshots) await page.screenshot({path: require('node:path').join(options.screenshots,
                 `ingredient-actions-${options.viewport.width}-${label}.png`)});
         };
+        const alignedActions = async () => {
+            const buttons = actionCell.locator('.ingredient-row-actions button:visible');
+            const bounds = await buttons.evaluateAll(elements => elements.map(element => {
+                const rect = element.getBoundingClientRect();
+                return {left: rect.left, right: rect.right, top: rect.top, height: rect.height};
+            }));
+            assert(bounds.length >= 3);
+            assert(bounds.every((box, index) => Math.abs(box.top - bounds[0].top) <= 1
+                && Math.abs(box.height - bounds[0].height) <= 1
+                && (!index || box.left >= bounds[index - 1].right)),
+                'Save, Cancel, Delete and Merge duplicate stay in one compact horizontal row');
+            const cell = await actionCell.boundingBox();
+            assert(bounds[0].left >= cell.x && bounds.at(-1).right <= cell.x + cell.width + 1,
+                'The compact actions fit inside their Action cell');
+        };
         assert.deepEqual(await page.locator('table[aria-label="Ingredient"] thead th').allTextContents(),
             ['Order', 'Item', 'Aliases', 'Store Section', 'Used In', 'Action']);
         assert.equal(await row.locator(':scope > td').count(), 6);
@@ -114,6 +132,27 @@ const base = process.argv[2];
         assert.equal(await recordRow(options.referencedId).locator('[data-ingredient-row-delete]').count(), 0);
         await state({dirty: false});
         await row.scrollIntoViewIfNeeded();
+        if (options.viewport.width <= 760) {
+            assert(await mobileToggle.isVisible());
+            assert.equal(await mobileToggle.getAttribute('aria-expanded'), 'false');
+            assert(await actionCell.isHidden(), 'Collapsed phone summary does not show actions');
+            assert(await mobileToggle.locator('[data-ingredient-mobile-name]').isVisible());
+            assert(await row.locator('.master-data-usage-cell').isVisible());
+            await capture('collapsed');
+            await mobileToggle.click();
+            assert.equal(await mobileToggle.getAttribute('aria-expanded'), 'true');
+            assert(await actionCell.isVisible(), 'Expanding the phone row reveals its actions');
+            await mobileToggle.click();
+            assert(await actionCell.isHidden(), 'Collapsing the phone row hides its actions again');
+            await mobileToggle.click();
+        } else {
+            assert(await mobileToggle.isHidden());
+            const aliasHeading = page.locator('table[aria-label="Ingredient"] th').filter({hasText: /^Aliases$/});
+            if (await aliasHeading.isVisible()) assert(await aliasHeading
+                .evaluate(element => element.scrollWidth <= element.clientWidth + 1),
+                'The desktop Aliases heading fits its column');
+        }
+        await alignedActions();
         await capture('resting');
         await name.click();
         await state({dirty: false});
@@ -130,7 +169,10 @@ const base = process.argv[2];
         await name.fill('Fresh celery');
         await state({dirty: true});
         assert(await mergeButton.isDisabled());
+        assert.match(await mergeButton.getAttribute('title'), /save|cancel|changes/i,
+            'A disabled merge action explains how to make it available');
         await state({dirty: true});
+        await alignedActions();
         await capture('dirty');
         await cancel.click();
         await state({dirty: false});

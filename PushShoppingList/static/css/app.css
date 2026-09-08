@@ -84096,10 +84096,10 @@ body.recipe-edit-standalone-page #recipeEditIngredients
 .ingredient-master-page .master-data-ingredients-table tbody > tr:has(+ .master-data-reference-row[hidden]:last-child),
 .ingredient-master-page .master-data-ingredients-table tbody > tr:has(+ .master-data-reference-row[hidden]:last-child) > td { border-bottom: 0; }
 .ingredient-master-page .ingredient-col-order { width: 120px; }
-.ingredient-master-page .ingredient-col-item { width: 26%; }
+.ingredient-master-page .ingredient-col-item { width: 22%; }
 .ingredient-master-page .ingredient-col-section { width: 18%; }
 .ingredient-master-page .ingredient-col-usage { width: 88px; }
-.ingredient-master-page .ingredient-col-action { width: 184px; }
+.ingredient-master-page .ingredient-col-action { width: 252px; }
 .ingredient-master-page .store-section-master-order > button { display: flex; align-items: center; justify-content: center; border-width: 1px; border-style: solid; border-radius: 7px; font-size: 13px; line-height: 1.4; }
 .ingredient-master-page .ingredient-item { display: flex; align-items: center; min-width: 0; gap: 10px; }
 .ingredient-master-page .ingredient-name-field { min-width: 0; flex: 1; }
@@ -84119,24 +84119,19 @@ body.recipe-edit-standalone-page #recipeEditIngredients
 .ingredient-master-page .master-data-thumbnail,
 .ingredient-master-page .master-data-no-image { flex: 0 0 var(--master-data-thumbnail-size, 48px); width: var(--master-data-thumbnail-size, 48px); height: var(--master-data-thumbnail-size, 48px); border: 1px solid var(--app-border); border-radius: 7px; background: var(--app-surface); color: var(--app-muted); font-size: 10px; }
 .ingredient-master-page .master-data-no-image { display: grid; place-items: center; border-style: dashed; text-align: center; }
-.ingredient-master-page .ingredient-row-more-button { width: 24px; min-width: 0; height: 38px; min-height: 38px; padding: 0; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--app-muted); font-size: 18px; }
 .ingredient-master-page .ingredient-action-cell { text-align: left; }
 /* Keep Save in the first Action slot, matching the other master-data tabs. */
-.ingredient-master-page .ingredient-row-actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 24px; align-items: center; gap: 6px; }
-.ingredient-master-page .ingredient-row-actions > button { margin: 0; }
+.ingredient-master-page .ingredient-row-actions { display: grid; grid-template-columns: max-content max-content max-content; align-items: center; justify-content: start; gap: 6px; }
+.ingredient-master-page .ingredient-row-actions > button { margin: 0; white-space: nowrap; }
 .ingredient-master-page [data-ingredient-row-save] { grid-column: 1; grid-row: 1; }
 .ingredient-master-page :is([data-ingredient-row-cancel], [data-ingredient-row-delete]) { grid-column: 2; grid-row: 1; }
-.ingredient-master-page .ingredient-row-more-button { grid-column: 3; grid-row: 1; }
-.ingredient-master-page .ingredient-row-more-button:is(:hover, :focus-visible) { border-color: var(--app-border); background: var(--app-surface-soft); color: var(--app-text-strong); }
+.ingredient-master-page .ingredient-row-merge { grid-column: 3; grid-row: 1; }
 .ingredient-master-page [data-ingredient-row-delete]:not(:disabled) { color: var(--app-danger); }
 .ingredient-master-page [data-ingredient-row-delete]:is(:hover, :focus-visible):not(:disabled) { border-color: var(--app-danger); background: color-mix(in srgb, var(--app-danger) 10%, transparent); color: var(--app-danger); }
 .ingredient-master-page [data-ingredient-row-save]:not(:disabled) { border-color: var(--app-primary); background: var(--app-primary-soft); color: var(--app-primary-hover); }
 .ingredient-master-page .ingredient-row-status { display: block; margin: 0; color: var(--app-muted); font-size: 11px; }
 .ingredient-master-page .ingredient-row-status:empty { display: none; }
 .ingredient-master-page .ingredient-row-status.is-error { color: var(--app-danger); }
-.ingredient-master-page .ingredient-row-more { position: fixed; margin: 0; min-width: 210px; max-width: min(320px, calc(100vw - 24px)); padding: 12px; border: 1px solid var(--app-border); border-radius: 9px; background: var(--app-surface); color: var(--app-text); box-shadow: 0 8px 24px #0003; font-size: 12px; }
-.ingredient-master-page .ingredient-row-more:popover-open { display: grid; gap: 10px; }
-.ingredient-master-page .ingredient-row-more .master-data-merge-open { display: block; margin: 0; }
 .ingredient-master-page .master-data-ingredients-table .master-data-usage-cell { text-align: left; white-space: nowrap; }
 .ingredient-master-page .master-data-ingredients-table .master-data-usage-button,
 .ingredient-master-page .master-data-ingredients-table .master-data-usage-empty { display: inline-flex; width: max-content; max-width: 100%; min-width: 0; min-height: 22px; gap: 3px; padding: 2px 0; border: 0; border-radius: 5px; background: transparent; color: var(--app-muted); font-size: 11px; font-weight: 700; text-transform: none; text-align: left; }
@@ -84152,11 +84147,11 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     .ingredient-master-page .ingredient-col-order { width: 116px; }
     .ingredient-master-page .ingredient-col-section { width: 120px; }
     .ingredient-master-page .ingredient-col-usage { width: 76px; }
-    .ingredient-master-page .ingredient-col-action { width: 180px; }
+    .ingredient-master-page .ingredient-col-action { width: 252px; }
     .ingredient-master-page .ingredient-col-item { width: 20%; }
     .ingredient-master-page .master-data-ingredients-table :is(th,td) { padding-inline: 10px; }
 }
-@media (max-width: 1100px) {
+@media (max-width: 1279px) {
     .ingredient-master-registry { padding: 10px; }
     .ingredient-master-page .master-data-filter-form { grid-template-columns: minmax(0, 1fr); }
     .ingredient-master-page .master-data-filter-form > label, .ingredient-master-page .master-data-filter-form > button[type="submit"], .ingredient-master-page .master-data-filter-form .master-data-thumbnail-size-section { grid-column: 1; grid-row: auto; }
@@ -84169,7 +84164,7 @@ body.recipe-edit-standalone-page #recipeEditIngredients
     .ingredient-master-page .master-data-ingredients-table :is(.ingredient-aliases-cell, .ingredient-section-cell) { grid-column: 1 / -1; }
     .ingredient-master-page .ingredient-aliases-cell::before, .ingredient-master-page .ingredient-section-cell::before { display: block; margin-bottom: 4px; color: var(--app-muted); font-size: 10px; font-weight: 800; content: attr(data-label); }
     .ingredient-master-page .master-data-ingredients-table .master-data-usage-cell { grid-column: 1; justify-self: start; padding: 4px; align-self: center; }
-    .ingredient-master-page .ingredient-action-cell { grid-column: 2; }
+    .ingredient-master-page .ingredient-action-cell { grid-column: 1 / -1; }
     .ingredient-master-page :is(.ingredient-row-name, .ingredient-row-section) { font-size: 16px; }
     .ingredient-master-page .master-data-ingredients-table .master-data-section-row { display: block; }
     .ingredient-master-page .master-data-ingredients-table .master-data-section-row th { display: block; width: 100%; }

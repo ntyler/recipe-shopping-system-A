@@ -169,6 +169,7 @@ const base = process.argv[2];
         assert.equal(await page.title(), 'Ingredient');
         assert.match(page.url(), /\/admin\/master-data\/ingredients/);
         const row = page.locator(`[data-ingredient-master-row][data-master-record-id="${options.recordId}"]`);
+        if (options.viewport.width <= 760) await row.locator('[data-ingredient-mobile-toggle]').click();
         const name = row.locator('[data-ingredient-row-name]');
         const section = row.locator('[data-ingredient-row-section]');
         const sectionTrigger = row.locator('button.master-data-store-section-trigger');
@@ -194,17 +195,24 @@ const base = process.argv[2];
             assert.equal(await page.getByRole('heading', {name: /^Edit /}).count(), 0);
         };
         const scroll = () => row.evaluate(element => {
-            const positions = [{x: window.scrollX, y: window.scrollY}];
+            const positions = [{x: window.scrollX, y: window.scrollY,
+                maxY: document.documentElement.scrollHeight - document.documentElement.clientHeight}];
             for (let parent = element.parentElement; parent; parent = parent.parentElement)
-                if (/(auto|scroll)/.test(getComputedStyle(parent).overflowY)) positions.push({x: parent.scrollLeft, y: parent.scrollTop});
+                if (/(auto|scroll)/.test(getComputedStyle(parent).overflowY)) positions.push({x: parent.scrollLeft, y: parent.scrollTop,
+                    maxY: parent.scrollHeight - parent.clientHeight});
             return positions;
         });
         const unchangedScroll = async (before, label) => {
             await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
             const after = await scroll();
             assert(before.length === after.length && before.every((position, index) =>
-                Math.abs(position.x - after[index].x) <= 1 && Math.abs(position.y - after[index].y) <= 1),
+                Math.abs(position.x - after[index].x) <= 1
+                && Math.abs(Math.min(position.y, after[index].maxY) - after[index].y) <= 1),
                 `${label} preserves scroll: ${JSON.stringify(before)} -> ${JSON.stringify(after)}`);
+            // Removing a wrapped alias can shorten content at the bottom. The
+            // browser clamps scrollTop to the new maximum; keep subsequent
+            // checks anchored to that reachable position.
+            before.forEach((position, index) => { position.y = Math.min(position.y, after[index].maxY); });
         };
         const capture = async label => {
             if (options.screenshots) await page.screenshot({path: require('node:path').join(options.screenshots, `ingredient-inline-${options.viewport.width}-${label}.png`)});
@@ -660,6 +668,8 @@ const base = process.argv[2];
         // including the smaller phone and its landscape orientation.
         for (const viewport of [{width: 390, height: 844}, {width: 320, height: 568}, {width: 844, height: 390}]) {
             await page.setViewportSize(viewport);
+            const toggle = row.locator('[data-ingredient-mobile-toggle]');
+            if (await toggle.isVisible() && await toggle.getAttribute('aria-expanded') === 'false') await toggle.click();
             for (const shape of options.responsiveImages) {
                 const label = `${viewport.width}x${viewport.height}-${shape.label}`;
                 await thumbnail.click();
