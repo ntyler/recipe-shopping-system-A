@@ -83995,6 +83995,8 @@ body.recipe-edit-standalone-page #recipeEditIngredients
 .ingredient-master-page .ingredient-row-section[hidden] { display: none; }
 .ingredient-master-page .ingredient-section-summary > .master-data-store-section-trigger { display: grid; grid-template-columns: 18px minmax(0, 1fr) 14px; gap: 8px; text-align: left; }
 .ingredient-master-page .master-data-store-section-trigger:is(:hover, :focus-visible, [aria-expanded="true"]) { background: var(--app-surface-soft); }
+.ingredient-master-page .master-data-store-section-trigger .recipe-edit-store-section-chevron { opacity: 0; }
+.ingredient-master-page .master-data-store-section-trigger:hover .recipe-edit-store-section-chevron { opacity: 1; }
 /* The closed field is transparent; Edge's native option menu needs an opaque surface. */
 .ingredient-master-page .ingredient-row-section option { background: var(--app-surface); color: var(--app-text-strong); }
 .ingredient-master-page .unit-master-inline-editor .ingredient-editor-control { border: 1px solid transparent; border-radius: 6px; background: transparent; box-shadow: none; }
