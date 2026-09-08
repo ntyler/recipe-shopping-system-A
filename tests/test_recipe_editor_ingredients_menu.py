@@ -11123,7 +11123,7 @@ def test_recipe_editor_store_section_picker_shows_icons_and_preserves_select_val
     assert 'menu.id = "recipeIngredientStoreSectionMenu";' in script
     assert 'menu.setAttribute("role", "listbox");' in script
     assert 'class="recipe-edit-store-section-option${selected ? " is-selected" : ""}"' in script
-    assert "${recipeIngredientStoreSectionIconHtml(value)}" in script
+    assert "${recipeIngredientStoreSectionIconHtml(value, option.dataset.icon)}" in script
     assert 'role="option"' in script
     assert "function chooseRecipeIngredientStoreSection(button)" in script
     assert 'select.value = button.dataset.storeSectionValue || "";' in script

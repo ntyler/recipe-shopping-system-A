@@ -48198,8 +48198,8 @@ function recipeIngredientStoreSectionIconName(section) {
     return "basket";
 }
 
-function recipeIngredientStoreSectionIconHtml(section) {
-    const iconName = recipeIngredientStoreSectionIconName(section);
+function recipeIngredientStoreSectionIconHtml(section, configuredIcon = "") {
+    const iconName = configuredIcon || recipeIngredientStoreSectionIconName(section);
     const color = window.StoreSectionColorMap
         ? window.StoreSectionColorMap.get(section, iconName).color
         : "#94a3b8";
@@ -49792,6 +49792,7 @@ function syncRecipeIngredientStoreSectionTrigger(trigger, selectedValue) {
     const icon = trigger.querySelector("[data-store-section-icon]");
     const triggerLabel = trigger.querySelector("[data-store-section-trigger-label]");
     const source = trigger.recipeEditStoreSectionSelect;
+    const selectedOption = source?.selectedOptions?.[0];
     trigger.disabled = Boolean(source?.disabled);
     ["aria-invalid", "data-recipe-edit-validation-invalid"].forEach(attribute => {
         if (source?.hasAttribute(attribute)) {
@@ -49802,11 +49803,11 @@ function syncRecipeIngredientStoreSectionTrigger(trigger, selectedValue) {
     });
     if (icon) {
         const replacement = document.createElement("span");
-        replacement.innerHTML = recipeIngredientStoreSectionIconHtml(selectedValue);
+        replacement.innerHTML = recipeIngredientStoreSectionIconHtml(selectedValue, selectedOption?.dataset.icon);
         icon.replaceWith(replacement.firstElementChild);
     }
     if (triggerLabel) {
-        triggerLabel.textContent = recipeStoreSectionDisplayLabel(selectedValue);
+        triggerLabel.textContent = selectedOption?.textContent || recipeStoreSectionDisplayLabel(selectedValue);
     }
 }
 
@@ -49922,7 +49923,7 @@ function renderRecipeIngredientStoreSectionMenu(menu, select) {
                     class="recipe-edit-store-section-option${selected ? " is-selected" : ""}"
                     data-store-section-value="${escapeAttribute(value)}"
                     onclick="return chooseRecipeIngredientStoreSection(this)">
-                ${recipeIngredientStoreSectionIconHtml(value)}
+                ${recipeIngredientStoreSectionIconHtml(value, option.dataset.icon)}
                 <span class="recipe-edit-store-section-option-label">${escapeHtml(option.textContent || recipeStoreSectionDisplayLabel(value))}</span>
                 <span class="recipe-edit-store-section-option-check" aria-hidden="true">${recipeEditSvgIcon("check")}</span>
             </button>

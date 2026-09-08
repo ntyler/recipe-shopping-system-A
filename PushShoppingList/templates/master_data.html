@@ -337,7 +337,7 @@
             <span class="ingredient-section-summary">
                 <span class="recipe-edit-store-section-icon" aria-hidden="true">{{ registry_section_icon(master_data.store_section_icons.get(row.store_section, 'basket')) }}</span>
                 <select class="ingredient-row-section" data-ingredient-row-section aria-label="Store Section for {{ row.name }}" aria-describedby="ingredientSectionError-{{ row.id }}">
-                    {% for section in master_data.store_section_options %}<option value="{{ section }}" {% if section == row.store_section %}selected{% endif %}>{{ master_data.store_section_labels.get(section, section) }}</option>{% endfor %}
+                    {% for section in master_data.store_section_options %}<option value="{{ section }}" data-icon="{{ master_data.store_section_icons.get(section, 'basket') }}" {% if section == row.store_section %}selected{% endif %}>{{ master_data.store_section_labels.get(section, section) }}</option>{% endfor %}
                 </select>
             </span>
             <small id="ingredientSectionError-{{ row.id }}" class="unit-master-field-error" data-ingredient-row-section-error aria-live="polite" hidden></small>

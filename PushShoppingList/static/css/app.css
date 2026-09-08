@@ -44264,6 +44264,7 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-column-view-empty > but
 }
 
 .recipe-edit-row-menu.recipe-edit-store-section-menu {
+    background: var(--app-surface);
     min-width: 220px;
     max-width: min(320px, calc(100vw - 16px));
     max-height: min(360px, calc(100vh - 16px));
@@ -44274,6 +44275,7 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-column-view-empty > but
 }
 
 .recipe-edit-row-menu.recipe-edit-store-section-menu .recipe-edit-store-section-option {
+    color: var(--app-text-strong);
     display: grid;
     grid-template-columns: 17px minmax(0, 1fr) 16px;
     align-items: center;
@@ -83990,6 +83992,9 @@ body.recipe-edit-standalone-page #recipeEditIngredients
 .ingredient-master-page .ingredient-name-field { min-width: 0; flex: 1; }
 .ingredient-master-page :is(.ingredient-row-name, .ingredient-row-section) { box-sizing: border-box; display: block; width: 100%; min-width: 0; height: 38px; min-height: 38px; margin: 0; padding: 7px 10px; border: 1px solid transparent; border-radius: 6px; background: transparent; box-shadow: none; color: var(--app-text-strong); font: inherit; font-size: 12px; font-weight: 750; pointer-events: auto; }
 .ingredient-master-page .ingredient-row-section { appearance: none; background-image: none; cursor: pointer; text-overflow: ellipsis; }
+.ingredient-master-page .ingredient-row-section[hidden] { display: none; }
+.ingredient-master-page .ingredient-section-summary > .master-data-store-section-trigger { display: grid; grid-template-columns: 18px minmax(0, 1fr) 14px; gap: 8px; text-align: left; }
+.ingredient-master-page .master-data-store-section-trigger:is(:hover, :focus-visible, [aria-expanded="true"]) { background: var(--app-surface-soft); }
 /* The closed field is transparent; Edge's native option menu needs an opaque surface. */
 .ingredient-master-page .ingredient-row-section option { background: var(--app-surface); color: var(--app-text-strong); }
 .ingredient-master-page .unit-master-inline-editor .ingredient-editor-control { border: 1px solid transparent; border-radius: 6px; background: transparent; box-shadow: none; }

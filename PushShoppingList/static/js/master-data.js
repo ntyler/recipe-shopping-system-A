@@ -1302,6 +1302,7 @@
             handle.disabled = false; handle.draggable = !blocked; handle.setAttribute('aria-disabled', String(blocked));
             row.querySelector('[data-ingredient-order-action="up"]').disabled = blocked || Number(row.dataset.sortOrder) === 0;
             row.querySelector('[data-ingredient-order-action="down"]').disabled = blocked || Number(row.dataset.sortOrder) >= Number(row.dataset.sectionCount) - 1;
+            syncRecipeIngredientStoreSectionControl(row.querySelector('[data-ingredient-row-section]'));
         });
         if (ingredientEditingRow) renderIngredientRowAliases(ingredientEditingRow, ingredientEditorAliases);
         if (ingredientAliasAnchor) window.MasterDataAliasEditor.positionPopover(form, ingredientAliasAnchor);
@@ -1594,9 +1595,34 @@
         }
     }
 
+    function initIngredientStoreSectionPicker(row) {
+        const select = row.querySelector('[data-ingredient-row-section]');
+        if (select.dataset.storeSectionControlBound === 'true') return;
+        select.dataset.storeSectionControlBound = 'true';
+        select.dataset.storeSectionAllowCustom = 'false';
+        const wrapper = select.closest('.ingredient-section-summary');
+        wrapper.classList.add('recipe-edit-store-section-label', 'master-data-store-section-picker');
+        wrapper.querySelector('.recipe-edit-store-section-icon')?.remove();
+        const trigger = createRecipeIngredientStoreSectionTrigger(select);
+        trigger.classList.add('ingredient-row-section', 'master-data-store-section-trigger');
+        trigger.setAttribute('aria-label', select.getAttribute('aria-label'));
+        trigger.setAttribute('aria-describedby', select.getAttribute('aria-describedby'));
+        // Capture the original section before the shared menu changes the select.
+        const beginEditing = event => {
+            if (!editIngredientRow(row)) { event.preventDefault(); event.stopImmediatePropagation(); }
+        };
+        trigger.addEventListener('click', beginEditing, true);
+        trigger.addEventListener('keydown', event => {
+            if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(event.key) || recipeEditListboxTypeaheadKey(event)) beginEditing(event);
+        }, true);
+        select.hidden = true;
+        wrapper.insertBefore(trigger, select);
+    }
+
     function initIngredientRegistry() {
         const root = document.querySelector('.ingredient-master-page'); if (!root) return;
         ingredientRows().forEach(row => {
+            initIngredientStoreSectionPicker(row);
             if (row.ingredientOriginal) return;
             row.ingredientOriginal = ingredientRowValues(row);
             const menu = row.querySelector('[popover]');
@@ -1685,6 +1711,7 @@
             }
         });
         root.addEventListener('keydown', event => {
+            if (event.defaultPrevented) return;
             const row = event.target.closest('[data-ingredient-master-row]'); if (!row) return;
             if (event.key === 'Escape' && row === ingredientEditingRow) {
                 event.preventDefault(); cancelIngredientRow(row, {discard: true}); return;
