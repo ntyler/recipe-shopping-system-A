@@ -201,3 +201,139 @@ def test_invalid_alias_payload_preserves_record(registry, aliases):
     result = md.update_ingredient_master_record(before[0]['id'], 'New name', 'new name', 'DAIRY & EGGS', user_id='user-a', aliases=aliases)
     assert result['status'] == 400
     assert stored(database) == before
+
+
+def test_row_save_commits_name_alias_image_and_order_together(registry):
+    app, database = registry
+    rows = stored(database)
+    ids = [row['id'] for row in rows]
+    record = rows[-1]
+    with md.recipe_master_connection(user_id='user-a') as conn:
+        conn.execute("UPDATE ingredients SET image_url = '/old.png', image_path = 'old.png' WHERE id = ?", (record['id'],))
+    with app.test_client() as client:
+        sign_in(client, 'user-a')
+        response = client.post(f'/admin/master-data/ingredients/{record["id"]}', json={
+            'name': 'Sweet corn', 'normalized_name': 'sweet corn', 'store_section': 'PRODUCE',
+            'aliases': ['maize'], 'image': {'action': 'remove'},
+            'order': {'position': 1, 'expected_ids': ids},
+        })
+    assert response.status_code == 200
+    result = response.json['result']
+    assert result['changed'] and result['ordered_ids'] == [ids[-1], *ids[:-1]]
+    assert result['position'] == 1 and result['sort_order'] == 0
+    assert result['aliases'] == ['maize'] and result['image_url'] == ''
+    after = stored(database)
+    assert [row['name'] for row in after] == ['Sweet corn', 'Tomato', 'Carrot']
+    assert after[0]['image_url'] == after[0]['image_path'] == ''
+    assert md.list_ingredients(user_id='user-a', search='maize')[0]['id'] == record['id']
+
+
+@pytest.mark.parametrize('position, expected_names', [
+    (1, ['Sweet corn', 'Milk']),
+    (3, ['Milk', 'Sweet corn']),
+])
+def test_row_save_applies_pending_position_with_section_change(registry, position, expected_names):
+    _, database = registry
+    before = stored(database)
+    record = before[-1]
+    result = md.update_ingredient_master_record(
+        record['id'], 'Sweet corn', 'sweet corn', 'DAIRY & EGGS', user_id='user-a',
+        aliases=['maize'], image={'image_url': '/corn.png', 'image_path': 'corn.png'},
+        order={'position': position, 'expected_ids': [row['id'] for row in before]},
+    )
+    assert result['ok'] and result['changed']
+    after = stored(database, section='DAIRY & EGGS')
+    assert [row['name'] for row in after] == expected_names
+    assert [row['sort_order'] for row in after] == [0, 1]
+    assert result['position'] == min(position, 2)
+    assert result['ordered_ids'] == [row['id'] for row in after]
+    assert [row['sort_order'] for row in stored(database)] == [0, 1]
+    assert result['image_url'] == '/corn.png' and result['aliases'] == ['maize']
+
+
+@pytest.mark.parametrize('order, status', [
+    ([], 400), ({}, 400), ({'position': True, 'expected_ids': [1]}, 400),
+    ({'position': 1, 'expected_ids': []}, 400),
+    ({'position': 1, 'expected_ids': ['1']}, 400),
+    ({'position': 1, 'expected_ids': [999]}, 409),
+])
+def test_invalid_pending_order_cannot_save_other_fields(registry, order, status):
+    app, database = registry
+    before = stored(database)
+    with app.test_client() as client:
+        sign_in(client, 'user-a')
+        response = client.post(f'/admin/master-data/ingredients/{before[-1]["id"]}', json={
+            'name': 'Sweet corn', 'normalized_name': 'sweet corn', 'store_section': 'DAIRY & EGGS',
+            'aliases': ['maize'], 'order': order,
+        })
+    assert response.status_code == status
+    assert stored(database) == before
+    assert len(stored(database, section='DAIRY & EGGS')) == 1
+    assert not md.list_ingredients(user_id='user-a', search='maize')
+
+
+def test_pending_order_rejects_stale_source_and_other_workspace(registry):
+    app, database = registry
+    before = stored(database)
+    ids = [row['id'] for row in before]
+    assert md.move_ingredient_master_record(ids[-1], 1, ids, user_id='user-a')['ok']
+    after_move = stored(database)
+    payload = {
+        'name': 'Sweet corn', 'normalized_name': 'sweet corn', 'store_section': 'DAIRY & EGGS',
+        'aliases': ['maize'], 'order': {'position': 1, 'expected_ids': ids},
+    }
+    with app.test_client() as client:
+        sign_in(client, 'user-a')
+        assert client.post(f'/admin/master-data/ingredients/{ids[-1]}', json=payload).status_code == 409
+        sign_in(client, 'user-b')
+        assert client.post(f'/admin/master-data/ingredients/{ids[-1]}', json=payload).status_code == 404
+    assert stored(database) == after_move
+    assert len(stored(database, section='DAIRY & EGGS')) == 1
+    assert not md.list_ingredients(user_id='user-a', search='maize')
+
+
+def test_alias_conflict_does_not_commit_pending_order(registry):
+    _, database = registry
+    before = stored(database)
+    result = md.update_ingredient_master_record(
+        before[-1]['id'], 'Sweet corn', 'sweet corn', 'PRODUCE', user_id='user-a',
+        aliases=['Carrot'], image={'image_url': '/corn.png', 'image_path': 'corn.png'},
+        order={'position': 1, 'expected_ids': [row['id'] for row in before]},
+    )
+    assert result['status'] == 409 and result['errors']['aliases']
+    assert stored(database) == before
+
+
+@pytest.mark.parametrize('section', ['PRODUCE', 'DAIRY & EGGS'])
+def test_failed_pending_reorder_rolls_back_all_pending_fields(registry, section):
+    _, database = registry
+    before = stored(database)
+    dairy_before = stored(database, section='DAIRY & EGGS')
+    ids = [row['id'] for row in before]
+    rejected_id = ids[0] if section == 'PRODUCE' else dairy_before[0]['id']
+    with sqlite3.connect(database) as conn:
+        conn.execute(f"""CREATE TRIGGER reject_saved_order BEFORE UPDATE OF sort_order ON ingredients
+            WHEN NEW.id = {rejected_id} AND NEW.sort_order = 1
+            BEGIN SELECT RAISE(ABORT, 'injected combined save failure'); END""")
+    with pytest.raises(sqlite3.IntegrityError, match='injected combined save failure'):
+        md.update_ingredient_master_record(
+            ids[-1], 'Sweet corn', 'sweet corn', section, user_id='user-a',
+            aliases=['maize'], image={'image_url': '/corn.png', 'image_path': 'corn.png'},
+            order={'position': 1, 'expected_ids': ids},
+        )
+    assert stored(database) == before
+    assert stored(database, section='DAIRY & EGGS') == dairy_before
+    assert not md.list_ingredients(user_id='user-a', search='maize')
+
+
+def test_order_only_row_save_preserves_content_timestamps(registry):
+    _, database = registry
+    before = stored(database)
+    record = before[-1]
+    result = md.update_ingredient_master_record(
+        record['id'], record['name'], record['normalized_name'], record['store_section'], user_id='user-a',
+        order={'position': 1, 'expected_ids': [row['id'] for row in before]},
+    )
+    assert result['ok'] and result['changed']
+    assert result['updated_at'] == record['updated_at']
+    assert [row['name'] for row in stored(database)] == ['Corn', 'Tomato', 'Carrot']

@@ -1,4 +1,4 @@
-"""Real-browser regression coverage for the Ingredient image draft workflow."""
+"""Real-browser regressions for Ingredient inline editing and image drafts."""
 import base64
 from io import BytesIO
 import json
@@ -18,13 +18,36 @@ from test_ingredient_inline_editor import editor_app, tomato
 from test_recipe_master_data_routes import sign_in
 
 
-def test_ingredient_lightbox_reuses_pending_image_actions(editor_app, monkeypatch):
+def playwright_runtime():
     node = shutil.which("node")
     module = os.environ.get("AI_PANTRY_PLAYWRIGHT_MODULE", "playwright")
     if not node or subprocess.run(
         [node, "-e", "require.resolve(process.argv[1])", module], capture_output=True
     ).returncode:
         pytest.skip("Install Playwright for Node or set AI_PANTRY_PLAYWRIGHT_MODULE")
+    return node, module
+
+
+def run_browser(editor_app, scenario, options):
+    node, module = playwright_runtime()
+    server = make_server("127.0.0.1", 0, editor_app, threaded=True)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        result = subprocess.run(
+            [node, "-e", scenario, module, f"http://127.0.0.1:{server.server_port}"],
+            input=json.dumps(options), capture_output=True, text=True, encoding="utf-8", timeout=180,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        return json.loads(result.stdout)
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def test_ingredient_lightbox_reuses_pending_image_actions(editor_app, monkeypatch):
+    playwright_runtime()
 
     picture = BytesIO()
     Image.new("RGB", (800, 600), "#b95b32").save(picture, format="PNG")
@@ -59,20 +82,7 @@ def test_ingredient_lightbox_reuses_pending_image_actions(editor_app, monkeypatc
             "Keep optional browser screenshots outside the repository"
         screenshot_path.mkdir(parents=True, exist_ok=True)
         options["screenshots"] = str(screenshot_path)
-    server = make_server("127.0.0.1", 0, editor_app, threaded=True)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    try:
-        result = subprocess.run(
-            [node, "-e", _BROWSER_SCENARIO, module, f"http://127.0.0.1:{server.server_port}"],
-            input=json.dumps(options), capture_output=True, text=True, encoding="utf-8", timeout=180,
-        )
-        assert result.returncode == 0, result.stdout + result.stderr
-        result_data = json.loads(result.stdout)
-    finally:
-        server.shutdown()
-        server.server_close()
-        thread.join(timeout=5)
+    result_data = run_browser(editor_app, _BROWSER_SCENARIO, options)
     assert result_data["saveRequests"] == 1
     assert tomato()["image_url"] == result_data["savedImage"]
     assert tomato()["image_url"] != original["image_url"]
@@ -80,6 +90,318 @@ def test_ingredient_lightbox_reuses_pending_image_actions(editor_app, monkeypatc
     assert tomato()["store_section"] == original["store_section"]
     assert result_data["emptySaveRequests"] == 2
     assert md.master_record_for_name("ingredients", "user-a", "carrot")["image_url"] == ""
+
+
+@pytest.mark.parametrize("viewport", [{"width": 1280, "height": 900}, {"width": 390, "height": 844}], ids=["desktop", "phone"])
+def test_ingredient_edits_stay_in_row_and_save_together(editor_app, monkeypatch, viewport):
+    playwright_runtime()
+    md.sync_recipe_master_records(
+        "https://example.com/inline-scroll-fixture",
+        recipe_data={"ingredients": [
+            {"ingredient": f"Apple {index:02}", "store_section": "Produce"} for index in range(12)
+        ] + [
+            {"ingredient": f"Zucchini {index:02}", "store_section": "Produce"} for index in range(12)
+        ]}, user_id="user-a",
+    )
+    picture = BytesIO()
+    Image.new("RGB", (800, 600), "#b95b32").save(picture, format="PNG")
+    image_bytes = picture.getvalue()
+    monkeypatch.setattr(images, "request_master_ingredient_image_bytes", lambda *_: image_bytes)
+    record = tomato()
+    moved = md.move_ingredient_master_record(
+        record["id"], 14,
+        [item["id"] for item in sorted(md.list_ingredients(user_id="user-a"), key=lambda item: item["sort_order"])
+         if item["store_section"] == "PRODUCE"],
+        user_id="user-a",
+    )
+    assert moved["ok"]
+    with editor_app.test_client() as client:
+        sign_in(client, "user-a")
+        cookie = client.get_cookie(editor_app.config["SESSION_COOKIE_NAME"])
+        options = {
+            "cookie": {"name": cookie.key, "value": cookie.value, "domain": "127.0.0.1", "path": "/"},
+            "recordId": record["id"], "viewport": viewport,
+            "image": base64.b64encode(image_bytes).decode("ascii"),
+            "imageFolder": str(images.STEP_IMAGE_FOLDER),
+        }
+    if screenshot_folder := os.environ.get("AI_PANTRY_LIGHTBOX_SCREENSHOTS"):
+        screenshot_path = Path(screenshot_folder).resolve()
+        repository_path = Path(__file__).resolve().parents[1]
+        assert screenshot_path != repository_path and repository_path not in screenshot_path.parents
+        screenshot_path.mkdir(parents=True, exist_ok=True)
+        options["screenshots"] = str(screenshot_path)
+    result = run_browser(editor_app, _INLINE_BROWSER_SCENARIO, options)
+    with editor_app.test_client() as client:
+        sign_in(client, "user-a")
+        saved = client.get(f'/api/master-data/ingredients/{record["id"]}/editor').json["record"]
+    assert saved["name"] == "Roma tomato"
+    assert saved["store_section"] == "DAIRY & EGGS"
+    assert set(saved["aliases"]) >= {"salad tomato", "plum tomato"}
+    assert saved["image_url"] == result["savedImage"] != record["image_url"]
+    assert result["saveRequests"] == 1
+
+
+_INLINE_BROWSER_SCENARIO = r"""
+const {chromium} = require(process.argv[1]);
+const assert = require('node:assert/strict');
+const options = JSON.parse(require('node:fs').readFileSync(0, 'utf8'));
+const base = process.argv[2];
+(async () => {
+    const browser = await chromium.launch({channel: process.env.AI_PANTRY_BROWSER_CHANNEL || 'chrome', headless: true});
+    try {
+        const context = await browser.newContext({viewport: options.viewport});
+        await context.addCookies([options.cookie]);
+        const page = await context.newPage();
+        page.setDefaultTimeout(10000);
+        const errors = [], saves = [], orderWrites = [];
+        page.on('pageerror', error => errors.push(error.message));
+        page.on('console', message => { if (['warning', 'error'].includes(message.type())) errors.push(message.text()); });
+        page.on('request', request => {
+            if (request.method() === 'POST' && new URL(request.url()).pathname === `/admin/master-data/ingredients/${options.recordId}`)
+                saves.push(request.postDataJSON());
+            if (request.method() === 'PATCH' && new URL(request.url()).pathname.includes('/order')) orderWrites.push(request.url());
+        });
+        await page.route('**/static/generated/tomato.png', route => route.fulfill({contentType: 'image/png', body: Buffer.from(options.image, 'base64')}));
+        await page.route('**/static/generated/recipe_steps/master_ingredient_*.png', route => route.fulfill({
+            contentType: 'image/png', path: require('node:path').join(options.imageFolder, require('node:path').basename(new URL(route.request().url()).pathname)),
+        }));
+        await page.goto(`${base}/admin/master-data/ingredients?sort=manual_order`);
+        assert.equal(await page.title(), 'Ingredient');
+        assert.match(page.url(), /\/admin\/master-data\/ingredients/);
+        const row = page.locator(`[data-ingredient-master-row][data-master-record-id="${options.recordId}"]`);
+        const name = row.locator('[data-ingredient-row-name]');
+        const section = row.locator('[data-ingredient-row-section]');
+        const sectionTrigger = row.locator('button.master-data-store-section-trigger');
+        const save = row.locator('[data-ingredient-row-save]');
+        const cancel = row.locator('[data-ingredient-row-cancel]');
+        const aliasTrigger = row.locator('[data-ingredient-row-alias]');
+        const aliases = page.locator('#ingredientAliasManager');
+        const aliasInput = aliases.getByRole('textbox', {name: 'New accepted alias'});
+        const more = row.getByRole('button', {name: /More actions/});
+        const menu = row.locator('[popover]');
+        const lightbox = page.locator('#recipeImageLightbox');
+        const imageClose = lightbox.getByRole('button', {name: 'Close', exact: true});
+        const focused = locator => locator.evaluate(element => document.activeElement === element);
+        const persisted = () => page.request.get(`${base}/api/master-data/ingredients/${options.recordId}/editor`).then(response => response.json()).then(data => data.record);
+        const waitEnabled = async locator => {
+            const deadline = Date.now() + 10000;
+            while (await locator.isDisabled()) {
+                assert(Date.now() < deadline, 'Row action did not become enabled');
+                await new Promise(resolve => setTimeout(resolve, 10));
+            }
+        };
+        const noExpansion = async () => {
+            assert.equal(await page.locator('[data-ingredient-editor-form], .ingredient-editor-row').count(), 0);
+            assert.equal(await page.getByRole('heading', {name: /^Edit /}).count(), 0);
+        };
+        const scroll = () => row.evaluate(element => {
+            const positions = [{x: window.scrollX, y: window.scrollY}];
+            for (let parent = element.parentElement; parent; parent = parent.parentElement)
+                if (/(auto|scroll)/.test(getComputedStyle(parent).overflowY)) positions.push({x: parent.scrollLeft, y: parent.scrollTop});
+            return positions;
+        });
+        const unchangedScroll = async (before, label) => {
+            await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+            const after = await scroll();
+            assert(before.length === after.length && before.every((position, index) =>
+                Math.abs(position.x - after[index].x) <= 1 && Math.abs(position.y - after[index].y) <= 1),
+                `${label} preserves scroll: ${JSON.stringify(before)} -> ${JSON.stringify(after)}`);
+        };
+        const capture = async label => {
+            if (options.screenshots) await page.screenshot({path: require('node:path').join(options.screenshots, `ingredient-inline-${options.viewport.width}-${label}.png`)});
+        };
+        await row.evaluate(element => element.scrollIntoView({block: 'center'}));
+        const initialScroll = await scroll();
+        assert(initialScroll.some(position => position.y > 0), 'Regression exercises an already scrolled table');
+        assert(await cancel.isHidden());
+        assert(await save.isDisabled());
+        await noExpansion();
+        await capture('initial');
+
+        // Row clicks and More only expose compact secondary details.
+        await row.locator('[data-ingredient-order-number]').click();
+        await noExpansion();
+        await more.click();
+        assert.match(await menu.innerText(), /User-created/);
+        assert.match(await menu.innerText(), /Canonical name: tomato/);
+        assert.match(await menu.innerText(), /Last Updated/);
+        assert.match(await menu.innerText(), /Name 1/);
+        assert(await menu.locator('time').getAttribute('datetime'));
+        assert(await cancel.isHidden(), 'More does not activate editing');
+        await noExpansion();
+        await more.press('Escape');
+        await unchangedScroll(initialScroll, 'More and metadata');
+
+        // Activating the name alone exposes Cancel; Escape cancels clean edits.
+        await name.click();
+        assert(await focused(name));
+        assert(await cancel.isVisible());
+        assert(await save.isDisabled());
+        await name.press('Escape');
+        assert(await cancel.isHidden());
+        await unchangedScroll(initialScroll, 'Name activation and Escape');
+        await name.fill('Unwanted tomato');
+        await waitEnabled(save);
+        await cancel.click();
+        assert.equal(await name.inputValue(), 'Tomato');
+        assert(await cancel.isHidden());
+        assert(await save.isDisabled());
+        await unchangedScroll(initialScroll, 'Name Cancel');
+
+        // Keyboard ordering stays pending and Cancel restores the former order.
+        const orderHandle = row.locator('[data-ingredient-order-handle]');
+        const orderNumber = row.locator('[data-ingredient-order-number]');
+        const originalOrder = Number(await orderNumber.innerText());
+        const originalRecord = await persisted();
+        await orderHandle.press('ArrowDown');
+        await waitEnabled(save);
+        assert.equal(Number(await orderNumber.innerText()), originalOrder + 1);
+        assert.equal((await persisted()).sort_order, originalRecord.sort_order);
+        assert.equal(orderWrites.length, 0, 'Ordering creates a draft instead of a separate write');
+        await cancel.click();
+        assert.equal(Number(await orderNumber.innerText()), originalOrder);
+        assert(await save.isDisabled());
+        assert(await cancel.isHidden());
+        await unchangedScroll(initialScroll, 'Order Cancel');
+
+        // One row draft combines the inline fields, aliases and lightbox image.
+        await name.fill('Roma tomato');
+        await waitEnabled(save);
+        await orderHandle.press('ArrowDown');
+        const draftScroll = await scroll();
+        await sectionTrigger.click();
+        const dairy = page.locator('.recipe-edit-store-section-menu [role="option"][data-store-section-value="DAIRY & EGGS"]');
+        await dairy.click();
+        assert.equal(await section.inputValue(), 'DAIRY & EGGS');
+        await noExpansion();
+        await aliasTrigger.click();
+        await aliases.waitFor({state: 'visible'});
+        await aliasInput.fill('temporary tomato');
+        await aliasInput.press('Enter');
+        await aliases.getByRole('button', {name: 'Remove alias temporary tomato', exact: true}).click();
+        await aliasInput.fill('salad tomato');
+        await aliasInput.press(',');
+        await aliasInput.fill('plum tomato');
+        await capture('aliases');
+        await aliasInput.press('Escape');
+        assert(await aliases.isHidden());
+        assert(await focused(aliasTrigger), 'Escape closes aliases and restores + focus');
+        await unchangedScroll(draftScroll, 'Inline fields and aliases');
+        await noExpansion();
+        if (options.viewport.width >= 1000) {
+            const previousId = await row.evaluate(element => element.previousElementSibling.dataset.masterRecordId);
+            const otherName = page.locator(`[data-ingredient-master-row][data-master-record-id="${previousId}"] [data-ingredient-row-name]`);
+            const otherOriginalName = await otherName.inputValue();
+            page.once('dialog', dialog => dialog.dismiss());
+            await otherName.click();
+            assert(await focused(name), 'Declining a row switch restores the active name input');
+            assert.equal(await otherName.inputValue(), otherOriginalName);
+            assert.equal(await name.inputValue(), 'Roma tomato');
+            assert(await cancel.isVisible());
+            await unchangedScroll(draftScroll, 'Declined switch to another row');
+        }
+        await more.click();
+        assert(await menu.locator('[data-master-merge-open]').isDisabled(), 'Merge cannot discard the current draft');
+        await more.press('Escape');
+        assert(await menu.isHidden());
+        assert.equal(await name.inputValue(), 'Roma tomato', 'Escape on More preserves the pending name');
+        assert.equal(await section.inputValue(), 'DAIRY & EGGS');
+        assert(await cancel.isVisible());
+        assert(await save.isEnabled());
+        await more.click();
+        await menu.locator('[data-ingredient-row-image]').click();
+        await lightbox.waitFor({state: 'visible'});
+        const generate = lightbox.getByRole('button', {name: 'Generate Image', exact: true});
+        await waitEnabled(generate);
+        await generate.click();
+        await waitEnabled(save);
+        const savedImage = await lightbox.locator('#recipeImageLightboxImage').getAttribute('src');
+        await imageClose.press('Escape');
+        assert(await lightbox.isHidden());
+        await unchangedScroll(draftScroll, 'Image management');
+        const before = await persisted();
+        assert.equal(before.name, 'Tomato');
+        assert.equal(before.store_section, 'PRODUCE');
+        assert.notEqual(before.image_url, savedImage);
+        assert(!before.aliases.includes('salad tomato'));
+        assert.equal(saves.length, 0, 'No field or image action saves implicitly');
+        await capture('pending');
+        await save.click();
+        await page.waitForFunction(id => {
+            const row = document.querySelector(`[data-ingredient-master-row][data-master-record-id="${id}"]`);
+            return row?.dataset.recordName === 'Roma tomato' && !row.classList.contains('is-saving')
+                && row.querySelector('[data-ingredient-row-save]').disabled && row.querySelector('[data-ingredient-row-cancel]').hidden;
+        }, options.recordId);
+        await unchangedScroll(draftScroll, 'Joint Save');
+        assert(await cancel.isHidden());
+        assert.equal(saves.length, 1);
+        assert.equal(saves[0].name, 'Roma tomato');
+        assert.equal(saves[0].store_section, 'DAIRY & EGGS');
+        assert.deepEqual(saves[0].aliases.sort(), ['plum tomato', 'salad tomato']);
+        assert.equal(saves[0].image.action, 'replace');
+        assert.equal(saves[0].order.position, originalOrder + 1);
+        assert(saves[0].order.expected_ids.includes(options.recordId));
+        assert.equal(orderWrites.length, 0);
+        await noExpansion();
+
+        // Section keyboard controls, aliases and image removal all roll back.
+        await row.evaluate(element => element.scrollIntoView({block: 'center'}));
+        const savedScroll = await scroll();
+        await capture('saved-before-keyboard');
+        await sectionTrigger.focus();
+        await unchangedScroll(savedScroll, 'Focusing section for keyboard editing');
+        await sectionTrigger.press('Enter');
+        await capture('section-keyboard');
+        await unchangedScroll(savedScroll, 'Opening section with keyboard');
+        await page.locator('.recipe-edit-store-section-menu [role="option"][data-store-section-value="PRODUCE"]').press('Enter');
+        assert.equal(await section.inputValue(), 'PRODUCE');
+        await unchangedScroll(savedScroll, 'Section keyboard editing');
+        await aliasTrigger.click();
+        await aliases.getByRole('button', {name: 'Remove alias salad tomato', exact: true}).click();
+        await aliasInput.press('Escape');
+        await unchangedScroll(savedScroll, 'Alias removal');
+        await row.locator('.master-data-thumbnail').press('Enter');
+        await lightbox.waitFor({state: 'visible'});
+        page.once('dialog', dialog => dialog.accept());
+        await lightbox.getByRole('button', {name: 'Remove Image', exact: true}).click();
+        await imageClose.click();
+        await unchangedScroll(savedScroll, 'Pending image removal');
+        await cancel.click();
+        assert.equal(await section.inputValue(), 'DAIRY & EGGS');
+        assert(await row.locator('[data-ingredient-alias="salad tomato"]').isVisible());
+        assert.equal(await row.locator('.master-data-thumbnail').getAttribute('src'), savedImage);
+        assert(await save.isDisabled());
+        assert(await cancel.isHidden());
+        await unchangedScroll(savedScroll, 'Cancel fields, aliases and image together');
+
+        // Recipe usage and Merge Duplicate remain available from compact UI.
+        await row.locator('[data-master-usage-button]').click();
+        const usage = page.locator('#masterDataUsageDialog');
+        await usage.waitFor({state: 'visible'});
+        await usage.locator('[data-master-usage-results] .master-data-reference-item').first().waitFor({state: 'visible'});
+        assert.match(await usage.innerText(), /Ingredient Name/);
+        await usage.getByRole('button', {name: 'Close', exact: true}).click();
+        await unchangedScroll(savedScroll, 'Recipe usage');
+        await more.click();
+        await menu.locator('[data-master-merge-open]').click();
+        const merge = page.locator('#masterDataIngredientMergeDialog');
+        await merge.waitFor({state: 'visible'});
+        await merge.locator('[data-master-merge-search]').fill('Carrot');
+        await merge.getByRole('option').filter({hasText: 'Carrot'}).click();
+        assert(await merge.locator('[data-master-merge-submit]').isEnabled());
+        assert.match(await merge.locator('[data-master-merge-target-name]').innerText(), /Carrot/);
+        await merge.getByRole('button', {name: 'Cancel', exact: true}).click();
+        assert(await focused(more), 'Merge returns focus to More');
+        await unchangedScroll(savedScroll, 'Merge Duplicate dialog');
+        await noExpansion();
+        await capture('saved');
+        assert.deepEqual(errors, []);
+        console.log(JSON.stringify({saveRequests: saves.length, savedImage}));
+    } finally {
+        await browser.close();
+    }
+})().catch(error => {console.error(error); process.exitCode = 1;});
+"""
 
 
 _BROWSER_SCENARIO = r"""
@@ -135,9 +457,12 @@ const base = process.argv[2];
             }
         };
         const cancel = async (targetRow = row, targetSave = save) => {
-            await targetRow.getByRole('button', {name: /More actions/}).click();
-            await targetRow.locator('[data-ingredient-row-cancel]').click();
+            const action = targetRow.locator('[data-ingredient-row-cancel]');
+            assert(await action.isVisible(), 'Active edits expose Cancel beside Save');
+            assert.equal(await action.evaluate(element => element.closest('[popover]')), null);
+            await action.click();
             assert(await targetSave.isDisabled());
+            assert(await action.isHidden());
         };
         const capture = async name => {
             if (options.screenshots) await page.screenshot({path: require('node:path').join(options.screenshots, `${name}.png`)});
@@ -204,7 +529,7 @@ const base = process.argv[2];
         await waitEnabled(generate);
         assert(await focused(close));
         assert.equal(await preview.getAttribute('src'), originalImage);
-        assert(await page.locator('[data-ingredient-editor-form]').isHidden());
+        assert.equal(await page.locator('[data-ingredient-editor-form]').count(), 0);
         assert(await save.isDisabled());
         await capture('ingredient-lightbox-desktop');
         await close.press('Shift+Tab');

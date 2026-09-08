@@ -1172,11 +1172,25 @@ def migrate_ingredient_order(connection):
     return changed
 
 
-def move_ingredient_master_record(ingredient_id, position, expected_ids, user_id=None, allow_other_users=False):
+def _ingredient_order_request_error(position, expected_ids):
     if isinstance(position, bool) or not isinstance(position, int) or position < 1:
         return {"ok": False, "status": 400, "error": "A positive ingredient position is required."}
     if not isinstance(expected_ids, list) or not expected_ids or any(type(value) is not int for value in expected_ids):
         return {"ok": False, "status": 400, "error": "The complete section order is required."}
+    return None
+
+
+def _ingredient_section_order(connection, user_id, store_section):
+    return [row["id"] for row in connection.execute(
+        "SELECT id FROM ingredients WHERE user_id = ? AND store_section = ? ORDER BY sort_order, id",
+        (user_id, store_section),
+    )]
+
+
+def move_ingredient_master_record(ingredient_id, position, expected_ids, user_id=None, allow_other_users=False):
+    error = _ingredient_order_request_error(position, expected_ids)
+    if error:
+        return error
     owner = scoped_recipe_user_id(user_id)
     with existing_recipe_master_connection(user_id=owner) as connection:
         if connection is None:
@@ -1184,9 +1198,7 @@ def move_ingredient_master_record(ingredient_id, position, expected_ids, user_id
         row = connection.execute("SELECT * FROM ingredients WHERE id = ?", (ingredient_id,)).fetchone()
         if not row or (not allow_other_users and row["user_id"] != owner):
             return {"ok": False, "status": 404, "error": "Ingredient record was not found."}
-        rows = connection.execute("SELECT id FROM ingredients WHERE user_id = ? AND store_section = ? ORDER BY sort_order, id",
-                                  (row["user_id"], row["store_section"])).fetchall()
-        ordered = [item["id"] for item in rows]
+        ordered = _ingredient_section_order(connection, row["user_id"], row["store_section"])
         if expected_ids != ordered:
             return {"ok": False, "status": 409, "error": "This section changed. Refresh before reordering; your edits have been kept."}
         if position > len(ordered):
@@ -6319,6 +6331,7 @@ def update_ingredient_master_record(
     allow_other_users=False,
     aliases=None,
     image=None,
+    order=None,
 ):
     try:
         ingredient_id = int(ingredient_id or 0)
@@ -6340,6 +6353,12 @@ def update_ingredient_master_record(
         or any(not isinstance(alias, str) or not clean_text(alias) or len(clean_text(alias)) > 160 for alias in aliases)
     ):
         return {"ok": False, "status": 400, "error": "Aliases must be a list of up to 100 names, each at most 160 characters."}
+    if order is not None:
+        if not isinstance(order, dict):
+            return {"ok": False, "status": 400, "error": "Ingredient order must include a position and the complete section order."}
+        order_error = _ingredient_order_request_error(order.get("position"), order.get("expected_ids"))
+        if order_error:
+            return order_error
 
     with existing_recipe_master_connection(user_id=scoped_user_id) as connection:
         if connection is None:
@@ -6367,6 +6386,24 @@ def update_ingredient_master_record(
             user_id=row["user_id"],
             connection=connection,
         )
+        ordered_ids = None
+        order_changed = False
+        if order is not None:
+            original_order = _ingredient_section_order(connection, row["user_id"], row["store_section"])
+            if order["expected_ids"] != original_order:
+                return {"ok": False, "status": 409, "error": "This section changed. Refresh before reordering; your edits have been kept."}
+            if section == row["store_section"]:
+                if order["position"] > len(original_order):
+                    return {"ok": False, "status": 400, "error": "The position is outside this Store Section."}
+                ordered_ids = original_order.copy()
+                ordered_ids.remove(row["id"])
+            else:
+                # The expected IDs describe the source section at edit time.
+                # A simultaneous section change places the ingredient at the
+                # requested destination position, or at its end if shorter.
+                ordered_ids = _ingredient_section_order(connection, row["user_id"], section)
+            ordered_ids.insert(min(order["position"] - 1, len(ordered_ids)), row["id"])
+            order_changed = ordered_ids != original_order
 
         duplicate = connection.execute(
             """
@@ -6499,11 +6536,13 @@ def update_ingredient_master_record(
         if image_changed:
             connection.execute("UPDATE ingredients SET image_url = ?, image_path = ? WHERE id = ? AND user_id = ?",
                                (image_values["image_url"], image_values["image_path"], row["id"], row["user_id"]))
+        if order_changed:
+            connection.executemany("UPDATE ingredients SET sort_order = ? WHERE id = ?", enumerate(ordered_ids))
         saved = connection.execute("SELECT sort_order, updated_at FROM ingredients WHERE id = ?", (row["id"],)).fetchone()
 
         return {
             "ok": True,
-            "changed": changed,
+            "changed": changed or order_changed,
             "ingredient_id": int(row["id"]),
             "user_id": row["user_id"],
             "name": name,
@@ -6514,6 +6553,7 @@ def update_ingredient_master_record(
             "sort_order": saved["sort_order"],
             "updated_at": saved["updated_at"],
             "image_url": image_values["image_url"],
+            **({"ordered_ids": ordered_ids, "position": saved["sort_order"] + 1} if order is not None else {}),
         }
 
 

@@ -32,13 +32,21 @@ def test_ingredient_page_name_and_controls_preserve_existing_endpoints(monkeypat
     assert form.select_one('input[name="name"]')['value'] == 'Tomato'
     assert form.select_one('input[name="normalized_name"]')
     assert form.select_one('input[name="store_section"]')
-    assert soup.select_one('[data-ingredient-editor-section]')
+    assert table.select_one('[data-ingredient-row-section]')
     assert not table.select('[data-master-mobile-record-toggle]')
     assert soup.select_one('[data-ingredient-row-save]').has_attr('disabled')
-    assert soup.select_one('[data-ingredient-editor-form]').has_attr('hidden')
-    assert soup.select_one('[data-ingredient-editor-cancel]')
+    assert not soup.select('[data-ingredient-editor-form], [data-ingredient-editor-row]')
+    assert not soup.select('#ingredientMasterInlineEditor, [data-ingredient-editor-home]')
+    assert soup.select_one('#ingredientAliasManager').has_attr('hidden')
+    assert table.select_one('.ingredient-action-cell [data-ingredient-row-cancel]').has_attr('hidden')
     assert soup.select_one('.ingredient-section-summary svg')
-    assert table.select_one('time[datetime]')
+    more = table.select_one('.ingredient-row-more[popover]')
+    assert more.select_one('time[datetime]')
+    assert 'Last Updated' in more.get_text(' ', strip=True)
+    assert more.select_one('[data-master-merge-open]')['aria-controls'] == 'masterDataIngredientMergeDialog'
+    assert more.select_one('[data-ingredient-row-image]')['aria-controls'] == 'recipeImageLightbox'
+    assert not more.select('[data-ingredient-row-cancel], [data-ingredient-row-save]')
+    assert table.select_one('[data-master-usage-button="ingredients"]')['aria-controls'] == 'masterDataUsageDialog'
     assert 'Ingredient Master Data' not in response.get_data(as_text=True)
 
 

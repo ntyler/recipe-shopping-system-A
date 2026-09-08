@@ -3064,6 +3064,7 @@ def update_ingredient_master_record_route(ingredient_id):
         allow_other_users=allow_other_users,
         aliases=payload.get("aliases") if request.is_json else None,
         image=image,
+        order=payload.get("order") if request.is_json else None,
     )
     if result.get("ok"):
         if result.get("changed"):

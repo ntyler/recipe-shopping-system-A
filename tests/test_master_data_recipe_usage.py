@@ -9,7 +9,7 @@ from test_recipe_master_data_routes import configure_master_data_app, seed_maste
 from PushShoppingList.services import recipe_master_data_service as md
 
 
-def test_both_pages_use_one_shared_usage_modal_and_ingredient_editor_stays_separate(monkeypatch, tmp_path):
+def test_both_pages_use_one_shared_usage_modal_and_alias_manager_stays_separate(monkeypatch, tmp_path):
     app, _, _ = configure_master_data_app(monkeypatch, tmp_path)
     seed_master_records()
     with app.test_client() as client:
@@ -29,9 +29,11 @@ def test_both_pages_use_one_shared_usage_modal_and_ingredient_editor_stays_separ
             assert trigger['aria-haspopup'] == 'dialog' and trigger['aria-controls'] == dialog['id']
             assert trigger['data-master-usage-button'] == kind
             if kind == 'ingredients':
-                editor = soup.select_one('[data-ingredient-editor-form]')
-                assert editor.has_attr('hidden') and editor['id'] != dialog['id']
-                assert soup.select_one('[data-ingredient-row-alias]')['aria-controls'] == editor['id']
+                manager = soup.select_one('#ingredientAliasManager')
+                assert manager.has_attr('hidden') and manager['id'] != dialog['id']
+                assert manager['role'] == 'dialog'
+                assert soup.select_one('[data-ingredient-row-alias]')['aria-controls'] == manager['id']
+                assert not soup.select('[data-ingredient-editor-form], [data-ingredient-editor-row]')
 
 
 @pytest.mark.parametrize('kind', ['ingredients', 'equipment'])

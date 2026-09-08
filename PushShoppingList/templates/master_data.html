@@ -328,10 +328,10 @@
         <td class="ingredient-aliases-cell" data-label="Aliases">
             <div class="unit-master-aliases ingredient-aliases" data-ingredient-aliases role="group" aria-label="Aliases for {{ row.name }}">
                 <span class="unit-master-alias-chip-list" data-ingredient-alias-list>
-                {% for alias in row.aliases %}<code data-ingredient-alias="{{ alias }}">{{ alias }}</code>{% endfor %}
+                {% for alias in row.aliases %}<code data-ingredient-alias="{{ alias }}" title="{{ alias }}">{{ alias }}</code>{% endfor %}
                 <span class="unit-master-no-aliases" data-ingredient-alias-empty {% if row.aliases %}hidden{% endif %}>No aliases</span>
                 </span>
-                <span class="unit-master-alias-actions"><button type="button" data-ingredient-row-alias="add" aria-label="Manage aliases" title="Manage aliases" aria-haspopup="dialog" aria-expanded="false" aria-controls="ingredientMasterInlineEditor">+</button></span>
+                <span class="unit-master-alias-actions"><button type="button" data-ingredient-row-alias="add" aria-label="Manage aliases" title="Manage aliases" aria-haspopup="dialog" aria-expanded="false" aria-controls="ingredientAliasManager">+</button></span>
             </div>
         </td>
         <td class="ingredient-section-cell" data-label="Store Section">
@@ -354,6 +354,7 @@
         </td>
         <td class="ingredient-action-cell" data-label="Save">
             <button type="button" class="unit-master-edit-button" data-ingredient-row-save disabled>Save</button>
+            <button type="button" class="unit-master-edit-button ingredient-row-cancel" data-ingredient-row-cancel hidden>Cancel</button>
             <span id="ingredientRowStatus-{{ row.id }}" class="ingredient-row-status" data-ingredient-row-status role="status" aria-live="polite"></span>
             <button type="button" class="unit-master-edit-button" data-ingredient-row-retry hidden>Retry validation</button>
         </td>
@@ -361,10 +362,10 @@
             <button type="button" class="ingredient-row-more-button" popovertarget="ingredientMore-{{ row.id }}" aria-label="More actions and details for {{ row.name }}">&hellip;</button>
             <div class="ingredient-row-more" id="ingredientMore-{{ row.id }}" popover>
                 <strong>{{ row.name }}</strong>
-                <button type="button" class="secondary" data-ingredient-row-cancel hidden>Cancel changes</button>
+                <span>{{ 'User-created' if row.user_id else 'Workspace ingredient' }} &middot; Canonical name: {{ row.normalized_name }}</span>
                 <span>Last Updated <time datetime="{{ row.updated_at }}" title="{{ row.updated_at }}">{{ row.updated_at_label }}</time></span>
                 <span>Name {{ row.ingredient_name_usage_count }} &middot; Buy As {{ row.buy_as_usage_count }}</span>
-                <button type="button" class="secondary" data-ingredient-row-image aria-haspopup="dialog" aria-controls="ingredientMasterInlineEditor">Manage image</button>
+                <button type="button" class="secondary" data-ingredient-row-image aria-haspopup="dialog" aria-controls="recipeImageLightbox">Manage image</button>
                 {% if master_data.scope == 'all' %}<span>{{ row.user_identity.display_name }} &middot; {{ row.user_identity.short_id }}</span>{% endif %}
                 <button type="button" class="master-data-merge-open" data-master-merge-open data-source-id="{{ row.id }}"
                         data-source-name="{{ row.name }}" data-source-normalized-name="{{ row.normalized_name }}" data-source-usage-count="{{ row.usage_count }}"
@@ -1387,7 +1388,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
             {% else %}Drag the handle or use Arrow Up/Down, Home or End. Ordering saves immediately. Load a complete Store Section to enable movement; increase Limit or filter by section if needed.{% endif %}
         </p>
         <p class="ingredient-registry-status sr-only" data-ingredient-registry-status role="status" aria-live="polite"></p>
-        {% include "partials/ingredient_inline_editor.html" %}
+        {% include "partials/ingredient_alias_manager.html" %}
         <div data-master-record-results>
             {% if master_data.rows %}
                 <div class="master-data-table-wrap unit-master-category master-data-registry-category">

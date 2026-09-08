@@ -37,32 +37,42 @@ def save_payload(record, **changes):
             'store_section': record['store_section'], **changes}
 
 
-def test_editor_uses_shared_alias_component_and_real_scoped_context(editor_app):
+def test_inline_row_uses_compact_alias_manager_and_real_scoped_context(editor_app):
     record = tomato()
     with editor_app.test_client() as client:
         sign_in(client, 'user-a')
         html = client.get('/admin/master-data/ingredients?search=Tomato').data
         soup = BeautifulSoup(html, 'html.parser')
-        assert len(soup.select('[data-ingredient-editor-form]')) == 1
-        form = soup.select_one('[data-ingredient-editor-form]')
-        assert form.has_attr('hidden') and form['aria-labelledby'] == 'ingredientEditorTitle'
-        assert form.select_one('[data-ingredient-editor-save]').has_attr('disabled')
-        assert form.select_one('.unit-master-alias-editor [data-ingredient-editor-alias-input]')['maxlength'] == '160'
-        assert form.select_one('[data-ingredient-editor-feedback]')['role'] == 'status'
-        assert form.select_one('[data-ingredient-editor-image-replace]')
-        assert form.select_one('[data-ingredient-editor-image-generate]')
-        assert form.select_one('[data-ingredient-editor-image-remove]')
-        assert not form.select('[data-unit-master-ai-suggest]')
+        assert not soup.select('[data-ingredient-editor-form], [data-ingredient-editor-row]')
+        assert not soup.select('[data-ingredient-editor-name], [data-ingredient-editor-section]')
+        assert len(soup.select('#ingredientAliasManager')) == 1
+        manager = soup.select_one('#ingredientAliasManager')
+        assert manager.has_attr('hidden') and manager['role'] == 'dialog'
+        assert soup.find(id=manager['aria-labelledby']).get_text(strip=True)
+        assert manager.select_one('.unit-master-alias-editor [data-ingredient-editor-alias-input]')['maxlength'] == '160'
+        assert manager.select_one('[data-ingredient-editor-alias-add]')['type'] == 'button'
+        assert manager.select_one('[data-ingredient-editor-alias-chips]')['role'] == 'group'
+        assert manager.select_one('[data-ingredient-editor-alias-error]')['aria-live'] == 'polite'
+        assert manager.select_one('[data-ingredient-editor-close-aliases]')
+        assert not manager.select('input:not([data-ingredient-editor-alias-input]), select, img')
+        assert not manager.select('[data-ingredient-editor-save], [data-ingredient-editor-cancel], [data-unit-master-ai-suggest]')
         row = soup.select_one('[data-ingredient-master-row]')
-        assert row.select_one('[data-ingredient-row-alias]')['aria-controls'] == form['id']
+        alias_trigger = row.select_one('[data-ingredient-row-alias]')
+        assert alias_trigger['aria-controls'] == manager['id']
+        assert alias_trigger['aria-haspopup'] == 'dialog' and alias_trigger['aria-expanded'] == 'false'
         assert not row.select('[data-ingredient-row-edit]')
         name = row.select_one('[data-ingredient-row-name]')
         assert name['type'] == 'text' and not name.has_attr('disabled') and not name.has_attr('readonly')
         assert not row.select_one('[data-ingredient-row-section]').has_attr('disabled')
         assert row.select_one('[data-ingredient-row-save]').has_attr('disabled')
+        cancel = row.select_one('.ingredient-action-cell [data-ingredient-row-cancel]')
+        assert cancel.has_attr('hidden') and cancel['type'] == 'button'
+        assert cancel.get_text(strip=True) == 'Cancel'
+        assert not row.select('.ingredient-row-more [data-ingredient-row-cancel]')
+        assert row.select_one('[data-ingredient-row-status]')['role'] == 'status'
         assert not row.select('input[type="number"]')
         assert len(row.select(':scope > td')) == 7
-        assert row.select_one('[data-master-merge-open]')
+        assert row.select_one('.ingredient-row-more [data-master-merge-open]')
         context = client.get(f'/api/master-data/ingredients/{record["id"]}/editor').json
         assert context['record']['name'] == record['name']
         assert context['record']['source_label'] == 'User-created'
@@ -113,6 +123,28 @@ def test_image_and_section_changes_roll_back_on_alias_conflict(editor_app):
         ))
         assert response.status_code == 409 and response.json['result']['errors']['aliases']
         assert tomato() == record
+
+
+def test_one_row_save_persists_name_section_aliases_and_image_together(editor_app):
+    record = tomato()
+    with editor_app.test_client() as client:
+        sign_in(client, 'user-a')
+        preview = client.post(
+            f'/api/master-data/ingredients/{record["id"]}/image-preview',
+            data={'image': (image_file(), 'replacement.png')},
+        ).json
+        assert tomato() == record
+        response = client.post(f'/admin/master-data/ingredients/{record["id"]}', json=save_payload(
+            record, name='Roma tomato', normalized_name='roma tomato', store_section='DAIRY & EGGS',
+            aliases=['plum tomato'], image={'action': 'replace', 'token': preview['token']},
+        ))
+        assert response.status_code == 200 and response.json['result']['changed']
+        context = client.get(f'/api/master-data/ingredients/{record["id"]}/editor').json['record']
+    assert context['name'] == 'Roma tomato'
+    assert context['normalized_name'] == 'roma tomato'
+    assert context['store_section'] == 'DAIRY & EGGS'
+    assert context['aliases'] == ['plum tomato']
+    assert context['image_url'] == preview['image_url']
 
 
 def test_generation_reuses_existing_service_without_attaching_image(editor_app, monkeypatch):

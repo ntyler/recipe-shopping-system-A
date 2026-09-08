@@ -1,0 +1,15 @@
+{% from "partials/master_data_alias_editor.html" import accepted_alias_editor %}
+<div id="ingredientAliasManager" class="unit-master-editor unit-master-alias-popover ingredient-alias-manager"
+     role="dialog" popover="manual" aria-labelledby="ingredientAliasTitle" hidden>
+    <header><div>
+        <h2 id="ingredientAliasTitle" data-ingredient-editor-title>Ingredient aliases</h2>
+        <p class="unit-master-editor-permissions">Use the row’s Save or Cancel for all alias changes.</p>
+    </div></header>
+    {{ accepted_alias_editor('ingredient-editor', 'ingredientEditorAlias', 160, 'For example, sweet potatoes') }}
+    <footer>
+        <div class="unit-master-editor-feedback" data-ingredient-editor-feedback role="status" aria-live="polite" hidden></div>
+        <button type="button" class="secondary" data-ingredient-editor-retry hidden>Retry loading</button>
+        <button type="button" class="secondary" data-ingredient-editor-close-aliases>Close aliases</button>
+    </footer>
+</div>
+<input type="file" data-ingredient-image-file accept="image/png,image/jpeg,image/webp,image/gif,image/bmp,image/avif" aria-label="Replace ingredient image" hidden>
