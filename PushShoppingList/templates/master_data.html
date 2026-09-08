@@ -296,7 +296,7 @@
 {% macro render_master_data_row(row, master_data) -%}
 {% if master_data.record_type == "equipment" %}{{ render_equipment_master_data_row(row, master_data) }}{% else %}
     {% set form_id = 'masterDataIngredientForm-' ~ row.id %}
-    <tr id="masterDataRecord-ingredients-{{ row.id }}" class="master-data-record-row"
+    <tr id="masterDataRecord-ingredients-{{ row.id }}" class="master-data-record-row" tabindex="-1"
         data-ingredient-master-row data-master-record-id="{{ row.id }}" data-user-id="{{ row.user_id }}"
         data-store-section="{{ row.store_section }}" data-order-enabled="{{ 'true' if row.order_enabled else 'false' }}"
         data-section-count="{{ row.section_count }}" data-sort-order="{{ row.sort_order }}"

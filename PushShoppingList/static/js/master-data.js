@@ -1485,7 +1485,8 @@
         row.querySelector('[popover]').hidePopover();
         ingredientEditorControl('form').hidden = true; parkIngredientEditor();
         ingredientEditingRow = null; ingredientEditorContext = null; syncIngredientRowControls();
-        if (restoreFocus) row.querySelector('[data-ingredient-row-name]').focus({preventScroll: true});
+        // Keep keyboard focus in the table without reactivating a finished field.
+        if (restoreFocus) row.focus({preventScroll: true});
         restoreScroll(); return true;
     }
     async function prepareIngredientImage(file = null) {
@@ -1514,7 +1515,7 @@
     async function saveIngredientRow(row) {
         if (!row || row !== ingredientEditingRow || ingredientEditorControl('save').disabled) return;
         if (!addIngredientAlias()) return;
-        const form = ingredientEditorControl('form'), restoreScroll = captureIngredientScroll(form);
+        const form = ingredientEditorControl('form'), restoreScroll = captureIngredientScroll(row);
         const values = ingredientRowValues(row), payload = {...values, redirect_url: window.location.href};
         delete payload.image_url; if (ingredientImageChange) payload.image = ingredientImageChange;
         ingredientMutationPending = true; ingredientSaving = true; row.classList.add('is-saving');
@@ -1539,7 +1540,7 @@
             ingredientMutationPending = false; ingredientSaving = false; row.classList.remove('is-saving');
             ingredientEditorControl('save').textContent = 'Save Changes'; syncIngredientRowControls();
             if (saved) {
-                const focusTarget = document.querySelector(`[data-ingredient-master-row][data-master-record-id="${row.dataset.masterRecordId}"] [data-ingredient-row-name]`)
+                const focusTarget = document.querySelector(`[data-ingredient-master-row][data-master-record-id="${row.dataset.masterRecordId}"]`)
                     || document.querySelector('.master-data-filter-form [name="search"]');
                 focusTarget?.focus({preventScroll: true}); restoreScroll();
             } else (row.querySelector('[aria-invalid="true"]') || form.querySelector('[aria-invalid="true"]'))?.focus({preventScroll: true});

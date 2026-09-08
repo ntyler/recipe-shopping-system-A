@@ -26722,46 +26722,6 @@ img[data-deferred-src] {
             width: 130px;
         }
 
-        .master-data-ingredients-table th:nth-child(1) {
-            width: 48%;
-        }
-
-        .master-data-ingredients-table th:nth-child(2) {
-            width: 220px;
-        }
-
-        .master-data-ingredients-table th:nth-child(3) {
-            width: 150px;
-        }
-
-        .master-data-ingredients-table th:nth-child(4) {
-            width: 120px;
-        }
-
-        .master-data-ingredients-table.master-data-table--show-user {
-            min-width: 980px;
-        }
-
-        .master-data-ingredients-table.master-data-table--show-user th:nth-child(1) {
-            width: 37%;
-        }
-
-        .master-data-ingredients-table.master-data-table--show-user th:nth-child(2) {
-            width: 210px;
-        }
-
-        .master-data-ingredients-table.master-data-table--show-user th:nth-child(3) {
-            width: 18%;
-        }
-
-        .master-data-ingredients-table.master-data-table--show-user th:nth-child(4) {
-            width: 150px;
-        }
-
-        .master-data-ingredients-table.master-data-table--show-user th:nth-child(5) {
-            width: 120px;
-        }
-
         .master-data-equipment-table th:nth-child(1) {
             width: 50%;
         }
@@ -84032,10 +83992,9 @@ body.recipe-edit-standalone-page #recipeEditIngredients
 .ingredient-master-page .ingredient-row-section { appearance: none; background-image: none; cursor: pointer; text-overflow: ellipsis; }
 .ingredient-master-page .unit-master-inline-editor .ingredient-editor-control { border: 1px solid transparent; border-radius: 6px; background: transparent; box-shadow: none; }
 .ingredient-master-page :is(.ingredient-row-name, .ingredient-row-section, .ingredient-editor-control):hover:where(:not(:disabled)) { border-color: var(--app-border); }
-.ingredient-master-page :is(input, button, select):focus-visible { outline: 2px solid var(--app-primary-hover); outline-offset: 2px; }
-.ingredient-master-page :is(.ingredient-row-name, .ingredient-row-section, .ingredient-editor-control):focus-visible { border-color: var(--app-primary-hover); box-shadow: none; }
+.ingredient-master-page :is(.ingredient-row-name, .ingredient-row-section, .ingredient-editor-control):focus { border-color: var(--app-primary-hover); outline: 2px solid var(--app-primary-hover); outline-offset: 2px; box-shadow: none; }
 .ingredient-master-page :is(.ingredient-row-name, .ingredient-row-section, .ingredient-editor-control)[aria-invalid="true"] { border-color: var(--app-danger); }
-.ingredient-master-page :is(.ingredient-row-name, .ingredient-row-section, .ingredient-editor-control)[aria-invalid="true"]:focus-visible { outline-color: var(--app-danger); }
+.ingredient-master-page :is(.ingredient-row-name, .ingredient-row-section, .ingredient-editor-control)[aria-invalid="true"]:focus { outline-color: var(--app-danger); }
 .ingredient-master-page .master-data-thumbnail,
 .ingredient-master-page .master-data-no-image { flex: 0 0 var(--master-data-thumbnail-size, 48px); width: var(--master-data-thumbnail-size, 48px); height: var(--master-data-thumbnail-size, 48px); border: 1px solid var(--app-border); border-radius: 7px; background: var(--app-surface); color: var(--app-muted); font-size: 10px; }
 .ingredient-master-page .master-data-no-image { display: grid; place-items: center; border-style: dashed; text-align: center; }
@@ -84097,7 +84056,6 @@ body.recipe-edit-standalone-page #recipeEditIngredients
 .ingredient-master-page .ingredient-inline-editor .unit-master-editor-grid { align-items: start; }
 .ingredient-master-page .ingredient-inline-editor [data-ingredient-editor-save] { width: auto; min-width: 110px; grid-column: auto; grid-row: auto; }
 .ingredient-master-page .ingredient-inline-editor [data-ingredient-editor-save]:not(:disabled) { border-color: var(--app-primary); background: var(--app-primary-soft); color: var(--app-primary-hover); }
-.ingredient-master-page .ingredient-row-name-display { min-width: 0; padding: 7px 10px; color: var(--app-text-strong); font-size: 13px; overflow-wrap: anywhere; }
 .ingredient-master-page .ingredient-section-summary { display: flex; min-width: 0; align-items: center; gap: 5px; font-size: 12px; font-weight: 750; }
 .ingredient-master-page .ingredient-section-summary .recipe-edit-store-section-icon { flex: 0 0 18px; width: 18px; height: 18px; color: var(--app-primary-hover); }
 .ingredient-master-page .ingredient-section-summary svg,
