@@ -424,7 +424,7 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert 'class="ingredient-item"' in all_html
     assert 'data-full-src="/static/generated/tomato.png"' in all_html
     assert all_html.index('class="master-data-thumbnail"') < all_html.index('value="Tomato"')
-    assert '<th scope="rowgroup" colspan="7">Produce</th>' in all_html
+    assert '<th scope="rowgroup" colspan="6">Produce</th>' in all_html
     assert '<th scope="col">User</th>' not in all_html
     assert 'class="ingredient-row-more"' in all_html
     assert 'name="normalized_name" value="tomato"' in all_html
@@ -486,7 +486,7 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert '<th scope="col">User</th>' not in filtered_html
     assert "master-data-table--show-user" not in filtered_html
     assert 'class="master-data-user-data-cell"' not in filtered_html
-    assert '<th scope="rowgroup" colspan="7">Spices</th>' in filtered_html
+    assert '<th scope="rowgroup" colspan="6">Spices</th>' in filtered_html
     assert equipment_response.status_code == 200
     assert 'data-equipment-master-registry' in equipment_html
     assert '<span>Workspace registry</span>' in equipment_html

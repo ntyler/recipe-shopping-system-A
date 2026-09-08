@@ -7,6 +7,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 
 from PushShoppingList.services import recipe_master_data_service as master_data
 from PushShoppingList.services import recipe_master_image_service as master_images
+from PushShoppingList.services import ingredient_deletion_service as ingredient_deletion
 
 
 def ingredient_editor_context(record):
@@ -25,7 +26,8 @@ def ingredient_editor_context(record):
     usage = master_data.list_master_record_recipe_references("ingredients", record["id"], user_id=owner, limit=1)
     # Ingredients are created from workspace recipes, not a system seed registry.
     # Section classifier provenance describes assignment, not ingredient origin.
-    source_label = "User-created" if owner else "Workspace ingredient"
+    source_label = "User-created" if owner and owner != master_data.LOCAL_USER_ID else "Workspace ingredient"
+    deletion_details = ingredient_deletion.ingredient_deletion_details([record]).get(record["id"], {})
     return {
         "record": {
             key: record[key] for key in ("id", "name", "normalized_name", "store_section", "image_url", "updated_at")
@@ -34,6 +36,7 @@ def ingredient_editor_context(record):
             "source_label": source_label,
             "usage_count": usage["total"],
             "section_editable": True,
+            **deletion_details,
         },
         "registry": list(by_id.values()),
         "sections": [{key: section[key] for key in ("section_key", "display_name", "icon")}

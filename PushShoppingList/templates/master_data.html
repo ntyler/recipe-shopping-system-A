@@ -352,25 +352,30 @@
             </button>
             {% else %}<span class="unit-master-usage-empty master-data-usage-empty" aria-label="{{ row.name }} is unused; no recipes currently reference it">Unused</span>{% endif %}
         </td>
-        <td class="ingredient-action-cell" data-label="Save">
-            <button type="button" class="unit-master-edit-button" data-ingredient-row-save disabled>Save</button>
-            <button type="button" class="unit-master-edit-button ingredient-row-cancel" data-ingredient-row-cancel hidden>Cancel</button>
+        <td class="ingredient-action-cell" data-label="Action">
+            <div class="ingredient-row-actions">
+                <button type="button" class="unit-master-edit-button" data-ingredient-row-save aria-label="Save {{ row.name }}" disabled>Save</button>
+                <button type="button" class="unit-master-edit-button ingredient-row-cancel" data-ingredient-row-cancel aria-label="Cancel changes to {{ row.name }}" hidden>Cancel</button>
+                {% if row.can_delete %}
+                <button type="button" class="unit-master-edit-button danger" data-ingredient-row-delete
+                        data-delete-url="{{ url_for('main_bp.delete_ingredient_master_record_route', ingredient_id=row.id) }}"
+                        aria-label="Delete {{ row.name }}">Delete</button>
+                {% endif %}
+                <button type="button" class="ingredient-row-more-button" popovertarget="ingredientMore-{{ row.id }}" aria-label="More actions and details for {{ row.name }}">&hellip;</button>
+            </div>
             <span id="ingredientRowStatus-{{ row.id }}" class="ingredient-row-status" data-ingredient-row-status role="status" aria-live="polite"></span>
             <button type="button" class="unit-master-edit-button" data-ingredient-row-retry hidden>Retry validation</button>
-        </td>
-        <td class="ingredient-more-cell" data-label="More">
-            <button type="button" class="ingredient-row-more-button" popovertarget="ingredientMore-{{ row.id }}" aria-label="More actions and details for {{ row.name }}">&hellip;</button>
             <div class="ingredient-row-more" id="ingredientMore-{{ row.id }}" popover>
                 <strong>{{ row.name }}</strong>
                 <span>{{ 'User-created' if row.user_id else 'Workspace ingredient' }} &middot; Canonical name: {{ row.normalized_name }}</span>
                 <span>Last Updated <time datetime="{{ row.updated_at }}" title="{{ row.updated_at }}">{{ row.updated_at_label }}</time></span>
-                <span>Name {{ row.ingredient_name_usage_count }} &middot; Buy As {{ row.buy_as_usage_count }}</span>
-                <button type="button" class="secondary" data-ingredient-row-image aria-haspopup="dialog" aria-controls="recipeImageLightbox">Manage image</button>
+                <span>Name references {{ row.ingredient_name_usage_count }} &middot; Buy As references {{ row.buy_as_usage_count }}</span>
+                {% if row.delete_blocked_reason %}<span data-ingredient-delete-reason>{{ row.delete_blocked_reason }}</span>{% endif %}
                 {% if master_data.scope == 'all' %}<span>{{ row.user_identity.display_name }} &middot; {{ row.user_identity.short_id }}</span>{% endif %}
                 <button type="button" class="master-data-merge-open" data-master-merge-open data-source-id="{{ row.id }}"
                         data-source-name="{{ row.name }}" data-source-normalized-name="{{ row.normalized_name }}" data-source-usage-count="{{ row.usage_count }}"
                         data-merge-options-url="{{ url_for('main_bp.ingredient_master_merge_options_route', ingredient_id=row.id, viewer_user_id=master_data.viewer_user_id or none) }}"
-                        data-merge-url="{{ url_for('main_bp.merge_ingredient_master_record_route', ingredient_id=row.id) }}" aria-controls="masterDataIngredientMergeDialog">Merge duplicate</button>
+                        data-merge-url="{{ url_for('main_bp.merge_ingredient_master_record_route', ingredient_id=row.id) }}" aria-haspopup="dialog" aria-controls="masterDataIngredientMergeDialog">Merge duplicate&hellip;</button>
             </div>
         </td>
     </tr>
@@ -1393,10 +1398,10 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
             {% if master_data.rows %}
                 <div class="master-data-table-wrap unit-master-category master-data-registry-category">
                     <table aria-label="Ingredient" class="master-data-table master-data-registry-table {% if master_data.record_type == 'ingredients' %}master-data-ingredients-table{% elif master_data.record_type == 'equipment' %}master-data-equipment-table{% endif %}{% if master_data.scope == 'all' %} master-data-table--show-user{% endif %}{% if master_data.store_section %} master-data-table--section-filtered{% endif %}">
-                    <colgroup><col class="ingredient-col-order"><col class="ingredient-col-item"><col class="ingredient-col-aliases"><col class="ingredient-col-section"><col class="ingredient-col-usage"><col class="ingredient-col-action"><col class="ingredient-col-more"></colgroup>
+                    <colgroup><col class="ingredient-col-order"><col class="ingredient-col-item"><col class="ingredient-col-aliases"><col class="ingredient-col-section"><col class="ingredient-col-usage"><col class="ingredient-col-action"></colgroup>
                     <thead><tr>
                         <th scope="col">Order</th><th scope="col">Item</th><th scope="col">Aliases</th>
-                        <th scope="col">Store Section</th><th scope="col">Used In</th><th scope="col">Save</th><th scope="col">More</th>
+                        <th scope="col">Store Section</th><th scope="col">Used In</th><th scope="col">Action</th>
                     </tr></thead>
                     <tbody>
                         {% if master_data.row_groups %}

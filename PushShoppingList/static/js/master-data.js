@@ -1418,7 +1418,12 @@
             const save = row.querySelector('[data-ingredient-row-save]');
             save.disabled = !editing || busy || !ingredientEditorContext || !dirty || Boolean(invalid);
             save.textContent = ingredientSaving && editing ? 'Saving…' : 'Save';
-            row.querySelector('[data-ingredient-row-cancel]').hidden = !editing;
+            row.querySelector('[data-ingredient-row-cancel]').hidden = !editing || !dirty;
+            const remove = row.querySelector('[data-ingredient-row-delete]');
+            if (remove) {
+                remove.disabled = ingredientMutationPending || ingredientImagePending || dirty;
+                remove.hidden = editing && dirty;
+            }
             row.querySelector('[data-ingredient-row-retry]').hidden = !editing || ingredientEditorControl('retry').hidden;
             row.querySelector('[data-master-merge-open]').disabled = ingredientMutationPending || ingredientImagePending || dirty;
             const blocked = ingredientMutationPending || row.dataset.orderEnabled !== 'true';
@@ -1662,6 +1667,51 @@
             } else (row.querySelector('[aria-invalid="true"]') || form.querySelector('[aria-invalid="true"]'))?.focus({preventScroll: true});
         }
     }
+    async function deleteIngredientRow(row) {
+        const button = row?.querySelector('[data-ingredient-row-delete]');
+        if (!button || button.disabled || ingredientMutationPending || ingredientRowIsDirty(ingredientEditingRow)) return;
+        const name = row.dataset.recordName;
+        if (!window.confirm(`Delete “${name}”? It has no recipe references. Its aliases and image association will also be removed. This cannot be undone.`)) return;
+        if (ingredientEditingRow) cancelIngredientRow(ingredientEditingRow, {restoreFocus: false});
+        const nextRowId = ingredientRows().find(item => item !== row)?.dataset.masterRecordId;
+        ingredientMutationPending = true;
+        button.textContent = 'Deleting…';
+        syncIngredientRowControls();
+        let deleted = false;
+        try {
+            const response = await fetch(button.dataset.deleteUrl, {
+                method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'fetch'},
+                body: JSON.stringify({confirm: true, redirect_url: window.location.href}),
+            });
+            const result = await response.json();
+            if (!response.ok || !result.ok) {
+                if (result.result?.can_delete === false) {
+                    button.remove();
+                    const menu = row.querySelector('[popover]');
+                    const reason = row.querySelector('[data-ingredient-delete-reason]') || document.createElement('span');
+                    reason.dataset.ingredientDeleteReason = '';
+                    reason.textContent = result.result.delete_blocked_reason || result.message;
+                    menu.insertBefore(reason, menu.querySelector('[data-master-merge-open]'));
+                }
+                throw new Error(result.message || result.error || 'The ingredient could not be deleted.');
+            }
+            deleted = true;
+            row.remove();
+            await refreshMasterDataRecordResults();
+            ingredientStatus(`${name} deleted.`);
+        } catch (error) {
+            if (deleted) ingredientRows().forEach(item => { item.dataset.orderEnabled = 'false'; });
+            ingredientStatus(deleted ? 'Deleted. The table could not refresh; reload the page to see the updated group.' : error.message || 'The ingredient could not be deleted.', true);
+        } finally {
+            ingredientMutationPending = false;
+            button.textContent = 'Delete';
+            syncIngredientRowControls();
+            const target = deleted
+                ? document.querySelector(`[data-ingredient-master-row][data-master-record-id="${nextRowId}"]`) || document.querySelector('.master-data-filter-form [name="search"]')
+                : button.isConnected ? button : row;
+            target?.focus({preventScroll: true});
+        }
+    }
     function ingredientSectionRows(row) {
         return ingredientRows().filter(other => other.dataset.userId === row.dataset.userId && other.dataset.storeSection === row.dataset.storeSection);
     }
@@ -1785,12 +1835,9 @@
         root.addEventListener('click', event => {
             const button = event.target.closest('button'), row = button?.closest('[data-ingredient-master-row]'); if (!row) return;
             if (button.matches('[data-ingredient-row-alias]')) openIngredientAliases(row, button);
-            else if (button.matches('[data-ingredient-row-image]') && editIngredientRow(row)) {
-                row.querySelector('[popover]').hidePopover();
-                openMasterDataImageLightbox(row.querySelector('.master-data-thumbnail, [data-master-image-empty]'));
-            }
             else if (button.matches('[data-ingredient-row-save]')) { event.preventDefault(); void saveIngredientRow(row); }
             else if (button.matches('[data-ingredient-row-cancel]')) cancelIngredientRow(row, {discard: true});
+            else if (button.matches('[data-ingredient-row-delete]')) void deleteIngredientRow(row);
             else if (button.matches('[data-ingredient-row-retry]')) void loadIngredientEditor(row, ++ingredientEditorToken);
             else if (button.matches('[data-ingredient-order-action]')) void moveIngredientRow(row, ingredientSectionRows(row).indexOf(row) + (button.dataset.ingredientOrderAction === 'up' ? -1 : 1), button);
             else if (button.matches('[data-master-merge-open]')) {
@@ -1922,12 +1969,12 @@
         }
         const targetId = text(button.dataset.ingredientId).trim();
         const targetName = text(button.dataset.ingredientName).trim();
-        const targetUsage = Math.max(0, Number(button.dataset.usageCount) || 0);
-        const sourceUsage = Math.max(0, Number(els.dialog && els.dialog.dataset.sourceUsageCount) || 0);
+        const sourceReferences = Number(els.dialog?.dataset.sourceReferenceCount);
+        if (!Number.isInteger(sourceReferences) || sourceReferences < 0) return;
         els.targetId.value = targetId;
         if (els.targetName) els.targetName.textContent = targetName;
         if (els.combinedUsage) {
-            els.combinedUsage.textContent = `${masterDataMergeUsageLabel(sourceUsage + targetUsage)} after merge`;
+            els.combinedUsage.textContent = `${masterDataMergeUsageLabel(sourceReferences)} affected. The selected canonical ingredient will be kept.`;
         }
         if (els.selection) els.selection.hidden = false;
         if (els.submit) els.submit.disabled = !targetId;
@@ -1973,7 +2020,8 @@
 
         const usage = document.createElement("span");
         usage.className = "master-data-merge-option-usage";
-        usage.textContent = masterDataMergeUsageLabel(ingredient.usage_count);
+        const recipeCount = Math.max(0, Number(ingredient.usage_count) || 0);
+        usage.textContent = `${recipeCount} recipe${recipeCount === 1 ? '' : 's'}`;
         button.append(media, copy, usage);
         button.addEventListener("click", () => chooseMasterDataMergeTarget(button));
         return button;
@@ -2031,6 +2079,15 @@
                 if (requestId !== masterDataMergeRequestId || !els.dialog.open) {
                     return;
                 }
+                const referenceCount = data.source?.reference_count;
+                if (!Number.isInteger(referenceCount) || referenceCount < 0) {
+                    throw new Error('Recipe references could not be counted. Try loading the canonical ingredients again.');
+                }
+                els.dialog.dataset.sourceReferenceCount = String(referenceCount);
+                if (els.sourceUsage) els.sourceUsage.textContent = `${masterDataMergeUsageLabel(referenceCount)} affected`;
+                if (els.targetId.value && els.combinedUsage) {
+                    els.combinedUsage.textContent = `${masterDataMergeUsageLabel(referenceCount)} affected. The selected canonical ingredient will be kept.`;
+                }
                 renderMasterDataMergeOptions(
                     data.ingredients,
                     queryValue
@@ -2061,6 +2118,7 @@
             els.dialog.removeAttribute("aria-busy");
             delete els.dialog.dataset.mergeOptionsUrl;
             delete els.dialog.dataset.sourceUsageCount;
+            delete els.dialog.dataset.sourceReferenceCount;
         }
         if (els.form) els.form.action = "";
         if (els.search) els.search.value = "";
@@ -2088,10 +2146,11 @@
         els.form.action = text(button.dataset.mergeUrl);
         els.dialog.dataset.mergeOptionsUrl = text(button.dataset.mergeOptionsUrl);
         els.dialog.dataset.sourceUsageCount = text(button.dataset.sourceUsageCount || 0);
+        delete els.dialog.dataset.sourceReferenceCount;
         if (els.sourceName) els.sourceName.textContent = text(button.dataset.sourceName);
         if (els.sourceNormalized) els.sourceNormalized.textContent = text(button.dataset.sourceNormalizedName);
         if (els.sourceUsage) {
-            els.sourceUsage.textContent = masterDataMergeUsageLabel(button.dataset.sourceUsageCount);
+            els.sourceUsage.textContent = 'Counting affected recipe references…';
         }
         els.search.value = "";
         resetMasterDataMergeSelection();

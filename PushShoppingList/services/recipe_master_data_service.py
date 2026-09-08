@@ -4658,6 +4658,81 @@ def count_ingredient_usage(record_id, user_id=None):
     return count_master_usage("ingredients", record_id, user_id=user_id)
 
 
+def count_ingredient_merge_references(record_id, user_id=None):
+    """Count logical Name/Buy As references, including alternative option items.
+
+    A normalized recipe's options are authoritative: its legacy ingredient rows
+    mirror originals or display grouped options, so adding both would double
+    count. Recipes without a normalized hierarchy retain their legacy count.
+    """
+    try:
+        record_id = int(record_id or 0)
+    except (TypeError, ValueError):
+        return 0
+    if record_id <= 0:
+        return 0
+    scoped_user_id = scoped_recipe_user_id(user_id)
+    with existing_recipe_master_read_connection() as connection:
+        if connection is None:
+            return 0
+        has_options = all(
+            _connection_has_table(connection, table)
+            for table in (
+                "recipe_ingredient_requirements",
+                "recipe_ingredient_options",
+                "recipe_ingredient_option_items",
+            )
+        )
+        legacy_filter = """
+            AND NOT EXISTS (
+                SELECT 1 FROM recipe_ingredient_requirements requirement
+                 WHERE requirement.user_id = r.user_id
+                   AND requirement.recipe_id = r.recipe_id
+            )
+        """ if has_options else ""
+        normalized_query = """
+            UNION ALL
+            SELECT item.id
+              FROM recipe_ingredient_option_items item
+              JOIN recipe_ingredient_options option ON option.id = item.option_id
+              JOIN recipe_ingredient_requirements requirement
+                ON requirement.id = option.requirement_id
+             WHERE requirement.user_id = ?
+               AND (
+                    item.ingredient_id = (SELECT id FROM target)
+                    OR LOWER(TRIM(item.buy_as)) IN (SELECT name FROM target_names)
+               )
+        """ if has_options else ""
+        params = [record_id, scoped_user_id, scoped_user_id, scoped_user_id]
+        if has_options:
+            params.append(scoped_user_id)
+        row = connection.execute(
+            f"""
+            WITH target AS (
+                SELECT id, normalized_name FROM ingredients WHERE id = ? AND user_id = ?
+            ), target_names AS (
+                SELECT normalized_name AS name FROM target
+                UNION
+                SELECT alias.normalized_alias FROM ingredient_aliases alias
+                 JOIN target ON target.id = alias.ingredient_id
+                WHERE alias.user_id = ?
+            )
+            SELECT COUNT(*) AS reference_count FROM (
+                SELECT r.id FROM recipe_ingredients r
+                 WHERE r.user_id = ?
+                   AND (
+                        r.ingredient_id = (SELECT id FROM target)
+                        OR LOWER(TRIM(r.buy_as)) IN (SELECT name FROM target_names)
+                   )
+                   {legacy_filter}
+                {normalized_query}
+            )
+            """,
+            params,
+        ).fetchone()
+    return int(row["reference_count"] or 0) if row else 0
+
+
 def count_equipment_usage(record_id, user_id=None):
     return count_master_usage("equipment", record_id, user_id=user_id)
 

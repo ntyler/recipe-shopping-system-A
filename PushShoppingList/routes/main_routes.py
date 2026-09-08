@@ -38,6 +38,7 @@ from PushShoppingList.services import ingredient_type_service as ingredient_type
 from PushShoppingList.services import cuisine_category_service as cuisine_categories
 from PushShoppingList.services import unit_suggestion_service as unit_suggestions
 from PushShoppingList.services import ingredient_editor_service as ingredient_editor
+from PushShoppingList.services import ingredient_deletion_service as ingredient_deletion
 from PushShoppingList.services.food_rules_service import load_food_rules
 from PushShoppingList.services.food_rules_service import shopping_item_food_rule_status
 from PushShoppingList.services.feedback_service import feedback_dashboard_for_user
@@ -1372,6 +1373,10 @@ def master_data_context(record_type, scope_info=None):
         user_ids_for_labels.add(scope_info["user_id"])
     user_identities = master_data_user_identity_lookup(user_ids_for_labels)
     rows = enrich_master_data_rows_with_users(rows, user_identities)
+    if record_type == "ingredients":
+        deletion_details = ingredient_deletion.ingredient_deletion_details(rows)
+        for row in rows:
+            row.update(deletion_details.get(int(row["id"]), {}))
     available_users = [
         user_identities.get(str(user_id or "").strip()) or master_data_user_identity(user_id)
         for user_id in available_user_ids
@@ -1572,7 +1577,7 @@ def master_data_context(record_type, scope_info=None):
         "group_by_store_section": bool(record_type == "ingredients" and not store_section),
         "group_by_equipment_section": bool(record_type == "equipment"),
         "table_column_count": (
-            7
+            6
             if record_type == "ingredients"
             else 5
             if record_type == "equipment" and scope_info["scope"] == "all"
@@ -3099,6 +3104,36 @@ def update_ingredient_master_record_route(ingredient_id):
     return redirect(redirect_url)
 
 
+@main_bp.route("/admin/master-data/ingredients/<int:ingredient_id>/delete", methods=["POST"])
+def delete_ingredient_master_record_route(ingredient_id):
+    payload = request.get_json(silent=True) if request.is_json else request.form
+    payload = payload if isinstance(payload, dict) or hasattr(payload, "get") else {}
+    redirect_url = canonicalize_master_data_redirect_url(
+        payload.get("redirect_url"), default_page="ingredients",
+    )
+    confirmation = payload.get("confirm")
+    if not request.is_json:
+        confirmation = confirmation == "true"
+    result = ingredient_deletion.delete_ingredient_master_record(
+        ingredient_id, confirm=confirmation,
+        allow_other_users=is_admin_user(current_public_user()),
+    )
+    message = result.get("message") or result.get("error") or "Ingredient could not be deleted."
+    category = "success" if result.get("ok") else "error"
+    wants_json = (
+        request.is_json or request.headers.get("X-Requested-With") == "fetch"
+        or request.accept_mimetypes.best == "application/json"
+    )
+    if wants_json:
+        return jsonify({
+            "ok": result.get("ok", False), "success": result.get("ok", False),
+            "category": category, "message": message, "error": result.get("error", ""),
+            "result": result, "redirect_url": redirect_url,
+        }), 200 if result.get("ok") else int(result.get("status") or 400)
+    session["recipe_master_data_messages"] = [{"category": category, "text": message}]
+    return redirect(redirect_url)
+
+
 @main_bp.route("/api/master-data/ingredients/<int:ingredient_id>/order", methods=["PATCH"])
 def reorder_ingredient_master_record_route(ingredient_id):
     payload = request.get_json(silent=True) or {}
@@ -3127,6 +3162,10 @@ def ingredient_master_merge_options_route(ingredient_id):
             "error": "Ingredient record was not found.",
         }), 404
 
+    source_reference_count = recipe_master_data.count_ingredient_merge_references(
+        source["id"],
+        user_id=source["user_id"],
+    )
     search = recipe_master_data.clean_text(request.args.get("search"))
     limit = int_query_arg("limit", 20, minimum=1, maximum=50)
     rows = recipe_master_data.list_ingredients(
@@ -3152,6 +3191,7 @@ def ingredient_master_merge_options_route(ingredient_id):
                 source["id"],
                 user_id=source["user_id"],
             ),
+            "reference_count": source_reference_count,
         },
         "ingredients": [
             {

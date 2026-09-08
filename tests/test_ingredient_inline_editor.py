@@ -71,8 +71,9 @@ def test_inline_row_uses_compact_alias_manager_and_real_scoped_context(editor_ap
         assert not row.select('.ingredient-row-more [data-ingredient-row-cancel]')
         assert row.select_one('[data-ingredient-row-status]')['role'] == 'status'
         assert not row.select('input[type="number"]')
-        assert len(row.select(':scope > td')) == 7
-        assert row.select_one('.ingredient-row-more [data-master-merge-open]')
+        assert len(row.select(':scope > td')) == 6
+        assert row.select_one('.ingredient-action-cell .ingredient-row-more [data-master-merge-open]')
+        assert not row.select('[data-ingredient-row-image], [data-ingredient-row-delete]')
         context = client.get(f'/api/master-data/ingredients/{record["id"]}/editor').json
         assert context['record']['name'] == record['name']
         assert context['record']['source_label'] == 'User-created'

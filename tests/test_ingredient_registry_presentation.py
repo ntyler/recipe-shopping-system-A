@@ -20,7 +20,7 @@ def test_ingredient_page_name_and_controls_preserve_existing_endpoints(monkeypat
     assert soup.select_one('.master-data-tabs [aria-current="page"]').get_text(strip=True) == 'Ingredient'
     assert soup.select_one('.master-data-home-link').text == 'Account'
     table = soup.select_one('table[aria-label="Ingredient"]')
-    assert [th.text for th in table.select('thead th')] == ['Order', 'Item', 'Aliases', 'Store Section', 'Used In', 'Save', 'More']
+    assert [th.text for th in table.select('thead th')] == ['Order', 'Item', 'Aliases', 'Store Section', 'Used In', 'Action']
     assert 'master-data-registry-category' in table.parent['class']
     filters = soup.select_one('.ingredient-master-registry .master-data-filter-form')
     assert filters['action'] == '/admin/master-data/ingredients'
@@ -40,11 +40,17 @@ def test_ingredient_page_name_and_controls_preserve_existing_endpoints(monkeypat
     assert soup.select_one('#ingredientAliasManager').has_attr('hidden')
     assert table.select_one('.ingredient-action-cell [data-ingredient-row-cancel]').has_attr('hidden')
     assert soup.select_one('.ingredient-section-summary svg')
-    more = table.select_one('.ingredient-row-more[popover]')
+    more = table.select_one('.ingredient-action-cell .ingredient-row-more[popover]')
     assert more.select_one('time[datetime]')
     assert 'Last Updated' in more.get_text(' ', strip=True)
     assert more.select_one('[data-master-merge-open]')['aria-controls'] == 'masterDataIngredientMergeDialog'
-    assert more.select_one('[data-ingredient-row-image]')['aria-controls'] == 'recipeImageLightbox'
+    assert not table.select('[data-ingredient-row-image]')
+    assert 'Manage Image' not in table.get_text(' ', strip=True)
+    actions = table.select_one('.ingredient-action-cell .ingredient-row-actions')
+    assert actions.select_one('[data-ingredient-row-save]')
+    assert actions.select_one('[data-ingredient-row-cancel]')
+    assert actions.select_one('[popovertarget]')['popovertarget'] == more['id']
+    assert not table.select('[data-ingredient-row-delete]'), 'Referenced ingredients cannot be deleted'
     assert not more.select('[data-ingredient-row-cancel], [data-ingredient-row-save]')
     assert table.select_one('[data-master-usage-button="ingredients"]')['aria-controls'] == 'masterDataUsageDialog'
     assert 'Ingredient Master Data' not in response.get_data(as_text=True)
