@@ -1,6 +1,6 @@
 {% extends "layouts/app_layout.html" %}
 {% from "partials/master_data_recipe_usage.html" import recipe_usage_dialog %}
-{% from "includes/master_data_controls.html" import registry_order, registry_section_icon %}
+{% from "includes/master_data_controls.html" import registry_order, registry_section_icon, equipment_type_label %}
 {% set app_page_title = master_data.title %}
 {% set app_shell_mode = "route" %}
 {% set app_active_nav_item = "settings" %}
@@ -116,7 +116,9 @@
         {% elif master_data.record_type == 'equipment' %}
             <label class="master-data-equipment-filter-field">
                 <span>Equipment Type</span>
-                <select name="equipment_section">
+                <span class="equipment-type-picker" data-equipment-type-picker>
+                {{ equipment_type_label(master_data.equipment_section, (master_data.equipment_section | title) if master_data.equipment_section else 'All types') }}
+                <select name="equipment_section" aria-label="Equipment Type">
                     <option value="" {% if not master_data.equipment_section %}selected{% endif %}>All types</option>
                     {% for section in master_data.equipment_section_options %}
                         <option value="{{ section }}" {% if master_data.equipment_section == section %}selected{% endif %}>
@@ -124,6 +126,7 @@
                         </option>
                     {% endfor %}
                 </select>
+                </span>
             </label>
         {% endif %}
         <label class="master-data-sort-filter-field">
@@ -219,8 +222,8 @@
             </div>
         </td>
         <td id="equipmentType-{{ row.id }}" class="ingredient-section-cell equipment-type-cell" data-label="Equipment Type">
-            <span class="ingredient-section-summary">
-                <span class="recipe-edit-store-section-icon" aria-hidden="true">{{ registry_section_icon('whisk') }}</span>
+            <span class="ingredient-section-summary equipment-type-picker" data-equipment-type-picker>
+                {{ equipment_type_label(row.equipment_section) }}
                 <select class="ingredient-row-section equipment-row-type" data-equipment-row-type {% if not editable %}disabled{% endif %} aria-label="Equipment Type for {{ row.name }}" aria-describedby="equipmentTypeError-{{ row.id }}">
                     {% for section in master_data.equipment_section_options %}<option value="{{ section }}" {% if section == row.equipment_section %}selected{% endif %}>{{ section | title }}</option>{% endfor %}
                 </select>
@@ -1199,6 +1202,12 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
         </p>
         <p class="ingredient-registry-status sr-only" data-equipment-registry-status role="status" aria-live="polite"></p>
         {% include "partials/equipment_alias_manager.html" %}
+        <div hidden data-equipment-type-templates>
+            <template data-equipment-type-template="">{{ equipment_type_label('', 'All types') }}</template>
+            {% for section in master_data.equipment_section_options %}
+            <template data-equipment-type-template="{{ section }}">{{ equipment_type_label(section) }}</template>
+            {% endfor %}
+        </div>
         <div data-master-record-results>
             {% if master_data.rows %}
                 <div class="master-data-table-wrap unit-master-category master-data-registry-category">
@@ -1212,7 +1221,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                         {% if master_data.row_groups %}
                             {% for group in master_data.row_groups %}
                                 <tr class="master-data-section-row">
-                                    <th scope="rowgroup" colspan="{{ master_data.table_column_count }}">{{ group.section | title }}</th>
+                                    <th scope="rowgroup" colspan="{{ master_data.table_column_count }}">{{ equipment_type_label(group.section) }}</th>
                                 </tr>
                                 {% for row in group.rows %}
                                     {{ render_master_data_row(row, master_data) }}

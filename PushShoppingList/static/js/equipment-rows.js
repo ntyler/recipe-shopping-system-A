@@ -17,6 +17,171 @@
     let editingRow = null, deletingRow = null, aliasAnchor = null, mutationPending = false;
     let orderOriginal = null, orderChange = null;
 
+    // Enhance the existing selects without changing their values or save contract.
+    // Labels and SVGs come from the same server-rendered mapping as group headings.
+    const typeTemplates = new Map([...root.querySelectorAll('[data-equipment-type-template]')]
+        .map(template => [template.dataset.equipmentTypeTemplate, template]));
+    const typeMenu = document.createElement('div');
+    typeMenu.id = 'equipmentTypeMenu';
+    typeMenu.className = 'equipment-type-menu';
+    typeMenu.setAttribute('popover', 'manual');
+    typeMenu.setAttribute('role', 'listbox');
+    typeMenu.tabIndex = -1;
+    typeMenu.hidden = true;
+    document.body.append(typeMenu);
+    let activeTypePicker = null, activeTypeIndex = 0, typeSearch = '', typeSearchAt = 0;
+
+    function typeLabel(value, text) {
+        const label = (typeTemplates.get(value) || typeTemplates.get('')).content.firstElementChild.cloneNode(true);
+        label.dataset.equipmentTypeLabel = value;
+        label.querySelector('.equipment-type-text').textContent = text;
+        return label;
+    }
+    function closeTypeMenu(restoreFocus = false) {
+        const picker = activeTypePicker;
+        activeTypePicker = null;
+        if (typeMenu.matches(':popover-open')) typeMenu.hidePopover();
+        typeMenu.hidden = true;
+        typeMenu.removeAttribute('aria-activedescendant');
+        if (picker) {
+            picker.trigger.setAttribute('aria-expanded', 'false');
+            if (restoreFocus && picker.trigger.isConnected) picker.trigger.focus({preventScroll: true});
+        }
+    }
+    function positionTypeMenu() {
+        if (!activeTypePicker) return;
+        const rect = activeTypePicker.trigger.getBoundingClientRect();
+        if (!activeTypePicker.trigger.isConnected || !rect.height) { closeTypeMenu(); return; }
+        const viewport = window.visualViewport;
+        const left = viewport?.offsetLeft || 0, top = viewport?.offsetTop || 0;
+        const width = viewport?.width || innerWidth, height = viewport?.height || innerHeight;
+        const menuWidth = Math.min(Math.max(240, rect.width), width - 16);
+        const below = top + height - rect.bottom - 8, above = rect.top - top - 8;
+        const upward = below < Math.min(typeMenu.scrollHeight, 360) && above > below;
+        typeMenu.style.width = `${menuWidth}px`;
+        typeMenu.style.maxHeight = `${Math.max(44, Math.min(360, upward ? above : below))}px`;
+        typeMenu.style.left = `${Math.max(left + 8, Math.min(rect.left, left + width - menuWidth - 8))}px`;
+        typeMenu.style.top = `${upward ? rect.top - typeMenu.offsetHeight - 4 : rect.bottom + 4}px`;
+    }
+    function highlightType(index) {
+        const options = [...typeMenu.children];
+        activeTypeIndex = Math.max(0, Math.min(options.length - 1, index));
+        options.forEach((option, i) => option.classList.toggle('is-active', i === activeTypeIndex));
+        const active = options[activeTypeIndex];
+        if (active) { typeMenu.setAttribute('aria-activedescendant', active.id); active.scrollIntoView({block: 'nearest'}); }
+    }
+    function chooseType(index) {
+        const picker = activeTypePicker, option = picker?.select.options[index];
+        if (!option || option.disabled || picker.select.disabled) return;
+        picker.select.value = option.value;
+        picker.select.dispatchEvent(new Event('change', {bubbles: true}));
+        syncTypePicker(picker);
+        closeTypeMenu(true);
+    }
+    function openTypeMenu(picker) {
+        if (picker.select.disabled) return false;
+        if (picker.row && !edit(picker.row)) return false;
+        closeTypeMenu();
+        activeTypePicker = picker;
+        typeSearch = ''; typeSearchAt = 0;
+        typeMenu.setAttribute('aria-label', picker.select.getAttribute('aria-label'));
+        typeMenu.replaceChildren(...[...picker.select.options].map((option, index) => {
+            const item = document.createElement('div');
+            item.id = `equipmentTypeOption-${index}`;
+            item.setAttribute('role', 'option');
+            item.setAttribute('aria-selected', String(option.selected));
+            item.setAttribute('aria-disabled', String(option.disabled));
+            item.append(typeLabel(option.value, option.textContent.trim()));
+            item.addEventListener('click', () => chooseType(index));
+            return item;
+        }));
+        picker.trigger.setAttribute('aria-expanded', 'true');
+        typeMenu.hidden = false;
+        typeMenu.showPopover();
+        positionTypeMenu();
+        highlightType(picker.select.selectedIndex);
+        typeMenu.focus({preventScroll: true});
+        return true;
+    }
+    function typeMenuKey(event) {
+        if (!activeTypePicker) return;
+        const last = typeMenu.children.length - 1;
+        if (event.key === 'Escape') closeTypeMenu(true);
+        else if (event.key === 'Tab') { closeTypeMenu(true); return; }
+        else if (event.key === 'ArrowDown') highlightType(activeTypeIndex === last ? 0 : activeTypeIndex + 1);
+        else if (event.key === 'ArrowUp') highlightType(activeTypeIndex === 0 ? last : activeTypeIndex - 1);
+        else if (event.key === 'Home') highlightType(0);
+        else if (event.key === 'End') highlightType(last);
+        else if (event.key === 'Enter' || event.key === ' ') chooseType(activeTypeIndex);
+        else if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+            const now = Date.now();
+            typeSearch = (now - typeSearchAt < 700 ? typeSearch : '') + event.key.toLowerCase();
+            typeSearchAt = now;
+            const options = [...activeTypePicker.select.options];
+            const repeated = [...typeSearch].every(char => char === typeSearch[0]);
+            const search = repeated ? typeSearch[0] : typeSearch;
+            const start = repeated ? activeTypeIndex + 1 : activeTypeIndex;
+            const index = options.map((_, i) => (start + i) % options.length)
+                .find(i => !options[i].disabled && options[i].textContent.trim().toLowerCase().startsWith(search));
+            if (index !== undefined) highlightType(index);
+        } else return;
+        event.preventDefault(); event.stopPropagation();
+    }
+    function syncTypePicker(picker) {
+        const {select, trigger} = picker;
+        const option = select.selectedOptions[0];
+        if (trigger.dataset.value !== select.value) {
+            trigger.replaceChildren(typeLabel(select.value, option?.textContent.trim() || select.value));
+            trigger.dataset.value = select.value;
+        }
+        trigger.disabled = select.disabled;
+        trigger.setAttribute('aria-label', `${select.getAttribute('aria-label')}: ${option?.textContent.trim() || select.value}`);
+        trigger.setAttribute('aria-invalid', select.getAttribute('aria-invalid') || 'false');
+        if (select.getAttribute('aria-describedby')) trigger.setAttribute('aria-describedby', select.getAttribute('aria-describedby'));
+        if (activeTypePicker === picker && select.disabled) closeTypeMenu();
+    }
+    function syncTypePickers() {
+        root.querySelectorAll('[data-equipment-type-picker]').forEach(wrapper => {
+            const select = wrapper.querySelector('select');
+            if (!select.equipmentTypePicker) {
+                const trigger = document.createElement('button');
+                trigger.type = 'button';
+                trigger.className = 'equipment-type-trigger';
+                if (select.matches('[data-equipment-row-type]')) trigger.classList.add('ingredient-row-section');
+                trigger.dataset.equipmentTypeTrigger = '';
+                trigger.setAttribute('aria-haspopup', 'listbox');
+                trigger.setAttribute('aria-expanded', 'false');
+                trigger.setAttribute('aria-controls', typeMenu.id);
+                const picker = {select, trigger, row: select.closest(rowSelector)};
+                select.equipmentTypePicker = picker;
+                trigger.addEventListener('click', () => activeTypePicker === picker ? closeTypeMenu(true) : openTypeMenu(picker));
+                trigger.addEventListener('keydown', event => {
+                    if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key) ||
+                        (event.key.length === 1 && event.key !== ' ' && !event.ctrlKey && !event.metaKey && !event.altKey)) {
+                        event.preventDefault();
+                        if (openTypeMenu(picker) && !['ArrowDown', 'ArrowUp'].includes(event.key)) typeMenuKey(event);
+                    }
+                });
+                select.addEventListener('change', () => syncTypePicker(picker));
+                wrapper.querySelector(':scope > .equipment-type-label')?.remove();
+                select.hidden = true;
+                wrapper.prepend(trigger);
+            }
+            syncTypePicker(select.equipmentTypePicker);
+        });
+        if (activeTypePicker && !activeTypePicker.trigger.isConnected) closeTypeMenu();
+    }
+    typeMenu.addEventListener('keydown', typeMenuKey);
+    document.addEventListener('pointerdown', event => {
+        if (activeTypePicker && !typeMenu.contains(event.target) && !activeTypePicker.trigger.contains(event.target)) closeTypeMenu();
+    });
+    document.addEventListener('focusin', event => {
+        if (activeTypePicker && !typeMenu.contains(event.target) && event.target !== activeTypePicker.trigger) closeTypeMenu();
+    });
+    window.addEventListener('resize', positionTypeMenu);
+    window.visualViewport?.addEventListener('resize', positionTypeMenu);
+    document.addEventListener('scroll', event => { if (event.target !== typeMenu) positionTypeMenu(); }, true);
+
     function state(row) {
         if (!row.equipmentOriginal) {
             row.equipmentAliases = [...row.querySelectorAll('[data-equipment-alias]')].map(chip => chip.dataset.equipmentAlias);
@@ -140,6 +305,7 @@
             }
             syncMobile(row);
         });
+        syncTypePickers();
         if (aliasAnchor) window.MasterDataAliasEditor?.positionPopover(manager, aliasAnchor);
     }
     function select(row) {
@@ -332,7 +498,7 @@
     const update = event => {
         if (!event.target.matches('[data-equipment-row-name], [data-equipment-row-type]')) return;
         const row = event.target.closest(rowSelector), value = event.target.value;
-        if (!edit(row)) { event.target.value = state(row)[event.target === field(row) ? 'name' : 'equipment_type']; return; }
+        if (!edit(row)) { event.target.value = state(row)[event.target === field(row) ? 'name' : 'equipment_type']; syncTypePickers(); return; }
         event.target.value = value; status(row); sync();
     };
     root.addEventListener('input', update); root.addEventListener('change', update);

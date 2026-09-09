@@ -2,3 +2,30 @@
    ingredient-mobile-rows.css. Only equipment-specific states belong here. */
 .equipment-master-page .master-data-results-header { border: 0; border-radius: 0; background: transparent; }
 .equipment-master-page .equipment-field-error { color: var(--app-danger); }
+
+.equipment-type-label { display: inline-flex; align-items: center; gap: 8px; min-width: 0; text-align: left; }
+.equipment-type-icon,
+.equipment-master-page .master-data-filter-form .equipment-type-icon { display: inline-flex; flex: 0 0 18px; width: 18px; height: 18px; align-items: center; justify-content: center; color: var(--app-primary-hover); }
+.equipment-type-icon svg { display: block; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.equipment-type-text { white-space: normal; overflow-wrap: normal; }
+.equipment-type-picker { display: flex; align-items: center; min-width: 0; width: 100%; }
+/* Keep the native select usable until the icon picker is initialized. */
+.equipment-type-picker > .equipment-type-label > .equipment-type-text { display: none; }
+.equipment-type-picker select[hidden] { display: none; }
+.equipment-master-page .equipment-type-trigger,
+.equipment-master-page .master-data-filter-form .equipment-type-trigger { display: flex; align-items: center; width: 100%; min-width: 0; min-height: 38px; margin: 0; padding: 7px 10px; border: 1px solid var(--app-border); border-radius: 6px; background: var(--app-surface); color: var(--app-text-strong); font: inherit; text-align: left; cursor: pointer; transition: none; }
+.equipment-master-page .master-data-filter-form .equipment-type-label,
+.equipment-master-page .master-data-filter-form .equipment-type-text { color: var(--app-text-strong); font: inherit; text-transform: none; }
+.equipment-master-page .equipment-type-trigger.ingredient-row-section { height: auto; border-color: transparent; background: transparent; font-size: 12px; font-weight: 750; }
+.equipment-master-page .equipment-type-trigger:is(:hover, [aria-expanded="true"]):not(:disabled) { border-color: var(--app-border); background: var(--app-surface-soft); }
+.equipment-master-page .equipment-type-trigger:focus-visible { outline: 2px solid var(--app-primary-hover); outline-offset: 2px; }
+.equipment-master-page .equipment-type-trigger:disabled { cursor: default; }
+.equipment-type-menu { position: fixed; inset: auto; margin: 0; box-sizing: border-box; overflow-y: auto; overscroll-behavior: contain; padding: 4px; border: 1px solid var(--app-border); border-radius: 8px; background: var(--app-surface); color: var(--app-text-strong); box-shadow: 0 8px 24px rgb(0 0 0 / 18%); font-size: 14px; }
+.equipment-type-menu[hidden] { display: none; }
+.equipment-type-menu:focus-visible { outline: 2px solid var(--app-primary-hover); outline-offset: 2px; }
+.equipment-type-menu [role="option"] { display: flex; align-items: center; box-sizing: border-box; min-height: 44px; padding: 8px 10px; border: 1px solid transparent; border-radius: 5px; cursor: pointer; }
+.equipment-type-menu [role="option"]:is(:hover, .is-active) { background: var(--app-surface-soft); border-color: var(--app-primary-hover); }
+.equipment-type-menu [aria-selected="true"] { font-weight: 750; }
+@media (max-width: 760px) {
+    .equipment-master-page .equipment-type-trigger.ingredient-row-section { min-height: 44px; font-size: 16px; }
+}

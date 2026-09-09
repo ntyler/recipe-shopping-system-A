@@ -17,7 +17,14 @@
 {%- endmacro %}
 
 {% macro registry_section_icon(name) -%}
-{% if name == "leaf" %}<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M5 19c8 0 14-6 14-14C11 5 5 11 5 19Z"></path><path d="M5 19c3-4 7-7 12-10"></path></svg>
+{% if name == "cooking-pot" %}{% from "includes/app_shell_macros.html" import svg_icon %}{{ svg_icon(name) }}
+{% elif name == "oven-tray" %}<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"></rect><rect x="6" y="9" width="12" height="6" rx="1"></rect><path d="M1 10v4M23 10v4"></path></svg>
+{% elif name == "blender" %}<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M6 4h11l-2 11H8L6 4ZM6 4V2h11v2M8 15l-2 6h12l-3-6M17 6h2a2 2 0 0 1 0 4h-3M9 8h3M9 11h2"></path><circle cx="12" cy="18" r=".5"></circle></svg>
+{% elif name == "measuring-cup" %}<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M3 5h13v14H5V8L3 5ZM16 8h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-3M8 9h4M8 12h2M8 15h4"></path></svg>
+{% elif name == "mixing-bowl" %}<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><ellipse cx="12" cy="8" rx="9" ry="3"></ellipse><path d="M3 8c0 7 4 12 9 12s9-5 9-12M8 19v2h8v-2"></path></svg>
+{% elif name == "storage-container" %}<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><rect x="3" y="6" width="18" height="4" rx="1"></rect><path d="M5 10v10h14V10M9 6V3h6v3M9 14h6v3H9Z"></path></svg>
+{% elif name == "misc-grid" %}<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><rect x="3" y="3" width="6" height="6" rx="1"></rect><rect x="15" y="3" width="6" height="6" rx="1"></rect><rect x="3" y="15" width="6" height="6" rx="1"></rect><rect x="15" y="15" width="6" height="6" rx="1"></rect></svg>
+{% elif name == "leaf" %}<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M5 19c8 0 14-6 14-14C11 5 5 11 5 19Z"></path><path d="M5 19c3-4 7-7 12-10"></path></svg>
 {% elif name == "fish" %}<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 12c3-4 7-6 12-4l4-3v14l-4-3c-5 2-9 0-12-4Z"></path><path d="M8 12h.01"></path></svg>
 {% elif name == "dairy" %}<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M8 3h7l1 4 2 2v12H6V9l2-2Z"></path><path d="M8 7h8"></path><path d="M9 11h6v6H9Z"></path></svg>
 {% elif name == "snowflake" %}<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M12 2v20"></path><path d="m4 6.5 16 11"></path><path d="m20 6.5-16 11"></path><path d="m9 4 3 3 3-3"></path><path d="m9 20 3-3 3 3"></path></svg>
@@ -39,4 +46,23 @@
 {% elif name == "paw" %}<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><circle cx="7" cy="8" r="2"></circle><circle cx="17" cy="8" r="2"></circle><circle cx="12" cy="5" r="2"></circle><path d="M6.5 18c0-3 2.5-6 5.5-6s5.5 3 5.5 6c0 2-2 3-5.5 1.5C8.5 21 6.5 20 6.5 18Z"></path></svg>
 {% elif name == "basket" %}<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M7 9 10 4"></path><path d="m17 9-3-5"></path><path d="M4 9h16l-2 10H6L4 9Z"></path><path d="M9 13v3"></path><path d="M15 13v3"></path></svg>
 {% endif %}
+{%- endmacro %}
+
+{# Presentation only: keys match the existing Equipment Type records. #}
+{% set equipment_type_icons = {
+    'COOKWARE': 'cooking-pot',
+    'BAKEWARE': 'oven-tray',
+    'APPLIANCES': 'blender',
+    'PREP TOOLS': 'whisk',
+    'MEASURING': 'measuring-cup',
+    'MIXING BOWLS': 'mixing-bowl',
+    'SERVING & STORAGE': 'storage-container',
+    'MISC': 'misc-grid'
+} %}
+
+{% macro equipment_type_label(section, label=none) -%}
+<span class="equipment-type-label" data-equipment-type-label="{{ section }}">
+    <span class="equipment-type-icon" data-equipment-type-icon="{{ equipment_type_icons.get(section, 'package') }}" aria-hidden="true">{{ registry_section_icon(equipment_type_icons.get(section, 'package')) }}</span>
+    <span class="equipment-type-text">{{ label if label is not none else section | title }}</span>
+</span>
 {%- endmacro %}

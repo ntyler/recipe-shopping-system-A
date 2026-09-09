@@ -169,6 +169,7 @@ const base = process.argv[2];
         const name = row.locator('[data-equipment-row-name]'), save = row.locator('[data-equipment-row-save]');
         const cancel = row.locator('[data-equipment-row-cancel]'), toggle = row.locator('[data-equipment-mobile-toggle]');
         const type = row.locator('[data-equipment-row-type]');
+        const typeTrigger = row.locator('[data-equipment-type-trigger]');
         const order = row.locator('[data-equipment-order-number]'), handle = row.locator('[data-equipment-order-handle]');
         const aliasTrigger = row.locator('[data-equipment-row-alias]'), aliases = page.locator('#equipmentAliasManager');
         const aliasInput = aliases.locator('[data-equipment-editor-alias-input]');
@@ -208,15 +209,15 @@ const base = process.argv[2];
             assert.notEqual(await row.evaluate(e => getComputedStyle(e).backgroundColor), 'rgba(0, 0, 0, 0)');
             assert(await row.locator(':scope > td').evaluateAll(es => es.every(e => getComputedStyle(e).backgroundColor === 'rgba(0, 0, 0, 0)')), 'All cells reveal the full-width row hover');
             assert.equal(await name.evaluate(e => getComputedStyle(e).borderTopColor), 'rgba(0, 0, 0, 0)');
-            assert.equal(await type.evaluate(e => getComputedStyle(e).borderTopColor), 'rgba(0, 0, 0, 0)');
+            assert.equal(await typeTrigger.evaluate(e => getComputedStyle(e).borderTopColor), 'rgba(0, 0, 0, 0)');
             await screenshot('hover');
-            await type.hover();
-            assert.notEqual(await type.evaluate(e => getComputedStyle(e).borderTopColor), 'rgba(0, 0, 0, 0)');
+            await typeTrigger.hover();
+            assert.notEqual(await typeTrigger.evaluate(e => getComputedStyle(e).borderTopColor), 'rgba(0, 0, 0, 0)');
             await name.hover();
             assert.notEqual(await name.evaluate(e => getComputedStyle(e).borderTopColor), 'rgba(0, 0, 0, 0)');
         }
         assert.equal(await name.evaluate(e => getComputedStyle(e).backgroundColor), 'rgba(0, 0, 0, 0)');
-        assert.equal(await type.evaluate(e => getComputedStyle(e).backgroundColor), 'rgba(0, 0, 0, 0)');
+        assert.equal(await typeTrigger.evaluate(e => getComputedStyle(e).backgroundColor), 'rgba(0, 0, 0, 0)');
         const restingMerge = await merge.boundingBox();
         await name.focus(); await page.mouse.move(0, 0);
         assert(await row.evaluate(e => e.classList.contains('is-selected')));
@@ -299,10 +300,10 @@ const base = process.argv[2];
         assert.equal(writes[0].order.position, initialOrder + 1);
         await screenshot('saved');
 
-        // Equipment Type is a transparent native inline field, including keyboard changes.
-        await type.focus();
+        // The icon picker preserves the select value and supports keyboard changes.
+        await typeTrigger.focus();
         const beforeType = await type.inputValue();
-        await type.press('Home'); await type.press('ArrowDown'); await type.press('Tab');
+        await typeTrigger.press('Home'); await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter');
         assert.notEqual(await type.inputValue(), beforeType);
         assert(await save.isVisible());
         await aliasTrigger.click();
@@ -310,7 +311,7 @@ const base = process.argv[2];
         await cancel.click();
         assert.equal(await type.inputValue(), beforeType);
         assert.equal(await row.getByText('cancel pot', {exact: true}).count(), 0, 'Cancel restores aliases and Equipment Type together');
-        await type.selectOption('BAKEWARE'); await save.click(); await saved();
+        await typeTrigger.click(); await page.getByRole('option', {name: 'Bakeware', exact: true}).click(); await save.click(); await saved();
         assert.equal(await type.inputValue(), 'BAKEWARE');
         assert.equal(writes.length, 2);
         await page.route('**' + updateURL, route => route.fulfill({status: 503, contentType: 'application/json', body: JSON.stringify({ok: false, error: 'Temporary test failure'})}));
@@ -391,7 +392,8 @@ const base = process.argv[2];
 
         // Equipment-specific filtering remains available in the compact toolbar.
         await page.locator('input[name="search"]').fill('Pan 03');
-        await page.locator('select[name="equipment_section"]').selectOption('COOKWARE');
+        await page.locator('.master-data-equipment-filter-field [data-equipment-type-trigger]').click();
+        await page.getByRole('option', {name: 'Cookware', exact: true}).click();
         await page.locator('select[name="sort"]').selectOption('usage_count_desc');
         await page.locator('select[name="limit"]').selectOption('50');
         await page.locator('.master-data-filter-form button[type="submit"]').click();
