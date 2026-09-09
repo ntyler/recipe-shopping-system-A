@@ -170,7 +170,7 @@ def test_merge_dialog_form_submission_uses_selected_target(equipment):
 
 
 def test_structured_alias_ids_and_options_survive_edit_and_merge(equipment, monkeypatch):
-    _, _, ids = equipment
+    _, database, ids = equipment
     monkeypatch.setenv("RECIPE_EQUIPMENT_SCHEMA_WRITES_ENABLED", "true")
     registry.update_equipment_master_record(ids["Pot"], {"aliases": ["Soup vessel"]}, user_id="user-a")
     with md.recipe_master_connection(user_id="user-a") as connection:
@@ -188,6 +188,17 @@ def test_structured_alias_ids_and_options_survive_edit_and_merge(equipment, monk
         assert tuple(alias) == (alias_id, ids["Pan"], "retired")
         option = connection.execute("SELECT equipment_id,matched_alias_id FROM recipe_equipment_options").fetchone()
         assert tuple(option) == (ids["Pan"], alias_id)
+    # An old malformed option may reference another account's alias without
+    # using its equipment_id. Protect that indirect link without exposing it.
+    with md.recipe_master_connection(user_id="user-b") as connection:
+        foreign_req = connection.execute("INSERT INTO recipe_equipment_requirements(requirement_id,user_id,recipe_id,created_at,updated_at) VALUES('foreign','user-b','secret recipe','now','now')").lastrowid
+        connection.execute("""INSERT INTO recipe_equipment_options(option_id,user_id,requirement_id,matched_alias_id,created_at,updated_at)
+                              VALUES('foreign','user-b',?,?,'now','now')""", (foreign_req, alias_id))
+    before = database.read_bytes()
+    own = registry.equipment_editor_record(ids["Pan"], user_id="user-a")
+    assert own["usage_count"] == 1 and not own["can_merge"]
+    assert registry.merge_equipment_master_records(ids["Pan"], ids["Tray"], user_id="user-a")["status"] == 409
+    assert database.read_bytes() == before
 
 
 @pytest.mark.parametrize("admin", [False, True])
