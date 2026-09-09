@@ -91,6 +91,15 @@ def sign_in(client, user_id):
         client._master_data_get_follows_canonical = True
 
 
+def set_master_data_admin_access(user_id, enabled=True):
+    users_file = user_account_service.USERS_FILE
+    data = json.loads(users_file.read_text(encoding="utf-8"))
+    for user in data["users"]:
+        if user["user_id"] == user_id:
+            user["admin_access_enabled"] = enabled
+    users_file.write_text(json.dumps(data), encoding="utf-8")
+
+
 def seed_master_records():
     master_data.sync_recipe_master_records(
         "https://example.com/user-a-soup",
@@ -137,10 +146,9 @@ def test_equipment_structured_review_ui_is_dark_launched(monkeypatch, tmp_path):
 
     monkeypatch.setenv("RECIPE_EQUIPMENT_STRUCTURED_UI_TENANTS", "user-a")
     preview_html = client.get("/admin/master-data/equipment").get_data(as_text=True)
-    assert "data-equipment-normalization-review" in preview_html
-    assert "Decision writes are locked until the migration dry run is approved." in preview_html
+    assert "data-equipment-normalization-review" not in preview_html
     assert "Large pot" in preview_html
-    assert "No structured-equipment decisions are needed on this page." in preview_html
+    assert "Structured Migration Preview" not in preview_html
     assert '<button type="button" disabled>Accept</button>' not in preview_html
 
 
@@ -181,7 +189,7 @@ def test_master_data_pages_scope_normal_users_to_their_records(monkeypatch, tmp_
     assert "Large pot" in equipment_html
     assert "Whisk" not in equipment_html
     assert '<h1 id="masterDataTitle">Equipment</h1>' in equipment_html
-    assert "Review equipment detected across your recipes." in equipment_html
+    assert "Review equipment detected across your recipes in the active workspace." in equipment_html
     assert 'name="scope"' not in equipment_html
     assert "data-equipment-master-admin-view" not in equipment_html
 
@@ -403,6 +411,11 @@ def test_misc_reclassification_undo_route_and_button_restore_last_apply(monkeypa
 def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
     seed_master_records()
+    master_data.sync_recipe_master_records(
+        "https://example.com/admin-soup",
+        recipe_data={"equipment": [{"equipment": "Large pot"}, {"equipment": "Whisk"}]},
+        user_id="admin-user",
+    )
 
     with app.test_client() as client:
         sign_in(client, "admin-user")
@@ -497,9 +510,10 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert 'data-equipment-master-read-only' in equipment_html
     assert "Recipe-derived" in equipment_html
     assert "Names customizable" in equipment_html
-    assert "data-equipment-master-admin-view" in equipment_html
-    assert "Viewing all users" in equipment_html
-    assert 'name="scope"' in equipment_html
+    assert "data-equipment-master-admin-view" not in equipment_html
+    assert "Viewing all users" not in equipment_html
+    assert "Viewing my data" not in equipment_html
+    assert 'name="scope"' not in equipment_html
     assert 'class="master-data-results-header"' not in equipment_html
     assert "Showing 1-2 of 2 equipment." in equipment_html
     assert '<th scope="col">Item</th>' in equipment_html
@@ -673,16 +687,14 @@ def test_equipment_usage_modal_endpoint_preserves_workspace_scope(monkeypatch, t
         )
 
     own_payload = own_response.get_json()
-    admin_payload = admin_response.get_json()
     assert own_response.status_code == 200
     assert own_payload["record"]["name"] == "Large pot"
     assert own_payload["total"] == 1
     assert own_payload["references"][0]["original_recipe_text"] == "Large pot"
     assert urlsplit(own_payload["references"][0]["edit_url"]).path == "/recipe/edit"
     assert blocked_response.status_code == 404
-    assert admin_response.status_code == 200
-    assert admin_payload["record"]["name"] == "Whisk"
-    assert admin_payload["references"][0]["edit_url"] == ""
+    assert admin_response.status_code == 404
+    assert "Whisk" not in admin_response.get_data(as_text=True)
 
 
 def test_equipment_display_name_route_updates_only_the_active_workspace(monkeypatch, tmp_path):
@@ -872,6 +884,11 @@ def test_misc_reclassification_preview_uses_dedicated_responsive_ui():
 def test_equipment_master_data_filters_and_groups_by_equipment_type(monkeypatch, tmp_path):
     app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
     seed_master_records()
+    master_data.sync_recipe_master_records(
+        "https://example.com/admin-soup",
+        recipe_data={"equipment": [{"equipment": "Large pot"}, {"equipment": "Whisk"}]},
+        user_id="admin-user",
+    )
 
     with app.test_client() as client:
         sign_in(client, "admin-user")
@@ -895,9 +912,14 @@ def test_equipment_master_data_filters_and_groups_by_equipment_type(monkeypatch,
     assert 'aria-label="Cookware equipment"' in cookware_html
 
 
-def test_equipment_user_column_only_renders_for_all_users_scope(monkeypatch, tmp_path):
+def test_equipment_user_column_never_renders_and_admin_rows_remain_inline_editable(monkeypatch, tmp_path):
     app, _db_path, _users_root = configure_master_data_app(monkeypatch, tmp_path)
     seed_master_records()
+    master_data.sync_recipe_master_records(
+        "https://example.com/admin-soup",
+        recipe_data={"equipment": [{"equipment": "Admin skillet"}]},
+        user_id="admin-user",
+    )
 
     with app.test_client() as client:
         sign_in(client, "user-a")
@@ -915,17 +937,17 @@ def test_equipment_user_column_only_renders_for_all_users_scope(monkeypatch, tmp
     specific_soup = BeautifulSoup(specific_response.get_data(as_text=True), "html.parser")
     all_soup = BeautifulSoup(all_response.get_data(as_text=True), "html.parser")
 
-    for soup, all_users, editable in ((mine_soup, False, True), (specific_soup, False, False), (all_soup, True, False)):
+    for soup in (mine_soup, specific_soup, all_soup):
         tables = soup.select('.master-data-equipment-table')
         assert len(tables) == 1
-        labels = ['Item', 'Aliases'] + (['User'] if all_users else []) + ['Used In', 'Updated', 'Action']
+        labels = ['Item', 'Aliases', 'Used In', 'Updated', 'Action']
         assert [header.get_text(strip=True) for header in tables[0].select('thead th')] == labels
         rows = tables[0].select('[data-equipment-master-row]')
         assert rows
         for row in rows:
             assert [cell.get('data-label') for cell in row.find_all('td', recursive=False)] == labels
-            assert bool(row.select_one('[data-equipment-row-name]')) is editable
-            assert bool(row.select_one('[data-equipment-row-save]')) is editable
+            assert row.select_one('[data-equipment-row-name]') is not None
+            assert row.select_one('[data-equipment-row-save]') is not None
             assert row.select_one('[data-equipment-master-display-edit]') is None
 
     mine_table = mine_response.get_data(as_text=True).split(
@@ -938,16 +960,17 @@ def test_equipment_user_column_only_renders_for_all_users_scope(monkeypatch, tmp
         '<table class="master-data-table', 1
     )[1].split("</table>", 1)[0]
 
-    for single_user_table in (mine_table, specific_table):
+    for single_user_table in (mine_table, specific_table, all_table):
         assert '<th scope="col">User</th>' not in single_user_table
         assert 'class="master-data-user-data-cell"' not in single_user_table
         assert 'data-master-reference-row' not in single_user_table
         assert "master-data-table--show-user" not in single_user_table
 
-    assert '<th scope="col">User</th>' in all_table
-    assert 'class="master-data-user-data-cell"' in all_table
-    assert 'data-master-reference-row' not in all_table
-    assert "master-data-table--show-user" in all_table
+    assert "Large pot" in mine_table
+    for admin_table in (specific_table, all_table):
+        assert "Admin skillet" in admin_table
+        assert "Whisk" not in admin_table
+        assert "Large pot" not in admin_table
 
 
 def test_equipment_summary_counts_include_unused_records(monkeypatch, tmp_path):
@@ -1498,6 +1521,7 @@ def test_ingredient_master_record_edit_is_scoped_and_admin_can_edit_other_users(
 
 def test_admin_backfill_route_uses_existing_service(monkeypatch, tmp_path):
     app, db_path, users_root = configure_master_data_app(monkeypatch, tmp_path)
+    set_master_data_admin_access("user-a")
     data_root = users_root / "user-a" / "recipe-extractor" / "data"
     output_root = data_root / "output"
     output_root.mkdir(parents=True)
@@ -1521,7 +1545,7 @@ def test_admin_backfill_route_uses_existing_service(monkeypatch, tmp_path):
     )
 
     with app.test_client() as client:
-        sign_in(client, "admin-user")
+        sign_in(client, "user-a")
         response = client.post(
             "/admin/master-data/backfill",
             data={"record_type": "equipment", "include_legacy": "1"},
@@ -1537,6 +1561,7 @@ def test_admin_backfill_route_uses_existing_service(monkeypatch, tmp_path):
 
 def test_admin_backfill_fetch_response_exposes_progress(monkeypatch, tmp_path):
     app, _db_path, users_root = configure_master_data_app(monkeypatch, tmp_path)
+    set_master_data_admin_access("user-a")
     data_root = users_root / "user-a" / "recipe-extractor" / "data"
     output_root = data_root / "output"
     output_root.mkdir(parents=True)
@@ -1561,7 +1586,7 @@ def test_admin_backfill_fetch_response_exposes_progress(monkeypatch, tmp_path):
     )
 
     with app.test_client() as client:
-        sign_in(client, "admin-user")
+        sign_in(client, "user-a")
         response = client.post(
             "/admin/master-data/backfill",
             data={"record_type": "ingredients", "job_id": "test-master-progress"},
@@ -1771,11 +1796,11 @@ def test_admin_generate_missing_images_route_starts_equipment_job(monkeypatch, t
     payload = response.get_json()
     assert response.status_code == 200
     assert payload["ok"] is True
-    assert payload["scope"] == "user"
+    assert payload["scope"] == "mine"
     assert captured == {
         "job_id": "equipment-image-job-1",
         "record_type": "equipment",
-        "user_id": "user-b",
+        "user_id": "admin-user",
         "include_all_users": False,
         "search": "pin",
     }

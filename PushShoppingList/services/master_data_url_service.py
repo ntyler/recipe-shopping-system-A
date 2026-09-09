@@ -119,8 +119,8 @@ def build_master_data_url(
     pairs = clean_master_data_query_parameters(
         parameters,
         viewer_user_id=viewer_user_id,
-        scope=scope,
-        target_user_id=target_user_id,
+        scope="mine" if page == "equipment" else scope,
+        target_user_id="" if page == "equipment" else target_user_id,
         overrides=overrides,
     )
     query = urlencode(pairs, doseq=True)

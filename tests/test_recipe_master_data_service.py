@@ -236,6 +236,9 @@ def test_equipment_display_name_override_is_user_scoped_and_survives_sync(monkey
         "Family stockpot",
         user_id="user-a",
     )
+    saved_record = master_data.master_record_for_id(
+        "equipment", user_a_equipment["id"], user_id="user-a",
+    )
     blocked = master_data.update_equipment_display_name(
         user_b_equipment["id"],
         "Not mine",
@@ -250,6 +253,7 @@ def test_equipment_display_name_override_is_user_scoped_and_survives_sync(monkey
         "name": "Family stockpot",
         "detected_name": "Large pot",
         "has_display_name_override": True,
+        "updated_at": saved_record["updated_at"],
     }
     assert blocked["status"] == 404
     assert user_a_rows[0]["name"] == "Family stockpot"

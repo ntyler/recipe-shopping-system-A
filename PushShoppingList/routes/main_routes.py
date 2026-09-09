@@ -1142,8 +1142,10 @@ def validate_master_data_target_scope(is_admin, values=None, *, allow_admin_scop
     return mine
 
 
-def master_data_scope(is_admin):
-    return validate_master_data_target_scope(is_admin, request.args)
+def master_data_scope(is_admin, *, record_type=None):
+    return validate_master_data_target_scope(
+        is_admin, request.args, allow_admin_scope=record_type != "equipment",
+    )
 
 
 def build_canonical_master_data_url(
@@ -1197,6 +1199,7 @@ def canonicalize_master_data_redirect_url(
             is_admin_user(current_public_user()),
             parameters,
             allow_admin_scope=page not in {
+                "equipment",
                 "store_sections",
                 "units",
                 "types",
@@ -1253,10 +1256,11 @@ def ingredient_duplicate_review_workspace(active_public_user, values):
     return "" if scope_info["scope"] == "all" else scope_info["user_id"]
 
 
-def master_data_form_scope():
+def master_data_form_scope(*, record_type=None):
     scope_info = validate_master_data_target_scope(
         is_admin_user(current_public_user()),
         request.form,
+        allow_admin_scope=record_type != "equipment",
     )
     scope_info["viewer_user_id"] = active_user_id()
     return scope_info
@@ -1276,7 +1280,12 @@ def master_data_context(record_type, scope_info=None):
     limit = int_query_arg("limit", 100, minimum=1, maximum=500)
     page = int_query_arg("page", 1, minimum=1)
     offset = (page - 1) * limit
-    scope_info = scope_info or master_data_scope(is_admin)
+    if record_type == "equipment":
+        # Equipment is always an active-workspace surface, including for admins.
+        scope_info = master_data_scope(is_admin, record_type=record_type)
+        scope_info["viewer_user_id"] = active_user_id()
+    else:
+        scope_info = scope_info or master_data_scope(is_admin)
     store_section = ""
     store_section_details = []
     if record_type == "ingredients":
@@ -1325,7 +1334,7 @@ def master_data_context(record_type, scope_info=None):
                 user_id=scope_info["user_id"],
                 include_all_users=scope_info["include_all_users"],
             )
-        if is_admin:
+        if is_admin and record_type != "equipment":
             registered_user_ids = master_data_registered_user_ids()
             available_user_ids = [
                 user_id
@@ -1581,7 +1590,7 @@ def master_data_context(record_type, scope_info=None):
         "store_section_icons": {section["section_key"]: section["icon"] for section in store_section_details},
         "equipment_section": equipment_section,
         "equipment_summary": equipment_summary,
-        "equipment_review_enabled": equipment_review_enabled,
+        "equipment_review_enabled": equipment_review_enabled and bool(equipment_review_queue),
         # Phase 4B intentionally exposes no review-write endpoint. The controls
         # remain disabled even if a review-write environment value is present.
         "equipment_review_writes_enabled": False,
@@ -1591,13 +1600,7 @@ def master_data_context(record_type, scope_info=None):
         else [],
         "group_by_store_section": bool(record_type == "ingredients" and not store_section),
         "group_by_equipment_section": bool(record_type == "equipment"),
-        "table_column_count": (
-            6
-            if record_type == "ingredients"
-            else 6
-            if record_type == "equipment" and scope_info["scope"] == "all"
-            else 5
-        ),
+        "table_column_count": 6 if record_type == "ingredients" else 5,
         "sort_options": [
             {"value": "updated_at_desc", "label": "Updated At"},
             {"value": "usage_count_desc", "label": "Usage Count"},
@@ -1614,7 +1617,11 @@ def master_data_context(record_type, scope_info=None):
         "available_users": available_users,
         "current_scope_user": current_scope_user,
         "scope_user": scope_user,
-        "messages": session.pop("recipe_master_data_messages", []),
+        "messages": (
+            session.pop("equipment_master_data_messages", [])
+            if record_type == "equipment"
+            else session.pop("recipe_master_data_messages", [])
+        ),
         "ingredient_url": ingredient_url,
         "equipment_url": equipment_url,
         "units_url": units_url,
@@ -1690,7 +1697,9 @@ def master_data_ingredients_route():
 
 @main_bp.route("/admin/master-data/equipment")
 def master_data_equipment_route():
-    scope_info, canonical_redirect = validate_canonical_master_data_page_request("equipment")
+    scope_info, canonical_redirect = validate_canonical_master_data_page_request(
+        "equipment", allow_admin_scope=False,
+    )
     if canonical_redirect:
         return canonical_redirect
     return render_master_data_page("equipment", scope_info)
@@ -1713,7 +1722,7 @@ def equipment_master_display_name_route(equipment_id):
         equipment_id,
         payload.get("display_name"),
         reset=reset,
-        user_id=active_user_id(),
+        user_id=recipe_master_data.scoped_recipe_user_id(),
     )
     if result.get("ok"):
         result["record"]["updated_at_label"] = master_data_date_label(result["record"]["updated_at"])
@@ -2949,7 +2958,7 @@ def master_data_record_references_route(record_type, record_id):
         }), 404
 
     active_public_user = current_public_user()
-    scope_info = master_data_scope(is_admin_user(active_public_user))
+    scope_info = master_data_scope(is_admin_user(active_public_user), record_type=record_type)
     references = recipe_master_data.list_master_record_recipe_references(
         record_type,
         record_id,
@@ -3400,7 +3409,10 @@ def recipe_master_data_backfill_route():
 
     progress = recipe_master_data.recipe_master_backfill_progress(job_id)
 
-    session["recipe_master_data_messages"] = [{
+    session[
+        "equipment_master_data_messages"
+        if record_type == "equipment" else "recipe_master_data_messages"
+    ] = [{
         "category": category,
         "text": message,
     }]
@@ -3463,7 +3475,7 @@ def recipe_master_data_generate_missing_images_route():
             "error": "Missing-image generation is not available for this master data type.",
         }), 400
 
-    scope_info = master_data_form_scope()
+    scope_info = master_data_form_scope(record_type=record_type)
     redirect_url = canonicalize_master_data_redirect_url(
         request.form.get("redirect_url"),
         default_page=record_type,
@@ -3504,7 +3516,13 @@ def recipe_master_data_image_generation_status_route():
 
     job_id = recipe_master_data.clean_text(request.args.get("job_id"))
     progress = recipe_master_images.master_image_progress(job_id)
-    if not progress:
+    if not progress or (
+        progress.get("record_type") == "equipment"
+        and (
+            progress.get("include_all_users")
+            or progress.get("user_id") != recipe_master_data.scoped_recipe_user_id()
+        )
+    ):
         return jsonify({
             "ok": False,
             "success": False,

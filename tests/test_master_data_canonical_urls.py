@@ -1156,7 +1156,7 @@ def test_admin_mine_specific_user_and_all_scopes_remain_distinct(master_data_app
         assert_private_no_store(response)
 
 
-def test_admin_legacy_target_bookmark_redirects_to_explicit_user_scope(
+def test_admin_legacy_equipment_target_bookmark_redirects_to_active_workspace(
     master_data_app,
 ):
     with master_data_app.test_client() as client:
@@ -1170,8 +1170,6 @@ def test_admin_legacy_target_bookmark_redirects_to_explicit_user_scope(
     path, pairs = location_parts(response)
     assert path == "/admin/master-data/equipment"
     assert query_multimap(pairs) == {
-        "scope": ["user"],
-        "user_id": ["user-b"],
         "search": ["whisk"],
     }
     assert_private_no_store(response)
@@ -1340,6 +1338,7 @@ def test_page_tabs_keep_canonical_admin_target_scope(master_data_app):
     for link in tab_links:
         path, params = canonical_query_from_href(link["href"])
         if path in {
+            "/admin/master-data/equipment",
             "/admin/master-data/store-sections",
             "/admin/master-data/units",
             "/admin/master-data/types",

@@ -4,6 +4,9 @@ import threading
 import uuid
 
 import requests
+from flask import has_request_context
+from werkzeug.exceptions import Forbidden
+from werkzeug.exceptions import NotFound
 
 from PushShoppingList.services import recipe_master_data_service as master_data
 from PushShoppingList.services.image_variant_service import ensure_webp_variants
@@ -105,8 +108,18 @@ def start_master_image_progress(job_id, record_type="ingredients", user_id="", i
     job_id = str(job_id or "").strip()
     if not job_id:
         return None
+    if record_type == "equipment" and has_request_context():
+        user_id = master_data.scoped_equipment_user_id()
+        include_all_users = False
 
     with MASTER_IMAGE_PROGRESS_LOCK:
+        existing = MASTER_IMAGE_PROGRESS_RUNS.get(job_id)
+        if has_request_context() and existing and (
+            record_type == "equipment" or existing.get("record_type") == "equipment"
+        ):
+            owner_id = master_data.scoped_equipment_user_id()
+            if existing.get("user_id") != owner_id or existing.get("include_all_users"):
+                raise Forbidden("Image generation job belongs to another workspace.")
         progress = _new_image_progress(
             job_id,
             record_type=record_type,
@@ -120,15 +133,27 @@ def start_master_image_progress(job_id, record_type="ingredients", user_id="", i
 
 
 def master_image_progress(job_id=None):
+    def is_visible(progress):
+        if not has_request_context() or progress.get("record_type") != "equipment":
+            return True
+        owner_id = master_data.scoped_equipment_user_id()
+        return (
+            progress.get("user_id") == owner_id
+            and not progress.get("include_all_users")
+            and all(item.get("user_id") == owner_id for item in progress.get("items", []))
+        )
+
     with MASTER_IMAGE_PROGRESS_LOCK:
         if job_id:
             progress = MASTER_IMAGE_PROGRESS_RUNS.get(str(job_id or "").strip())
         else:
             progress = None
             for candidate in MASTER_IMAGE_PROGRESS_RUNS.values():
+                if not is_visible(candidate):
+                    continue
                 if progress is None or str(candidate.get("updated_at") or "") > str(progress.get("updated_at") or ""):
                     progress = candidate
-        if not progress:
+        if not progress or not is_visible(progress):
             return None
         return {
             **progress,
@@ -144,6 +169,19 @@ def update_master_image_progress(job_id, event, payload=None):
 
     with MASTER_IMAGE_PROGRESS_LOCK:
         progress = MASTER_IMAGE_PROGRESS_RUNS.get(job_id)
+        if has_request_context() and (
+            payload.get("record_type") == "equipment"
+            or (progress and progress.get("record_type") == "equipment")
+        ):
+            owner_id = master_data.scoped_equipment_user_id()
+            if progress and (
+                progress.get("user_id") != owner_id or progress.get("include_all_users")
+            ):
+                raise Forbidden("Image generation job belongs to another workspace.")
+            row = payload.get("row")
+            if isinstance(row, dict) and not _equipment_image_row_is_accessible(row, "equipment"):
+                raise NotFound("Equipment was not found.")
+            payload = {**payload, "user_id": owner_id, "include_all_users": False}
         if progress is None:
             progress = _new_image_progress(
                 job_id,
@@ -223,6 +261,7 @@ def missing_master_image_rows(record_type="ingredients", user_id=None, search=No
     config = master_data.master_record_table_config(record_type)
     usage_table = config["usage_table"]
     usage_fk = config["usage_fk"]
+    usage_count = "COUNT(DISTINCT u.recipe_id)" if record_type == "equipment" else "COUNT(u.id)"
 
     where, params = master_data.master_record_filters(
         record_type,
@@ -252,7 +291,7 @@ def missing_master_image_rows(record_type="ingredients", user_id=None, search=No
                 m.image_path,
                 m.created_at,
                 m.updated_at,
-                COUNT(u.id) AS usage_count
+                {usage_count} AS usage_count
               FROM {record_type} m
               LEFT JOIN {usage_table} u
                 ON u.{usage_fk} = m.id
@@ -298,7 +337,18 @@ def build_master_image_prompt(record_type, row, index):
     return build_master_ingredient_image_prompt(row, index)
 
 
+def _equipment_image_row_is_accessible(row, record_type):
+    if record_type != "equipment" or not has_request_context():
+        return True
+    owner_id = master_data.scoped_equipment_user_id()
+    return master_data.clean_text(row.get("user_id")) == owner_id and bool(
+        master_data.master_record_for_id("equipment", row.get("id"), user_id=owner_id)
+    )
+
+
 def request_master_image_bytes(prompt, row, record_type="ingredients"):
+    if not _equipment_image_row_is_accessible(row, record_type):
+        raise NotFound("Equipment was not found.")
     timeout_seconds = int(os.getenv("OPENAI_STEP_IMAGE_TIMEOUT_SECONDS", "90"))
     model = os.getenv("OPENAI_STEP_IMAGE_MODEL", "gpt-image-1")
     size = os.getenv("OPENAI_STEP_IMAGE_SIZE", "1024x1024")
@@ -358,6 +408,8 @@ def request_master_ingredient_image_bytes(prompt, row):
 
 
 def save_master_record_image(row, image_bytes, record_type="ingredients"):
+    if not _equipment_image_row_is_accessible(row, record_type):
+        raise NotFound("Equipment was not found.")
     STEP_IMAGE_FOLDER.mkdir(parents=True, exist_ok=True)
     record_id = int(row.get("id") or 0)
     label = master_image_type_label(record_type)
@@ -376,9 +428,18 @@ def save_master_ingredient_image(row, image_bytes):
 def attach_master_record_image(row, image_url, image_path, record_type="ingredients"):
     if record_type not in SUPPORTED_MASTER_IMAGE_TYPES:
         raise ValueError("Unsupported master image record type.")
+    if not _equipment_image_row_is_accessible(row, record_type):
+        return False
 
     now = master_data.utc_now_iso()
-    with master_data.recipe_master_connection(user_id=row.get("user_id")) as connection:
+    connection_context = (
+        master_data.existing_recipe_master_connection(user_id=row.get("user_id"), initialize_schema=False)
+        if record_type == "equipment"
+        else master_data.recipe_master_connection(user_id=row.get("user_id"))
+    )
+    with connection_context as connection:
+        if connection is None:
+            return False
         existing = connection.execute(
             f"""
             SELECT image_url
@@ -424,6 +485,9 @@ def generate_missing_master_images(
     search=None,
     max_errors=10,
 ):
+    if record_type == "equipment" and has_request_context():
+        user_id = master_data.scoped_equipment_user_id()
+        include_all_users = False
     try:
         rows = missing_master_image_rows(
             record_type=record_type,
@@ -488,6 +552,10 @@ def start_master_image_generation_job(
     include_all_users=False,
     search=None,
 ):
+    # Capture the authenticated owner before the worker loses request context.
+    if record_type == "equipment" and has_request_context():
+        user_id = master_data.scoped_equipment_user_id()
+        include_all_users = False
     start_master_image_progress(
         job_id,
         record_type=record_type,

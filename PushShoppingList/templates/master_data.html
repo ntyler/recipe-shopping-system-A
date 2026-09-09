@@ -32,6 +32,9 @@
 {% endif %}
 {% endblock %}
 {% macro master_data_reference_url(row, master_data) -%}
+    {%- if master_data.record_type == 'equipment' -%}
+        {{- url_for('main_bp.master_data_record_references_route', record_type='equipment', record_id=row.id) -}}
+    {%- else -%}
     {{- url_for(
         'main_bp.master_data_record_references_route',
         record_type=master_data.record_type,
@@ -40,6 +43,7 @@
         scope=master_data.scope if master_data.scope in ['all', 'user'] else none,
         user_id=master_data.scope_user_id if master_data.scope == 'user' else none
     ) -}}
+    {%- endif -%}
 {%- endmacro %}
 {% macro render_master_data_scope_controls(master_data) -%}
     <label class="master-data-scope-filter-field">
@@ -165,27 +169,6 @@
                 </div>
             </div>
         {% endif %}
-        {% if master_data.is_admin and master_data.record_type == 'equipment' %}
-            <details class="equipment-master-admin-view"
-                     data-equipment-master-admin-view
-                     {% if master_data.scope != 'mine' %}open{% endif %}>
-                <summary>
-                    <span>Admin view</span>
-                    <small>
-                        {% if master_data.scope == 'all' %}
-                            Viewing all users
-                        {% elif master_data.scope == 'user' and master_data.scope_user.user_id %}
-                            Viewing {{ master_data.scope_user.label }}
-                        {% else %}
-                            Viewing my data
-                        {% endif %}
-                    </small>
-                </summary>
-                <div>
-                    {{ render_master_data_scope_controls(master_data) }}
-                </div>
-            </details>
-        {% endif %}
         <button type="submit">Apply</button>
     </form>
     {% if master_data.record_type in ['ingredients', 'equipment'] %}
@@ -214,7 +197,7 @@
                 <img class="master-data-thumbnail" src="{{ row.image_url }}" data-full-src="{{ row.image_url }}" alt="{{ row.name }} image">
                 {% else %}<span class="master-data-no-image">No image</span>{% endif %}
                 <button type="button" class="equipment-mobile-row-toggle" data-equipment-mobile-toggle
-                        aria-expanded="false" aria-controls="equipmentName-{{ row.id }} equipmentAliases-{{ row.id }} equipmentUpdated-{{ row.id }} equipmentActions-{{ row.id }}{% if master_data.scope == 'all' %} equipmentUser-{{ row.id }}{% endif %}"
+                        aria-expanded="false" aria-controls="equipmentName-{{ row.id }} equipmentAliases-{{ row.id }} equipmentUpdated-{{ row.id }} equipmentActions-{{ row.id }}"
                         aria-label="Expand details for {{ row.name }}">
                     <strong data-equipment-master-display-name>{{ row.name }}</strong>
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
@@ -235,15 +218,6 @@
                 {% else %}<span class="unit-master-no-aliases">No aliases</span>{% endfor %}
             </div>
         </td>
-        {% if master_data.scope == 'all' %}
-        <td id="equipmentUser-{{ row.id }}" class="master-data-user-data-cell" data-label="User">
-            <div class="master-data-user-cell">
-                <strong>{{ row.user_identity.display_name }}</strong>
-                {% if row.user_identity.email_detail %}<span>{{ row.user_identity.email_detail }}</span>{% endif %}
-                <code title="{{ row.user_id }}">{{ row.user_identity.short_id }}</code>
-            </div>
-        </td>
-        {% endif %}
         <td class="master-data-usage-cell" data-label="Used In">
             {% if row.usage_count %}
             <button type="button" class="master-data-usage-button unit-master-usage-button equipment-master-usage-button"
@@ -382,13 +356,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                 <h1 id="masterDataTitle">{{ master_data.title }}</h1>
                 <p>
                     {% if master_data.record_type == 'equipment' %}
-                        {% if master_data.scope == 'all' %}
-                            Review equipment detected across all recipe workspaces.
-                        {% elif master_data.scope == 'user' %}
-                            Review equipment detected in the selected user's recipes.
-                        {% else %}
-                            Review equipment detected across your recipes.
-                        {% endif %}
+                        Review equipment detected across your recipes in the active workspace.
                     {% else %}
                         Browse normalized reusable recipe records for the active workspace.
                     {% endif %}
@@ -725,6 +693,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
         {% endif %}
 
         {% if master_data.is_admin %}
+            {% if master_data.record_type != 'equipment' %}
             <form class="master-data-backfill-form"
                   data-master-backfill-form
                   data-backfill-status-url="{{ master_data.backfill_status_url }}"
@@ -774,6 +743,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                 </div>
                 <ol class="master-data-backfill-item-list" data-master-backfill-items></ol>
             </section>
+            {% endif %}
             {% if master_data.db_status.exists %}
                 <form class="master-data-image-form"
                       data-master-image-form
@@ -782,15 +752,17 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                       method="POST"
                       action="{{ master_data.image_generation_url }}">
                     <input type="hidden" name="record_type" value="{{ master_data.record_type }}">
-                    <input type="hidden" name="scope" value="{{ master_data.scope }}">
-                    {% if master_data.scope == 'user' %}
-                        <input type="hidden" name="user_id" value="{{ master_data.scope_user_id }}">
+                    {% if master_data.record_type != 'equipment' %}
+                        <input type="hidden" name="scope" value="{{ master_data.scope }}">
+                        {% if master_data.scope == 'user' %}
+                            <input type="hidden" name="user_id" value="{{ master_data.scope_user_id }}">
+                        {% endif %}
                     {% endif %}
                     <input type="hidden" name="search" value="{{ master_data.search }}">
                     <input type="hidden" name="redirect_url" value="{{ master_data.current_url }}">
                     <div>
                         <strong>Generate missing images</strong>
-                        <span>Creates {{ master_data.empty_label }} thumbnails for records missing an image in the current scope.</span>
+                        <span>Creates {{ master_data.empty_label }} thumbnails for records missing an image in the {% if master_data.record_type == 'equipment' %}active workspace{% else %}current scope{% endif %}.</span>
                     </div>
                     <button type="submit" data-master-image-submit>Generate Missing Images</button>
                 </form>
@@ -1153,7 +1125,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
         </details>
 
         {% if master_data.record_type == 'equipment' %}
-            {% if master_data.equipment_review_enabled %}
+            {% if master_data.equipment_review_enabled and master_data.equipment_review_queue %}
                 <section class="equipment-normalization-review"
                          aria-labelledby="equipmentNormalizationReviewTitle"
                          data-equipment-normalization-review>
@@ -1214,10 +1186,6 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                                     <button type="button" disabled>Reject</button>
                                 </footer>
                             </details>
-                        {% else %}
-                            <p class="equipment-normalization-review-empty">
-                                No structured-equipment decisions are needed on this page.
-                            </p>
                         {% endfor %}
                     </div>
                 </section>
@@ -1252,16 +1220,15 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                      data-master-record-results>
                     {% if master_data.rows %}
                         <div class="master-data-table-wrap">
-                            <table class="master-data-table master-data-equipment-table{% if master_data.scope == 'all' %} master-data-table--show-user{% endif %}" aria-label="Equipment">
-                                <colgroup><col class="equipment-col-item"><col class="equipment-col-aliases">{% if master_data.scope == 'all' %}<col class="equipment-col-user">{% endif %}<col class="equipment-col-usage"><col class="equipment-col-updated"><col class="equipment-col-action"></colgroup>
+                            <table class="master-data-table master-data-equipment-table" aria-label="Equipment">
+                                <colgroup><col class="equipment-col-item"><col class="equipment-col-aliases"><col class="equipment-col-usage"><col class="equipment-col-updated"><col class="equipment-col-action"></colgroup>
                                 <thead><tr>
                                     <th scope="col">Item</th><th scope="col">Aliases</th>
-                                    {% if master_data.scope == 'all' %}<th scope="col">User</th>{% endif %}
                                     <th scope="col">Used In</th><th scope="col">Updated</th><th scope="col">Action</th>
                                 </tr></thead>
                                 {% for group in master_data.row_groups %}
                                 <tbody class="equipment-master-category" aria-label="{{ group.section | title }} equipment">
-                                    <tr class="equipment-section-row"><th colspan="{{ 6 if master_data.scope == 'all' else 5 }}" scope="rowgroup">
+                                    <tr class="equipment-section-row"><th colspan="5" scope="rowgroup">
                                         <h3 id="equipmentCategory-{{ loop.index }}">{{ group.section | title }}</h3>
                                         <span>{{ group.rows | length }} {% if group.rows | length == 1 %}item{% else %}items{% endif %}</span>
                                     </th></tr>
@@ -1272,7 +1239,7 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                         </div>
                     {% elif master_data.db_status.exists %}
                         <div class="master-data-empty-state equipment-master-empty-state">
-                            No matching {{ master_data.empty_label }} records were found for this scope.
+                            No matching {{ master_data.empty_label }} records were found in the active workspace.
                         </div>
                     {% endif %}
                 </div>

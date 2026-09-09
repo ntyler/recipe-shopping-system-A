@@ -10,6 +10,9 @@ from contextlib import nullcontext
 from datetime import datetime
 from pathlib import Path
 
+from flask import has_request_context
+from werkzeug.exceptions import Forbidden
+
 from PushShoppingList.services import storage_service
 from PushShoppingList.services import unit_category_service
 from PushShoppingList.services.ingredient_unit_service import canonical_unit_aliases
@@ -433,12 +436,13 @@ def utc_now_iso():
     return datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
 
 
-def _new_backfill_progress(job_id, include_legacy=True, force=False):
+def _new_backfill_progress(job_id, include_legacy=True, force=False, user_id=""):
     now = utc_now_iso()
     return {
         "job_id": str(job_id or "").strip(),
         "status": "starting",
         "summary": "Preparing recipe master backfill.",
+        "user_id": clean_text(user_id),
         "include_legacy": bool(include_legacy),
         "force": bool(force),
         "started_at": now,
@@ -477,24 +481,44 @@ def start_recipe_master_backfill_progress(job_id, include_legacy=True, force=Fal
     job_id = str(job_id or "").strip()
     if not job_id:
         return None
+    owner_id = scoped_equipment_user_id() if has_request_context() else ""
+    if has_request_context():
+        include_legacy = False
+        force = False
 
     with RECIPE_MASTER_BACKFILL_PROGRESS_LOCK:
-        progress = _new_backfill_progress(job_id, include_legacy=include_legacy, force=force)
+        existing = RECIPE_MASTER_BACKFILL_PROGRESS_RUNS.get(job_id)
+        if has_request_context() and existing and existing.get("user_id") != owner_id:
+            raise Forbidden("Backfill job belongs to another workspace.")
+        progress = _new_backfill_progress(
+            job_id, include_legacy=include_legacy, force=force, user_id=owner_id,
+        )
         RECIPE_MASTER_BACKFILL_PROGRESS_RUNS[job_id] = progress
         _prune_backfill_progress_runs()
         return dict(progress)
 
 
 def recipe_master_backfill_progress(job_id=None):
+    owner_id = scoped_equipment_user_id() if has_request_context() else None
+
+    def is_visible(progress):
+        return owner_id is None or (
+            progress.get("user_id") == owner_id
+            and progress.get("current_user_id", "") in {"", owner_id}
+            and all(item.get("user_id") == owner_id for item in progress.get("items", []))
+        )
+
     with RECIPE_MASTER_BACKFILL_PROGRESS_LOCK:
         if job_id:
             progress = RECIPE_MASTER_BACKFILL_PROGRESS_RUNS.get(str(job_id or "").strip())
         else:
             progress = None
             for candidate in RECIPE_MASTER_BACKFILL_PROGRESS_RUNS.values():
+                if not is_visible(candidate):
+                    continue
                 if progress is None or str(candidate.get("updated_at") or "") > str(progress.get("updated_at") or ""):
                     progress = candidate
-        if not progress:
+        if not progress or not is_visible(progress):
             return None
         return json.loads(json.dumps(progress))
 
@@ -574,11 +598,20 @@ def update_recipe_master_backfill_progress(job_id, event, payload=None):
     if not job_id:
         return None
     payload = payload if isinstance(payload, dict) else {}
+    owner_id = scoped_equipment_user_id() if has_request_context() else ""
 
     with RECIPE_MASTER_BACKFILL_PROGRESS_LOCK:
         progress = RECIPE_MASTER_BACKFILL_PROGRESS_RUNS.get(job_id)
+        if has_request_context():
+            if progress and progress.get("user_id") != owner_id:
+                raise Forbidden("Backfill job belongs to another workspace.")
+            if clean_text(payload.get("user_id")) not in {"", owner_id}:
+                raise Forbidden("Backfill data belongs to another workspace.")
+            payload = {**payload, "user_id": owner_id}
         if progress is None:
-            progress = _new_backfill_progress(job_id)
+            progress = _new_backfill_progress(
+                job_id, include_legacy=not has_request_context(), user_id=owner_id,
+            )
             RECIPE_MASTER_BACKFILL_PROGRESS_RUNS[job_id] = progress
 
         now = utc_now_iso()
@@ -689,6 +722,24 @@ def scoped_recipe_user_id(user_id=None):
         return f"guest:{guest_session_id}"
 
     return LOCAL_USER_ID
+
+
+def scoped_equipment_user_id(user_id=None):
+    """Resolve Equipment ownership from validated request identity, never input.
+
+    Equipment rows use the account id as their workspace owner (or guest:ID
+    for a temporary workspace). Explicit owners remain available to offline
+    migration/background jobs, which do not have a browser request context.
+    """
+    if not has_request_context():
+        return scoped_recipe_user_id(user_id)
+    active_user_id = storage_service.active_user_id()
+    if active_user_id:
+        return active_user_id
+    guest_session_id = storage_service.active_guest_session_id()
+    if guest_session_id:
+        return f"guest:{guest_session_id}"
+    raise Forbidden("No authenticated equipment workspace is active.")
 
 
 def _guest_recipe_owner_parts(user_id):
@@ -897,7 +948,7 @@ def _raise_recipe_write_fence_error(exc):
 
 
 @contextmanager
-def recipe_master_connection(user_id=None, *, application_db_path=None):
+def recipe_master_connection(user_id=None, *, application_db_path=None, initialize_schema=True):
     db_path = recipe_master_db_path()
     db_path.parent.mkdir(parents=True, exist_ok=True)
     with RECIPE_MASTER_DB_LOCK:
@@ -910,7 +961,8 @@ def recipe_master_connection(user_id=None, *, application_db_path=None):
                 user_id=user_id,
                 application_db_path=application_db_path,
             )
-            ensure_recipe_master_schema(connection)
+            if initialize_schema:
+                ensure_recipe_master_schema(connection)
             if guest_guard[2]:
                 _install_connection_guest_write_fences(connection)
             yield connection
@@ -932,7 +984,7 @@ def recipe_master_connection(user_id=None, *, application_db_path=None):
 
 
 @contextmanager
-def existing_recipe_master_connection(user_id=None, *, application_db_path=None):
+def existing_recipe_master_connection(user_id=None, *, application_db_path=None, initialize_schema=True):
     db_path = recipe_master_db_path()
     if not db_path.is_file():
         yield None
@@ -948,7 +1000,8 @@ def existing_recipe_master_connection(user_id=None, *, application_db_path=None)
                 user_id=user_id,
                 application_db_path=application_db_path,
             )
-            ensure_recipe_master_schema(connection)
+            if initialize_schema:
+                ensure_recipe_master_schema(connection)
             if guest_guard[2]:
                 _install_connection_guest_write_fences(connection)
             yield connection
@@ -4187,6 +4240,9 @@ def master_record_filters(
     where = []
     params = []
 
+    if table_name == "equipment" and has_request_context():
+        user_id = scoped_equipment_user_id()
+        include_all_users = False
     user_id = clean_text(user_id)
     if include_all_users:
         if user_id:
@@ -4346,7 +4402,7 @@ def list_master_records(
     elif table_name == "equipment":
         section_select = ",\n                m.display_name_override,\n                m.equipment_section"
         alias_select = ""
-        usage_select = ",\n                COUNT(u.id) AS usage_count"
+        usage_select = ",\n                COUNT(DISTINCT u.recipe_id) AS usage_count"
     else:
         section_select = ""
         alias_select = ""
@@ -4551,7 +4607,11 @@ def update_equipment_display_name(record_id, display_name=None, *, reset=False, 
     if record_id <= 0:
         return {"ok": False, "status": 404, "error": "Equipment was not found."}
 
-    workspace_user_id = scoped_recipe_user_id(user_id)
+    workspace_user_id = scoped_equipment_user_id(user_id)
+    # Authorize before field validation or opening a write connection. Rejected
+    # ids must neither disclose validation details nor run global schema repair.
+    if not master_record_for_id("equipment", record_id, user_id=workspace_user_id):
+        return {"ok": False, "status": 404, "error": "Equipment was not found."}
     requested_name = clean_text(display_name)
     if not reset and not requested_name:
         return {"ok": False, "status": 400, "error": "Enter a display name."}
@@ -4562,7 +4622,9 @@ def update_equipment_display_name(record_id, display_name=None, *, reset=False, 
             "error": "Display name must be 160 characters or fewer.",
         }
 
-    with recipe_master_connection(user_id=workspace_user_id) as connection:
+    with existing_recipe_master_connection(user_id=workspace_user_id, initialize_schema=False) as connection:
+        if connection is None:
+            return {"ok": False, "status": 404, "error": "Equipment was not found."}
         record = connection.execute(
             """
             SELECT id, name, display_name_override
@@ -4658,18 +4720,33 @@ def count_master_usage(table_name, record_id, user_id=None):
     if record_id <= 0:
         return 0
 
+    owner_id = (
+        scoped_equipment_user_id(user_id)
+        if table_name == "equipment" else scoped_recipe_user_id(user_id)
+    )
+    count_expression = "COUNT(*)"
+    ownership_clause = ""
+    if table_name == "equipment":
+        count_expression = "COUNT(DISTINCT recipe_id)"
+        ownership_clause = """AND EXISTS (
+            SELECT 1 FROM equipment m
+             WHERE m.id = recipe_equipment.equipment_id
+               AND m.user_id = recipe_equipment.user_id
+        )"""
+
     with existing_recipe_master_read_connection() as connection:
         if connection is None:
             return 0
 
         row = connection.execute(
             f"""
-            SELECT COUNT(*) AS usage_count
+            SELECT {count_expression} AS usage_count
               FROM {config["usage_table"]}
              WHERE user_id = ?
                AND {config["usage_fk"]} = ?
+               {ownership_clause}
             """,
-            (scoped_recipe_user_id(user_id), record_id),
+            (owner_id, record_id),
         ).fetchone()
 
     return int(row["usage_count"] or 0) if row else 0
@@ -4770,6 +4847,9 @@ def master_record_for_id(table_name, record_id, user_id=None, include_all_users=
 
     where = ["id = ?"]
     params = [record_id]
+    if table_name == "equipment" and has_request_context():
+        user_id = scoped_equipment_user_id()
+        include_all_users = False
     user_id = clean_text(user_id)
     if include_all_users:
         if user_id:
@@ -8207,6 +8287,11 @@ def upsert_master_record(
     if table_name not in {"ingredients", "equipment"}:
         raise ValueError("Unsupported master table.")
 
+    if table_name == "equipment" and has_request_context():
+        owner_id = scoped_equipment_user_id()
+        if clean_text(user_id) != owner_id:
+            raise Forbidden("Equipment belongs to another workspace.")
+
     name = clean_text(name)
     normalized_name = normalized_master_name(name)
     if not user_id or not normalized_name:
@@ -8879,12 +8964,14 @@ def sync_recipe_master_records(
     recipe_data=None,
     user_id=None,
     force_store_sections_from_recipe=False,
+    *,
+    initialize_schema=True,
 ):
     scoped_user_id = scoped_recipe_user_id(user_id)
     if not scoped_user_id or not recipe_id_for_url(recipe_url):
         return {"ok": False, "error": "Recipe URL and user id are required."}
 
-    with recipe_master_connection(user_id=scoped_user_id) as connection:
+    with recipe_master_connection(user_id=scoped_user_id, initialize_schema=initialize_schema) as connection:
         if (
             isinstance(recipe_data, dict)
             and isinstance(recipe_data.get("ingredients"), list)
@@ -9147,13 +9234,13 @@ def recipe_master_log_value(value):
     return str(value or "").replace("\\", "\\\\").replace('"', '\\"')
 
 
-def backfill_ingredient_store_sections_for_user(user_id):
+def backfill_ingredient_store_sections_for_user(user_id, *, initialize_schema=True):
     user_id = scoped_recipe_user_id(user_id)
     print(f"[IngredientMaster] action=store_section_backfill_start user_id={user_id}")
     updated = 0
     defaulted = 0
 
-    with recipe_master_connection(user_id=user_id) as connection:
+    with recipe_master_connection(user_id=user_id, initialize_schema=initialize_schema) as connection:
         rows = connection.execute(
             """
             SELECT
@@ -9244,14 +9331,20 @@ def backfill_ingredient_store_sections_for_user(user_id):
 
 
 def backfill_recipe_master_records_for_user(user_id, extractor_data_root=None, progress_callback=None):
-    user_id = scoped_recipe_user_id(user_id)
+    if has_request_context():
+        user_id = scoped_equipment_user_id()
+        extractor_data_root = recipe_reference_metadata_path(user_id).parent
+    else:
+        user_id = scoped_recipe_user_id(user_id)
     if extractor_data_root is None:
         extractor_data_root = storage_service.extractor_root(user_id) / "data"
     extractor_data_root = Path(extractor_data_root)
     unit_normalization = normalize_saved_recipe_units(extractor_data_root)
     metadata = load_json_file(extractor_data_root / "recipe_ingredients.json")
     if not isinstance(metadata, dict) or not metadata:
-        store_section_result = backfill_ingredient_store_sections_for_user(user_id)
+        store_section_result = backfill_ingredient_store_sections_for_user(
+            user_id, initialize_schema=not has_request_context() or not recipe_master_db_exists(),
+        )
         _emit_backfill_progress(progress_callback, "user_start", {
             "user_id": user_id,
             "recipe_count": 0,
@@ -9313,6 +9406,7 @@ def backfill_recipe_master_records_for_user(user_id, extractor_data_root=None, p
                 ingredients=record.get("ingredients") if isinstance(record.get("ingredients"), list) else [],
                 recipe_data=recipe_data,
                 user_id=user_id,
+                initialize_schema=not has_request_context() or not recipe_master_db_exists(),
             )
         except Exception as exc:
             _emit_backfill_progress(progress_callback, "recipe_failed", {
@@ -9332,7 +9426,9 @@ def backfill_recipe_master_records_for_user(user_id, extractor_data_root=None, p
                 "equipment_count": equipment_count,
             })
 
-    store_section_result = backfill_ingredient_store_sections_for_user(user_id)
+    store_section_result = backfill_ingredient_store_sections_for_user(
+        user_id, initialize_schema=not has_request_context() or not recipe_master_db_exists(),
+    )
     summary = {
         "ok": True,
         "user_id": user_id,
@@ -9383,6 +9479,33 @@ def mark_migration_applied(connection, name):
 
 
 def backfill_all_recipe_master_records(include_legacy=True, force=False, progress_callback=None):
+    if has_request_context():
+        # The shared HTTP backfill action touches Equipment even when launched
+        # from another master-data page. Its source files and writes must use
+        # the active workspace, and must not consult or change a global marker.
+        owner_id = scoped_equipment_user_id()
+        extractor_data_root = recipe_reference_metadata_path(owner_id).parent
+        _emit_backfill_progress(progress_callback, "started", {
+            "users_total": 1,
+            "recipes_total": count_backfill_recipes_for_root(extractor_data_root),
+        })
+        summary = backfill_recipe_master_records_for_user(
+            owner_id, extractor_data_root=extractor_data_root, progress_callback=progress_callback,
+        )
+        result = {
+            "ok": True,
+            "skipped": False,
+            "users": 1,
+            "recipes": int(summary.get("recipes") or 0),
+            "ingredient_rows": int(summary.get("ingredient_rows") or 0),
+            "equipment_rows": int(summary.get("equipment_rows") or 0),
+            "store_section_updated": int(summary.get("store_section_updated") or 0),
+            "store_section_defaulted": int(summary.get("store_section_defaulted") or 0),
+            "summaries": [summary],
+        }
+        _emit_backfill_progress(progress_callback, "complete", result)
+        return result
+
     with recipe_master_connection() as connection:
         if not force and migration_already_applied(connection, BACKFILL_MIGRATION_NAME):
             result = {"ok": True, "skipped": True, "users": 0, "recipes": 0}
@@ -9426,7 +9549,10 @@ def backfill_all_recipe_master_records(include_legacy=True, force=False, progres
 def master_record_for_name(table_name, user_id, name):
     if table_name not in {"ingredients", "equipment"}:
         raise ValueError("Unsupported master table.")
-    user_id = scoped_recipe_user_id(user_id)
+    user_id = (
+        scoped_equipment_user_id(user_id)
+        if table_name == "equipment" else scoped_recipe_user_id(user_id)
+    )
     normalized_name = normalized_master_name(name)
     with existing_recipe_master_read_connection() as connection:
         if connection is None:
@@ -9466,7 +9592,10 @@ def recipe_master_rows(table_name, recipe_url, user_id=None):
     else:
         raise ValueError("Unsupported recipe row table.")
 
-    user_id = scoped_recipe_user_id(user_id)
+    user_id = (
+        scoped_equipment_user_id(user_id)
+        if table_name == "recipe_equipment" else scoped_recipe_user_id(user_id)
+    )
     recipe_id = recipe_id_for_url(recipe_url)
     with existing_recipe_master_read_connection() as connection:
         if (

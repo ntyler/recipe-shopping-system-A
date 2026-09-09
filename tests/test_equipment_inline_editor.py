@@ -1,12 +1,48 @@
 """Equipment presentation edits stay scoped and preserve recipe-derived identity."""
 import os
 from pathlib import Path
+from urllib.parse import urlsplit
 
+from bs4 import BeautifulSoup
 import pytest
 
 from PushShoppingList.services import recipe_master_data_service as md
 from test_recipe_master_data_routes import configure_master_data_app, seed_master_records, sign_in
 from test_ingredient_image_lightbox import run_browser
+
+
+@pytest.mark.parametrize('account', ['user-a', 'admin-user'])
+@pytest.mark.parametrize('query', ['', '?scope=all', '?scope=user&user_id=user-b'])
+def test_equipment_controls_are_permanently_workspace_scoped(monkeypatch, tmp_path, account, query):
+    app, _, _ = configure_master_data_app(monkeypatch, tmp_path)
+    seed_master_records()
+    if account == 'admin-user':
+        md.sync_recipe_master_records('https://example.com/admin-pan', recipe_data={
+            'equipment': [{'equipment': 'Admin pan'}],
+        }, user_id=account)
+    monkeypatch.setenv('RECIPE_EQUIPMENT_STRUCTURED_UI_ENABLED', 'true')
+    monkeypatch.setenv('RECIPE_EQUIPMENT_STRUCTURED_UI_TENANTS', account)
+    with app.test_client() as client:
+        sign_in(client, account)
+        response = client.get('/admin/master-data/equipment' + query)
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    page = BeautifulSoup(html, 'html.parser')
+    equipment = page.select_one('.equipment-master-page')
+    assert not page.select('[data-equipment-master-admin-view], [data-master-scope-filter], [data-master-target-user-filter]')
+    assert not equipment.select('input[name="scope"], select[name="scope"], input[name="user_id"], input[name="viewer_user_id"]')
+    assert not page.select('[data-equipment-normalization-review], [data-master-backfill-form]')
+    assert not page.select('.master-data-user-data-cell, .equipment-col-user')
+    assert 'Admin view' not in html and 'Viewing my data' not in html
+    assert 'Structured migration preview' not in html
+    assert 'Whisk' not in html and 'user-b@example.com' not in html
+    names = [node['value'] for node in page.select('[data-equipment-row-name]')]
+    assert names == (['Admin pan'] if account == 'admin-user' else ['Large pot'])
+    assert [node.get_text(strip=True) for node in page.select('.master-data-equipment-table thead th')] == [
+        'Item', 'Aliases', 'Used In', 'Updated', 'Action',
+    ]
+    for usage in page.select('[data-equipment-master-usage-button]'):
+        assert not urlsplit(usage['data-reference-url']).query
 
 
 @pytest.mark.parametrize('width,dark', [(1440, False), (1181, False), (390, False), (320, False), (1440, True), (390, True)])
@@ -93,6 +129,9 @@ const base = process.argv[2];
         assert.equal(await page.title(), 'Equipment');
         assert.match(page.url(), /\/admin\/master-data\/equipment/);
         assert(await page.getByRole('heading', {name: 'Equipment', exact: true}).isVisible());
+        assert.equal(await page.locator('.equipment-master-page').locator('[data-equipment-master-admin-view], [data-master-scope-filter], [name="scope"], [name="user_id"], [name="viewer_user_id"], [data-equipment-normalization-review]').count(), 0);
+        assert.equal(await page.getByText('Admin view', {exact: true}).count(), 0);
+        assert.equal(await page.getByText('Viewing my data', {exact: true}).count(), 0);
         assert.equal(await page.locator('table thead').count(), 1);
         assert.deepEqual(await page.locator('.master-data-equipment-table thead th').allTextContents(), ['Item', 'Aliases', 'Used In', 'Updated', 'Action']);
         assert.equal(await page.locator('[data-equipment-master-row]').count(), 25);
@@ -199,6 +238,8 @@ const base = process.argv[2];
         await row.locator('[data-master-usage-button]').click();
         await page.locator('#masterDataUsageDialog').waitFor({state: 'visible'});
         await page.locator('[data-master-usage-results] a').first().waitFor();
+        assert.equal(new URL(await row.locator('[data-master-usage-button]').getAttribute('data-reference-url'), base).search, '');
+        assert(!(await page.locator('#masterDataUsageDialog').innerText()).includes('user-b'));
         await page.keyboard.press('Escape');
         assert(await row.locator('[data-master-usage-button]').evaluate(e => e === document.activeElement));
         if (options.width > 760) {

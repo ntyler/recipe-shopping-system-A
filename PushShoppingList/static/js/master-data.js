@@ -52,7 +52,8 @@
             url.searchParams.append(name, value);
         });
 
-        const scope = text(url.searchParams.get("scope")).trim().toLowerCase();
+        const isEquipment = url.pathname === "/admin/master-data/equipment";
+        const scope = isEquipment ? "mine" : text(url.searchParams.get("scope")).trim().toLowerCase();
         if (!scope || scope === "mine") {
             url.searchParams.delete("scope");
         }
@@ -535,8 +536,12 @@
         const search = text(formData.get("search")).trim();
         const redirectUrl = filterRedirectUrl(filterForm);
 
-        setNamedFormValue(form, "scope", scope);
-        setNamedFormValue(form, "user_id", userId);
+        if (form.closest(".equipment-master-page")) {
+            form.querySelectorAll('[name="scope"], [name="user_id"], [name="viewer_user_id"]').forEach(input => input.remove());
+        } else {
+            setNamedFormValue(form, "scope", scope);
+            setNamedFormValue(form, "user_id", userId);
+        }
         setNamedFormValue(form, "search", search);
         setNamedFormValue(form, "redirect_url", redirectUrl);
         form.dataset.imageRedirectUrl = redirectUrl;
