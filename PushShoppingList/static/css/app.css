@@ -9653,6 +9653,10 @@ body {
             color: #d5dddd;
         }
 
+        .master-data-image-lightbox [hidden] {
+            display: none !important;
+        }
+
         .master-data-image-lightbox .recipe-image-lightbox-actions {
             inset: auto 0 0;
             display: grid;

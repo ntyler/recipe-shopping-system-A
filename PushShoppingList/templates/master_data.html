@@ -7,7 +7,7 @@
 {% set app_search_id = "masterDataGlobalSearch" %}
 {% set app_content_class = "master-data-app-content" %}
 {% block app_head %}
-{% if master_data.record_type == 'ingredients' %}
+{% if master_data.record_type in ['ingredients', 'equipment'] %}
 <script>
     // Restore the existing preference before any thumbnails can be painted.
     (() => {
@@ -24,6 +24,9 @@
 {% endif %}
 {% endblock %}
 {% block app_styles %}
+{% if master_data.record_type == 'equipment' %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/equipment-rows.css', v=equipment_css_version) }}">
+{% endif %}
 {% if master_data.record_type == 'ingredients' %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/ingredient-mobile-rows.css', v=app_css_version) }}">
 {% endif %}
@@ -150,7 +153,7 @@
                             data-master-thumbnail-size-decrease
                             aria-label="Decrease thumbnail size"
                             title="Decrease thumbnail size">-</button>
-                    <span class="master-data-thumbnail-size-value" data-master-thumbnail-size-value>{% if master_data.record_type == 'ingredients' %}48{% else %}64{% endif %}px</span>
+                    <span class="master-data-thumbnail-size-value" data-master-thumbnail-size-value>48px</span>
                     <button type="button"
                             class="master-data-thumbnail-size-button"
                             data-master-thumbnail-size-increase
@@ -185,7 +188,7 @@
         {% endif %}
         <button type="submit">Apply</button>
     </form>
-    {% if master_data.record_type == 'ingredients' %}
+    {% if master_data.record_type in ['ingredients', 'equipment'] %}
     <script>
         (() => {
             const form = document.currentScript.previousElementSibling;
@@ -198,105 +201,81 @@
     {% endif %}
 {%- endmacro %}
 {% macro render_equipment_master_data_row(row, master_data) -%}
-    {% set reference_row_id = 'masterDataReferences-' ~ master_data.record_type ~ '-' ~ row.id %}
-    {% set ingredient_form_id = 'masterDataIngredientForm-' ~ row.id %}
-    <tr id="masterDataRecord-{{ master_data.record_type }}-{{ row.id }}"
-        class="master-data-record-row{% if not row.usage_count %} master-data-record-row-unused{% endif %}{% if master_data.record_type == 'equipment' and row.user_id == master_data.current_scope_user_id %} equipment-master-row-editable{% endif %}"
-        data-master-record-id="{{ row.id }}"
+    {% set editable = row.user_id == master_data.current_scope_user_id and not is_guest_demo %}
+    <tr id="masterDataRecord-equipment-{{ row.id }}"
+        class="master-data-record-row{% if editable %} equipment-master-row-editable{% endif %}"
+        data-equipment-master-row data-master-record-id="{{ row.id }}" tabindex="-1"
+        data-record-name="{{ row.name }}" data-current-name="{{ row.name }}" data-detected-name="{{ row.detected_name }}"
+        data-update-url="{{ url_for('main_bp.equipment_master_display_name_route', equipment_id=row.id) }}"
         {% if not row.usage_count %}data-master-record-unused="true"{% endif %}>
         <td class="master-data-item-cell" data-label="Item">
             <div class="master-data-item">
                 {% if row.image_url %}
-                    <img class="master-data-thumbnail"
-                         src="{{ row.image_url }}"
-                         data-full-src="{{ row.image_url }}"
-                         alt="{{ row.name }} image">
-                {% else %}
-                    <span class="master-data-no-image">No image</span>
-                {% endif %}
-
-                    <div class="master-data-item-copy">
-                        <strong data-equipment-master-display-name>{{ row.name }}</strong>
-                        <details class="master-data-equipment-details">
-                            <summary aria-label="Show created date for {{ row.name }}">Details</summary>
-                            <div>
-                                <span>Created</span>
-                                <time datetime="{{ row.created_at }}" title="{{ row.created_at }}">
-                                    {{ row.created_at_label }}
-                                </time>
-                            </div>
-                        </details>
-                    </div>
-
+                <img class="master-data-thumbnail" src="{{ row.image_url }}" data-full-src="{{ row.image_url }}" alt="{{ row.name }} image">
+                {% else %}<span class="master-data-no-image">No image</span>{% endif %}
+                <button type="button" class="equipment-mobile-row-toggle" data-equipment-mobile-toggle
+                        aria-expanded="false" aria-controls="equipmentName-{{ row.id }} equipmentAliases-{{ row.id }} equipmentUpdated-{{ row.id }} equipmentActions-{{ row.id }}{% if master_data.scope == 'all' %} equipmentUser-{{ row.id }}{% endif %}"
+                        aria-label="Expand details for {{ row.name }}">
+                    <strong data-equipment-master-display-name>{{ row.name }}</strong>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+                </button>
+                <div id="equipmentName-{{ row.id }}" class="equipment-name-field">
+                    {% if editable %}
+                    <input class="equipment-row-name" data-equipment-row-name type="text" value="{{ row.name }}"
+                           maxlength="160" autocomplete="off" required aria-label="Display name for {{ row.name }}"
+                           aria-describedby="equipmentNameError-{{ row.id }}">
+                    <span id="equipmentNameError-{{ row.id }}" class="equipment-field-error" data-equipment-name-error aria-live="polite" hidden></span>
+                    {% else %}<strong>{{ row.name }}</strong>{% endif %}
+                </div>
             </div>
         </td>
-
+        <td id="equipmentAliases-{{ row.id }}" class="equipment-aliases-cell" data-label="Aliases">
+            <div class="equipment-alias-list">
+                {% for alias in row.aliases %}<code title="{{ alias }}">{{ alias }}</code>
+                {% else %}<span class="unit-master-no-aliases">No aliases</span>{% endfor %}
+            </div>
+        </td>
         {% if master_data.scope == 'all' %}
-            <td class="master-data-user-data-cell" data-label="User">
-                <div class="master-data-user-cell">
-                    <strong>{{ row.user_identity.display_name }}</strong>
-                    {% if row.user_identity.email_detail %}
-                        <span>{{ row.user_identity.email_detail }}</span>
-                    {% endif %}
-                    <code title="{{ row.user_id }}">{{ row.user_identity.short_id }}</code>
-                </div>
-            </td>
+        <td id="equipmentUser-{{ row.id }}" class="master-data-user-data-cell" data-label="User">
+            <div class="master-data-user-cell">
+                <strong>{{ row.user_identity.display_name }}</strong>
+                {% if row.user_identity.email_detail %}<span>{{ row.user_identity.email_detail }}</span>{% endif %}
+                <code title="{{ row.user_id }}">{{ row.user_identity.short_id }}</code>
+            </div>
+        </td>
         {% endif %}
         <td class="master-data-usage-cell" data-label="Used In">
             {% if row.usage_count %}
-                <button type="button"
-                        class="master-data-usage-button unit-master-usage-button equipment-master-usage-button"
-                        data-master-reference-toggle
-                        data-equipment-master-usage-button data-master-usage-button="equipment" data-record-name="{{ row.name }}"
-                        data-reference-url="{{ master_data_reference_url(row, master_data) }}"
-                        aria-expanded="false"
-                        aria-controls="masterDataUsageDialog"
-                        aria-haspopup="dialog"
-                        aria-label="Show {{ row.usage_count }} recipe{% if row.usage_count != 1 %}s{% endif %} referencing {{ row.name }}"
-                        title="Show recipes referencing {{ row.name }}">
-
-                        <strong aria-hidden="true">{{ row.usage_count }}</strong>
-                        <span aria-hidden="true">
-                            {% if row.usage_count == 1 %}recipe{% else %}recipes{% endif %}
-                        </span>
-
-                </button>
+            <button type="button" class="master-data-usage-button unit-master-usage-button equipment-master-usage-button"
+                    data-master-reference-toggle data-equipment-master-usage-button data-master-usage-button="equipment" data-record-name="{{ row.name }}"
+                    data-reference-url="{{ master_data_reference_url(row, master_data) }}"
+                    aria-expanded="false" aria-controls="masterDataUsageDialog" aria-haspopup="dialog"
+                    aria-label="Show {{ row.usage_count }} recipe{% if row.usage_count != 1 %}s{% endif %} referencing {{ row.name }}"
+                    title="Show recipes referencing {{ row.name }}">
+                <strong aria-hidden="true">{{ row.usage_count }}</strong>
+                <span aria-hidden="true">{% if row.usage_count == 1 %}recipe{% else %}recipes{% endif %}</span>
+            </button>
             {% else %}
-                <span class="master-data-usage-empty"
-                      aria-label="{{ row.name }} is unused; no recipes currently reference it"
-                      title="No recipes currently reference {{ row.name }}">
-                    <strong>Unused</strong>
-                    <small>0 uses</small>
-                </span>
+            <span class="master-data-usage-empty" aria-label="{{ row.name }} is unused; no recipes currently reference it">
+                <strong>Unused</strong><small>0 uses</small>
+            </span>
             {% endif %}
         </td>
-        <td class="master-data-updated-cell" data-label="Updated">
-
-                <time datetime="{{ row.updated_at }}" title="{{ row.updated_at }}">
-                    {{ row.updated_at_label }}
-                </time>
-
+        <td id="equipmentUpdated-{{ row.id }}" class="master-data-updated-cell" data-label="Updated">
+            <time datetime="{{ row.updated_at }}" title="{{ row.updated_at }}">{{ row.updated_at_label }}</time>
         </td>
-
-            <td class="equipment-master-action-cell{% if row.user_id != master_data.current_scope_user_id %} is-read-only{% endif %}"
-                data-label="Action">
-                {% if row.user_id == master_data.current_scope_user_id %}
-                    <button type="button"
-                            class="unit-master-edit-button equipment-master-display-edit"
-                            data-equipment-master-display-edit
-                            data-update-url="{{ url_for('main_bp.equipment_master_display_name_route', equipment_id=row.id) }}"
-                            data-current-name="{{ row.name }}"
-                            data-detected-name="{{ row.detected_name }}"
-                            data-has-display-name-override="{{ 'true' if row.has_display_name_override else 'false' }}"
-                            aria-label="Edit display name for {{ row.name }}"
-                            aria-haspopup="dialog"
-                            aria-controls="equipmentMasterDisplayNameDialog"
-                            title="Edit display name for {{ row.name }}">Edit</button>
-                {% endif %}
-            </td>
-
+        <td id="equipmentActions-{{ row.id }}" class="equipment-master-action-cell{% if not editable %} is-read-only{% endif %}" data-label="Action">
+            {% if editable %}
+            <div class="equipment-row-actions">
+                <button type="button" class="unit-master-edit-button" data-equipment-row-save hidden>Save</button>
+                <button type="button" class="unit-master-edit-button" data-equipment-row-cancel hidden>Cancel</button>
+                <button type="button" class="unit-master-edit-button" data-equipment-row-reset
+                        aria-label="Reset display name to detected name" {% if not row.has_display_name_override %}hidden{% endif %}>Reset</button>
+            </div>
+            <span class="equipment-row-status" data-equipment-row-status role="status" aria-live="polite"></span>
+            {% endif %}
+        </td>
     </tr>
-
 {%- endmacro %}
 {% macro render_master_data_row(row, master_data) -%}
 {% if master_data.record_type == "equipment" %}{{ render_equipment_master_data_row(row, master_data) }}{% else %}
@@ -1272,36 +1251,25 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                 <div class="unit-master-category-list equipment-master-category-list"
                      data-master-record-results>
                     {% if master_data.rows %}
-                        {% for group in master_data.row_groups %}
-                            <section class="unit-master-category equipment-master-category"
-                                     aria-labelledby="equipmentCategory-{{ loop.index }}">
-                                <header>
-                                    <h3 id="equipmentCategory-{{ loop.index }}">{{ group.section | title }}</h3>
-                                    <span>{{ group.rows | length }} {% if group.rows | length == 1 %}item{% else %}items{% endif %}</span>
-                                </header>
-                                <div class="master-data-table-wrap">
-                                    <table class="master-data-table master-data-equipment-table{% if master_data.scope == 'all' %} master-data-table--show-user{% endif %}"
-                                           aria-label="{{ group.section | title }} equipment">
-                                        <thead>
-                                            <tr>
-                                                <th scope="col">Item</th>
-                                                {% if master_data.scope == 'all' %}
-                                                    <th scope="col">User</th>
-                                                {% endif %}
-                                                <th scope="col">Used In</th>
-                                                <th scope="col">Updated</th>
-                                                <th scope="col">Action</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {% for row in group.rows %}
-                                                {{ render_master_data_row(row, master_data) }}
-                                            {% endfor %}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </section>
-                        {% endfor %}
+                        <div class="master-data-table-wrap">
+                            <table class="master-data-table master-data-equipment-table{% if master_data.scope == 'all' %} master-data-table--show-user{% endif %}" aria-label="Equipment">
+                                <colgroup><col class="equipment-col-item"><col class="equipment-col-aliases">{% if master_data.scope == 'all' %}<col class="equipment-col-user">{% endif %}<col class="equipment-col-usage"><col class="equipment-col-updated"><col class="equipment-col-action"></colgroup>
+                                <thead><tr>
+                                    <th scope="col">Item</th><th scope="col">Aliases</th>
+                                    {% if master_data.scope == 'all' %}<th scope="col">User</th>{% endif %}
+                                    <th scope="col">Used In</th><th scope="col">Updated</th><th scope="col">Action</th>
+                                </tr></thead>
+                                {% for group in master_data.row_groups %}
+                                <tbody class="equipment-master-category" aria-label="{{ group.section | title }} equipment">
+                                    <tr class="equipment-section-row"><th colspan="{{ 6 if master_data.scope == 'all' else 5 }}" scope="rowgroup">
+                                        <h3 id="equipmentCategory-{{ loop.index }}">{{ group.section | title }}</h3>
+                                        <span>{{ group.rows | length }} {% if group.rows | length == 1 %}item{% else %}items{% endif %}</span>
+                                    </th></tr>
+                                    {% for row in group.rows %}{{ render_master_data_row(row, master_data) }}{% endfor %}
+                                </tbody>
+                                {% endfor %}
+                            </table>
+                        </div>
                     {% elif master_data.db_status.exists %}
                         <div class="master-data-empty-state equipment-master-empty-state">
                             No matching {{ master_data.empty_label }} records were found for this scope.
@@ -1323,60 +1291,6 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                     {% endif %}
                 </div>
             </section>
-
-            <dialog id="equipmentMasterDisplayNameDialog"
-                    class="unit-master-dialog equipment-master-display-dialog"
-                    data-equipment-master-display-dialog
-                    aria-labelledby="equipmentMasterDisplayNameTitle"
-                    aria-describedby="equipmentMasterDisplayNameContext">
-                <form method="dialog"
-                      class="unit-master-editor equipment-master-display-form"
-                      data-equipment-master-display-form
-                      novalidate>
-                    <header>
-                        <div>
-                            <span>Presentation only</span>
-                            <h2 id="equipmentMasterDisplayNameTitle">Edit display name</h2>
-                            <p id="equipmentMasterDisplayNameContext">
-                                This changes only the label you see. Recipe connections and equipment identity stay unchanged.
-                            </p>
-                        </div>
-                        <button type="button"
-                                class="unit-master-dialog-close"
-                                data-equipment-master-display-close
-                                aria-label="Close display name editor">&times;</button>
-                    </header>
-                    <label class="unit-master-field">
-                        <span>Display name</span>
-                        <input type="text"
-                               maxlength="160"
-                               autocomplete="off"
-                               required
-                               data-equipment-master-display-input>
-                    </label>
-                    <p class="equipment-master-detected-name">
-                        Detected name: <strong data-equipment-master-detected-name></strong>
-                    </p>
-                    <div class="unit-master-editor-feedback"
-                         role="alert"
-                         data-equipment-master-display-feedback
-                         hidden></div>
-                    <footer>
-                        <button type="button"
-                                class="secondary equipment-master-display-reset"
-                                data-equipment-master-display-reset
-                                aria-label="Reset display name to detected name">Reset</button>
-                        <div>
-                            <button type="button"
-                                    class="secondary"
-                                    data-equipment-master-display-close>Cancel</button>
-                            <button type="submit"
-                                    data-equipment-master-display-save
-                                    aria-label="Save display name">Save</button>
-                        </div>
-                    </footer>
-                </form>
-            </dialog>
 
         {% else %}
         <section class="unit-master-panel ingredient-master-registry" aria-label="Ingredient registry">
@@ -1519,6 +1433,9 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
     </section>
 {% endblock %}
 {% block app_scripts %}
+{% if master_data.record_type == 'equipment' %}
+<script src="{{ url_for('static', filename='js/equipment-rows.js', v=equipment_js_version) }}" defer></script>
+{% endif %}
 <script src="{{ url_for('static', filename='js/master-data-alias-editor.js', v=master_data_js_version) }}" defer></script>
 <script src="{{ url_for('static', filename='js/master-data.js', v=master_data_js_version) }}" defer></script>
 {% if master_data.record_type == 'ingredients' %}

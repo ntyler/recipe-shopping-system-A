@@ -512,13 +512,12 @@ def test_admin_master_data_page_can_filter_by_user_id(monkeypatch, tmp_path):
     assert 'class="master-data-created-cell"' not in equipment_html
     assert "<code>large pot</code>" not in equipment_html
     assert "<code>whisk</code>" not in equipment_html
-    assert 'class="master-data-equipment-details"' in equipment_html
-    assert ">Details</summary>" in equipment_html
-    assert ">Created</span>" in equipment_html
+    assert 'class="master-data-equipment-details"' not in equipment_html
+    assert ">Details</summary>" not in equipment_html
     assert 'class="master-data-updated-cell"' in equipment_html
     assert '<th scope="col">Normalized Name</th>' not in equipment_html
     assert '<th scope="col">Image</th>' not in equipment_html
-    assert '<section class="unit-master-category equipment-master-category"' in equipment_html
+    assert '<tbody class="equipment-master-category"' in equipment_html
     assert '<h3 id="equipmentCategory-1">Cookware</h3>' in equipment_html
     assert '<h3 id="equipmentCategory-2">Prep Tools</h3>' in equipment_html
     assert 'aria-label="Cookware equipment"' in equipment_html
@@ -722,21 +721,14 @@ def test_equipment_display_name_route_updates_only_the_active_workspace(monkeypa
     assert '<strong data-equipment-master-display-name>Family stockpot</strong>' in renamed_html
     assert 'data-current-name="Family stockpot"' in renamed_html
     assert 'data-detected-name="Large pot"' in renamed_html
-    assert 'data-has-display-name-override="true"' in renamed_html
-    assert "Edit display name" in renamed_html
-    assert "data-equipment-master-display-dialog" in renamed_html
+    assert 'data-equipment-master-display-dialog' not in renamed_html
     renamed_soup = BeautifulSoup(renamed_html, "html.parser")
-    display_dialog = renamed_soup.select_one("[data-equipment-master-display-dialog]")
-    reset_button = display_dialog.select_one("[data-equipment-master-display-reset]")
-    save_button = display_dialog.select_one("[data-equipment-master-display-save]")
-    cancel_button = display_dialog.select_one(
-        "footer [data-equipment-master-display-close]"
-    )
-    assert reset_button.get_text(strip=True) == "Reset"
-    assert reset_button["aria-label"] == "Reset display name to detected name"
-    assert cancel_button.get_text(strip=True) == "Cancel"
-    assert save_button.get_text(strip=True) == "Save"
-    assert save_button["aria-label"] == "Save display name"
+    row = renamed_soup.select_one('[data-equipment-master-row]')
+    assert row.select_one('[data-equipment-row-name]')['value'] == 'Family stockpot'
+    assert row.select_one('[data-equipment-row-reset]').get_text(strip=True) == 'Reset'
+    assert not row.select_one('[data-equipment-row-reset]').has_attr('hidden')
+    assert row.select_one('[data-equipment-row-save]').has_attr('hidden')
+    assert row.select_one('[data-equipment-row-cancel]').has_attr('hidden')
     assert reset_response.status_code == 200
     assert reset_response.get_json()["record"]["name"] == "Large pot"
     assert reset_response.get_json()["record"]["has_display_name_override"] is False
@@ -891,14 +883,14 @@ def test_equipment_master_data_filters_and_groups_by_equipment_type(monkeypatch,
 
     assert all_response.status_code == 200
     assert 'data-equipment-master-registry' in all_html
-    assert '<section class="unit-master-category equipment-master-category"' in all_html
+    assert '<tbody class="equipment-master-category"' in all_html
     assert "COOKWARE" in all_html
     assert "PREP TOOLS" in all_html
     assert cookware_response.status_code == 200
     assert 'value="COOKWARE" selected' in cookware_html
     assert "Large pot" in cookware_html
     assert "Whisk" not in cookware_html
-    assert '<section class="unit-master-category equipment-master-category"' in cookware_html
+    assert '<tbody class="equipment-master-category"' in cookware_html
     assert '<h3 id="equipmentCategory-1">Cookware</h3>' in cookware_html
     assert 'aria-label="Cookware equipment"' in cookware_html
 
@@ -923,46 +915,18 @@ def test_equipment_user_column_only_renders_for_all_users_scope(monkeypatch, tmp
     specific_soup = BeautifulSoup(specific_response.get_data(as_text=True), "html.parser")
     all_soup = BeautifulSoup(all_response.get_data(as_text=True), "html.parser")
 
-    for table in mine_soup.select(".equipment-master-category table"):
-        assert [
-            header.get_text(" ", strip=True)
-            for header in table.select("thead th")
-        ] == ["Item", "Used In", "Updated", "Action"]
-        for row in table.select("tbody > .master-data-record-row"):
-            assert [cell.get("data-label") for cell in row.find_all("td", recursive=False)] == [
-                "Item",
-                "Used In",
-                "Updated",
-                "Action",
-            ]
-            item_cell = row.select_one(".master-data-item-cell")
-            action_cell = row.select_one(".equipment-master-action-cell")
-            edit_button = action_cell.select_one("[data-equipment-master-display-edit]")
-            assert item_cell.select_one("[data-equipment-master-display-edit]") is None
-            assert edit_button.get_text(strip=True) == "Edit"
-            assert edit_button["aria-label"].startswith("Edit display name for ")
-
-    for table in specific_soup.select(".equipment-master-category table"):
-        assert [
-            header.get_text(" ", strip=True)
-            for header in table.select("thead th")
-        ] == ["Item", "Used In", "Updated", "Action"]
-        assert table.select_one("[data-equipment-master-display-edit]") is None
-
-    for table in all_soup.select(".equipment-master-category table"):
-        assert [
-            header.get_text(" ", strip=True)
-            for header in table.select("thead th")
-        ] == ["Item", "User", "Used In", "Updated", "Action"]
-        for row in table.select("tbody > .master-data-record-row"):
-            assert [cell.get("data-label") for cell in row.find_all("td", recursive=False)] == [
-                "Item",
-                "User",
-                "Used In",
-                "Updated",
-                "Action",
-            ]
-        assert table.select_one("[data-equipment-master-display-edit]") is None
+    for soup, all_users, editable in ((mine_soup, False, True), (specific_soup, False, False), (all_soup, True, False)):
+        tables = soup.select('.master-data-equipment-table')
+        assert len(tables) == 1
+        labels = ['Item', 'Aliases'] + (['User'] if all_users else []) + ['Used In', 'Updated', 'Action']
+        assert [header.get_text(strip=True) for header in tables[0].select('thead th')] == labels
+        rows = tables[0].select('[data-equipment-master-row]')
+        assert rows
+        for row in rows:
+            assert [cell.get('data-label') for cell in row.find_all('td', recursive=False)] == labels
+            assert bool(row.select_one('[data-equipment-row-name]')) is editable
+            assert bool(row.select_one('[data-equipment-row-save]')) is editable
+            assert row.select_one('[data-equipment-master-display-edit]') is None
 
     mine_table = mine_response.get_data(as_text=True).split(
         '<table class="master-data-table', 1
@@ -1013,7 +977,7 @@ def test_equipment_summary_counts_include_unused_records(monkeypatch, tmp_path):
     }
 
 
-def test_equipment_registry_renders_single_name_created_details_and_unused_state(
+def test_equipment_registry_renders_inline_name_without_metadata_popup_and_unused_state(
     monkeypatch,
     tmp_path,
 ):
@@ -1038,16 +1002,15 @@ def test_equipment_registry_renders_single_name_created_details_and_unused_state
     assert '<h3 id="equipmentCategory-1">Cookware</h3>' in html
     assert html.count('<strong data-equipment-master-display-name>Large pot</strong>') == 1
     assert "<code>large pot</code>" not in html
-    assert '<details class="master-data-equipment-details">' in html
-    assert ">Details</summary>" in html
-    assert 'aria-label="Show created date for Large pot"' in html
-    assert ">Created</span>" in html
+    assert '<details class="master-data-equipment-details">' not in html
+    assert 'data-equipment-mobile-toggle' in html
     assert "<strong>Unused</strong>" in html
     assert "<small>0 uses</small>" in html
     assert "equipment-master-usage-button" not in registry_html
     assert ">Add" not in registry_html
-    assert 'aria-label="Edit display name for Large pot"' in registry_html
-    assert ">Edit</button>" in registry_html
+    assert 'aria-label="Display name for Large pot"' in registry_html
+    assert ">Edit</button>" not in registry_html
+    assert 'data-equipment-row-save hidden' in registry_html
     assert ">Delete" not in registry_html
 
 
@@ -1910,7 +1873,7 @@ def test_master_data_mobile_layout_prioritizes_filters_and_results():
     assert "data-master-maintenance open" not in template
     assert "<span>Maintenance tools</span>" in template
     assert 'data-label="Store Section"' in template
-    assert 'class="unit-master-category equipment-master-category"' in template
+    assert 'class="equipment-master-category"' in template
     assert ".equipment-master-category-list" in css
     assert ".equipment-master-category .master-data-record-row" in css
     assert ".equipment-master-read-only-badge" in css
@@ -1926,12 +1889,9 @@ def test_master_data_mobile_layout_prioritizes_filters_and_results():
     assert 'pagination.insertAdjacentElement("afterend", maintenance);' in script
     assert "maintenance.open = false;" in script
     assert "async function loadReferenceData(button, panel, options = {})" in script
-    assert "function initEquipmentMasterDisplayName()" in script
-    assert "async function saveEquipmentMasterDisplayName(reset = false)" in script
-    assert 'method: "PATCH"' in script
+    assert "js/equipment-rows.js" in template
     assert "function openMasterDataUsage(button)" in script
     assert "initMasterDataMaintenance();" in script
-    assert "initEquipmentMasterDisplayName();" in script
     assert "@media (max-width: 760px)" in css
     assert ".master-data-maintenance:not([open]) > .master-data-maintenance-content" in css
     assert ".master-data-maintenance {" in css
@@ -2247,7 +2207,7 @@ def test_master_data_shared_usage_dialog_is_wired():
     assert '<th scope="col">Normalized Name</th>' not in template
     assert '<th scope="col">Image</th>' not in template
     assert "master-data-item-cell" in template
-    assert "master-data-item-copy" in template
+    assert "equipment-name-field" in template
     assert "data-master-reference-toggle" in template
     assert "data-master-reference-row" not in template
     assert "recipe_usage_dialog(master_data.record_type)" in template

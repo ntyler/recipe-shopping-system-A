@@ -1594,9 +1594,9 @@ def master_data_context(record_type, scope_info=None):
         "table_column_count": (
             6
             if record_type == "ingredients"
-            else 5
+            else 6
             if record_type == "equipment" and scope_info["scope"] == "all"
-            else 4
+            else 5
         ),
         "sort_options": [
             {"value": "updated_at_desc", "label": "Updated At"},
@@ -1675,6 +1675,8 @@ def render_master_data_page(record_type, scope_info):
         app_css_version=static_asset_version("css/app.css"),
         app_js_version=static_asset_version("js/app.js"),
         master_data_js_version=static_asset_version("js/master-data.js"),
+        equipment_css_version=static_asset_version("css/equipment-rows.css"),
+        equipment_js_version=static_asset_version("js/equipment-rows.js"),
     )
 
 
@@ -1713,6 +1715,8 @@ def equipment_master_display_name_route(equipment_id):
         reset=reset,
         user_id=active_user_id(),
     )
+    if result.get("ok"):
+        result["record"]["updated_at_label"] = master_data_date_label(result["record"]["updated_at"])
     status = int(result.pop("status", 200 if result.get("ok") else 400))
     return jsonify({**result, "success": result.get("ok", False)}), status
 

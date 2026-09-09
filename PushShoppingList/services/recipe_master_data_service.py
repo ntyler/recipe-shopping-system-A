@@ -4356,6 +4356,20 @@ def list_master_records(
         if connection is None:
             return []
 
+        if table_name == "equipment":
+            # The optional structured schema is read-only here. Never create it
+            # or enable its write gates just to display existing aliases.
+            alias_select = ", '' AS aliases_serialized"
+            if recipe_master_table_exists(connection, "equipment_aliases"):
+                alias_select = """, COALESCE((
+                    SELECT GROUP_CONCAT(alias_name, CHAR(31)) FROM (
+                        SELECT a.alias_name FROM equipment_aliases a
+                        WHERE a.user_id = m.user_id AND a.equipment_id = m.id
+                          AND a.status = 'active'
+                        ORDER BY a.alias_key
+                    )
+                ), '') AS aliases_serialized"""
+
         if table_name == "ingredients":
             has_order = "sort_order" in recipe_master_column_names(connection, "ingredients")
             section_select += ", m.sort_order" if has_order else ", 0 AS sort_order"
@@ -4411,6 +4425,11 @@ def list_master_records(
             )
             row_data["buy_as_usage_count"] = int(row["buy_as_usage_count"] or 0)
         elif table_name == "equipment":
+            row_data["aliases"] = [
+                clean_text(alias)
+                for alias in str(row_data.pop("aliases_serialized", "") or "").split(chr(31))
+                if clean_text(alias)
+            ]
             detected_name = clean_text(row_data.get("name"))
             display_name_override = clean_text(row_data.pop("display_name_override", ""))
             row_data["detected_name"] = detected_name
@@ -4558,6 +4577,7 @@ def update_equipment_display_name(record_id, display_name=None, *, reset=False, 
 
         detected_name = clean_text(record["name"])
         display_name_override = "" if reset or requested_name == detected_name else requested_name
+        updated_at = utc_now_iso()
         connection.execute(
             """
             UPDATE equipment
@@ -4566,7 +4586,7 @@ def update_equipment_display_name(record_id, display_name=None, *, reset=False, 
              WHERE id = ?
                AND user_id = ?
             """,
-            (display_name_override, utc_now_iso(), record_id, workspace_user_id),
+            (display_name_override, updated_at, record_id, workspace_user_id),
         )
 
     return {
@@ -4576,6 +4596,7 @@ def update_equipment_display_name(record_id, display_name=None, *, reset=False, 
             "name": display_name_override or detected_name,
             "detected_name": detected_name,
             "has_display_name_override": bool(display_name_override),
+            "updated_at": updated_at,
         },
     }
 
