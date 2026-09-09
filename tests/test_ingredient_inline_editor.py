@@ -65,6 +65,7 @@ def test_inline_row_uses_compact_alias_manager_and_real_scoped_context(editor_ap
         assert name['type'] == 'text' and not name.has_attr('disabled') and not name.has_attr('readonly')
         assert not row.select_one('[data-ingredient-row-section]').has_attr('disabled')
         assert row.select_one('[data-ingredient-row-save]').has_attr('disabled')
+        assert row.select_one('[data-ingredient-row-save]').has_attr('hidden')
         cancel = row.select_one('.ingredient-action-cell [data-ingredient-row-cancel]')
         assert cancel.has_attr('hidden') and cancel['type'] == 'button'
         assert cancel.get_text(strip=True) == 'Cancel'

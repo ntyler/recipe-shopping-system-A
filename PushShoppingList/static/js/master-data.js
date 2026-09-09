@@ -1277,6 +1277,7 @@
     }
 
     let ingredientEditingRow = null;
+    let ingredientDeletingRow = null;
     let ingredientMutationPending = false;
     let ingredientEditorContext = null;
     let ingredientEditorLoading = false;
@@ -1414,20 +1415,32 @@
         }
         ingredientRows().forEach(row => {
             const editing = row === ingredientEditingRow;
+            const confirmingDelete = row === ingredientDeletingRow;
             row.classList.toggle('is-editing', editing);
             row.classList.toggle('is-dirty', editing && dirty);
+            row.classList.toggle('is-confirming-delete', confirmingDelete);
             row.querySelectorAll('button, input, select').forEach(control => { control.disabled = ingredientMutationPending; });
             const save = row.querySelector('[data-ingredient-row-save]');
+            save.hidden = !editing || !dirty || confirmingDelete;
             save.disabled = !editing || busy || !ingredientEditorContext || !dirty || Boolean(invalid);
             save.textContent = ingredientSaving && editing ? 'Saving…' : 'Save';
-            row.querySelector('[data-ingredient-row-cancel]').hidden = !editing || !dirty;
+            const cancel = row.querySelector('[data-ingredient-row-cancel]');
+            cancel.hidden = !confirmingDelete && (!editing || !dirty);
+            cancel.setAttribute('aria-label', confirmingDelete ? `Cancel deleting ${row.dataset.recordName}` : `Cancel changes to ${row.dataset.recordName}`);
             const remove = row.querySelector('[data-ingredient-row-delete]');
             if (remove) {
                 remove.disabled = ingredientMutationPending || ingredientImagePending || dirty;
-                remove.hidden = editing && dirty;
+                remove.hidden = confirmingDelete || (editing && dirty);
+            }
+            const confirmDelete = row.querySelector('[data-ingredient-row-confirm-delete]');
+            if (confirmDelete) {
+                confirmDelete.hidden = !confirmingDelete;
+                confirmDelete.disabled = ingredientMutationPending || ingredientImagePending || dirty;
+                confirmDelete.textContent = confirmingDelete && ingredientMutationPending ? 'Deleting…' : 'Confirm delete';
             }
             row.querySelector('[data-ingredient-row-retry]').hidden = !editing || ingredientEditorControl('retry').hidden;
             const merge = row.querySelector('[data-master-merge-open]');
+            merge.hidden = confirmingDelete || (editing && dirty && Boolean(invalid));
             merge.disabled = Boolean(merge.dataset.mergeBlockedReason) || ingredientMutationPending || ingredientImagePending || dirty;
             merge.title = merge.dataset.mergeBlockedReason || (dirty ? 'Save or cancel the current changes before merging.'
                 : ingredientMutationPending || ingredientImagePending ? 'Wait for the current ingredient operation to finish.' : merge.dataset.mergeTitle);
@@ -1552,6 +1565,7 @@
     }
     function editIngredientRow(row) {
         if (ingredientMutationPending) return false;
+        if (ingredientDeletingRow) cancelIngredientDeletion({restoreFocus: false});
         if (ingredientEditingRow === row) return true;
         const restoreScroll = captureIngredientScroll(row);
         if (ingredientEditingRow && !cancelIngredientRow(ingredientEditingRow, {restoreFocus: false})) return false;
@@ -1671,30 +1685,47 @@
             } else (row.querySelector('[aria-invalid="true"]') || form.querySelector('[aria-invalid="true"]'))?.focus({preventScroll: true});
         }
     }
-    async function deleteIngredientRow(row) {
+    function cancelIngredientDeletion({restoreFocus = true} = {}) {
+        if (!ingredientDeletingRow || ingredientMutationPending) return;
+        const row = ingredientDeletingRow;
+        ingredientDeletingRow = null;
+        ingredientStatus('', false, row);
+        syncIngredientRowControls();
+        if (restoreFocus) row.querySelector('[data-ingredient-row-delete]')?.focus({preventScroll: true});
+    }
+    function confirmIngredientDeletion(row) {
         const button = row?.querySelector('[data-ingredient-row-delete]');
         if (!button || button.disabled || ingredientMutationPending || ingredientRowIsDirty(ingredientEditingRow)) return;
-        const name = row.dataset.recordName;
-        if (!window.confirm(`Delete “${name}”? It has no recipe references. Its aliases and image association will also be removed. This cannot be undone.`)) return;
         if (ingredientEditingRow) cancelIngredientRow(ingredientEditingRow, {restoreFocus: false});
+        cancelIngredientDeletion({restoreFocus: false});
+        ingredientDeletingRow = row;
+        ingredientStatus('', false, row);
+        syncIngredientRowControls();
+        row.querySelector('[data-ingredient-row-cancel]').focus({preventScroll: true});
+    }
+    async function deleteIngredientRow(row) {
+        const button = row?.querySelector('[data-ingredient-row-confirm-delete]');
+        const remove = row?.querySelector('[data-ingredient-row-delete]');
+        if (row !== ingredientDeletingRow || !button || !remove || button.disabled || ingredientMutationPending || ingredientRowIsDirty(ingredientEditingRow)) return;
+        const name = row.dataset.recordName;
         const nextRowId = ingredientRows().find(item => item !== row)?.dataset.masterRecordId;
         ingredientMutationPending = true;
-        button.textContent = 'Deleting…';
         syncIngredientRowControls();
         let deleted = false;
         try {
-            const response = await fetch(button.dataset.deleteUrl, {
+            const response = await fetch(remove.dataset.deleteUrl, {
                 method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'fetch'},
                 body: JSON.stringify({confirm: true, redirect_url: window.location.href}),
             });
             const result = await response.json();
             if (!response.ok || !result.ok) {
                 if (result.result?.can_delete === false) {
-                    button.remove();
+                    remove.remove(); button.remove(); ingredientDeletingRow = null;
                 }
                 throw new Error(result.result?.delete_blocked_reason || result.message || result.error || 'The ingredient could not be deleted.');
             }
             deleted = true;
+            ingredientDeletingRow = null;
             row.remove();
             await refreshMasterDataRecordResults();
             ingredientStatus(`${name} deleted.`);
@@ -1703,7 +1734,6 @@
             ingredientStatus(deleted ? 'Deleted. The table could not refresh; reload the page to see the updated group.' : error.message || 'The ingredient could not be deleted.', true, deleted ? null : row);
         } finally {
             ingredientMutationPending = false;
-            button.textContent = 'Delete';
             syncIngredientRowControls();
             const target = deleted
                 ? document.querySelector(`[data-ingredient-master-row][data-master-record-id="${nextRowId}"]`) || document.querySelector('.master-data-filter-form [name="search"]')
@@ -1835,17 +1865,25 @@
             const button = event.target.closest('button'), row = button?.closest('[data-ingredient-master-row]'); if (!row) return;
             if (button.matches('[data-ingredient-row-alias]')) openIngredientAliases(row, button);
             else if (button.matches('[data-ingredient-row-save]')) { event.preventDefault(); void saveIngredientRow(row); }
-            else if (button.matches('[data-ingredient-row-cancel]')) cancelIngredientRow(row, {discard: true});
-            else if (button.matches('[data-ingredient-row-delete]')) void deleteIngredientRow(row);
+            else if (button.matches('[data-ingredient-row-cancel]')) {
+                if (row === ingredientDeletingRow) cancelIngredientDeletion();
+                else cancelIngredientRow(row, {discard: true});
+            }
+            else if (button.matches('[data-ingredient-row-delete]')) confirmIngredientDeletion(row);
+            else if (button.matches('[data-ingredient-row-confirm-delete]')) void deleteIngredientRow(row);
             else if (button.matches('[data-ingredient-row-retry]')) void loadIngredientEditor(row, ++ingredientEditorToken);
             else if (button.matches('[data-ingredient-order-action]')) void moveIngredientRow(row, ingredientSectionRows(row).indexOf(row) + (button.dataset.ingredientOrderAction === 'up' ? -1 : 1), button);
             else if (button.matches('[data-master-merge-open]')) {
+                cancelIngredientDeletion({restoreFocus: false});
                 if (ingredientEditingRow && !ingredientRowIsDirty(ingredientEditingRow)) cancelIngredientRow(ingredientEditingRow, {restoreFocus: false});
             }
         });
         root.addEventListener('keydown', event => {
             if (event.defaultPrevented) return;
             const row = event.target.closest('[data-ingredient-master-row]'); if (!row) return;
+            if (event.key === 'Escape' && row === ingredientDeletingRow) {
+                event.preventDefault(); cancelIngredientDeletion(); return;
+            }
             if (event.key === 'Escape' && row === ingredientEditingRow) {
                 event.preventDefault(); cancelIngredientRow(row, {discard: true}); return;
             }

@@ -84135,14 +84135,16 @@ body.recipe-edit-standalone-page #recipeEditIngredients
 .ingredient-master-page .master-data-no-image { flex: 0 0 var(--master-data-thumbnail-size, 48px); width: var(--master-data-thumbnail-size, 48px); height: var(--master-data-thumbnail-size, 48px); border: 1px solid var(--app-border); border-radius: 7px; background: var(--app-surface); color: var(--app-muted); font-size: 10px; }
 .ingredient-master-page .master-data-no-image { display: grid; place-items: center; border-style: dashed; text-align: center; }
 .ingredient-master-page .ingredient-action-cell { text-align: left; }
-/* Reserve each control's intrinsic width; the final track anchors Merge at the cell's right padding. */
-.ingredient-master-page .ingredient-row-actions { display: grid; grid-template-columns: max-content max-content minmax(max-content, 1fr); align-items: center; gap: 6px; }
+/* Fixed leading slots keep changing actions from moving the column or the final Merge action. */
+.ingredient-master-page .ingredient-row-actions { display: grid; grid-template-columns: 60px 50px minmax(0, 1fr); min-height: 38px; align-items: center; gap: 6px; }
 .ingredient-master-page .ingredient-row-actions > button { margin: 0; white-space: nowrap; }
-.ingredient-master-page [data-ingredient-row-save] { grid-column: 1; grid-row: 1; }
-.ingredient-master-page :is([data-ingredient-row-cancel], [data-ingredient-row-delete]) { grid-column: 2; grid-row: 1; }
+.ingredient-master-page :is([data-ingredient-row-save], [data-ingredient-row-delete]) { grid-column: 1; grid-row: 1; }
+.ingredient-master-page [data-ingredient-row-cancel] { grid-column: 2; grid-row: 1; }
+.ingredient-master-page [data-ingredient-row-confirm-delete] { grid-column: 1 / 3; grid-row: 1; }
+.ingredient-master-page .is-confirming-delete [data-ingredient-row-cancel] { grid-column: 3; justify-self: start; width: 50px; }
 .ingredient-master-page .ingredient-row-merge { grid-column: 3; grid-row: 1; justify-self: end; width: auto; }
-.ingredient-master-page [data-ingredient-row-delete]:not(:disabled) { color: var(--app-danger); }
-.ingredient-master-page [data-ingredient-row-delete]:is(:hover, :focus-visible):not(:disabled) { border-color: var(--app-danger); background: color-mix(in srgb, var(--app-danger) 10%, transparent); color: var(--app-danger); }
+.ingredient-master-page :is([data-ingredient-row-delete], [data-ingredient-row-confirm-delete]):not(:disabled) { color: var(--app-danger); }
+.ingredient-master-page :is([data-ingredient-row-delete], [data-ingredient-row-confirm-delete]):is(:hover, :focus-visible):not(:disabled) { border-color: var(--app-danger); background: color-mix(in srgb, var(--app-danger) 10%, transparent); color: var(--app-danger); }
 .ingredient-master-page [data-ingredient-row-save]:not(:disabled) { border-color: var(--app-primary); background: var(--app-primary-soft); color: var(--app-primary-hover); }
 .ingredient-master-page .ingredient-row-status { display: block; margin: 0; color: var(--app-muted); font-size: 11px; }
 .ingredient-master-page .ingredient-row-status:empty { display: none; }

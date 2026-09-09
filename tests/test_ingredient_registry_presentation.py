@@ -35,6 +35,7 @@ def test_ingredient_page_name_and_controls_preserve_existing_endpoints(monkeypat
     assert table.select_one('[data-ingredient-row-section]')
     assert not table.select('[data-master-mobile-record-toggle]')
     assert soup.select_one('[data-ingredient-row-save]').has_attr('disabled')
+    assert soup.select_one('[data-ingredient-row-save]').has_attr('hidden')
     assert not soup.select('[data-ingredient-editor-form], [data-ingredient-editor-row]')
     assert not soup.select('#ingredientMasterInlineEditor, [data-ingredient-editor-home]')
     assert soup.select_one('#ingredientAliasManager').has_attr('hidden')

@@ -115,6 +115,7 @@
 
     .ingredient-master-page.has-mobile-ingredient-rows .ingredient-row-actions {
         width: 100%;
+        min-height: 44px;
     }
 
     .ingredient-master-page.has-mobile-ingredient-rows .ingredient-row-actions > button {

@@ -11,7 +11,7 @@
     const aliasManager = document.getElementById('ingredientAliasManager');
 
     function rowHasPendingWork(row) {
-        return row.matches('.is-dirty, .is-saving, .is-deleting, [aria-busy="true"]')
+        return row.matches('.is-dirty, .is-saving, .is-deleting, .is-confirming-delete, [aria-busy="true"]')
             || (row.classList.contains('is-editing') && aliasManager?.getAttribute('aria-busy') === 'true');
     }
 
@@ -36,20 +36,23 @@
             toggle.setAttribute('aria-controls', controls.join(' '));
         }
         const pending = rowHasPendingWork(row);
+        const deleting = row.classList.contains('is-confirming-delete');
         if (pending && phoneLayout.matches) state.expanded = true;
         const expanded = !phoneLayout.matches || state.expanded;
         if (row.classList.contains('is-mobile-expanded') !== expanded) {
             row.classList.toggle('is-mobile-expanded', expanded);
         }
         const name = row.dataset.recordName || 'ingredient';
+        const pendingLabel = deleting ? `Confirm or cancel deletion of ${name}` : `Save or cancel changes to ${name}`;
+        const pendingTitle = deleting ? 'Confirm or cancel deletion' : 'Save or cancel';
         const label = toggle.querySelector('[data-ingredient-mobile-name]');
         if (label && label.textContent !== name) label.textContent = name;
         setAttribute(toggle, 'aria-expanded', String(expanded));
         setAttribute(toggle, 'aria-disabled', String(pending));
         setAttribute(toggle, 'aria-label', pending
-            ? `Save or cancel changes to ${name} before collapsing details`
+            ? `${pendingLabel} before collapsing details`
             : `${expanded ? 'Collapse' : 'Expand'} details for ${name}`);
-        setAttribute(toggle, 'title', pending ? 'Save or cancel before collapsing details' : expanded ? 'Collapse details' : 'Expand details');
+        setAttribute(toggle, 'title', pending ? `${pendingTitle} before collapsing details` : expanded ? 'Collapse details' : 'Expand details');
     }
 
     function syncRows() {

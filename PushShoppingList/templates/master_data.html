@@ -364,13 +364,16 @@
         </td>
         <td id="ingredientActions-{{ row.id }}" class="ingredient-action-cell" data-label="Action">
             <div class="ingredient-row-actions">
-                <button type="button" class="unit-master-edit-button" data-ingredient-row-save aria-label="Save {{ row.name }}" disabled>Save</button>
-                <button type="button" class="unit-master-edit-button ingredient-row-cancel" data-ingredient-row-cancel aria-label="Cancel changes to {{ row.name }}" hidden>Cancel</button>
+                <button type="button" class="unit-master-edit-button" data-ingredient-row-save aria-label="Save {{ row.name }}" hidden disabled>Save</button>
                 {% if row.can_delete %}
                 <button type="button" class="unit-master-edit-button danger" data-ingredient-row-delete
                         data-delete-url="{{ url_for('main_bp.delete_ingredient_master_record_route', ingredient_id=row.id) }}"
                         aria-label="Delete {{ row.name }}">Delete</button>
+                <button type="button" class="unit-master-edit-button danger" data-ingredient-row-confirm-delete
+                        aria-label="Confirm delete {{ row.name }}"
+                        title="Delete this ingredient, its aliases and image association. This cannot be undone." hidden>Confirm delete</button>
                 {% endif %}
+                <button type="button" class="unit-master-edit-button ingredient-row-cancel" data-ingredient-row-cancel aria-label="Cancel changes to {{ row.name }}" hidden>Cancel</button>
                 <button type="button" class="unit-master-edit-button ingredient-row-merge" data-master-merge-open data-source-id="{{ row.id }}"
                         data-merge-blocked-reason="{{ row.merge_blocked_reason }}"
                         title="{{ row.merge_blocked_reason or row.delete_blocked_reason or 'Merge into another ingredient and preserve recipe references.' }}"
