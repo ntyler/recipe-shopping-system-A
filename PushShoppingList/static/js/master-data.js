@@ -1796,6 +1796,11 @@
         return `${usageCount} recipe reference${usageCount === 1 ? "" : "s"}`;
     }
 
+    function masterDataMergeRecordLabel(plural = false) {
+        return document.querySelector('[data-master-merge-dialog]')?.dataset.recordType === 'equipment'
+            ? 'equipment' : plural ? 'ingredients' : 'ingredient';
+    }
+
     function setMasterDataMergeError(message = "") {
         const els = masterDataMergeElements();
         if (!els.error) {
@@ -1815,7 +1820,7 @@
         }
         if (els.submit) {
             els.submit.disabled = busy || !(els.targetId && els.targetId.value);
-            els.submit.textContent = busy ? "Merging..." : "Merge ingredient";
+            els.submit.textContent = busy ? "Merging..." : `Merge ${masterDataMergeRecordLabel()}`;
         }
         if (els.results) {
             els.results.querySelectorAll("button").forEach((button) => {
@@ -1850,7 +1855,7 @@
         els.targetId.value = targetId;
         if (els.targetName) els.targetName.textContent = targetName;
         if (els.combinedUsage) {
-            els.combinedUsage.textContent = `${masterDataMergeUsageLabel(sourceReferences)} affected. The selected canonical ingredient will be kept.`;
+            els.combinedUsage.textContent = `${masterDataMergeUsageLabel(sourceReferences)} affected. The selected canonical ${masterDataMergeRecordLabel()} will be kept.`;
         }
         if (els.selection) els.selection.hidden = false;
         if (els.submit) els.submit.disabled = !targetId;
@@ -1868,7 +1873,7 @@
         button.className = "master-data-merge-option";
         button.setAttribute("role", "option");
         button.setAttribute("aria-selected", "false");
-        button.dataset.ingredientId = text(ingredient.ingredient_id);
+        button.dataset.ingredientId = text(ingredient.ingredient_id || ingredient.equipment_id || ingredient.id);
         button.dataset.ingredientName = text(ingredient.name);
         button.dataset.usageCount = text(ingredient.usage_count || 0);
 
@@ -1891,7 +1896,7 @@
         const aliases = Array.isArray(ingredient.aliases) && ingredient.aliases.length
             ? ` · aliases: ${ingredient.aliases.join(", ")}`
             : "";
-        detail.textContent = `${text(ingredient.normalized_name)} · ${text(ingredient.store_section)}${aliases}`;
+        detail.textContent = `${text(ingredient.normalized_name)} · ${text(ingredient.store_section || ingredient.equipment_section)}${aliases}`;
         copy.append(name, detail);
 
         const usage = document.createElement("span");
@@ -1914,7 +1919,7 @@
         if (!rows.length) {
             const empty = document.createElement("div");
             empty.className = "master-data-merge-empty";
-            empty.textContent = message || "No other master ingredients match this search.";
+            empty.textContent = message || `No other master ${masterDataMergeRecordLabel(true)} match this search.`;
             els.results.appendChild(empty);
             return;
         }
@@ -1935,7 +1940,7 @@
         masterDataMergeSearchTimer = window.setTimeout(async () => {
             const requestId = ++masterDataMergeRequestId;
             const queryValue = text(els.search.value).trim();
-            renderMasterDataMergeOptions([], "Loading canonical ingredients...");
+            renderMasterDataMergeOptions([], `Loading canonical ${masterDataMergeRecordLabel(true)}...`);
             setMasterDataMergeError("");
             try {
                 const requestUrl = canonicalMasterDataUrl(optionsUrl, {
@@ -1950,31 +1955,31 @@
                 });
                 const data = await response.json().catch(() => ({}));
                 if (!response.ok || data.ok === false || data.success === false) {
-                    throw new Error(data.error || "Canonical ingredients could not be loaded.");
+                    throw new Error(data.error || `Canonical ${masterDataMergeRecordLabel(true)} could not be loaded.`);
                 }
                 if (requestId !== masterDataMergeRequestId || !els.dialog.open) {
                     return;
                 }
                 const referenceCount = data.source?.reference_count;
                 if (!Number.isInteger(referenceCount) || referenceCount < 0) {
-                    throw new Error('Recipe references could not be counted. Try loading the canonical ingredients again.');
+                    throw new Error(`Recipe references could not be counted. Try loading the canonical ${masterDataMergeRecordLabel(true)} again.`);
                 }
                 els.dialog.dataset.sourceReferenceCount = String(referenceCount);
                 if (els.sourceUsage) els.sourceUsage.textContent = `${masterDataMergeUsageLabel(referenceCount)} affected`;
                 if (els.targetId.value && els.combinedUsage) {
-                    els.combinedUsage.textContent = `${masterDataMergeUsageLabel(referenceCount)} affected. The selected canonical ingredient will be kept.`;
+                    els.combinedUsage.textContent = `${masterDataMergeUsageLabel(referenceCount)} affected. The selected canonical ${masterDataMergeRecordLabel()} will be kept.`;
                 }
                 renderMasterDataMergeOptions(
-                    data.ingredients,
+                    data.ingredients || data.equipment,
                     queryValue
-                        ? `No master ingredients match “${queryValue}”.`
-                        : "No other master ingredients are available in this workspace."
+                        ? `No master ${masterDataMergeRecordLabel(true)} match “${queryValue}”.`
+                        : `No other master ${masterDataMergeRecordLabel(true)} are available in this workspace.`
                 );
             } catch (error) {
                 if (requestId === masterDataMergeRequestId) {
-                    renderMasterDataMergeOptions([], "Canonical ingredients could not be loaded.");
+                    renderMasterDataMergeOptions([], `Canonical ${masterDataMergeRecordLabel(true)} could not be loaded.`);
                     setMasterDataMergeError(
-                        error && error.message ? error.message : "Canonical ingredients could not be loaded."
+                        error && error.message ? error.message : `Canonical ${masterDataMergeRecordLabel(true)} could not be loaded.`
                     );
                 }
             }
@@ -2017,6 +2022,7 @@
             ingredientStatus('Save or cancel the current ingredient before merging.', true, ingredientEditingRow);
             return;
         }
+        if (window.EquipmentRegistry?.hasPendingWork()) return;
 
         masterDataMergeReturnFocus = button;
         els.form.action = text(button.dataset.mergeUrl);
@@ -2045,7 +2051,7 @@
         event.preventDefault();
         const els = masterDataMergeElements();
         if (!els.form || !els.targetId || !els.targetId.value) {
-            setMasterDataMergeError("Choose the canonical ingredient first.");
+            setMasterDataMergeError(`Choose the canonical ${masterDataMergeRecordLabel()} first.`);
             return;
         }
         setMasterDataMergeBusy(true);
@@ -2061,12 +2067,12 @@
             });
             const data = await response.json().catch(() => ({}));
             if (!response.ok || data.ok === false || data.success === false) {
-                throw new Error(data.message || data.error || "Ingredient records could not be merged.");
+                throw new Error(data.message || data.error || `The ${masterDataMergeRecordLabel()} records could not be merged.`);
             }
             if (els.selection) els.selection.classList.add("is-complete");
-            if (els.combinedUsage) els.combinedUsage.textContent = data.message || "Ingredient merge complete.";
+            if (els.combinedUsage) els.combinedUsage.textContent = data.message || 'Merge complete.';
             try {
-                if (window.localStorage) {
+                if (window.localStorage && masterDataMergeRecordLabel() === 'ingredient') {
                     window.localStorage.setItem(
                         INGREDIENT_MASTER_DATA_VERSION_STORAGE_KEY,
                         String(Date.now())
@@ -2083,7 +2089,7 @@
         } catch (error) {
             setMasterDataMergeBusy(false);
             setMasterDataMergeError(
-                error && error.message ? error.message : "Ingredient records could not be merged."
+                error && error.message ? error.message : `The ${masterDataMergeRecordLabel()} records could not be merged.`
             );
         }
     }
@@ -2304,7 +2310,11 @@
         decorateMasterDataLightboxImages();
         applyMasterDataThumbnailSize(masterDataThumbnailSize);
         initIngredientRegistry();
+        window.EquipmentRegistry?.sync();
     }
+
+    // Equipment uses the same refreshed fragments and image decoration as Ingredient.
+    window.MasterDataRegistryRefresh = refreshMasterDataRecordResults;
 
     function broadcastIngredientMasterDataMerge(plural = false) {
         try {

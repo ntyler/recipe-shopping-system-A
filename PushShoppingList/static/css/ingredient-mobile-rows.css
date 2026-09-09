@@ -1,30 +1,30 @@
-.ingredient-master-page .ingredient-mobile-row-toggle {
+.master-data-inline-page .ingredient-mobile-row-toggle {
     display: none;
 }
 
 @media (max-width: 760px) {
-    .ingredient-master-page.has-mobile-ingredient-rows .master-data-ingredients-table [data-ingredient-master-row] {
+    .master-data-inline-page.has-mobile-ingredient-rows .master-data-ingredients-table :is([data-ingredient-master-row], [data-equipment-master-row]) {
         grid-template-columns: minmax(0, 1fr) auto;
         align-items: center;
         column-gap: 8px;
     }
 
-    .ingredient-master-page.has-mobile-ingredient-rows .master-data-ingredients-table .ingredient-item-cell {
+    .master-data-inline-page.has-mobile-ingredient-rows .master-data-ingredients-table .ingredient-item-cell {
         grid-area: 1 / 1;
         padding: 4px 0;
     }
 
-    .ingredient-master-page.has-mobile-ingredient-rows .master-data-ingredients-table .master-data-usage-cell {
+    .master-data-inline-page.has-mobile-ingredient-rows .master-data-ingredients-table .master-data-usage-cell {
         grid-area: 1 / 2;
         justify-self: end;
         padding: 4px 0;
     }
 
-    .ingredient-master-page.has-mobile-ingredient-rows .master-data-ingredients-table .master-data-usage-button {
+    .master-data-inline-page.has-mobile-ingredient-rows .master-data-ingredients-table .master-data-usage-button {
         min-height: 44px;
     }
 
-    .ingredient-master-page.has-mobile-ingredient-rows .ingredient-mobile-row-toggle {
+    .master-data-inline-page.has-mobile-ingredient-rows .ingredient-mobile-row-toggle {
         display: flex;
         flex: 1 1 auto;
         align-items: center;
@@ -66,59 +66,59 @@
         transform: rotate(180deg);
     }
 
-    .ingredient-master-page.has-mobile-ingredient-rows .master-data-ingredients-table [data-ingredient-master-row]:not(.is-mobile-expanded) > :is(.ingredient-order-cell, .ingredient-aliases-cell, .ingredient-section-cell, .ingredient-action-cell),
-    .ingredient-master-page.has-mobile-ingredient-rows [data-ingredient-master-row]:not(.is-mobile-expanded) .ingredient-name-field {
+    .master-data-inline-page.has-mobile-ingredient-rows .master-data-ingredients-table :is([data-ingredient-master-row], [data-equipment-master-row]):not(.is-mobile-expanded) > :is(.ingredient-order-cell, .ingredient-aliases-cell, .ingredient-section-cell, .ingredient-action-cell),
+    .master-data-inline-page.has-mobile-ingredient-rows :is([data-ingredient-master-row], [data-equipment-master-row]):not(.is-mobile-expanded) .ingredient-name-field {
         display: none;
     }
 
-    .ingredient-master-page.has-mobile-ingredient-rows .master-data-ingredients-table [data-ingredient-master-row].is-mobile-expanded .ingredient-item-cell {
+    .master-data-inline-page.has-mobile-ingredient-rows .master-data-ingredients-table :is([data-ingredient-master-row], [data-equipment-master-row]).is-mobile-expanded .ingredient-item-cell {
         grid-area: 1 / 1 / auto / -1;
     }
 
-    .ingredient-master-page.has-mobile-ingredient-rows [data-ingredient-master-row].is-mobile-expanded .ingredient-name-field {
+    .master-data-inline-page.has-mobile-ingredient-rows :is([data-ingredient-master-row], [data-equipment-master-row]).is-mobile-expanded .ingredient-name-field {
         order: 1;
     }
 
-    .ingredient-master-page.has-mobile-ingredient-rows [data-ingredient-master-row].is-mobile-expanded .ingredient-mobile-row-toggle {
+    .master-data-inline-page.has-mobile-ingredient-rows :is([data-ingredient-master-row], [data-equipment-master-row]).is-mobile-expanded .ingredient-mobile-row-toggle {
         order: 2;
         flex: 0 0 44px;
         justify-content: center;
         width: 44px;
     }
 
-    .ingredient-master-page.has-mobile-ingredient-rows [data-ingredient-master-row].is-mobile-expanded .ingredient-mobile-row-toggle > span {
+    .master-data-inline-page.has-mobile-ingredient-rows :is([data-ingredient-master-row], [data-equipment-master-row]).is-mobile-expanded .ingredient-mobile-row-toggle > span {
         display: none;
     }
 
-    .ingredient-master-page.has-mobile-ingredient-rows .master-data-ingredients-table [data-ingredient-master-row].is-mobile-expanded > .master-data-usage-cell {
+    .master-data-inline-page.has-mobile-ingredient-rows .master-data-ingredients-table :is([data-ingredient-master-row], [data-equipment-master-row]).is-mobile-expanded > .master-data-usage-cell {
         grid-area: 2 / 1;
         justify-self: start;
     }
 
-    .ingredient-master-page.has-mobile-ingredient-rows .master-data-ingredients-table [data-ingredient-master-row].is-mobile-expanded > .ingredient-order-cell {
+    .master-data-inline-page.has-mobile-ingredient-rows .master-data-ingredients-table :is([data-ingredient-master-row], [data-equipment-master-row]).is-mobile-expanded > .ingredient-order-cell {
         grid-area: 2 / 2;
         justify-self: end;
     }
 
-    .ingredient-master-page.has-mobile-ingredient-rows .master-data-ingredients-table [data-ingredient-master-row].is-mobile-expanded > .ingredient-aliases-cell {
+    .master-data-inline-page.has-mobile-ingredient-rows .master-data-ingredients-table :is([data-ingredient-master-row], [data-equipment-master-row]).is-mobile-expanded > .ingredient-aliases-cell {
         grid-area: 3 / 1 / auto / -1;
     }
 
-    .ingredient-master-page.has-mobile-ingredient-rows .master-data-ingredients-table [data-ingredient-master-row].is-mobile-expanded > .ingredient-section-cell {
+    .master-data-inline-page.has-mobile-ingredient-rows .master-data-ingredients-table :is([data-ingredient-master-row], [data-equipment-master-row]).is-mobile-expanded > .ingredient-section-cell {
         grid-area: 4 / 1 / auto / -1;
     }
 
-    .ingredient-master-page.has-mobile-ingredient-rows .master-data-ingredients-table [data-ingredient-master-row].is-mobile-expanded > .ingredient-action-cell {
+    .master-data-inline-page.has-mobile-ingredient-rows .master-data-ingredients-table :is([data-ingredient-master-row], [data-equipment-master-row]).is-mobile-expanded > .ingredient-action-cell {
         grid-area: 5 / 1 / auto / -1;
         padding-top: 10px;
     }
 
-    .ingredient-master-page.has-mobile-ingredient-rows .ingredient-row-actions {
+    .master-data-inline-page.has-mobile-ingredient-rows .ingredient-row-actions {
         width: 100%;
         min-height: 44px;
     }
 
-    .ingredient-master-page.has-mobile-ingredient-rows .ingredient-row-actions > button {
+    .master-data-inline-page.has-mobile-ingredient-rows .ingredient-row-actions > button {
         min-height: 44px;
     }
 }

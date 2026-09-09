@@ -68,7 +68,7 @@ def test_ingredient_name_is_used_in_shared_navigation(monkeypatch, tmp_path):
             link = soup.select_one('.master-data-tabs a[href="/admin/master-data/ingredients"]')
             assert link.get_text(strip=True) == 'Ingredient'
             if page == 'equipment':
-                assert soup.select_one('[data-master-thumbnail-size-value]').text == '64px'
+                assert soup.select_one('[data-master-thumbnail-size-value]').text == '48px'
 
 
 def test_ingredient_editor_validates_complete_registry_and_semantic_changes():

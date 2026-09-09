@@ -1,0 +1,13 @@
+{% from "partials/master_data_alias_editor.html" import accepted_alias_editor %}
+<div id="equipmentAliasManager" class="unit-master-editor unit-master-alias-popover ingredient-alias-manager"
+     role="dialog" popover="manual" aria-labelledby="equipmentAliasTitle" hidden>
+    <header><div>
+        <h2 id="equipmentAliasTitle" data-equipment-editor-title>Equipment aliases</h2>
+        <p class="unit-master-editor-permissions">Use the row’s Save or Cancel for all alias changes.</p>
+    </div></header>
+    {{ accepted_alias_editor('equipment-editor', 'equipmentEditorAlias', 160, 'For example, stock pot') }}
+    <footer>
+        <div class="unit-master-editor-feedback" data-equipment-editor-feedback role="status" aria-live="polite" hidden></div>
+        <button type="button" class="secondary" data-equipment-editor-close-aliases>Close aliases</button>
+    </footer>
+</div>

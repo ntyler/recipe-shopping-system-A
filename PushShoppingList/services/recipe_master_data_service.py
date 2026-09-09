@@ -1225,6 +1225,64 @@ def migrate_ingredient_order(connection):
     return changed
 
 
+def migrate_equipment_order(connection):
+    """Maintain the same compact per-category order as Ingredient master data."""
+    if not connection.in_transaction:
+        connection.execute("BEGIN IMMEDIATE")
+    if not recipe_master_table_exists(connection, "equipment"):
+        return 0
+    if "sort_order" not in recipe_master_column_names(connection, "equipment"):
+        connection.execute("ALTER TABLE equipment ADD COLUMN sort_order INTEGER NOT NULL DEFAULT -1")
+    groups = connection.execute("""
+        SELECT user_id, equipment_section FROM equipment GROUP BY user_id, equipment_section
+        HAVING MIN(sort_order) <> 0 OR MAX(sort_order) <> COUNT(*) - 1
+            OR COUNT(DISTINCT sort_order) <> COUNT(*) OR SUM(typeof(sort_order) <> 'integer') > 0
+    """).fetchall()
+    changed = 0
+    for group in groups:
+        rows = connection.execute("""
+            SELECT id, sort_order FROM equipment WHERE user_id = ? AND equipment_section = ?
+            ORDER BY CASE WHEN typeof(sort_order) = 'integer' AND sort_order >= 0
+                          THEN sort_order ELSE 2147483647 END, updated_at DESC, id DESC
+        """, (group["user_id"], group["equipment_section"])).fetchall()
+        updates = [(index, row["id"]) for index, row in enumerate(rows) if row["sort_order"] != index]
+        connection.executemany("UPDATE equipment SET sort_order = ? WHERE id = ?", updates)
+        changed += len(updates)
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_equipment_section_order ON equipment(user_id, equipment_section, sort_order, id)")
+    connection.execute("""
+        CREATE TRIGGER IF NOT EXISTS equipment_order_append AFTER INSERT ON equipment
+        BEGIN
+            UPDATE equipment SET sort_order = (
+                SELECT COALESCE(MAX(sort_order), -1) + 1 FROM equipment
+                WHERE user_id = NEW.user_id AND equipment_section = NEW.equipment_section AND id <> NEW.id
+            ) WHERE id = NEW.id;
+        END
+    """)
+    connection.execute("""
+        CREATE TRIGGER IF NOT EXISTS equipment_order_section_move
+        AFTER UPDATE OF equipment_section, user_id ON equipment
+        WHEN OLD.equipment_section <> NEW.equipment_section OR OLD.user_id <> NEW.user_id
+        BEGIN
+            UPDATE equipment SET sort_order = sort_order - 1
+             WHERE user_id = OLD.user_id AND equipment_section = OLD.equipment_section
+               AND id <> NEW.id AND sort_order > OLD.sort_order;
+            UPDATE equipment SET sort_order = (
+                SELECT COALESCE(MAX(sort_order), -1) + 1 FROM equipment
+                WHERE user_id = NEW.user_id AND equipment_section = NEW.equipment_section AND id <> NEW.id
+            ) WHERE id = NEW.id;
+        END
+    """)
+    connection.execute("""
+        CREATE TRIGGER IF NOT EXISTS equipment_order_remove AFTER DELETE ON equipment
+        BEGIN
+            UPDATE equipment SET sort_order = sort_order - 1
+             WHERE user_id = OLD.user_id AND equipment_section = OLD.equipment_section
+               AND sort_order > OLD.sort_order;
+        END
+    """)
+    return changed
+
+
 def _ingredient_order_request_error(position, expected_ids):
     if isinstance(position, bool) or not isinstance(position, int) or position < 1:
         return {"ok": False, "status": 400, "error": "A positive ingredient position is required."}
@@ -1780,6 +1838,8 @@ def ensure_recipe_master_schema(connection=None):
             )
     migrate_ingredient_order(connection)
     equipment_columns = recipe_master_column_names(connection, "equipment")
+    if "equipment_section_user_confirmed" not in equipment_columns:
+        connection.execute("ALTER TABLE equipment ADD COLUMN equipment_section_user_confirmed INTEGER NOT NULL DEFAULT 0")
     if "display_name_override" not in equipment_columns:
         connection.execute(
             "ALTER TABLE equipment ADD COLUMN display_name_override TEXT NOT NULL DEFAULT ''"
@@ -1860,6 +1920,7 @@ def ensure_recipe_master_schema(connection=None):
     migrate_existing_recipe_ingredient_units(connection)
     normalize_existing_ingredient_store_sections(connection)
     normalize_existing_equipment_sections(connection)
+    migrate_equipment_order(connection)
     connection.execute("CREATE INDEX IF NOT EXISTS idx_ingredients_user_name ON ingredients(user_id, normalized_name)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_ingredient_aliases_ingredient ON ingredient_aliases(ingredient_id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_ingredient_aliases_user_name ON ingredient_aliases(user_id, normalized_alias)")
@@ -4183,13 +4244,15 @@ def normalize_existing_ingredient_store_sections(connection):
 def normalize_existing_equipment_sections(connection):
     try:
         rows = connection.execute(
-            "SELECT id, name, normalized_name, equipment_section FROM equipment"
+            "SELECT * FROM equipment"
         ).fetchall()
     except sqlite3.OperationalError:
         return
 
     for row in rows:
         raw_section = str(row["equipment_section"] or "")
+        if "equipment_section_user_confirmed" in row.keys() and row["equipment_section_user_confirmed"]:
+            continue
         section = resolve_equipment_section(
             " ".join(
                 part
@@ -4319,7 +4382,7 @@ def list_master_records(
     limit = bounded_master_limit(limit)
     offset = bounded_master_offset(offset)
     order_clause = MASTER_RECORD_SORTS.get(sort, MASTER_RECORD_SORTS["updated_at_desc"])
-    if table_name != "ingredients" and sort == "manual_order":
+    if table_name not in {"ingredients", "equipment"} and sort == "manual_order":
         order_clause = MASTER_RECORD_SORTS["updated_at_desc"]
     if table_name == "equipment" and sort == "name_asc":
         order_clause = (
@@ -4413,6 +4476,17 @@ def list_master_records(
             return []
 
         if table_name == "equipment":
+            has_order = "sort_order" in recipe_master_column_names(connection, "equipment")
+            section_select += ", m.sort_order AS sort_order" if has_order else """, (
+                SELECT COUNT(*) FROM equipment predecessor
+                 WHERE predecessor.user_id = m.user_id AND predecessor.equipment_section = m.equipment_section
+                   AND (predecessor.updated_at > m.updated_at OR (predecessor.updated_at = m.updated_at AND predecessor.id > m.id))
+            ) AS sort_order"""
+            section_select += """, (SELECT COUNT(*) FROM equipment section_member
+                WHERE section_member.user_id = m.user_id AND section_member.equipment_section = m.equipment_section) AS section_count"""
+            if sort == "manual_order":
+                section_cases = " ".join(f"WHEN '{section}' THEN {index}" for index, section in enumerate(equipment_section_options()))
+                order_clause = f"CASE m.equipment_section {section_cases} ELSE 2147483647 END, m.equipment_section, sort_order, m.id"
             # The optional structured schema is read-only here. Never create it
             # or enable its write gates just to display existing aliases.
             alias_select = ", '' AS aliases_serialized"
@@ -8502,6 +8576,19 @@ def upsert_master_record(
         )
     else:
         equipment_section = resolve_equipment_section(name, equipment_section)
+        # Registry merges keep old equipment names as aliases. Reimports must
+        # retain the surviving ID instead of recreating the removed duplicate.
+        if recipe_master_table_exists(connection, "equipment_aliases"):
+            from PushShoppingList.services.equipment_normalization_service import normalized_equipment_key
+            alias_target = connection.execute("""
+                SELECT m.id, m.equipment_section FROM equipment_aliases a
+                JOIN equipment m ON m.id = a.equipment_id AND m.user_id = a.user_id
+                WHERE a.user_id = ? AND a.alias_key = ? AND a.status = 'active'
+            """, (user_id, normalized_equipment_key(name))).fetchone()
+            if alias_target:
+                return {"id": int(alias_target["id"]), "equipment_section": alias_target["equipment_section"],
+                        "previous_equipment_section": alias_target["equipment_section"],
+                        "equipment_section_changed": False, "equipment_section_inserted": False}
         previous_row = connection.execute(
             """
             SELECT id, equipment_section
@@ -8526,6 +8613,7 @@ def upsert_master_record(
                 name = CASE WHEN excluded.name != '' THEN excluded.name ELSE equipment.name END,
                 equipment_section = CASE
                     WHEN COALESCE(NULLIF(TRIM(equipment.equipment_section), ''), 'MISC') = 'MISC'
+                         AND equipment.equipment_section_user_confirmed = 0
                         THEN excluded.equipment_section
                     ELSE equipment.equipment_section
                 END,

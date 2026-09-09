@@ -116,7 +116,7 @@ def test_usage_loader_collects_all_pages_and_ignores_closed_dialog_responses():
     if not node:
         pytest.skip('Node.js is required for reference loading')
     source = Path('PushShoppingList/static/js/master-data.js').read_text(encoding='utf-8')
-    loader = source[source.index('    async function loadReferenceData('):source.index('    function equipmentMasterDisplayNameElements(')]
+    loader = source[source.index('    async function loadReferenceData('):source.index('    function masterDataUsageElements(')]
     script = '''const assert = require('node:assert/strict');
 global.window = {fetch:true};
 const canonicalMasterDataUrl = raw => new URL(raw, 'http://localhost');

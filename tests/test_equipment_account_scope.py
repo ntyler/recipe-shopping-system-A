@@ -118,8 +118,10 @@ def test_equipment_page_is_permanently_bound_to_authenticated_workspace(equipmen
         assert "Viewing all users" not in html
         assert "Family skillet" in html
         assert "/static/generated/own-skillet.png" in html
-        for key, expected in (("total", "3"), ("type", "3"), ("used", "2"), ("unused", "1")):
-            assert soup.select_one(f"[data-equipment-master-{key}-count]").get_text(strip=True) == expected
+        assert len(soup.select("[data-equipment-master-row]")) == 3
+        assert master_data.equipment_summary_counts(user_id="user-a") == {
+            "total_count": 3, "type_count": 3, "in_use_count": 2, "unused_count": 1,
+        }
         skillet = soup.select_one(f'[data-equipment-master-row][data-master-record-id="{records["Alpha skillet"]["id"]}"]')
         assert skillet.select_one("[data-equipment-master-usage-button] strong").get_text(strip=True) == "2"
         assert "Showing 1-3 of 3 equipment." in html
@@ -157,7 +159,7 @@ def test_search_filters_sorts_and_pagination_only_count_active_equipment(equipme
         assert names_in(response) == expected
         assert_private(response)
         soup = BeautifulSoup(response.get_data(as_text=True), "html.parser")
-        assert soup.select_one("[data-equipment-master-total-count]").get_text(strip=True) == "3"
+        assert master_data.count_equipment(user_id="user-a") == 3
         for anchor in soup.select('a[href*="/admin/master-data/equipment"]'):
             parameters = parse_qs(urlsplit(anchor["href"]).query)
             assert parameters.get("scope", ["mine"]) == ["mine"]
@@ -225,33 +227,47 @@ def test_inline_save_reset_and_forged_owner_fields_cannot_change_foreign_equipme
 
 
 @pytest.mark.parametrize("admin", [False, True])
-def test_unavailable_equipment_mutations_do_not_allow_forged_delete_order_or_merge(equipment_workspaces, monkeypatch, admin):
+def test_equipment_mutations_reject_foreign_sources_and_merge_targets(equipment_workspaces, monkeypatch, admin):
     app, db_path, records = equipment_workspaces
     client = scoped_client(app, monkeypatch, admin=admin)
     own_id, foreign_id = records["Alpha skillet"]["id"], records["Secret mixer"]["id"]
-    # Equipment retains its presentation-only editor. These destructive routes
-    # are deliberately unavailable, including for same-workspace records.
+    # Editors are now available for owned equipment. Every foreign source and
+    # merge target remains inaccessible even when an admin forges scope fields.
     before = db_path.read_bytes()
-    for source, destination in ((own_id, foreign_id), (foreign_id, own_id), (foreign_id, records["Secret whisk"]["id"])):
+    for source, destination in ((foreign_id, own_id), (foreign_id, records["Secret whisk"]["id"])):
         for method, path in (
-            ("GET", f"/api/master-data/equipment/{source}"),
+            ("PATCH", f"/api/master-data/equipment/{source}"),
             ("GET", f"/api/master-data/equipment/{source}/editor"),
             ("GET", f"/api/master-data/equipment/{source}/merge-options"),
-            ("POST", f"/admin/master-data/equipment/{source}"),
-            ("DELETE", f"/api/master-data/equipment/{source}"),
             ("POST", f"/admin/master-data/equipment/{source}/delete"),
             ("POST", f"/admin/master-data/equipment/{source}/merge"),
-            ("POST", f"/api/master-data/equipment/{source}/merge"),
             ("PATCH", f"/api/master-data/equipment/{source}/order"),
-            ("POST", f"/api/master-data/equipment/{source}/image-preview"),
         ):
             response = client.open(path + "?scope=all&user_id=user-b", method=method, json={
                 "user_id": "user-b", "workspace_id": "user-b", "scope": "all",
                 "source_id": source, "destination_id": destination, "target_id": destination,
                 "target_equipment_id": destination, "before_id": destination,
+                "name": "Stolen equipment", "confirm": True,
+                "position": 1, "expected_ids": [source],
             })
             assert response.status_code in {403, 404}, (method, path, response.status_code)
             assert_private(response)
+    response = client.post(f"/admin/master-data/equipment/{own_id}/merge?scope=all&user_id=user-b", json={
+        "target_equipment_id": foreign_id, "user_id": "user-b",
+    })
+    assert response.status_code == 404
+    assert_private(response)
+    assert db_path.read_bytes() == before
+    own_editor = client.get(f"/api/master-data/equipment/{own_id}/editor?scope=all&user_id=user-b")
+    assert own_editor.status_code == 200
+    assert own_editor.json["record"]["user_id"] == "user-a"
+    assert_private(own_editor)
+    candidates = client.get(f"/api/master-data/equipment/{own_id}/merge-options?scope=all&user_id=user-b")
+    assert candidates.status_code == 200
+    assert {row["id"] for row in candidates.json["equipment"]} == {
+        records["Cedar spoon"]["id"], records["Zebra tray"]["id"],
+    }
+    assert_private(candidates)
     assert db_path.read_bytes() == before
 
 

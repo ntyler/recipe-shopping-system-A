@@ -29,6 +29,7 @@ from flask import url_for
 
 from PushShoppingList.scripts.sort_ingredients import main as sort_ingredients
 from PushShoppingList.services import recipe_master_data_service as recipe_master_data
+from PushShoppingList.services import equipment_registry_service as equipment_registry
 from PushShoppingList.services import recipe_master_image_service as recipe_master_images
 from PushShoppingList.services import recipe_equipment_requirement_service as recipe_equipment_requirements
 from PushShoppingList.services import master_data_url_service
@@ -1275,7 +1276,7 @@ def master_data_context(record_type, scope_info=None):
     sort = str(request.args.get("sort") or "updated_at_desc").strip()
     if sort not in recipe_master_data.MASTER_RECORD_SORTS:
         sort = "updated_at_desc"
-    if record_type != "ingredients" and sort == "manual_order":
+    if record_type not in {"ingredients", "equipment"} and sort == "manual_order":
         sort = "updated_at_desc"
     limit = int_query_arg("limit", 100, minimum=1, maximum=500)
     page = int_query_arg("page", 1, minimum=1)
@@ -1382,6 +1383,16 @@ def master_data_context(record_type, scope_info=None):
         user_ids_for_labels.add(scope_info["user_id"])
     user_identities = master_data_user_identity_lookup(user_ids_for_labels)
     rows = enrich_master_data_rows_with_users(rows, user_identities)
+    if record_type == "equipment":
+        action_details = equipment_registry.equipment_action_details(rows)
+        visible_counts = {}
+        for row in rows:
+            key = (row["user_id"], row["equipment_section"])
+            visible_counts[key] = visible_counts.get(key, 0) + 1
+        for row in rows:
+            row.update(action_details.get(int(row["id"]), {}))
+            row["order_enabled"] = bool(sort == "manual_order" and not search and
+                visible_counts[(row["user_id"], row["equipment_section"])] == row["section_count"])
     if record_type == "ingredients":
         deletion_details = ingredient_deletion.ingredient_deletion_details(rows)
         # Merge targets belong to the source workspace, regardless of the
@@ -1530,7 +1541,7 @@ def master_data_context(record_type, scope_info=None):
                     "section_key": section,
                     "rows": section_rows,
                 })
-    elif record_type == "equipment" and rows:
+    elif record_type == "equipment" and not equipment_section and rows:
         for section in recipe_master_data.equipment_section_options():
             section_rows = [
                 row
@@ -1599,13 +1610,13 @@ def master_data_context(record_type, scope_info=None):
         if record_type == "equipment"
         else [],
         "group_by_store_section": bool(record_type == "ingredients" and not store_section),
-        "group_by_equipment_section": bool(record_type == "equipment"),
-        "table_column_count": 6 if record_type == "ingredients" else 5,
+        "group_by_equipment_section": bool(record_type == "equipment" and not equipment_section),
+        "table_column_count": 6,
         "sort_options": [
             {"value": "updated_at_desc", "label": "Updated At"},
             {"value": "usage_count_desc", "label": "Usage Count"},
             {"value": "name_asc", "label": "Name"},
-        ] + ([{"value": "manual_order", "label": "Manual Order"}] if record_type == "ingredients" else []),
+        ] + [{"value": "manual_order", "label": "Manual Order"}],
         "limit_options": [50, 100, 250, 500],
         "db_status": status,
         "is_admin": is_admin,
@@ -1728,6 +1739,58 @@ def equipment_master_display_name_route(equipment_id):
         result["record"]["updated_at_label"] = master_data_date_label(result["record"]["updated_at"])
     status = int(result.pop("status", 200 if result.get("ok") else 400))
     return jsonify({**result, "success": result.get("ok", False)}), status
+
+
+@main_bp.route("/api/master-data/equipment/<int:equipment_id>", methods=["PATCH", "POST"])
+def update_equipment_master_record_route(equipment_id):
+    payload = request.get_json(silent=True) or {}
+    result = equipment_registry.update_equipment_master_record(equipment_id, payload)
+    return jsonify({**result, "success": result.get("ok", False)}), 200 if result.get("ok") else int(result.get("status") or 400)
+
+
+@main_bp.route("/api/master-data/equipment/<int:equipment_id>/editor")
+def equipment_master_editor_route(equipment_id):
+    record = equipment_registry.equipment_editor_record(equipment_id)
+    if not record:
+        return jsonify({"ok": False, "error": "Equipment was not found."}), 404
+    return jsonify({"ok": True, "record": record})
+
+
+@main_bp.route("/api/master-data/equipment/<int:equipment_id>/order", methods=["PATCH"])
+def reorder_equipment_master_record_route(equipment_id):
+    payload = request.get_json(silent=True) or {}
+    payload = payload if isinstance(payload, dict) else {}
+    result = equipment_registry.move_equipment_master_record(equipment_id, payload.get("position"), payload.get("expected_ids"))
+    return jsonify(result), 200 if result.get("ok") else int(result.get("status") or 400)
+
+
+@main_bp.route("/admin/master-data/equipment/<int:equipment_id>/delete", methods=["POST"])
+def delete_equipment_master_record_route(equipment_id):
+    payload = request.get_json(silent=True) or {}
+    payload = payload if isinstance(payload, dict) else {}
+    result = equipment_registry.delete_equipment_master_record(equipment_id, confirm=payload.get("confirm"))
+    return jsonify({**result, "success": result.get("ok", False), "result": result}), 200 if result.get("ok") else int(result.get("status") or 400)
+
+
+@main_bp.route("/api/master-data/equipment/<int:equipment_id>/merge-options")
+def equipment_master_merge_options_route(equipment_id):
+    source = equipment_registry.equipment_editor_record(equipment_id)
+    if not source:
+        return jsonify({"ok": False, "error": "Equipment was not found."}), 404
+    limit = int_query_arg("limit", 20, minimum=1, maximum=50)
+    rows = recipe_master_data.list_equipment(search=request.args.get("search"), limit=limit + 1,
+                                            sort="name_asc" if request.args.get("search") else "usage_count_desc")
+    candidates = [{**row, "equipment_id": row["id"]} for row in rows if row["id"] != equipment_id][:limit]
+    return jsonify({"ok": True, "success": True, "source": {**source, "equipment_id": equipment_id,
+                    "reference_count": source["delete_reference_count"]}, "equipment": candidates})
+
+
+@main_bp.route("/admin/master-data/equipment/<int:equipment_id>/merge", methods=["POST"])
+def merge_equipment_master_record_route(equipment_id):
+    payload = request.get_json(silent=True) if request.is_json else request.form
+    payload = payload if isinstance(payload, dict) or hasattr(payload, "get") else {}
+    result = equipment_registry.merge_equipment_master_records(equipment_id, payload.get("target_equipment_id"))
+    return jsonify({**result, "success": result.get("ok", False), "result": result}), 200 if result.get("ok") else int(result.get("status") or 400)
 
 
 def unit_master_data_context(scope_info):

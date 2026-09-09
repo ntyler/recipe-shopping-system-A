@@ -1,16 +1,16 @@
-{% macro registry_order(name, position, enabled, count) -%}
+{% macro registry_order(name, position, enabled, count, namespace='ingredient') -%}
 <div class="store-section-master-order">
-    <button type="button" class="store-section-master-drag-handle" data-ingredient-order-handle
+    <button type="button" class="store-section-master-drag-handle" data-{{ namespace }}-order-handle
             draggable="{{ 'true' if enabled else 'false' }}" aria-disabled="{{ 'false' if enabled else 'true' }}"
-            aria-keyshortcuts="ArrowUp ArrowDown Home End" aria-describedby="ingredientOrderHelp"
+            aria-keyshortcuts="ArrowUp ArrowDown Home End" aria-describedby="{{ namespace }}OrderHelp"
             aria-label="Reorder {{ name }}" title="Reorder {{ name }}">
         <svg viewBox="0 0 16 20" aria-hidden="true"><circle cx="5" cy="4" r="1.4"></circle><circle cx="11" cy="4" r="1.4"></circle><circle cx="5" cy="10" r="1.4"></circle><circle cx="11" cy="10" r="1.4"></circle><circle cx="5" cy="16" r="1.4"></circle><circle cx="11" cy="16" r="1.4"></circle></svg>
     </button>
-    <button type="button" value="move_up" data-ingredient-order-action="up" aria-label="Move {{ name }} up" {% if not enabled or position == 1 %}disabled{% endif %}>
+    <button type="button" value="move_up" data-{{ namespace }}-order-action="up" aria-label="Move {{ name }} up" {% if not enabled or position == 1 %}disabled{% endif %}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"></path><path d="m6 11 6-6 6 6"></path></svg>
     </button>
-    <span class="store-section-master-order-step" data-ingredient-order-number aria-label="Position {{ position }}">{{ position }}</span>
-    <button type="button" value="move_down" data-ingredient-order-action="down" aria-label="Move {{ name }} down" {% if not enabled or position == count %}disabled{% endif %}>
+    <span class="store-section-master-order-step" data-{{ namespace }}-order-number aria-label="Position {{ position }}">{{ position }}</span>
+    <button type="button" value="move_down" data-{{ namespace }}-order-action="down" aria-label="Move {{ name }} down" {% if not enabled or position == count %}disabled{% endif %}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"></path><path d="m6 13 6 6 6-6"></path></svg>
     </button>
 </div>
