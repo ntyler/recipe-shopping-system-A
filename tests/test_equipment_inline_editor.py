@@ -324,11 +324,11 @@ const base = process.argv[2];
         await page.unroute('**' + updateURL); writes.pop();
 
         // Image and usage use the same keyboard-operable shared dialogs as Ingredient.
-        const image = row.locator('.master-data-thumbnail');
+        const image = row.locator('[data-master-image-trigger]');
         await image.focus(); await image.press('Enter');
         const lightbox = page.locator('#recipeImageLightbox');
         assert(await lightbox.isVisible());
-        assert(await lightbox.locator('[data-master-image-actions]').isHidden());
+        assert(await lightbox.locator('[data-master-image-actions]').isVisible());
         const preview = await lightbox.locator('#recipeImageLightboxImage').boundingBox();
         assert(preview && preview.x >= 0 && preview.y >= 0 && preview.x + preview.width <= viewport.width + 1 && preview.y + preview.height <= viewport.height + 1, 'Image preview fits the viewport');
         await screenshot('image');
