@@ -48,7 +48,7 @@ def test_ingredient_page_name_and_controls_preserve_existing_endpoints(monkeypat
     assert actions.select_one('[data-ingredient-row-cancel]')
     merge = actions.select_one('[data-master-merge-open]')
     assert merge['aria-controls'] == 'masterDataIngredientMergeDialog'
-    assert merge.get_text(strip=True) == 'Merge duplicate…'
+    assert merge.get_text(strip=True) == 'Merge duplicate'
     assert merge.has_attr('disabled'), 'Another workspace cannot supply a merge target'
     assert merge['title'], 'Unavailable merge actions explain why they are disabled'
     assert not table.select('[data-ingredient-row-delete]'), 'Referenced ingredients cannot be deleted'

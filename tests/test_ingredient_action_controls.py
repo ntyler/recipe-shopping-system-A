@@ -162,7 +162,7 @@ const base = process.argv[2];
         assert.equal(await row.locator('.ingredient-row-more, [popover], [popovertarget]').count(), 0);
         assert(await mergeButton.isEnabled());
         assert(await mergeButton.isVisible());
-        assert.equal(await mergeButton.innerText(), 'Merge duplicate…');
+        assert.equal(await mergeButton.innerText(), 'Merge duplicate');
         assert(!/Manage Image/i.test(await actionCell.innerText()));
         await state({dirty: false});
 

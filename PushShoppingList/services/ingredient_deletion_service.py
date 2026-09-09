@@ -126,7 +126,7 @@ def _deletion_details(connection, records):
         elif count:
             reason = (
                 f"Used by {count} recipe{'s' if count != 1 else ''}. Deleting this ingredient "
-                "would break recipe references. Use Merge duplicate… to preserve the "
+                "would break recipe references. Use Merge duplicate to preserve the "
                 "references, or reassign them before deleting."
             )
         elif int(record["id"]) in foreign_alias_ids:

@@ -377,7 +377,7 @@
                         {% if not row.can_merge %}disabled{% endif %}
                         data-source-name="{{ row.name }}" data-source-normalized-name="{{ row.normalized_name }}" data-source-usage-count="{{ row.usage_count }}"
                         data-merge-options-url="{{ url_for('main_bp.ingredient_master_merge_options_route', ingredient_id=row.id, viewer_user_id=master_data.viewer_user_id or none) }}"
-                        data-merge-url="{{ url_for('main_bp.merge_ingredient_master_record_route', ingredient_id=row.id) }}" aria-haspopup="dialog" aria-controls="masterDataIngredientMergeDialog">Merge duplicate&hellip;</button>
+                        data-merge-url="{{ url_for('main_bp.merge_ingredient_master_record_route', ingredient_id=row.id) }}" aria-haspopup="dialog" aria-controls="masterDataIngredientMergeDialog">Merge duplicate</button>
             </div>
             <span id="ingredientRowStatus-{{ row.id }}" class="ingredient-row-status" data-ingredient-row-status role="status" aria-live="polite"></span>
             <button type="button" class="unit-master-edit-button" data-ingredient-row-retry hidden>Retry validation</button>
