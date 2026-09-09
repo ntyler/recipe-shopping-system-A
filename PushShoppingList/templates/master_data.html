@@ -1227,7 +1227,12 @@ data-viewer-user-id="{{ master_data.viewer_user_id }}"
                         {% if master_data.row_groups %}
                             {% for group in master_data.row_groups %}
                                 <tr class="master-data-section-row">
-                                    <th scope="rowgroup" colspan="{{ master_data.table_column_count }}">{{ equipment_type_label(group.section) }}</th>
+                                    <th scope="rowgroup" colspan="{{ master_data.table_column_count }}">
+                                        <div class="equipment-group-header">
+                                            <h3 class="equipment-group-title">{{ equipment_type_label(group.section) }}</h3>
+                                            <span data-equipment-group-count>{{ group.count }} {{ 'item' if group.count == 1 else 'items' }}</span>
+                                        </div>
+                                    </th>
                                 </tr>
                                 {% for row in group.rows %}
                                     {{ render_master_data_row(row, master_data) }}

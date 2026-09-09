@@ -4671,6 +4671,37 @@ def count_equipment(user_id=None, search=None, include_all_users=False, store_se
     )
 
 
+def equipment_type_counts(user_id=None, search=None, include_all_users=False, equipment_section=None):
+    """Count complete filtered Equipment Types, independently of the page size."""
+    where, params = master_record_filters(
+        "equipment",
+        user_id=user_id,
+        search=search,
+        include_all_users=include_all_users,
+        equipment_section=equipment_section,
+    )
+    where_clause = f"WHERE {' AND '.join(where)}" if where else ""
+    with existing_recipe_master_read_connection() as connection:
+        if connection is None:
+            return {}
+        rows = connection.execute(
+            f"""
+            SELECT m.equipment_section, COUNT(*) AS item_count
+              FROM equipment m
+              {where_clause}
+             GROUP BY m.equipment_section
+            """,
+            params,
+        ).fetchall()
+
+    counts = {}
+    for row in rows:
+        # Match list_master_records' presentation of legacy or unknown types.
+        section = clean_equipment_section(row["equipment_section"])
+        counts[section] = counts.get(section, 0) + int(row["item_count"])
+    return counts
+
+
 def update_equipment_display_name(record_id, display_name=None, *, reset=False, user_id=None):
     """Set or clear one workspace's presentation-only equipment name override."""
 

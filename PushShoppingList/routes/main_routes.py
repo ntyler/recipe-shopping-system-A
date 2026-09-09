@@ -1306,6 +1306,7 @@ def master_data_context(record_type, scope_info=None):
 
     rows = []
     total_count = 0
+    equipment_type_counts = {}
     equipment_summary = {
         "total_count": 0,
         "type_count": 0,
@@ -1332,6 +1333,12 @@ def master_data_context(record_type, scope_info=None):
             equipment_section=equipment_section if record_type == "equipment" else None,
         )
         if record_type == "equipment":
+            equipment_type_counts = recipe_master_data.equipment_type_counts(
+                user_id=scope_info["user_id"],
+                search=search,
+                include_all_users=scope_info["include_all_users"],
+                equipment_section=equipment_section,
+            )
             equipment_summary = recipe_master_data.equipment_summary_counts(
                 user_id=scope_info["user_id"],
                 include_all_users=scope_info["include_all_users"],
@@ -1542,7 +1549,7 @@ def master_data_context(record_type, scope_info=None):
                     "section_key": section,
                     "rows": section_rows,
                 })
-    elif record_type == "equipment" and not equipment_section and rows:
+    elif record_type == "equipment" and rows:
         for section in recipe_master_data.equipment_section_options():
             section_rows = [
                 row
@@ -1552,6 +1559,7 @@ def master_data_context(record_type, scope_info=None):
             if section_rows:
                 row_groups.append({
                     "section": section,
+                    "count": equipment_type_counts.get(section, 0),
                     "rows": section_rows,
                 })
 
@@ -1611,7 +1619,7 @@ def master_data_context(record_type, scope_info=None):
         if record_type == "equipment"
         else [],
         "group_by_store_section": bool(record_type == "ingredients" and not store_section),
-        "group_by_equipment_section": bool(record_type == "equipment" and not equipment_section),
+        "group_by_equipment_section": record_type == "equipment",
         "table_column_count": 6,
         "sort_options": [
             {"value": "updated_at_desc", "label": "Updated At"},

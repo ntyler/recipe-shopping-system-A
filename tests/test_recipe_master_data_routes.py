@@ -900,16 +900,19 @@ def test_equipment_master_data_filters_and_groups_by_equipment_type(monkeypatch,
 
     assert all_response.status_code == 200
     assert 'data-equipment-master-registry' in all_html
-    assert '<tbody class="equipment-master-category"' in all_html
+    all_page = BeautifulSoup(all_html, "html.parser")
+    assert len(all_page.select('.master-data-section-row')) == 2
     assert "COOKWARE" in all_html
     assert "PREP TOOLS" in all_html
     assert cookware_response.status_code == 200
     assert 'value="COOKWARE" selected' in cookware_html
     assert "Large pot" in cookware_html
     assert "Whisk" not in cookware_html
-    assert '<tbody class="equipment-master-category"' in cookware_html
-    assert '<h3 id="equipmentCategory-1">Cookware</h3>' in cookware_html
-    assert 'aria-label="Cookware equipment"' in cookware_html
+    cookware_page = BeautifulSoup(cookware_html, "html.parser")
+    assert len(cookware_page.select('.master-data-section-row')) == 1
+    heading = cookware_page.select_one('.master-data-section-row')
+    assert heading.select_one('h3').get_text(strip=True) == 'Cookware'
+    assert heading.select_one('[data-equipment-group-count]').get_text(strip=True) == '1 item'
 
 
 def test_equipment_user_column_never_renders_and_admin_rows_remain_inline_editable(monkeypatch, tmp_path):

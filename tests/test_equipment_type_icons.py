@@ -100,7 +100,9 @@ const options = JSON.parse(require('node:fs').readFileSync(0, 'utf8'));
                 const stroke = getComputedStyle(svg).stroke;
                 ctx.fillStyle = stroke; ctx.fillRect(0, 0, 1, 1);
                 const rgb = [...ctx.getImageData(0, 0, 1, 1).data].slice(0, 3);
-                ctx.fillStyle = getComputedStyle(e).getPropertyValue('--app-text-strong'); ctx.fillRect(0, 0, 1, 1);
+                const textToken = e.closest('.equipment-group-title') && matchMedia('(max-width: 600px)').matches
+                    ? '--app-muted' : '--app-text-strong';
+                ctx.fillStyle = getComputedStyle(e).getPropertyValue(textToken); ctx.fillRect(0, 0, 1, 1);
                 const normalText = `rgb(${[...ctx.getImageData(0, 0, 1, 1).data].slice(0, 3).join(', ')})`;
                 const luminance = channels => channels.map(c => {
                     c /= 255; return c <= .04045 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4;

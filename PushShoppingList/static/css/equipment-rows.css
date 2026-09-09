@@ -1,6 +1,21 @@
 /* Equipment uses the shared Ingredient registry styles in app.css and
    ingredient-mobile-rows.css. Only equipment-specific states belong here. */
 .equipment-master-page .master-data-results-header { border: 0; border-radius: 0; background: transparent; }
+/* Match the Units category header, including its compact phone treatment. */
+.equipment-master-page .master-data-equipment-table .master-data-section-row th { padding: 0; border-top: 0; border-bottom: 1px solid var(--app-border-subtle); background: transparent; }
+.equipment-group-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 14px; }
+.equipment-master-page .equipment-group-title { display: flex; min-width: 0; margin: 0; color: var(--app-text-strong); font-size: 14px; font-weight: 700; }
+.equipment-group-header > [data-equipment-group-count] { flex-shrink: 0; color: var(--app-muted); font-size: 12px; font-weight: 750; white-space: nowrap; }
+@media (max-width: 760px) {
+    .equipment-master-page .master-data-equipment-table.master-data-table--section-filtered .master-data-section-row { display: block; }
+}
+@media (max-width: 600px) {
+    .equipment-master-page .master-data-equipment-table .master-data-section-row th { border: 0; }
+    .equipment-group-header { padding: 0 4px 8px; }
+    .equipment-master-page .equipment-group-title { color: var(--app-muted); font-size: 12px; }
+    .equipment-group-title .equipment-type-icon { flex-basis: 16px; width: 16px; height: 16px; }
+    .equipment-group-title .equipment-type-icon svg { width: 16px; height: 16px; }
+}
 .equipment-master-page .equipment-field-error { color: var(--app-danger); }
 .equipment-master-page .equipment-thumbnail-trigger { display: inline-flex; flex: 0 0 auto; width: auto; min-width: 0; min-height: 0; margin: 0; padding: 0; border: 0; border-radius: 7px; background: transparent; box-shadow: none; cursor: pointer; }
 .equipment-master-page .equipment-thumbnail-trigger:focus-visible { outline: 2px solid var(--app-primary-hover); outline-offset: 2px; }
