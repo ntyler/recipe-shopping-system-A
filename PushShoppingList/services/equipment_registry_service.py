@@ -49,18 +49,22 @@ def _write_alias(connection, owner, record_id, alias_key, alias_name):
     columns = md.recipe_master_column_names(connection, "equipment_aliases")
     now = md.utc_now_iso()
     existing = connection.execute(
-        "SELECT 1 FROM equipment_aliases WHERE user_id = ? AND alias_key = ?", (owner, alias_key),
+        "SELECT equipment_id FROM equipment_aliases WHERE user_id = ? AND alias_key = ?", (owner, alias_key),
     ).fetchone()
-    values = {"equipment_id": record_id, "alias_name": alias_name, "status": "active"}
+    # Only the explicit merge operation may transfer ownership. Even a caller
+    # that missed validation must never reassign an existing alias here.
+    if existing and existing["equipment_id"] != record_id:
+        raise ValueError("Alias ownership changed; resolve the conflict before saving.")
+    values = {"alias_name": alias_name, "status": "active"}
     if "updated_at" in columns:
         values["updated_at"] = now
     if existing:
         connection.execute(
-            "UPDATE equipment_aliases SET " + ", ".join(f"{key} = ?" for key in values) + " WHERE user_id = ? AND alias_key = ?",
-            (*values.values(), owner, alias_key),
+            "UPDATE equipment_aliases SET " + ", ".join(f"{key} = ?" for key in values) + " WHERE user_id = ? AND alias_key = ? AND equipment_id = ?",
+            (*values.values(), owner, alias_key, record_id),
         )
     else:
-        values.update(user_id=owner, alias_key=alias_key)
+        values.update(user_id=owner, equipment_id=record_id, alias_key=alias_key)
         if "created_at" in columns:
             values["created_at"] = now
         connection.execute(
@@ -189,7 +193,7 @@ def _order_error(order):
     return error
 
 
-def _name_conflict(connection, owner, record_id, key, *, allowed_ids=()):
+def _equipment_name_conflict(connection, owner, record_id, key, *, allowed_ids=()):
     for other in connection.execute("SELECT * FROM equipment WHERE user_id = ? AND id <> ?", (owner, record_id)):
         other = dict(other)
         if other["id"] in allowed_ids:
@@ -197,15 +201,40 @@ def _name_conflict(connection, owner, record_id, key, *, allowed_ids=()):
         if key in {normalized_equipment_key(other.get(column)) for column in (
             "name", "normalized_name", "display_name_override", "canonical_name", "canonical_key",
         )}:
-            return True
+            return {"equipment_id": other["id"],
+                    "equipment_name": other.get("display_name_override") or other["name"],
+                    "alias_id": None, "conflict_kind": "name"}
+    return None
+
+
+def _alias_owner_conflict(connection, owner, record_id, key, *, allowed_ids=()):
+    """An alias owner is an Equipment ID in this workspace, never a name."""
     if md.recipe_master_table_exists(connection, "equipment_aliases"):
-        alias = connection.execute(
-            "SELECT equipment_id FROM equipment_aliases WHERE user_id = ? AND alias_key = ? AND equipment_id <> ?",
+        for alias in connection.execute(
+            "SELECT * FROM equipment_aliases WHERE user_id = ? AND alias_key = ? AND equipment_id <> ?",
             (owner, key, record_id),
-        ).fetchone()
-        if alias and alias["equipment_id"] not in allowed_ids:
-            return True
-    return False
+        ):
+            alias = dict(alias)
+            if alias["equipment_id"] in allowed_ids:
+                continue
+            equipment = _row(connection, owner, alias["equipment_id"])
+            # Do not expose a different workspace through malformed old links.
+            equipment_name = (equipment["display_name_override"] or equipment["name"]) if equipment else "Unavailable equipment"
+            return {"equipment_id": alias["equipment_id"], "equipment_name": equipment_name,
+                    "alias_id": alias.get("id"), "alias_status": alias["status"],
+                    "stored_alias_name": alias["alias_name"], "stored_alias_key": alias["alias_key"],
+                    "conflict_kind": "alias"}
+    return None
+
+
+def _name_conflict(connection, owner, record_id, key, *, allowed_ids=()):
+    return (_alias_owner_conflict(connection, owner, record_id, key, allowed_ids=allowed_ids)
+            or _equipment_name_conflict(connection, owner, record_id, key, allowed_ids=allowed_ids))
+
+
+def _alias_conflict_error(conflicts):
+    message = " ".join(f'“{item["alias_name"]}” is currently assigned to “{item["equipment_name"]}”.' for item in conflicts)
+    return {**_error(message, 409, "aliases"), "alias_conflicts": conflicts}
 
 
 def update_equipment_master_record(record_id, payload, user_id=None):
@@ -240,6 +269,7 @@ def update_equipment_master_record(record_id, payload, user_id=None):
         if not row:
             return _error("Equipment was not found.", 404)
         row = dict(row)
+        record_id = row["id"]
         try:
             image = resolve_master_image(row, payload.get("image"), record_type="equipment")
         except ValueError as exc:
@@ -248,14 +278,27 @@ def update_equipment_master_record(record_id, payload, user_id=None):
         display_name = row["name"] if reset else md.clean_text(name) if name is not None else row["display_name_override"] or row["name"]
         override = "" if display_name == row["name"] else display_name
         key = normalized_equipment_key(display_name)
-        if _name_conflict(connection, owner, record_id, key):
+        previous_key = normalized_equipment_key(row["display_name_override"] or row["name"])
+        if key != previous_key and _name_conflict(connection, owner, record_id, key):
             return _error("This name belongs to another equipment item. Use Merge duplicate to combine them.", 409, "name")
         existing = _aliases(connection, owner, record_id)
         requested = existing.copy() if aliases is None else {normalized_equipment_key(alias): md.clean_text(alias) for alias in aliases}
-        requested.pop(key, None)
+        # Preserve explicit aliases even when one equals the display name.
+        # Dropping it could retire a referenced alias or hide a foreign owner.
+        conflicts = []
         for alias_key, alias_name in requested.items():
-            if not alias_key or _name_conflict(connection, owner, record_id, alias_key):
-                return _error(f'The alias "{alias_name}" belongs to another equipment item.', 409, "aliases")
+            if not alias_key:
+                return _error("Aliases must contain a letter or number.", field="aliases")
+            conflict = _alias_owner_conflict(connection, owner, record_id, alias_key)
+            # Revalidate ownership, but an unchanged, already-owned alias is
+            # valid even when a legacy Equipment row has the same name.
+            if not conflict and alias_key not in existing:
+                conflict = _equipment_name_conflict(connection, owner, record_id, alias_key)
+            if conflict:
+                conflicts.append({**conflict, "alias_name": alias_name, "alias_key": alias_key,
+                                  "current_equipment_id": record_id})
+        if conflicts:
+            return _alias_conflict_error(conflicts)
         ordered = None
         if order is not None:
             original = _section_order(connection, owner, row["equipment_section"])
@@ -333,8 +376,10 @@ def delete_equipment_master_record(record_id, *, confirm=False, user_id=None):
 
 def merge_equipment_master_records(record_id, target_id, user_id=None):
     owner = md.scoped_equipment_user_id(user_id)
-    if not md.master_record_for_id("equipment", record_id, user_id=owner):
+    record = md.master_record_for_id("equipment", record_id, user_id=owner)
+    if not record:
         return _error("Equipment was not found.", 404)
+    record_id = record["id"]
     try:
         if isinstance(target_id, bool) or isinstance(target_id, float):
             raise ValueError
@@ -358,12 +403,20 @@ def merge_equipment_master_records(record_id, target_id, user_id=None):
         if any(item["has_protected_references"] or item["is_protected"] for item in details):
             return _error("This equipment has protected references and cannot be safely merged.", 409)
         aliases = _aliases(connection, owner, record_id)
+        existing_keys = aliases.keys() | _aliases(connection, owner, target_id).keys()
         for field in ("name", "normalized_name", "display_name_override", "canonical_name", "canonical_key"):
             if source.get(field):
                 aliases[normalized_equipment_key(source[field])] = source[field]
-        for key in list(aliases):
-            if _name_conflict(connection, owner, target_id, key, allowed_ids=(record_id,)):
-                return _error("An equipment alias belongs to another item. Resolve it before merging.", 409)
+        conflicts = []
+        for key, value in aliases.items():
+            conflict = _alias_owner_conflict(connection, owner, target_id, key, allowed_ids=(record_id,))
+            if not conflict and key not in existing_keys:
+                conflict = _equipment_name_conflict(connection, owner, target_id, key, allowed_ids=(record_id,))
+            if conflict:
+                conflicts.append({**conflict, "alias_name": value, "alias_key": key,
+                                  "current_equipment_id": record_id})
+        if conflicts:
+            return _alias_conflict_error(conflicts)
         md.migrate_equipment_order(connection)
         _ensure_aliases(connection)
         # Transfer existing alias IDs intact before adding the old source names.

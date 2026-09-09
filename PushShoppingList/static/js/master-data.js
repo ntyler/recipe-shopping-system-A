@@ -1976,6 +1976,8 @@
                 const requestUrl = canonicalMasterDataUrl(optionsUrl, {
                     search: queryValue,
                     limit: "20",
+                    ...(els.dialog.dataset.recordType === 'equipment' && els.dialog.dataset.preferredTargetId
+                        ? {target_equipment_id: els.dialog.dataset.preferredTargetId} : {}),
                 });
                 const response = await fetch(requestUrl.toString(), {
                     headers: {
@@ -2005,6 +2007,14 @@
                         ? `No master ${masterDataMergeRecordLabel(true)} match “${queryValue}”.`
                         : `No other master ${masterDataMergeRecordLabel(true)} are available in this workspace.`
                 );
+                const preferredId = els.dialog.dataset.preferredTargetId;
+                if (preferredId) {
+                    const target = [...els.results.querySelectorAll('[role="option"]')]
+                        .find(option => option.dataset.ingredientId === preferredId);
+                    if (target) chooseMasterDataMergeTarget(target);
+                    else setMasterDataMergeError('The conflicting equipment is no longer available in these results. Reload the equipment list to check its current owner.');
+                    delete els.dialog.dataset.preferredTargetId;
+                }
             } catch (error) {
                 if (requestId === masterDataMergeRequestId) {
                     renderMasterDataMergeOptions([], `Canonical ${masterDataMergeRecordLabel(true)} could not be loaded.`);
@@ -2030,6 +2040,7 @@
             delete els.dialog.dataset.mergeOptionsUrl;
             delete els.dialog.dataset.sourceUsageCount;
             delete els.dialog.dataset.sourceReferenceCount;
+            delete els.dialog.dataset.preferredTargetId;
         }
         if (els.form) els.form.action = "";
         if (els.search) els.search.value = "";
@@ -2043,7 +2054,7 @@
         masterDataMergeReturnFocus = null;
     }
 
-    function openMasterDataMergeDialog(button) {
+    function openMasterDataMergeDialog(button, options = {}) {
         const els = masterDataMergeElements();
         if (!button || button.disabled || !els.dialog || !els.form || !els.search) {
             return;
@@ -2064,7 +2075,9 @@
         if (els.sourceUsage) {
             els.sourceUsage.textContent = 'Counting affected recipe references…';
         }
-        els.search.value = "";
+        els.search.value = text(options.targetName);
+        if (options.targetId) els.dialog.dataset.preferredTargetId = text(options.targetId);
+        else delete els.dialog.dataset.preferredTargetId;
         resetMasterDataMergeSelection();
         setMasterDataMergeError("");
         setMasterDataMergeBusy(false);
@@ -2076,6 +2089,8 @@
         els.search.focus({ preventScroll: true });
         void loadMasterDataMergeOptions({ immediate: true });
     }
+
+    window.MasterDataMerge = {open: openMasterDataMergeDialog};
 
     async function submitMasterDataMerge(event) {
         event.preventDefault();

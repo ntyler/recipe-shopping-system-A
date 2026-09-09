@@ -190,6 +190,7 @@
             row.equipmentImageChange = null; row.equipmentImageError = ''; row.equipmentImagePending = false;
             row.equipmentOriginal = {name: row.dataset.currentName, equipment_type: typeField(row)?.value || row.dataset.equipmentType || '', aliases: [...row.equipmentAliases], image_url: row.equipmentImageUrl};
             row.equipmentPendingAlias = '';
+            row.equipmentAliasConflicts = [];
         }
         return row.equipmentOriginal;
     }
@@ -211,6 +212,55 @@
             editor('feedback').hidden = !message;
             editor('feedback').dataset.status = error ? 'error' : 'success';
         }
+    }
+    function renderAliasConflicts(row, conflicts = row.equipmentAliasConflicts || []) {
+        // Ownership comes from the server's stable IDs, never a displayed row name.
+        row.equipmentAliasConflicts = conflicts.filter(conflict =>
+            String(conflict.current_equipment_id) === row.dataset.masterRecordId &&
+            String(conflict.equipment_id) !== row.dataset.masterRecordId &&
+            row.equipmentAliases.some(alias => key(alias) === key(conflict.alias_name)));
+        let container = row.querySelector('[data-equipment-alias-conflicts]');
+        if (!container && row.equipmentAliasConflicts.length) {
+            container = document.createElement('div');
+            container.dataset.equipmentAliasConflicts = '';
+            container.className = 'equipment-alias-conflicts';
+            container.setAttribute('role', 'alert');
+            row.querySelector('.equipment-aliases-cell').append(container);
+        }
+        if (!container) return;
+        container.hidden = !row.equipmentAliasConflicts.length;
+        container.replaceChildren(...row.equipmentAliasConflicts.map(conflict => {
+            const item = document.createElement('div');
+            const message = document.createElement('small');
+            message.className = 'unit-master-field-error';
+            message.textContent = `“${conflict.alias_name}” is currently assigned to “${conflict.equipment_name}”.`;
+            const details = document.createElement('details');
+            const summary = document.createElement('summary'); summary.textContent = 'Ownership details';
+            const trace = document.createElement('small');
+            trace.textContent = `Normalized alias: ${conflict.alias_key}. Alias record: ${conflict.alias_id ?? 'none (equipment name)'}. Editing Equipment #${conflict.current_equipment_id}; assigned Equipment #${conflict.equipment_id}.`;
+            details.append(summary, trace);
+            const actions = document.createElement('div'); actions.className = 'equipment-alias-conflict-actions';
+            const remove = document.createElement('button');
+            remove.type = 'button'; remove.textContent = 'Remove alias';
+            remove.dataset.equipmentConflictRemove = ''; remove.title = 'Remove this alias from the draft, then Save to keep the change.';
+            remove.addEventListener('click', () => {
+                if (mutationPending) return;
+                row.equipmentAliases = row.equipmentAliases.filter(alias => key(alias) !== key(conflict.alias_name));
+                renderRowAliases(row, row.equipmentAliases); renderAliases(); renderAliasConflicts(row);
+                status(row, 'Alias removed from the draft. Save the row to keep the change.'); sync();
+                row.querySelector('[data-equipment-row-save]')?.focus({preventScroll: true});
+            });
+            const merge = document.createElement('button');
+            merge.type = 'button'; merge.textContent = 'Merge duplicate'; merge.dataset.equipmentConflictMerge = '';
+            merge.addEventListener('click', () => {
+                const source = row.querySelector('[data-master-merge-open]');
+                if (mutationPending || row.equipmentImagePending || !source || source.dataset.mergeBlockedReason || !window.MasterDataMerge) return;
+                if (dirty(row) && !window.confirm(`Discard unsaved changes to “${row.dataset.recordName}” and review merging it into “${conflict.equipment_name}”? No records change until you confirm Merge equipment.`)) return;
+                cancel(row, {restoreFocus: false});
+                window.MasterDataMerge.open(source, {targetId: conflict.equipment_id, targetName: conflict.equipment_name});
+            });
+            actions.append(remove, merge); item.append(message, details, actions); return item;
+        }));
     }
     function validation(row) {
         const draft = values(row), errors = {aliases: {}};
@@ -291,6 +341,10 @@
                 merge.disabled = Boolean(merge.dataset.mergeBlockedReason) || mutationPending || anyDirty || Boolean(editingRow?.equipmentImagePending);
                 merge.title = merge.dataset.mergeBlockedReason || (anyDirty ? 'Save or cancel the current changes before merging.' : merge.dataset.mergeTitle);
             }
+            row.querySelectorAll('[data-equipment-conflict-merge]').forEach(button => {
+                button.disabled = mutationPending || row.equipmentImagePending || !merge || Boolean(merge.dataset.mergeBlockedReason);
+                button.title = merge?.dataset.mergeBlockedReason || 'Review merging this equipment into the current alias owner.';
+            });
             const blocked = mutationPending || row.dataset.orderEnabled !== 'true';
             const handle = row.querySelector('[data-equipment-order-handle]');
             if (handle) { handle.disabled = false; handle.draggable = !blocked; handle.setAttribute('aria-disabled', String(blocked)); }
@@ -369,6 +423,7 @@
         field(row).value = original.name;
         if (typeField(row)) typeField(row).value = original.equipment_type;
         row.equipmentAliases = [...original.aliases]; row.equipmentPendingAlias = '';
+        renderAliasConflicts(row, []);
         renderRowAliases(row, original.aliases);
         closeAliases({restoreFocus: false});
         if (orderOriginal) placeRows(groupRows(row), orderOriginal);
@@ -392,7 +447,7 @@
             const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = '×'; remove.setAttribute('aria-label', `Remove alias ${alias}`);
             remove.addEventListener('click', () => {
                 if (mutationPending) return;
-                row.equipmentAliases.splice(index, 1); renderAliases(); renderRowAliases(row, row.equipmentAliases); status(row); sync(); editor('alias-input').focus({preventScroll: true});
+                row.equipmentAliases.splice(index, 1); renderAliases(); renderRowAliases(row, row.equipmentAliases); renderAliasConflicts(row); status(row); sync(); editor('alias-input').focus({preventScroll: true});
             });
             chip.append(text, remove); return chip;
         }));
@@ -423,6 +478,7 @@
         field(row).value = record.name; field(row).setAttribute('aria-label', `Display name for ${record.name}`);
         if (typeField(row)) { typeField(row).value = row.dataset.equipmentType; typeField(row).setAttribute('aria-label', `Equipment Type for ${record.name}`); }
         row.equipmentAliases = [...(record.aliases || row.equipmentAliases)]; row.equipmentPendingAlias = '';
+        renderAliasConflicts(row, []);
         row.dataset.imageSrc = record.image_url || '';
         row.equipmentImageUrl = row.dataset.imageSrc; row.equipmentImageChange = null; row.equipmentImageError = '';
         row.equipmentOriginal = values(row); renderRowAliases(row, row.equipmentAliases);
@@ -458,6 +514,7 @@
             const result = await response.json();
             if (!response.ok || !result.ok) {
                 row.equipmentImageError = result.errors?.image || '';
+                renderAliasConflicts(row, result.alias_conflicts || []);
                 throw new Error(result.message || result.error || 'Equipment could not be saved.');
             }
             applySaved(row, result.record || result.result); saved = true;

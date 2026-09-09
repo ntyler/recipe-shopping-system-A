@@ -1803,6 +1803,17 @@ def equipment_master_merge_options_route(equipment_id):
     rows = recipe_master_data.list_equipment(search=request.args.get("search"), limit=limit + 1,
                                             sort="name_asc" if request.args.get("search") else "usage_count_desc")
     candidates = [{**row, "equipment_id": row["id"]} for row in rows if row["id"] != equipment_id][:limit]
+    if "target_equipment_id" in request.args:
+        target_id = request.args.get("target_equipment_id", type=int)
+        target = equipment_registry.equipment_editor_record(target_id) if target_id and target_id != equipment_id else None
+        if not target:
+            return jsonify({"ok": False, "error": "Equipment was not found."}), 404
+        # Conflict resolution must not depend on display-name search or which
+        # page happens to contain the Equipment ID returned by validation.
+        candidates = [{**target, "equipment_id": target["id"]}] + [
+            candidate for candidate in candidates if candidate["id"] != target["id"]
+        ]
+        candidates = candidates[:limit]
     return jsonify({"ok": True, "success": True, "source": {**source, "equipment_id": equipment_id,
                     "reference_count": source["delete_reference_count"]}, "equipment": candidates})
 
