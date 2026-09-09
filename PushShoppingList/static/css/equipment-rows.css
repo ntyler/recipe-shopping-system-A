@@ -3,9 +3,23 @@
 .equipment-master-page .master-data-results-header { border: 0; border-radius: 0; background: transparent; }
 .equipment-master-page .equipment-field-error { color: var(--app-danger); }
 
-.equipment-type-label { display: inline-flex; align-items: center; gap: 8px; min-width: 0; text-align: left; }
+.equipment-type-label { --equipment-type-accent: var(--equipment-type-accent-light, #64748b); display: inline-flex; align-items: center; gap: 8px; min-width: 0; text-align: left; }
+/* Presentation only: all eight stored Equipment Types, shared by headings,
+   rows, selectors and portaled options. Unmapped types keep neutral slate. */
+.equipment-type-label[data-equipment-type-label="COOKWARE"] { --equipment-type-accent-light: #15803d; --equipment-type-accent-dark: #4ade80; }
+.equipment-type-label[data-equipment-type-label="BAKEWARE"] { --equipment-type-accent-light: #1d4ed8; --equipment-type-accent-dark: #60a5fa; }
+.equipment-type-label[data-equipment-type-label="APPLIANCES"] { --equipment-type-accent-light: #7e22ce; --equipment-type-accent-dark: #c084fc; }
+.equipment-type-label[data-equipment-type-label="PREP TOOLS"] { --equipment-type-accent-light: #c2410c; --equipment-type-accent-dark: #fb923c; }
+.equipment-type-label[data-equipment-type-label="MEASURING"] { --equipment-type-accent-light: #0e7490; --equipment-type-accent-dark: #22d3ee; }
+.equipment-type-label[data-equipment-type-label="MIXING BOWLS"] { --equipment-type-accent-light: #a16207; --equipment-type-accent-dark: #facc15; }
+.equipment-type-label[data-equipment-type-label="SERVING & STORAGE"] { --equipment-type-accent-light: #be185d; --equipment-type-accent-dark: #f472b6; }
+.equipment-type-label[data-equipment-type-label="MISC"] { --equipment-type-accent-light: #b91c1c; --equipment-type-accent-dark: #f87171; }
+@media (prefers-color-scheme: dark) {
+    html:not([data-public-auth-theme="light"]) .equipment-type-label { --equipment-type-accent: var(--equipment-type-accent-dark, #a8b5c1); }
+}
+html[data-public-auth-theme="dark"] .equipment-type-label { --equipment-type-accent: var(--equipment-type-accent-dark, #a8b5c1); }
 .equipment-type-icon,
-.equipment-master-page .master-data-filter-form .equipment-type-icon { display: inline-flex; flex: 0 0 18px; width: 18px; height: 18px; align-items: center; justify-content: center; color: var(--app-primary-hover); }
+.equipment-master-page .master-data-filter-form .equipment-type-icon { display: inline-flex; flex: 0 0 18px; width: 18px; height: 18px; align-items: center; justify-content: center; color: var(--equipment-type-accent); }
 .equipment-type-icon svg { display: block; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .equipment-type-text { white-space: normal; overflow-wrap: normal; }
 .equipment-type-picker { display: flex; align-items: center; min-width: 0; width: 100%; }
