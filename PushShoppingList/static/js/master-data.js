@@ -212,7 +212,14 @@
     }
 
     function masterDataLightboxImageSelector() {
-        return "[data-master-image-trigger], .master-data-thumbnail[src], .master-data-reference-title-image[src], [data-ingredient-master-row] .master-data-no-image";
+        return "[data-equipment-image-trigger], .master-data-thumbnail[src], .master-data-reference-title-image[src], [data-ingredient-master-row] .master-data-no-image";
+    }
+
+    function masterDataImageTrigger(event) {
+        if (!event.target?.closest) return null;
+        // Resolve the native Equipment button even when its image or empty span was clicked.
+        return event.target.closest("[data-equipment-image-trigger]")
+            || event.target.closest(masterDataLightboxImageSelector());
     }
 
     function ensureMasterDataImageLightbox() {
@@ -302,12 +309,11 @@
 
     function openMasterDataImageLightbox(image) {
         if (!image) return;
-        image = image.closest('[data-master-image-trigger]') || image;
+        image = image.closest('[data-equipment-image-trigger]') || image;
         const row = image.closest('[data-ingredient-master-row]');
         const equipmentRow = image.closest('[data-equipment-master-row]');
         const media = image.matches('img') ? image : image.querySelector('img');
-        const src = media?.dataset.fullSrc || media?.currentSrc || media?.src || '';
-        if (!src && !row && !equipmentRow) return;
+        const src = equipmentRow ? image.dataset.imageUrl || '' : media?.dataset.fullSrc || media?.currentSrc || media?.src || '';
         if (row && !editIngredientRow(row)) return;
         if (equipmentRow && !window.EquipmentRegistry.imageEditor.open(equipmentRow)) return;
         closeIngredientAliases({restoreFocus: false});
@@ -422,7 +428,7 @@
     function decorateMasterDataLightboxImages(root = document) {
         const scope = root && typeof root.querySelectorAll === "function" ? root : document;
         scope.querySelectorAll(masterDataLightboxImageSelector()).forEach((image) => {
-            const trigger = image.closest('[data-master-image-trigger]');
+            const trigger = image.closest('[data-equipment-image-trigger]');
             if (trigger) return; // The native button is the only Equipment thumbnail focus target.
             image.tabIndex = 0;
             image.setAttribute("role", "button");
@@ -437,9 +443,7 @@
     function initMasterDataImageLightbox() {
         decorateMasterDataLightboxImages(document);
         document.addEventListener("click", (event) => {
-            const image = event.target && event.target.closest
-                ? event.target.closest(masterDataLightboxImageSelector())
-                : null;
+            const image = masterDataImageTrigger(event);
             if (!image) {
                 return;
             }
@@ -466,9 +470,7 @@
                 return;
             }
 
-            const image = event.target && event.target.closest
-                ? event.target.closest(masterDataLightboxImageSelector())
-                : null;
+            const image = masterDataImageTrigger(event);
             if (!image || (event.key !== "Enter" && event.key !== " ")) {
                 return;
             }

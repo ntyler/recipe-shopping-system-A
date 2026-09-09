@@ -101,11 +101,14 @@ def test_both_thumbnail_states_use_one_accessible_button(image_equipment):
     app, _, ids = image_equipment
     with app.test_client() as client:
         sign_in(client, 'user-a')
-        page = BeautifulSoup(client.get('/admin/master-data/equipment').data, 'html.parser')
+        page = BeautifulSoup(client.get('/admin/master-data/equipment?sort=name_asc&limit=500').data, 'html.parser')
     for name in ['Pot', 'Pan']:
         row = page.select_one(f'[data-equipment-master-row][data-master-record-id="{ids[name]}"]')
-        trigger, = row.select('[data-master-image-trigger]')
+        trigger, = row.select('[data-equipment-image-trigger]')
         assert trigger.name == 'button' and trigger['type'] == 'button'
+        assert 'equipment-thumbnail-trigger' in trigger['class']
+        assert trigger['data-equipment-id'] == str(ids[name])
+        assert trigger['data-image-url'] == ('' if name == 'Pot' else '/static/test-pot.png')
         assert trigger['aria-label'] == f'{"Add" if name == "Pot" else "Manage"} image for {name}'
         assert trigger['aria-controls'] == 'recipeImageLightbox' and trigger['aria-haspopup'] == 'dialog'
         assert trigger.select_one('.master-data-no-image' if name == 'Pot' else 'img.master-data-thumbnail')
@@ -152,13 +155,14 @@ const base = process.argv[2];
         await page.route('**/static/test-pot.png', route => route.fulfill({contentType: 'image/png', body: Buffer.from(options.image, 'base64')}));
         await page.route('**/static/generated/recipe_steps/master_equipment_*.png', route => route.fulfill({contentType: 'image/png',
             path: require('node:path').join(options.imageFolder, require('node:path').basename(new URL(route.request().url()).pathname))}));
-        await page.goto(base + '/admin/master-data/equipment');
+        const equipmentUrl = base + '/admin/master-data/equipment?sort=name_asc&limit=500';
+        await page.goto(equipmentUrl);
         assert.equal(await page.title(), 'Equipment');
         assert.match(page.url(), /\/admin\/master-data\/equipment/);
         assert(await page.getByRole('heading', {name: 'Equipment', exact: true}).isVisible());
         assert.equal(await page.locator('vite-error-overlay, nextjs-portal').count(), 0);
         const row = id => page.locator(`[data-equipment-master-row][data-master-record-id="${id}"]`);
-        const trigger = id => row(id).locator('[data-master-image-trigger]');
+        const trigger = id => row(id).locator('button.equipment-thumbnail-trigger[data-equipment-image-trigger]');
         const save = id => row(id).locator('[data-equipment-row-save]');
         const stored = async id => (await (await page.request.get(`${base}/api/master-data/equipment/${id}/editor`)).json()).record.image_url;
         const box = page.locator('#recipeImageLightbox'), preview = box.locator('#recipeImageLightboxImage');
@@ -181,6 +185,8 @@ const base = process.argv[2];
             }
         };
         const empty = async id => {
+            await box.waitFor({state: 'visible'});
+            assert(await box.getByRole('dialog', {name: 'Image for Pot', exact: true}).isVisible(), 'The placeholder must open the image dialog, not merely select the row');
             assert(await box.getByText('No image', {exact: true}).isVisible());
             assert(await preview.isHidden() && await remove.isDisabled() && await upload.isEnabled() && await generate.isEnabled());
             assert(await save(id).isDisabled(), 'Opening or canceling is not an image change');
@@ -207,15 +213,20 @@ const base = process.argv[2];
             await trigger(id).click();
         };
         const persist = async (id, url) => {
+            const oldTrigger = await trigger(id).elementHandle();
             await close.click(); await save(id).click();
             await page.waitForFunction(({id, url}) => {
                 const row = document.querySelector(`[data-equipment-master-row][data-master-record-id="${id}"]`);
                 return row?.dataset.imageSrc === url && row.querySelector('[data-equipment-row-save]').disabled && !row.classList.contains('is-dirty');
             }, {id, url});
+            await page.waitForFunction(e => !e.isConnected, oldTrigger);
+            assert.equal(await trigger(id).getAttribute('data-image-url'), url);
             assert.equal(await stored(id), url);
         };
         const id = options.emptyId;
         await shot('initial');
+        assert.equal(await trigger(id).getAttribute('data-equipment-id'), String(id));
+        assert.equal(await trigger(id).getAttribute('data-image-url'), '');
         assert.equal(await trigger(id).getAttribute('aria-label'), 'Add image for Pot');
         await trigger(id).locator('.master-data-no-image').click();
         await empty(id); await layout(); await shot('empty');
@@ -226,6 +237,37 @@ const base = process.argv[2];
         await page.keyboard.press('Escape'); assert(await focused(trigger(id)));
         await trigger(id).press('Space'); await empty(id);
         await box.click({position: {x: 1, y: 1}}); assert(await focused(trigger(id)));
+
+        const checkActivations = async () => {
+            for (const activation of ['mouse', 'Enter', 'Space']) {
+                if (activation === 'mouse') await trigger(id).getByText('No image', {exact: true}).click();
+                else await trigger(id).press(activation);
+                await empty(id);
+                assert.equal(await box.getAttribute('aria-hidden'), 'false');
+                await close.click();
+                assert(await focused(trigger(id)));
+            }
+        };
+        // Exercise the real filter form and the same partial refresh used by saves and merges.
+        for (const change of ['search', 'sort', 'filter']) {
+            if (change === 'search') await page.locator('input[name="search"]').fill('Pot');
+            if (change === 'sort') await page.locator('select[name="sort"]').selectOption('usage_count_desc');
+            if (change === 'filter') {
+                await page.locator('.master-data-equipment-filter-field [data-equipment-type-trigger]').click();
+                await page.getByRole('option', {name: 'Cookware', exact: true}).click();
+            }
+            await Promise.all([
+                page.waitForEvent('load'),
+                page.locator('.master-data-filter-form button[type="submit"]').click(),
+            ]);
+            await checkActivations();
+        }
+        await page.goto(equipmentUrl);
+        const originalTrigger = await trigger(id).elementHandle();
+        await page.evaluate(() => window.MasterDataRegistryRefresh());
+        assert.equal(await originalTrigger.evaluate(e => e.isConnected), false, 'Refresh must replace the actual table DOM');
+        await checkActivations();
+        assert.equal(saves.length, 0, 'Opening thumbnails never saves or changes classification');
         await trigger(id).click();
         await prepare(id, 'upload', false); await empty(id);
         const generated = await prepare(id, 'generate'); await layout(); await shot('generated-pending');

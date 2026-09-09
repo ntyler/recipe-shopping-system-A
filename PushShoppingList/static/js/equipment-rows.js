@@ -426,7 +426,8 @@
         row.dataset.imageSrc = record.image_url || '';
         row.equipmentImageUrl = row.dataset.imageSrc; row.equipmentImageChange = null; row.equipmentImageError = '';
         row.equipmentOriginal = values(row); renderRowAliases(row, row.equipmentAliases);
-        const trigger = row.querySelector('[data-master-image-trigger]');
+        const trigger = row.querySelector('[data-equipment-image-trigger]');
+        trigger.dataset.imageUrl = row.dataset.imageSrc;
         const image = document.createElement(record.image_url ? 'img' : 'span');
         image.className = record.image_url ? 'master-data-thumbnail' : 'master-data-no-image';
         if (record.image_url) { image.src = record.image_url; image.dataset.fullSrc = record.image_url; image.alt = `${record.name} image`; }
@@ -561,12 +562,14 @@
     };
     root.addEventListener('input', update); root.addEventListener('change', update);
     root.addEventListener('focusin', event => {
+        if (event.target.closest('[data-equipment-image-trigger]')) return;
         const row = event.target.closest(rowSelector); if (!row) return;
         select(row);
         if (event.target.matches('[data-equipment-row-name], [data-equipment-row-type]') && !edit(row)) { field(editingRow)?.focus({preventScroll: true}); return; }
         if (phone.matches && event.target.closest(detailSelector)) { syncMobile(row); rowStates.get(row.dataset.masterRecordId).expanded = true; syncMobile(row); }
     });
     root.addEventListener('click', event => {
+        if (event.target.closest('[data-equipment-image-trigger]')) return;
         const row = event.target.closest(rowSelector); if (!row) return;
         select(row); const button = event.target.closest('button'); if (!button) return;
         if (button.matches('[data-equipment-mobile-toggle]')) {

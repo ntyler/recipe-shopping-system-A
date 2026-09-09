@@ -324,7 +324,7 @@ const base = process.argv[2];
         await page.unroute('**' + updateURL); writes.pop();
 
         // Image and usage use the same keyboard-operable shared dialogs as Ingredient.
-        const image = row.locator('[data-master-image-trigger]');
+        const image = row.locator('[data-equipment-image-trigger]');
         await image.focus(); await image.press('Enter');
         const lightbox = page.locator('#recipeImageLightbox');
         assert(await lightbox.isVisible());
