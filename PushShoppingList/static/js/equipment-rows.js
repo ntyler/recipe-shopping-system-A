@@ -16,6 +16,7 @@
     const rowStates = new Map();
     let editingRow = null, deletingRow = null, aliasAnchor = null, mutationPending = false;
     let orderOriginal = null, orderChange = null;
+    let imageRequestToken = 0;
 
     // Enhance the existing selects without changing their values or save contract.
     // Labels and SVGs come from the same server-rendered mapping as group headings.
@@ -185,14 +186,16 @@
     function state(row) {
         if (!row.equipmentOriginal) {
             row.equipmentAliases = [...row.querySelectorAll('[data-equipment-alias]')].map(chip => chip.dataset.equipmentAlias);
-            row.equipmentOriginal = {name: row.dataset.currentName, equipment_type: typeField(row)?.value || row.dataset.equipmentType || '', aliases: [...row.equipmentAliases]};
+            row.equipmentImageUrl = row.dataset.imageSrc || '';
+            row.equipmentImageChange = null; row.equipmentImageError = ''; row.equipmentImagePending = false;
+            row.equipmentOriginal = {name: row.dataset.currentName, equipment_type: typeField(row)?.value || row.dataset.equipmentType || '', aliases: [...row.equipmentAliases], image_url: row.equipmentImageUrl};
             row.equipmentPendingAlias = '';
         }
         return row.equipmentOriginal;
     }
     function values(row) {
         state(row);
-        return {name: clean(field(row)?.value ?? row.dataset.currentName), equipment_type: typeField(row)?.value || row.dataset.equipmentType || '', aliases: [...row.equipmentAliases]};
+        return {name: clean(field(row)?.value ?? row.dataset.currentName), equipment_type: typeField(row)?.value || row.dataset.equipmentType || '', aliases: [...row.equipmentAliases], image_url: row.equipmentImageUrl};
     }
     function signature(value) {
         return JSON.stringify({...value, name: clean(value.name), aliases: value.aliases.map(clean).sort()});
@@ -211,6 +214,7 @@
     }
     function validation(row) {
         const draft = values(row), errors = {aliases: {}};
+        if (row.equipmentImageError) errors.image = row.equipmentImageError;
         if (!draft.name) errors.name = 'Enter a display name.';
         else if (draft.name.length > 160) errors.name = 'Display name must be 160 characters or fewer.';
         const type = typeField(row);
@@ -232,7 +236,7 @@
         }
         if (output) { output.textContent = message; output.hidden = !message; }
     }
-    function pending(row) { return dirty(row) || row === deletingRow || mutationPending && row === editingRow; }
+    function pending(row) { return dirty(row) || row.equipmentImagePending || row.equipmentImageError || row === deletingRow || mutationPending && row === editingRow; }
     function syncMobile(row) {
         const toggle = row.querySelector('[data-equipment-mobile-toggle]');
         if (!toggle) return;
@@ -264,7 +268,7 @@
             if (!editable(row)) { syncMobile(row); return; }
             const changed = dirty(row), confirming = row === deletingRow;
             const errors = validation(row), aliasError = Object.values(errors.aliases).join(' ');
-            const invalid = Boolean(errors.name || errors.type || aliasError);
+            const invalid = Boolean(errors.name || errors.type || aliasError || errors.image);
             fieldError(field(row), row.querySelector('[data-equipment-name-error], [data-equipment-row-name-error]'), errors.name);
             fieldError(typeField(row), row.querySelector('[data-equipment-type-error], [data-equipment-row-type-error]'), errors.type);
             row.classList.toggle('is-editing', row === editingRow);
@@ -273,18 +277,18 @@
             row.classList.toggle('is-confirming-delete', confirming);
             row.querySelectorAll('button, input, select').forEach(control => { control.disabled = mutationPending; });
             const save = row.querySelector('[data-equipment-row-save]');
-            if (save) { save.hidden = !changed || confirming; save.disabled = mutationPending || invalid; save.textContent = mutationPending && row === editingRow ? 'Saving…' : 'Save'; }
+            if (save) { save.hidden = !changed || confirming; save.disabled = mutationPending || row.equipmentImagePending || !changed || invalid; save.textContent = mutationPending && row === editingRow ? 'Saving…' : 'Save'; }
             const cancel = row.querySelector('[data-equipment-row-cancel]');
-            if (cancel) { cancel.hidden = !changed && !confirming; cancel.setAttribute('aria-label', confirming ? `Cancel deleting ${row.dataset.recordName}` : `Cancel changes to ${row.dataset.recordName}`); }
+            if (cancel) { cancel.hidden = !changed && !confirming && !row.equipmentImagePending && !row.equipmentImageError; cancel.setAttribute('aria-label', confirming ? `Cancel deleting ${row.dataset.recordName}` : `Cancel changes to ${row.dataset.recordName}`); }
             const remove = row.querySelector('[data-equipment-row-delete]');
-            if (remove) { remove.hidden = confirming || changed; remove.disabled = mutationPending || anyDirty; }
+            if (remove) { remove.hidden = confirming || changed; remove.disabled = mutationPending || anyDirty || Boolean(editingRow?.equipmentImagePending); }
             const confirm = row.querySelector('[data-equipment-row-confirm-delete]');
             if (confirm) { confirm.hidden = !confirming; confirm.disabled = mutationPending || anyDirty; confirm.textContent = mutationPending && confirming ? 'Deleting…' : 'Confirm delete'; }
             const merge = row.querySelector('[data-master-merge-open]');
             if (merge) {
                 if (!merge.dataset.mergeTitle) merge.dataset.mergeTitle = merge.title;
                 merge.hidden = confirming || changed && invalid;
-                merge.disabled = Boolean(merge.dataset.mergeBlockedReason) || mutationPending || anyDirty;
+                merge.disabled = Boolean(merge.dataset.mergeBlockedReason) || mutationPending || anyDirty || Boolean(editingRow?.equipmentImagePending);
                 merge.title = merge.dataset.mergeBlockedReason || (anyDirty ? 'Save or cancel the current changes before merging.' : merge.dataset.mergeTitle);
             }
             const blocked = mutationPending || row.dataset.orderEnabled !== 'true';
@@ -306,6 +310,7 @@
             syncMobile(row);
         });
         syncTypePickers();
+        window.MasterDataImageLightbox?.sync();
         if (aliasAnchor) window.MasterDataAliasEditor?.positionPopover(manager, aliasAnchor);
     }
     function select(row) {
@@ -358,6 +363,9 @@
         if (mutationPending) return false;
         if (!discard && dirty(row) && !window.confirm('Discard unsaved changes to this equipment?')) return false;
         const restore = captureScroll(row), original = state(row);
+        imageRequestToken++;
+        row.equipmentImageUrl = original.image_url; row.equipmentImageChange = null;
+        row.equipmentImagePending = false; row.equipmentImageError = '';
         field(row).value = original.name;
         if (typeField(row)) typeField(row).value = original.equipment_type;
         row.equipmentAliases = [...original.aliases]; row.equipmentPendingAlias = '';
@@ -415,9 +423,16 @@
         field(row).value = record.name; field(row).setAttribute('aria-label', `Display name for ${record.name}`);
         if (typeField(row)) { typeField(row).value = row.dataset.equipmentType; typeField(row).setAttribute('aria-label', `Equipment Type for ${record.name}`); }
         row.equipmentAliases = [...(record.aliases || row.equipmentAliases)]; row.equipmentPendingAlias = '';
+        row.dataset.imageSrc = record.image_url || '';
+        row.equipmentImageUrl = row.dataset.imageSrc; row.equipmentImageChange = null; row.equipmentImageError = '';
         row.equipmentOriginal = values(row); renderRowAliases(row, row.equipmentAliases);
-        const image = row.querySelector('img.master-data-thumbnail');
-        if (image) { image.alt = `${record.name} image`; image.setAttribute('aria-label', `View image: ${record.name} image`); }
+        const trigger = row.querySelector('[data-master-image-trigger]');
+        const image = document.createElement(record.image_url ? 'img' : 'span');
+        image.className = record.image_url ? 'master-data-thumbnail' : 'master-data-no-image';
+        if (record.image_url) { image.src = record.image_url; image.dataset.fullSrc = record.image_url; image.alt = `${record.name} image`; }
+        else image.textContent = 'No image';
+        trigger.replaceChildren(image);
+        trigger.setAttribute('aria-label', `${record.image_url ? 'Manage' : 'Add'} image for ${record.name}`);
         const usage = row.querySelector('[data-master-usage-button]');
         if (usage) {
             usage.dataset.recordName = record.name;
@@ -433,13 +448,17 @@
         sync(); if (row.querySelector('[data-equipment-row-save]')?.disabled) return;
         const draft = values(row), restore = captureScroll(row);
         const payload = {display_name: draft.name, reset: draft.name === row.dataset.detectedName, equipment_type: draft.equipment_type, aliases: draft.aliases};
+        if (row.equipmentImageChange) payload.image = row.equipmentImageChange;
         if (orderChange) payload.order = orderChange;
         mutationPending = true; row.setAttribute('aria-busy', 'true'); status(row, 'Saving changes…'); sync();
         let saved = false;
         try {
             const response = await fetch(row.dataset.updateUrl, {method: 'PATCH', headers: {'Accept': 'application/json', 'Content-Type': 'application/json', 'X-Requested-With': 'fetch'}, body: JSON.stringify(payload)});
             const result = await response.json();
-            if (!response.ok || !result.ok) throw new Error(result.message || result.error || 'Equipment could not be saved.');
+            if (!response.ok || !result.ok) {
+                row.equipmentImageError = result.errors?.image || '';
+                throw new Error(result.message || result.error || 'Equipment could not be saved.');
+            }
             applySaved(row, result.record || result.result); saved = true;
             orderOriginal = null; orderChange = null; editingRow = null; closeAliases({restoreFocus: false});
             await window.MasterDataRegistryRefresh();
@@ -452,6 +471,45 @@
             const current = rows().find(item => item.dataset.masterRecordId === row.dataset.masterRecordId);
             (saved ? current || root.querySelector('[name="search"]') : field(row))?.focus({preventScroll: true}); restore();
         }
+    }
+    // The shared Ingredient/Equipment lightbox delegates draft ownership to this row editor.
+    async function prepareImage(row, file = null) {
+        if (row !== editingRow || mutationPending || row.equipmentImagePending) return;
+        const token = ++imageRequestToken;
+        row.equipmentImagePending = true; row.equipmentImageError = '';
+        row.equipmentImageStatus = file ? 'Preparing image preview…' : 'Generating an image preview…';
+        status(row); sync();
+        try {
+            let body, headers = {'X-Requested-With': 'fetch'};
+            if (file) { body = new FormData(); body.append('image', file); }
+            else { body = JSON.stringify({action: 'generate', name: values(row).name}); headers['Content-Type'] = 'application/json'; }
+            const response = await fetch(row.dataset.imageUrl, {method: 'POST', headers, body});
+            const result = await response.json();
+            if (token !== imageRequestToken || row !== editingRow) return;
+            if (!response.ok || !result.ok || !result.token || !result.image_url) throw new Error(result.error || 'Image preview could not be prepared.');
+            row.equipmentImageUrl = result.image_url;
+            row.equipmentImageChange = {action: 'replace', token: result.token};
+        } catch (error) {
+            if (token === imageRequestToken && row === editingRow) {
+                row.equipmentImageError = error.message || 'Image preview could not be prepared.';
+                status(row, row.equipmentImageError, true);
+            }
+        } finally {
+            if (token === imageRequestToken && row === editingRow) {
+                row.equipmentImagePending = false; sync();
+                const lightbox = document.getElementById('recipeImageLightbox');
+                if (lightbox?.classList.contains('open') && lightbox.equipmentRow === row) {
+                    lightbox.querySelector(`[data-master-image-action="${file ? 'replace' : 'generate'}"]`).focus({preventScroll: true});
+                }
+            }
+        }
+    }
+    function removeImage(row) {
+        if (row !== editingRow || mutationPending || row.equipmentImagePending || !row.equipmentImageUrl) return;
+        if (!window.confirm('Remove this equipment image? The change stays pending until you save.')) return;
+        row.equipmentImageUrl = ''; row.equipmentImageChange = state(row).image_url ? {action: 'remove'} : null;
+        row.equipmentImageError = ''; status(row); sync();
+        document.querySelector('#recipeImageLightbox [data-master-image-action="replace"]')?.focus({preventScroll: true});
     }
     function confirmDelete(row) {
         const button = row.querySelector('[data-equipment-row-delete]');
@@ -571,7 +629,7 @@
         clearDrag(); dragged = null;
     });
     root.addEventListener('dragend', () => { clearDrag(); dragged = null; });
-    window.addEventListener('beforeunload', event => { if (dirty(editingRow) || mutationPending) { event.preventDefault(); event.returnValue = ''; } });
+    window.addEventListener('beforeunload', event => { if (dirty(editingRow) || mutationPending || editingRow?.equipmentImagePending) { event.preventDefault(); event.returnValue = ''; } });
     phone.addEventListener('change', () => {
         const row = document.activeElement?.closest(rowSelector);
         if (phone.matches && row && document.activeElement.closest(detailSelector)) { syncMobile(row); rowStates.get(row.dataset.masterRecordId).expanded = true; }
@@ -583,6 +641,22 @@
         if (frame || !changes.some(change => [...change.addedNodes].some(node => node.nodeType === 1 && (node.matches?.(rowSelector) || node.querySelector?.(rowSelector))))) return;
         frame = requestAnimationFrame(() => { frame = 0; sync(); });
     }).observe(root, {subtree: true, childList: true});
-    window.EquipmentRegistry = {hasPendingWork: () => dirty(editingRow) || mutationPending, sync};
+    window.EquipmentRegistry = {
+        hasPendingWork: () => dirty(editingRow) || mutationPending || Boolean(editingRow?.equipmentImagePending), sync,
+        imageEditor: {
+            open(row) { if (editable(row) && !edit(row)) return false; closeAliases({restoreFocus: false}); return true; },
+            prepare: prepareImage, remove: removeImage,
+            state(row) {
+                if (row !== editingRow || !editable(row)) return null;
+                return {
+                    url: row.equipmentImageUrl, name: values(row).name,
+                    busy: mutationPending || row.equipmentImagePending,
+                    feedback: Boolean(row.equipmentImageError || row.equipmentImagePending),
+                    status: row.equipmentImageError || (row.equipmentImagePending ? row.equipmentImageStatus
+                        : row.equipmentImageChange ? 'Unsaved image change · Save the row to keep it.' : 'Use the row’s Save to keep image changes.'),
+                };
+            },
+        },
+    };
     sync(); root.classList.add('has-mobile-equipment-rows', 'has-mobile-ingredient-rows');
 })();

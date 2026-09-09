@@ -212,7 +212,7 @@
     }
 
     function masterDataLightboxImageSelector() {
-        return ".master-data-thumbnail[src], .master-data-reference-title-image[src], [data-ingredient-master-row] .master-data-no-image";
+        return "[data-master-image-trigger], .master-data-thumbnail[src], .master-data-reference-title-image[src], [data-ingredient-master-row] .master-data-no-image";
     }
 
     function ensureMasterDataImageLightbox() {
@@ -237,7 +237,7 @@
                     <div class="master-data-lightbox-empty" role="status" hidden>No image</div>
                     <div class="recipe-image-lightbox-actions" data-master-image-actions hidden>
                         <p data-master-image-status role="status" aria-live="polite"></p>
-                        <div class="master-data-lightbox-buttons" role="group" aria-label="Ingredient image actions">
+                        <div class="master-data-lightbox-buttons" role="group" aria-label="Image actions">
                             <button type="button" data-master-image-action="replace">Replace Image</button>
                             <button type="button" data-master-image-action="generate">Generate Image</button>
                             <button type="button" class="is-remove" data-master-image-action="remove">Remove Image</button>
@@ -245,6 +245,7 @@
                         </div>
                     </div>
                 </div>
+                <input type="file" data-master-image-file accept="image/*" hidden>
             </div>
         `;
         lightbox.addEventListener("click", (event) => {
@@ -261,13 +262,24 @@
         }
         lightbox.querySelectorAll('[data-master-image-action]').forEach(button => {
             button.addEventListener('click', () => {
-                if (lightbox.ingredientRow !== ingredientEditingRow) return;
                 if (button.disabled) return;
                 const action = button.dataset.masterImageAction;
+                if (lightbox.equipmentRow) {
+                    if (action === 'replace') lightbox.querySelector('[data-master-image-file]').click();
+                    else if (action === 'generate') void window.EquipmentRegistry.imageEditor.prepare(lightbox.equipmentRow);
+                    else window.EquipmentRegistry.imageEditor.remove(lightbox.equipmentRow);
+                    return;
+                }
+                if (lightbox.ingredientRow !== ingredientEditingRow) return;
                 if (action === 'replace') document.querySelector('[data-ingredient-image-file]').click();
                 else if (action === 'generate') void prepareIngredientImage();
                 else removeIngredientImage();
             });
+        });
+        lightbox.querySelector('[data-master-image-file]').addEventListener('change', event => {
+            const file = event.target.files[0];
+            if (file && lightbox.equipmentRow) void window.EquipmentRegistry.imageEditor.prepare(lightbox.equipmentRow, file);
+            event.target.value = '';
         });
         lightbox.querySelector('[data-master-image-retry]').addEventListener('click', () => {
             if (lightbox.ingredientRow === ingredientEditingRow) void loadIngredientEditor(ingredientEditingRow, ++ingredientEditorToken);
@@ -290,10 +302,14 @@
 
     function openMasterDataImageLightbox(image) {
         if (!image) return;
+        image = image.closest('[data-master-image-trigger]') || image;
         const row = image.closest('[data-ingredient-master-row]');
-        const src = image.dataset.fullSrc || image.currentSrc || image.src;
-        if (!src && !row) return;
+        const equipmentRow = image.closest('[data-equipment-master-row]');
+        const media = image.matches('img') ? image : image.querySelector('img');
+        const src = media?.dataset.fullSrc || media?.currentSrc || media?.src || '';
+        if (!src && !row && !equipmentRow) return;
         if (row && !editIngredientRow(row)) return;
+        if (equipmentRow && !window.EquipmentRegistry.imageEditor.open(equipmentRow)) return;
         closeIngredientAliases({restoreFocus: false});
         const lightbox = ensureMasterDataImageLightbox();
         const lightboxImage = document.getElementById("recipeImageLightboxImage");
@@ -306,11 +322,12 @@
         if (lightbox.parentNode !== host) host.appendChild(lightbox);
         lightbox.returnFocus = image;
         lightbox.ingredientRow = row;
-        lightbox.querySelector('[role="dialog"]').setAttribute('aria-label', row ? `Image for ${row.dataset.recordName}` : 'Enlarged recipe image');
-        lightbox.querySelector('.recipe-image-lightbox-media').style.setProperty('--image-ratio', image.naturalWidth && image.naturalHeight ? image.naturalWidth / image.naturalHeight : 1);
+        lightbox.equipmentRow = equipmentRow;
+        lightbox.querySelector('[role="dialog"]').setAttribute('aria-label', row || equipmentRow ? `Image for ${(row || equipmentRow).dataset.recordName}` : 'Enlarged recipe image');
+        lightbox.querySelector('.recipe-image-lightbox-media').style.setProperty('--image-ratio', media?.naturalWidth && media?.naturalHeight ? media.naturalWidth / media.naturalHeight : 1);
         if (src) lightboxImage.src = src;
         else lightboxImage.removeAttribute('src');
-        lightboxImage.alt = image.alt || "Recipe image";
+        lightboxImage.alt = media?.alt || "Recipe image";
         syncMasterDataLightboxImageState(lightbox);
         lightbox.classList.add("open");
         lightbox.setAttribute("aria-hidden", "false");
@@ -334,6 +351,7 @@
         const trigger = lightbox.returnFocus;
         delete lightbox.returnFocus;
         delete lightbox.ingredientRow;
+        delete lightbox.equipmentRow;
         lightbox.classList.remove("open");
         lightbox.setAttribute("aria-hidden", "true");
         document.body.classList.remove("image-lightbox-open");
@@ -363,33 +381,39 @@
         const lightbox = document.getElementById('recipeImageLightbox');
         if (!lightbox?.classList.contains('open')) return;
         const row = lightbox.ingredientRow;
-        const managing = Boolean(row && row === ingredientEditingRow);
+        const equipment = lightbox.equipmentRow && window.EquipmentRegistry.imageEditor.state(lightbox.equipmentRow);
+        const managing = Boolean(equipment || row && row === ingredientEditingRow);
         const toolbar = lightbox.querySelector('[data-master-image-actions]');
         toolbar.hidden = !managing;
         lightbox.classList.toggle('has-image-actions', managing);
         if (!managing) return;
 
+        const draft = equipment || {
+            url: ingredientImageUrl, name: ingredientRowValues(row).name,
+            busy: ingredientMutationPending || ingredientEditorLoading || ingredientImagePending || !ingredientEditorContext,
+            retry: !ingredientEditorControl('retry').hidden, retryDisabled: ingredientEditorControl('retry').disabled,
+            feedback: Boolean(ingredientEditorLoading || ingredientImagePending || ingredientEditorErrors.image || !ingredientEditorControl('retry').hidden),
+            status: ingredientEditorLoading ? 'Loading ingredient details…'
+                : !ingredientEditorControl('retry').hidden ? ingredientEditorControl('feedback').textContent
+                : ingredientEditorErrors.image || (ingredientImagePending ? ingredientImageStatus
+                    : ingredientImageChange ? 'Unsaved image change · Save the row to keep it.' : 'Use the row’s Save to keep image changes.'),
+        };
         const image = lightbox.querySelector('img');
-        if (ingredientImageUrl) {
-            if (image.getAttribute('src') !== ingredientImageUrl) image.src = ingredientImageUrl;
+        if (draft.url) {
+            if (image.getAttribute('src') !== draft.url) image.src = draft.url;
         } else image.removeAttribute('src');
-        image.alt = `${ingredientRowValues(row).name} image`;
+        image.alt = `${draft.name} image`;
         syncMasterDataLightboxImageState(lightbox);
         toolbar.querySelectorAll('[data-master-image-action]').forEach(button => {
-            button.disabled = ingredientMutationPending || ingredientEditorLoading || ingredientImagePending || !ingredientEditorContext
-                || (button.dataset.masterImageAction === 'remove' && !ingredientImageUrl);
+            button.disabled = draft.busy || (button.dataset.masterImageAction === 'remove' && !draft.url);
         });
         const retry = toolbar.querySelector('[data-master-image-retry]');
-        retry.hidden = ingredientEditorControl('retry').hidden;
-        retry.disabled = ingredientEditorControl('retry').disabled;
-        const error = ingredientEditorErrors.image;
+        retry.hidden = !draft.retry;
+        retry.disabled = Boolean(draft.retryDisabled);
         const status = toolbar.querySelector('[data-master-image-status]');
-        toolbar.classList.toggle('has-image-feedback', Boolean(ingredientEditorLoading || ingredientImagePending || error || !retry.hidden));
-        status.textContent = ingredientEditorLoading ? 'Loading ingredient details…'
-            : !retry.hidden ? ingredientEditorControl('feedback').textContent
-            : error || (ingredientImagePending ? ingredientImageStatus
-                : ingredientImageChange ? 'Unsaved image change · Save the row to keep it.' : 'Use the row’s Save to keep image changes.');
-        toolbar.setAttribute('aria-busy', String(ingredientImagePending || ingredientEditorLoading));
+        toolbar.classList.toggle('has-image-feedback', draft.feedback);
+        status.textContent = draft.status;
+        toolbar.setAttribute('aria-busy', String(Boolean(draft.busy)));
         if (lightbox.contains(document.activeElement) && document.activeElement.disabled) {
             lightbox.querySelector('.recipe-image-lightbox-close').focus({preventScroll: true});
         }
@@ -398,6 +422,8 @@
     function decorateMasterDataLightboxImages(root = document) {
         const scope = root && typeof root.querySelectorAll === "function" ? root : document;
         scope.querySelectorAll(masterDataLightboxImageSelector()).forEach((image) => {
+            const trigger = image.closest('[data-master-image-trigger]');
+            if (trigger) return; // The native button is the only Equipment thumbnail focus target.
             image.tabIndex = 0;
             image.setAttribute("role", "button");
             image.setAttribute("aria-label", image.matches('.master-data-no-image')
@@ -420,7 +446,7 @@
             event.preventDefault();
             event.stopPropagation();
             openMasterDataImageLightbox(image);
-        });
+        }, true); // Claim thumbnails before row click handlers can change or cancel the draft.
         document.addEventListener("keydown", (event) => {
             const lightbox = document.getElementById('recipeImageLightbox');
             if (lightbox?.classList.contains('open') && event.key === "Escape") {
@@ -457,6 +483,8 @@
             }
         });
     }
+
+    window.MasterDataImageLightbox = {sync: syncMasterDataImageLightbox};
 
     function query(form, selector) {
         const root = form.closest(".master-data-page") || document;

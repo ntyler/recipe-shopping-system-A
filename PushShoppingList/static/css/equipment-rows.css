@@ -2,6 +2,8 @@
    ingredient-mobile-rows.css. Only equipment-specific states belong here. */
 .equipment-master-page .master-data-results-header { border: 0; border-radius: 0; background: transparent; }
 .equipment-master-page .equipment-field-error { color: var(--app-danger); }
+.equipment-master-page .master-data-image-trigger { display: inline-flex; flex: 0 0 auto; width: auto; min-width: 0; min-height: 0; margin: 0; padding: 0; border: 0; border-radius: 7px; background: transparent; box-shadow: none; cursor: pointer; }
+.equipment-master-page .master-data-image-trigger:focus-visible { outline: 2px solid var(--app-primary-hover); outline-offset: 2px; }
 
 .equipment-type-label { --equipment-type-accent: var(--equipment-type-accent-light, #64748b); display: inline-flex; align-items: center; gap: 8px; min-width: 0; text-align: left; }
 /* Presentation only: all eight stored Equipment Types, shared by headings,

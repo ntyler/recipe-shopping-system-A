@@ -6,6 +6,7 @@ enabling structured parsing or creating its recipe requirement tables.
 """
 
 from PushShoppingList.services import recipe_master_data_service as md
+from PushShoppingList.services.master_image_preview_service import resolve_master_image
 from PushShoppingList.services.equipment_normalization_service import normalized_equipment_key
 
 
@@ -239,6 +240,10 @@ def update_equipment_master_record(record_id, payload, user_id=None):
         if not row:
             return _error("Equipment was not found.", 404)
         row = dict(row)
+        try:
+            image = resolve_master_image(row, payload.get("image"), record_type="equipment")
+        except ValueError as exc:
+            return _error(str(exc), field="image")
         section = section or row["equipment_section"]
         display_name = row["name"] if reset else md.clean_text(name) if name is not None else row["display_name_override"] or row["name"]
         override = "" if display_name == row["name"] else display_name
@@ -263,7 +268,8 @@ def update_equipment_master_record(record_id, payload, user_id=None):
             else:
                 ordered = _section_order(connection, owner, section)
             ordered.insert(min(order["position"] - 1, len(ordered)), record_id)
-        changed = override != row["display_name_override"] or section != row["equipment_section"] or requested != existing
+        image_changed = image is not None and any(image[key] != row[key] for key in image)
+        changed = override != row["display_name_override"] or section != row["equipment_section"] or requested != existing or image_changed
         order_changed = ordered is not None and ordered != original
         # Validate everything before schema changes, aliases or row fields.
         md.migrate_equipment_order(connection)
@@ -274,6 +280,9 @@ def update_equipment_master_record(record_id, payload, user_id=None):
                 equipment_section_user_confirmed = CASE WHEN ? THEN 1 ELSE equipment_section_user_confirmed END,
                 updated_at = ? WHERE user_id = ? AND id = ?""",
                                (override, section, section != row["equipment_section"], md.utc_now_iso(), owner, record_id))
+        if image_changed:
+            connection.execute("UPDATE equipment SET image_url = ?, image_path = ? WHERE user_id = ? AND id = ?",
+                               (image["image_url"], image["image_path"], owner, record_id))
         if requested != existing:
             _ensure_aliases(connection)
             # Retire removed aliases instead of invalidating matched_alias_id on saved options.

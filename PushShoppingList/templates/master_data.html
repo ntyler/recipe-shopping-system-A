@@ -191,6 +191,7 @@
         data-current-type="{{ row.equipment_section }}" data-equipment-type="{{ row.equipment_section }}" data-order-enabled="{{ 'true' if row.order_enabled and editable else 'false' }}"
         data-section-count="{{ row.section_count }}" data-sort-order="{{ row.sort_order }}"
         data-update-url="{{ url_for('main_bp.update_equipment_master_record_route', equipment_id=row.id) }}"
+        data-image-url="{{ url_for('main_bp.equipment_master_image_preview_route', equipment_id=row.id) }}"
         data-record-name="{{ row.name }}" data-current-name="{{ row.name }}" data-detected-name="{{ row.detected_name }}" data-image-src="{{ row.image_url }}" data-usage-count="{{ row.usage_count }}"
         data-source-label="{{ 'User-created' if row.user_id else 'Workspace equipment' }}"
         data-order-url="{{ url_for('main_bp.reorder_equipment_master_record_route', equipment_id=row.id) }}"
@@ -198,8 +199,12 @@
         <td id="equipmentOrder-{{ row.id }}" class="ingredient-order-cell equipment-order-cell" data-label="Order">{{ registry_order(row.name, row.sort_order + 1, row.order_enabled and editable, row.section_count, namespace='equipment') }}</td>
         <td class="ingredient-item-cell" data-label="Item">
             <div class="ingredient-item">
-                {% if row.image_url %}<img class="master-data-thumbnail" src="{{ row.image_url }}" data-full-src="{{ row.image_url }}" alt="{{ row.name }} image">
-                {% else %}<span class="master-data-no-image">No image</span>{% endif %}
+                <button type="button" class="master-data-image-trigger" data-master-image-trigger
+                        aria-label="{{ 'Manage' if row.image_url else 'Add' }} image for {{ row.name }}"
+                        aria-haspopup="dialog" aria-controls="recipeImageLightbox">
+                    {% if row.image_url %}<img class="master-data-thumbnail" src="{{ row.image_url }}" data-full-src="{{ row.image_url }}" alt="{{ row.name }} image">
+                    {% else %}<span class="master-data-no-image">No image</span>{% endif %}
+                </button>
                 <button type="button" class="ingredient-mobile-row-toggle equipment-mobile-row-toggle" data-equipment-mobile-toggle
                         aria-expanded="false" aria-label="Expand details for {{ row.name }}">
                     <span data-equipment-master-display-name>{{ row.name }}</span>

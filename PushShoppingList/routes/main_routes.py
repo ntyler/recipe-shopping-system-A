@@ -39,6 +39,7 @@ from PushShoppingList.services import ingredient_type_service as ingredient_type
 from PushShoppingList.services import cuisine_category_service as cuisine_categories
 from PushShoppingList.services import unit_suggestion_service as unit_suggestions
 from PushShoppingList.services import ingredient_editor_service as ingredient_editor
+from PushShoppingList.services import master_image_preview_service as master_image_preview
 from PushShoppingList.services import ingredient_deletion_service as ingredient_deletion
 from PushShoppingList.services.food_rules_service import load_food_rules
 from PushShoppingList.services.food_rules_service import shopping_item_food_rule_status
@@ -1754,6 +1755,27 @@ def equipment_master_editor_route(equipment_id):
     if not record:
         return jsonify({"ok": False, "error": "Equipment was not found."}), 404
     return jsonify({"ok": True, "record": record})
+
+
+@main_bp.route("/api/master-data/equipment/<int:equipment_id>/image-preview", methods=["POST"])
+def equipment_master_image_preview_route(equipment_id):
+    record = equipment_registry.equipment_editor_record(equipment_id)
+    if not record:
+        return jsonify({"ok": False, "error": "Equipment was not found."}), 404
+    payload = request.get_json(silent=True) if request.is_json else {}
+    payload = payload if isinstance(payload, dict) else {}
+    try:
+        if isinstance(payload.get("name"), str) and payload["name"].strip():
+            record = {**record, "name": recipe_master_data.clean_text(payload["name"])[:160]}
+        preview = master_image_preview.prepare_master_image(
+            record, record_type="equipment", uploaded_file=request.files.get("image"), generate=payload.get("action") == "generate",
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception:
+        current_app.logger.exception("Equipment image preview failed")
+        return jsonify({"ok": False, "error": "The image could not be prepared. Please try again."}), 502
+    return jsonify({"ok": True, **preview})
 
 
 @main_bp.route("/api/master-data/equipment/<int:equipment_id>/order", methods=["PATCH"])
