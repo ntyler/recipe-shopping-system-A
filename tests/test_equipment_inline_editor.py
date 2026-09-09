@@ -160,8 +160,10 @@ const base = process.argv[2];
         assert.equal(await page.locator('.equipment-master-page').locator('[data-equipment-master-admin-view], [data-master-scope-filter], [name="scope"], [name="user_id"], [name="viewer_user_id"], [data-equipment-normalization-review]').count(), 0);
         assert.equal(await page.getByText('Admin view', {exact: true}).count(), 0);
         assert.equal(await page.getByText('Viewing my data', {exact: true}).count(), 0);
-        assert.equal(await page.locator('table thead').count(), 1);
-        assert.deepEqual(await page.locator('.master-data-equipment-table thead th').allTextContents(), ['Order', 'Item', 'Aliases', 'Equipment Type', 'Used In', 'Action']);
+        assert.equal(await page.locator('[data-equipment-group] table thead').count(), await page.locator('[data-equipment-group]').count());
+        for (const table of await page.locator('.master-data-equipment-table').all()) {
+            assert.deepEqual(await table.locator('thead th').allTextContents(), ['Order', 'Item', 'Aliases', 'Equipment Type', 'Used In', 'Action']);
+        }
         assert.equal(await page.locator('[data-equipment-master-row]').count(), 27);
         assert.equal(await page.locator('.master-data-updated-cell, .equipment-col-updated, .equipment-row-more, [data-equipment-master-row] [popover], [popovertarget]').count(), 0);
         const byId = id => page.locator(`[data-equipment-master-row][data-master-record-id="${id}"]`);
@@ -201,7 +203,7 @@ const base = process.argv[2];
             await toggle.focus(); await page.keyboard.press('Enter');
             assert.equal(await toggle.getAttribute('aria-expanded'), 'true');
         } else {
-            const columns = await page.locator('table thead th').evaluateAll(es => es.map(e => e.getBoundingClientRect().width));
+            const columns = await row.locator('xpath=ancestor::table').locator('thead th').evaluateAll(es => es.map(e => e.getBoundingClientRect().width));
             assert(columns.every((width, i) => Math.abs(width - referenceColumns[i]) < 2), `Ingredient column widths ${referenceColumns} match Equipment ${columns}`);
             assert(Math.abs((await row.boundingBox()).height - referenceHeight) < 2, 'Ingredient row height matches');
             assert(await toggle.isHidden());
@@ -343,11 +345,12 @@ const base = process.argv[2];
         await page.keyboard.press('Escape');
         assert(await row.locator('[data-master-usage-button]').evaluate(e => e === document.activeElement));
         if (options.width >= 1280) {
-            await page.locator('.app-content').evaluate(e => e.scrollTop += 900);
-            const heading = await page.locator('table thead').boundingBox();
+            const cookwareTable = byId(options.unusedId).locator('xpath=ancestor::table');
+            await cookwareTable.locator('[data-equipment-master-row]').nth(12).scrollIntoViewIfNeeded();
+            const heading = await cookwareTable.locator('thead').boundingBox();
             const toolbar = await page.locator('.app-topbar').boundingBox();
             assert(Math.abs(heading.y - toolbar.y - toolbar.height) < 2, 'Whole header sticks flush below application header');
-            const headers = await page.locator('table thead th').evaluateAll(es => es.map(e => e.getBoundingClientRect().top));
+            const headers = await cookwareTable.locator('thead th').evaluateAll(es => es.map(e => e.getBoundingClientRect().top));
             assert(headers.every(y => Math.abs(y - heading.y) < 1));
             await screenshot('sticky');
         }

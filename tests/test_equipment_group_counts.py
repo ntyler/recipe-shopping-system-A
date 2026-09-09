@@ -48,13 +48,26 @@ def rendered_context(app, client, query=""):
     assert response.status_code == 200
     context = contexts[-1]
     page = BeautifulSoup(response.data, "html.parser")
-    headings = page.select(".master-data-section-row")
-    assert len(headings) == len(context["row_groups"])
-    for heading, group in zip(headings, context["row_groups"]):
+    groups = page.select("[data-equipment-group]")
+    assert len(groups) == len(context["row_groups"])
+    assert len(page.select(".master-data-equipment-table")) == len(groups)
+    for rendered_group, group in zip(groups, context["row_groups"]):
+        heading = rendered_group.select_one(":scope > header.equipment-group-header")
+        assert heading is not None
         assert heading.select_one("[data-equipment-type-label]")["data-equipment-type-label"] == group["section"]
         assert heading.select_one("[data-equipment-group-count]").get_text(strip=True) == (
             f'{group["count"]} {"item" if group["count"] == 1 else "items"}'
         )
+        table = rendered_group.select_one("table.master-data-equipment-table")
+        assert table is not None and len(rendered_group.select("table")) == 1
+        assert not table.select(".master-data-section-row")
+        assert [column.get_text(strip=True) for column in table.select("thead th[scope='col']")] == [
+            "Order", "Item", "Aliases", "Equipment Type", "Used In", "Action",
+        ]
+        assert len(table.select("colgroup > col")) == 6
+        assert [int(row["data-master-record-id"]) for row in table.select("tbody > [data-equipment-master-row]")] == [
+            row["id"] for row in group["rows"]
+        ]
     if not context["rows"] and context["db_status"]["exists"]:
         assert page.select_one(".master-data-empty-state")
         assert not page.select("[data-equipment-group-count]")

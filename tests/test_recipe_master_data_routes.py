@@ -901,7 +901,8 @@ def test_equipment_master_data_filters_and_groups_by_equipment_type(monkeypatch,
     assert all_response.status_code == 200
     assert 'data-equipment-master-registry' in all_html
     all_page = BeautifulSoup(all_html, "html.parser")
-    assert len(all_page.select('.master-data-section-row')) == 2
+    assert len(all_page.select('[data-equipment-group] > header.equipment-group-header')) == 2
+    assert len(all_page.select('[data-equipment-group] table thead')) == 2
     assert "COOKWARE" in all_html
     assert "PREP TOOLS" in all_html
     assert cookware_response.status_code == 200
@@ -909,8 +910,8 @@ def test_equipment_master_data_filters_and_groups_by_equipment_type(monkeypatch,
     assert "Large pot" in cookware_html
     assert "Whisk" not in cookware_html
     cookware_page = BeautifulSoup(cookware_html, "html.parser")
-    assert len(cookware_page.select('.master-data-section-row')) == 1
-    heading = cookware_page.select_one('.master-data-section-row')
+    assert len(cookware_page.select('[data-equipment-group]')) == 1
+    heading = cookware_page.select_one('[data-equipment-group] > header.equipment-group-header')
     assert heading.select_one('h3').get_text(strip=True) == 'Cookware'
     assert heading.select_one('[data-equipment-group-count]').get_text(strip=True) == '1 item'
 

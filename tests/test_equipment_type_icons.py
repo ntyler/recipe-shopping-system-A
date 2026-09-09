@@ -37,7 +37,7 @@ def test_all_equipment_types_have_distinct_server_rendered_icons(monkeypatch, tm
         assert svg['aria-hidden'] == 'true' and svg['focusable'] == 'false'
         icons.append(svg.decode_contents().strip())
         template = page.select_one(f'template[data-equipment-type-template="{section}"]')
-        heading = page.select_one(f'.master-data-section-row [data-equipment-type-label="{section}"]')
+        heading = page.select_one(f'[data-equipment-group] > header [data-equipment-type-label="{section}"]')
         assert template.select_one('svg') == svg == heading.select_one('svg')
     assert len(set(icons)) == len(rows)
     controls = app.jinja_env.get_template('includes/master_data_controls.html').module
@@ -84,6 +84,20 @@ const options = JSON.parse(require('node:fs').readFileSync(0, 'utf8'));
         assert.equal(await page.locator('vite-error-overlay, nextjs-portal').count(), 0);
         const rows = page.locator('[data-equipment-master-row]');
         assert.equal(await rows.count(), options.types.length);
+        const groups = page.locator('[data-equipment-group]');
+        assert.equal(await groups.count(), options.types.length);
+        const groupColumns = [];
+        for (const group of await groups.all()) {
+            const heading = group.locator(':scope > header.equipment-group-header');
+            assert.equal(await heading.count(), 1);
+            assert.equal(await heading.locator('[data-equipment-group-count]').textContent(), '1 item');
+            assert.equal(await group.locator('table').count(), 1);
+            assert.deepEqual(await group.locator('thead th').allTextContents(), ['Order', 'Item', 'Aliases', 'Equipment Type', 'Used In', 'Action']);
+            const section = await heading.locator('[data-equipment-type-label]').getAttribute('data-equipment-type-label');
+            assert.equal(await group.locator('[data-equipment-master-row]').getAttribute('data-equipment-type'), section);
+            if (options.width >= 1280) groupColumns.push(await group.locator('thead th').evaluateAll(es => es.map(e => e.getBoundingClientRect().width)));
+        }
+        assert(groupColumns.every(columns => columns.every((width, index) => Math.abs(width - groupColumns[0][index]) < 1)), 'Equipment groups share identical column widths');
         const shot = async state => {
             if (options.screenshots) await page.screenshot({path: require('node:path').join(options.screenshots, `equipment-types-${options.width}-${options.dark ? 'dark' : 'light'}-${state}.png`), fullPage: state === 'rows'});
         };
@@ -152,7 +166,7 @@ const options = JSON.parse(require('node:fs').readFileSync(0, 'utf8'));
         assert.equal(new Set(shapes.map(s => s.trim())).size, options.types.length);
         assert.equal(new Set(colors.values()).size, options.types.length, 'Every stored type has a distinct accent');
         assert(styles.every(s => JSON.stringify(s.filter((_, i) => i !== 4)) === JSON.stringify(styles[0].filter((_, i) => i !== 4))), 'Consistent icon geometry across all rows');
-        for (const label of await page.locator('.master-data-section-row .equipment-type-label').all()) {
+        for (const label of await page.locator('[data-equipment-group] > header .equipment-type-label').all()) {
             assert.equal(await accent(label), colors.get(await label.getAttribute('data-equipment-type-label')));
         }
         assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'No phone overflow');
@@ -215,7 +229,7 @@ const options = JSON.parse(require('node:fs').readFileSync(0, 'utf8'));
         // Explicit appearance overrides the OS setting, including portaled menus.
         await page.evaluate(dark => window.aiPantryTheme.setPreference(dark ? 'light' : 'dark'), options.dark);
         const overrideColors = new Map();
-        for (const label of await page.locator('.master-data-section-row .equipment-type-label').all()) {
+        for (const label of await page.locator('[data-equipment-group] > header .equipment-type-label').all()) {
             const section = await label.getAttribute('data-equipment-type-label');
             overrideColors.set(section, await accent(label));
             assert.notEqual(overrideColors.get(section), colors.get(section));
