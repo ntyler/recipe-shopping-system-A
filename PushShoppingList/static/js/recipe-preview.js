@@ -238,8 +238,10 @@ function recipePreviewInstructionMetadata(step) {
 function recipePreviewNutritionHtml(recipe) {
     if (!recipe.nutrition?.length) return '<p class="recipe-preview-empty">Nutrition is not available for this recipe.</p>';
     const summary = recipe.nutrition_summary, esc = escapeHtml;
+    const printRows = [...summary.primary.filter(row => row.value), ...summary.groups.flatMap(group => group.rows)];
     return `<div class="recipe-preview-nutrient-grid">${summary.primary.map(row => `<div>${recipePreviewIcon(row.icon)}<span><strong>${esc(row.value || 'Not provided')}</strong><span>${esc(row.label)}</span></span></div>`).join('')}</div>
         <div class="recipe-preview-nutrient-details">${summary.groups.map(group => `<section class="recipe-preview-nutrient-group"><h3>${esc(group.label)}</h3><dl>${group.rows.map(row => `<div><dt>${esc(row.label)}</dt><dd>${esc(row.value)}</dd></div>`).join('')}</dl></section>`).join('')}</div>
+        <p class="recipe-preview-print-nutrition">${printRows.map(row => `<span>${esc(row.label)}: ${esc(row.value)}</span>`).join(' | ')}</p>
         <p class="recipe-preview-nutrition-note">${esc(summary.note)}</p>`;
 }
 
