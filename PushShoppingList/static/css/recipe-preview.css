@@ -221,6 +221,7 @@ body.recipe-preview-active { overflow: auto; }
     #recipePreviewPage .recipe-preview-choice-group summary { display: block; min-height: 0; margin: 0 0 .7mm; font-size: 1em; font-weight: 400; break-after: avoid; }
     #recipePreviewPage .recipe-preview-choice-title { color: #333; text-decoration: none; opacity: 1; }
     #recipePreviewPage .recipe-preview-choice-options { display: block; margin: 0; }
+    #recipePreviewPage .recipe-preview-card[data-print-bundle-info="false"] .recipe-preview-choice-options { display: none; }
     #recipePreviewPage .recipe-preview-choice-option[data-selected="false"] { display: none; }
     #recipePreviewPage .recipe-preview-choice-option { border: 0; padding: 0; background: transparent; }
     #recipePreviewPage .recipe-preview-equipment .recipe-preview-section-heading { min-height: 0; }

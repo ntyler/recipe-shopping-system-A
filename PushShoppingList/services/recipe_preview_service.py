@@ -65,6 +65,7 @@ def preview_options(value, recipe=None):
         "scale": scale,
         "show_image": value.get("show_image") is not False,
         "show_nutrition": value.get("show_nutrition") is not False,
+        "print_bundle_info": value.get("print_bundle_info") is not False,
         "text_size": size,
         "nutrition_mode": nutrition_mode,
     }
@@ -378,8 +379,11 @@ def build_recipe_preview_pdf_html(view, resolved, options):
         if standard:
             ingredient_blocks.append(ingredient_table(standard))
             standard = []
-        ingredient_blocks.append('<div class="choice-heading"><small>Original recipe requirement · Selected bundle below</small>'
-                                 f'<h3>{escape(group["source_text"])}</h3></div>' + ingredient_table(group["items"]))
+        if options.get("print_bundle_info", True):
+            ingredient_blocks.append('<div class="choice-heading"><small>Original recipe requirement · Selected bundle below</small>'
+                                     f'<h3>{escape(group["source_text"])}</h3></div>' + ingredient_table(group["items"]))
+        else:
+            ingredient_blocks.append(f'<div class="choice-heading"><h3>{escape(group["source_text"])}</h3></div>')
     if standard:
         ingredient_blocks.append(ingredient_table(standard))
     ingredients = "".join(ingredient_blocks)

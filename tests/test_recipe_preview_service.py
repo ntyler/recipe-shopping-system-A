@@ -388,6 +388,21 @@ def test_pdf_visibility_text_size_and_escaping_preserve_projection(recipe, monke
     assert "200 kcal" in visible
 
 
+@pytest.mark.parametrize("enabled", [True, False])
+def test_print_bundle_info_controls_export_without_changing_projection(recipe, enabled):
+    response, resolved = preview.prepare_recipe_preview({
+        "url": URL, "options": {"show_image": False, "print_bundle_info": enabled},
+    })
+    assert response["options"]["print_bundle_info"] is enabled
+    assert "unsalted butter" in [row["ingredient"] for row in resolved["ingredients"]]
+    assert response["recipe"]["ingredient_groups"][1]["items"]
+    html = preview.build_recipe_preview_pdf_html(response["recipe"], resolved, response["options"])
+    assert "<h3>source butter</h3>" in html
+    assert "room temperature" in html
+    assert ("unsalted butter" in html) is enabled
+    assert ("Selected bundle below" in html) is enabled
+
+
 def test_pdf_export_is_ephemeral_and_does_not_update_persisted_archive(recipe, monkeypatch):
     seen = {}
     def render(url, html, _source, path, **kwargs):

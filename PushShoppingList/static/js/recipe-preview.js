@@ -56,7 +56,7 @@ async function openIntegratedRecipePreview({history = true} = {}) {
         draft: {...(recipeEditOriginalSnapshot || {}), ...collected.recipe,
             ...collectRecipeEditorCategoryValues(),
             cookbook_name: document.getElementById('recipeEditCookbookField')?.dataset.currentCookbookName || ''},
-        options: {scale: currentRecipeEditScaleMultiplier(), show_image: true, show_nutrition: true, text_size: 'normal', nutrition_mode: 'per_serving'},
+        options: {scale: currentRecipeEditScaleMultiplier(), show_image: true, show_nutrition: true, print_bundle_info: true, text_size: 'normal', nutrition_mode: 'per_serving'},
         hidden, page, trigger: document.activeElement, title: document.title,
         contentLabel: content.getAttribute('aria-label'), scroll: content.scrollTop,
         shellScroll: document.querySelector('[data-app-main-shell]')?.scrollTop || 0,
@@ -73,7 +73,7 @@ async function openIntegratedRecipePreview({history = true} = {}) {
         <div class="recipe-preview-actions"><button type="button" data-preview-action="back">${recipePreviewIcon('back')}Back to Editor</button><button type="button" data-preview-action="pdf" disabled>${recipePreviewIcon('pdf')}Download PDF</button><button type="button" data-preview-action="print" class="is-primary" disabled>${recipePreviewIcon('print')}Print</button></div>
         </div>
         <div class="recipe-preview-options" aria-label="Preview options">
-            <div class="recipe-preview-visibility"><label><input type="checkbox" data-preview-option="show_image" checked>Recipe image</label><label><input type="checkbox" data-preview-option="show_nutrition" checked>Nutrition</label></div>
+            <div class="recipe-preview-visibility"><label><input type="checkbox" data-preview-option="show_image" checked>Recipe image</label><label><input type="checkbox" data-preview-option="show_nutrition" checked>Nutrition</label><label><input type="checkbox" data-preview-option="print_bundle_info" checked>Print Bundle Info</label></div>
             <div class="recipe-preview-control"><label for="recipePreviewServings">Servings</label><div class="recipe-preview-segment"><button type="button" data-preview-action="less" aria-label="Decrease servings">${recipePreviewIcon('minus')}</button><input id="recipePreviewServings" type="number" min="0.01" step="any" aria-label="Servings" disabled><button type="button" data-preview-action="more" aria-label="Increase servings">${recipePreviewIcon('plus')}</button></div></div>
             <div class="recipe-preview-control"><span>Scale</span><div class="recipe-preview-segment" role="group" aria-label="Recipe scale">${[1,2,3].map(scale => `<button type="button" data-preview-scale="${scale}" aria-pressed="false">${scale}x</button>`).join('')}</div></div>
             <div class="recipe-preview-control"><span>Text size</span><div class="recipe-preview-segment" role="group" aria-label="Recipe text size">${['smaller','normal','larger'].map((size,index) => `<button type="button" data-preview-size="${size}" aria-label="${size[0].toUpperCase()+size.slice(1)} text" aria-pressed="${size === 'normal'}">${['A−','A','A+'][index]}</button>`).join('')}</div></div>
@@ -260,6 +260,7 @@ function syncRecipePreviewOptions() {
     state.page.querySelector('[data-preview-nutrition]')?.toggleAttribute('hidden', !state.options.show_nutrition);
     state.page.querySelector('.recipe-preview-summary')?.classList.toggle('without-image', !state.options.show_image);
     state.page.querySelector('.recipe-preview-card').dataset.textSize = state.options.text_size;
+    state.page.querySelector('.recipe-preview-card').dataset.printBundleInfo = state.options.print_bundle_info !== false;
     state.page.querySelectorAll('[data-preview-scale]').forEach(button => button.setAttribute('aria-pressed', Number(button.dataset.previewScale) === state.options.scale ? 'true' : 'false'));
     state.page.querySelectorAll('[data-preview-size]').forEach(button => button.setAttribute('aria-pressed', button.dataset.previewSize === state.options.text_size ? 'true' : 'false'));
 }
