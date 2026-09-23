@@ -81,13 +81,23 @@ body.recipe-preview-active { overflow: auto; }
 .recipe-preview-nutrition { border-top: 1px solid var(--app-border-strong); margin-top: 22px; padding-top: 16px; }
 .recipe-preview-nutrition .recipe-preview-section-heading { justify-content: flex-start; }
 .recipe-preview-nutrition .recipe-preview-section-heading > span { color: var(--app-muted); font-size: .9em; }
+.recipe-preview-nutrition .recipe-preview-nutrition-basis { padding: 4px 9px; border: 1px solid var(--app-border-strong); border-radius: 20px; color: var(--app-primary-hover); }
+.recipe-preview-nutrition-yield { margin-left: auto; }
 .recipe-preview-nutrient-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; }
 .recipe-preview-nutrient-grid > div { display: flex; align-items: center; gap: 16px; padding: 12px 16px; border: 1px solid var(--app-border-strong); border-radius: 8px; }
-.recipe-preview-nutrient-grid svg { width: 28px; height: 28px; }
+.recipe-preview-nutrient-grid svg { width: 28px; height: 28px; color: var(--app-primary-hover); }
 .recipe-preview-nutrient-grid > div > span { display: grid; gap: 4px; font-size: 1em; }
-.recipe-preview-nutrient-grid strong { color: var(--app-text-strong); }
+.recipe-preview-nutrient-grid strong { color: var(--app-text-strong); font-size: 1.4em; overflow-wrap: anywhere; }
 .recipe-preview-nutrient-grid span { font-size: .85em; color: var(--app-muted); }
-.recipe-preview-nutrients { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 0; line-height: 1.6; font-size: .85em; }
+.recipe-preview-nutrient-details { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(230px, 100%), 1fr)); gap: 16px; margin-top: 18px; }
+.recipe-preview-nutrient-group { min-width: 0; padding: 14px 16px; border: 1px solid var(--app-border); border-radius: 8px; }
+.recipe-preview-page .recipe-preview-nutrient-group h3 { margin: 0 0 10px; font-size: 1em; text-align: left; color: var(--app-text-strong); }
+.recipe-preview-nutrient-group dl { margin: 0; font-size: .95em; }
+.recipe-preview-nutrient-group dl > div { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--app-border); }
+.recipe-preview-nutrient-group dl > div:last-child { border: 0; }
+.recipe-preview-nutrient-group dt { color: var(--app-muted); overflow-wrap: anywhere; }
+.recipe-preview-nutrient-group dd { margin: 0; font-weight: 600; text-align: right; overflow-wrap: anywhere; }
+.recipe-preview-nutrition-note { color: var(--app-muted); font-size: .85em; line-height: 1.6; margin: 14px 0 0; }
 .recipe-preview-empty { color: var(--app-muted); margin: 8px 0; }
 .recipe-preview-assignment { display: flex; flex-wrap: wrap; gap: 10px 24px; margin: 12px 0; font-size: .9em; }
 .recipe-preview-assignment > div { display: flex; flex-wrap: wrap; gap: 5px; min-width: 0; }
@@ -127,6 +137,9 @@ body.recipe-preview-active { overflow: auto; }
     .recipe-preview-columns { grid-template-columns: minmax(0,1fr); gap: 24px; }
     .recipe-preview-ingredients { padding: 0 0 22px; border-right: 0; border-bottom: 1px solid var(--app-border-strong); }
     .recipe-preview-nutrient-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+    .recipe-preview-nutrient-grid > div { padding: 12px; gap: 10px; }
+    .recipe-preview-nutrient-details { grid-template-columns: 1fr; }
+    .recipe-preview-nutrition-yield { flex-basis: 100%; margin-left: 0; }
     .recipe-preview-instructions ol { gap: 20px; }
 }
 @media print {
@@ -146,7 +159,7 @@ body.recipe-preview-active { overflow: auto; }
     #recipePreviewPage .recipe-preview-columns { display: block; }
     #recipePreviewPage .recipe-preview-ingredients { border-right: 0; padding: 0 0 18px; }
     #recipePreviewPage .recipe-preview-ingredients .recipe-task-text { grid-template-columns: 110px minmax(0,1fr); text-decoration: none; opacity: 1; }
-    #recipePreviewPage .recipe-preview-instructions li, #recipePreviewPage .recipe-preview-ingredients li, #recipePreviewPage .recipe-preview-nutrition, #recipePreviewPage .recipe-preview-summary { break-inside: avoid; }
+    #recipePreviewPage .recipe-preview-instructions li, #recipePreviewPage .recipe-preview-ingredients li, #recipePreviewPage .recipe-preview-nutrient-group, #recipePreviewPage .recipe-preview-nutrient-grid, #recipePreviewPage .recipe-preview-summary { break-inside: avoid; }
     #recipePreviewPage h2 { break-after: avoid; }
     #recipePreviewPage .recipe-preview-instructions ol { gap: 12px; }
     #recipePreviewPage .recipe-preview-nutrient-grid { grid-template-columns: repeat(4,1fr); }

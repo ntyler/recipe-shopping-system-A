@@ -140,6 +140,32 @@ def preview_nutrition(recipe, scale):
     return result, basis or "Serving basis not specified"
 
 
+def preview_nutrition_summary(rows):
+    """Group the same available amounts for screen and PDF, without estimating gaps."""
+    primary = {key: {"key": key, "label": label, "value": "", "icon": icon}
+               for key, label, icon in (("calories", "Calories", "calories"),
+                                       ("carbohydrates", "Carbohydrates", "carbs"),
+                                       ("protein", "Protein", "protein"), ("fat", "Total fat", "fat"))}
+    groups = {label: [] for label in ("Fats & cholesterol", "Carbohydrate details", "Vitamins & minerals", "Other nutrients")}
+    aliases = {"energy": "calories", "carbs": "carbohydrates", "carbohydrate": "carbohydrates", "totalfat": "fat"}
+    for row in rows:
+        key = re.sub(r"[^a-z0-9]", "", row["key"].lower()).removesuffix("content")
+        key = aliases.get(key, key)
+        label = re.sub(r"([a-z])([A-Z])", r"\1 \2", row["key"]).replace("_", " ").strip().capitalize()
+        label = re.sub(r"\bvitamin ([a-z]\d*)\b", lambda m: "Vitamin " + m[1].upper(), label, flags=re.I)
+        if key in primary and not primary[key]["value"]:
+            primary[key]["value"] = row["value"]
+            continue
+        group = ("Fats & cholesterol" if key in {"saturatedfat", "transfat", "polyunsaturatedfat", "monounsaturatedfat", "cholesterol"}
+                 else "Carbohydrate details" if key in {"fiber", "dietaryfiber", "sugar", "sugars", "addedsugar", "addedsugars", "starch"}
+                 else "Vitamins & minerals" if key.startswith("vitamin") or key in {"sodium", "potassium", "calcium", "iron", "magnesium", "zinc", "phosphorus", "selenium", "copper", "manganese", "folate", "folicacid", "niacin", "riboflavin", "thiamin", "thiamine"}
+                 else "Other nutrients")
+        groups[group].append({"key": row["key"], "label": label, "value": row["value"]})
+    return {"primary": list(primary.values()),
+            "groups": [{"label": label, "rows": values} for label, values in groups.items() if values],
+            "note": "Only available nutrition values are shown; missing values are not zero. Nutrition is not recalculated for ingredient choices."}
+
+
 def preview_tags(recipe):
     categories = recipe.get("recipe_categories") or recipe.get("categories") or {}
     categories = categories if isinstance(categories, dict) else {}
@@ -236,6 +262,7 @@ def prepare_recipe_preview(payload):
                         for row in resolved["ingredients"]],
         "instructions": instructions,
         "nutrition": nutrition,
+        "nutrition_summary": preview_nutrition_summary(nutrition),
         "nutrition_basis": basis,
         "favorite": bool(saved.get("favorite")),
         "rating": recipe.get("rating") or 0,
@@ -273,9 +300,14 @@ def build_recipe_preview_pdf_html(view, resolved, options):
     instructions = recipe_extract_service.format_video_recipe_instructions_for_pdf(resolved["instructions"])
     nutrition = ""
     if options["show_nutrition"]:
-        rows = "".join(f'<div><span>{escape(row["key"].replace("_", " ").title())}</span><strong>{escape(row["value"])}</strong></div>'
-                       for row in view["nutrition"])
-        nutrition = f'<section class="nutrition"><h2>Nutrition <small>{escape(view["nutrition_basis"])}</small></h2><div class="nutrients">{rows}</div></section>' if rows else '<section><h2>Nutrition</h2><p>Nutrition information is not available.</p></section>'
+        summary = view["nutrition_summary"]
+        rows = "".join(f'<div><span>{escape(row["label"])}</span><strong>{escape(row["value"] or "Not provided")}</strong></div>' for row in summary["primary"])
+        groups = "".join(f'<div class="nutrient-group"><h3>{escape(group["label"])}</h3><dl>' +
+                         "".join(f'<div><dt>{escape(row["label"])}</dt><dd>{escape(row["value"])}</dd></div>' for row in group["rows"]) + '</dl></div>' for group in summary["groups"])
+        nutrition = (f'<section class="nutrition"><h2>Nutrition <small>{escape(view["nutrition_basis"])}</small></h2>'
+                     f'<p class="source">Recipe yield: {escape(text(view["servings"]) or "Not specified")}</p>'
+                     f'<div class="nutrients">{rows}</div><div class="nutrient-details">{groups}</div><p class="source">{escape(summary["note"])}</p></section>'
+                     if view["nutrition"] else '<section><h2>Nutrition</h2><p>Nutrition information is not available.</p></section>')
     size = {"smaller": "10pt", "normal": "11.5pt", "larger": "13pt"}[options["text_size"]]
     return f'''<!doctype html><html lang="en"><head><meta charset="utf-8"><title>{title}</title>
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: https: http:; style-src 'unsafe-inline'">
@@ -296,6 +328,7 @@ tr,li,.title-image {{ break-inside: avoid; }} li {{ padding-left: 6px; margin-bo
 .step-meta {{ font-size: .8em; color: #52636a; }} ol {{ padding-left: 24px; }}
 .nutrition {{ border-top: 1px solid #ccd6d3; margin-top: 24px; padding-top: 16px; }} .nutrition h2 small {{ margin-left: 8px; }}
 .nutrients {{ display: flex; flex-wrap: wrap; gap: 12px 24px; }} .nutrients div {{ min-width: 105px; break-inside: avoid; }} .nutrients span,.nutrients strong {{ display: block; }} .nutrients span {{ font-size: .8em; }}
+.nutrient-details {{ display: flex; flex-wrap: wrap; gap: 18px; margin-top: 18px; }} .nutrient-group {{ flex: 1 1 170px; break-inside: avoid; }} .nutrient-group h3 {{ margin-bottom: 8px; }} .nutrient-group dl {{ margin: 0; }} .nutrient-group dl div {{ display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-bottom: 1px solid #e3e8e6; }} .nutrient-group dd {{ margin: 0; white-space: nowrap; }}
 </style></head><body><header>{image}<h1>{title}</h1><div class="source">{attribution}</div>{description}<div class="tags">{tags}</div><p class="source">{assignment}</p></header>
 <div class="metrics">{metrics}</div><section class="ingredients"><h2>Ingredients</h2>{ingredients}</section>
 <section class="instructions"><h2>Instructions</h2>{instructions}</section>{nutrition}</body></html>'''

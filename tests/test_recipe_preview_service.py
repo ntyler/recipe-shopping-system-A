@@ -177,6 +177,25 @@ def test_nutrition_basis_controls_scaling_without_inventing_data(recipe, basis, 
     assert unknown["nutrition_basis"] == "Serving basis not specified"
 
 
+def test_nutrition_groups_keep_zero_unknowns_and_missing_macros_distinct(recipe):
+    recipe["nutrition"] = {"serving_basis": "per serving", "calories": "240 kcal", "sugar": 0,
+                           "sodium": "330 mg", "vitamin_c": "2 mg", "saturated_fat": "7 g",
+                           "other": [{"label": "Custom nutrient", "value": "8 mg"}]}
+    response, resolved = preview.prepare_recipe_preview({"url": URL, "options": {"scale": 2, "show_image": False}})
+    summary = response["recipe"]["nutrition_summary"]
+    assert [row["value"] for row in summary["primary"]] == ["240 kcal", "", "", ""]
+    grouped = {group["label"]: group["rows"] for group in summary["groups"]}
+    assert grouped["Carbohydrate details"][0]["value"] == "0"
+    assert {row["label"] for row in grouped["Vitamins & minerals"]} == {"Sodium", "Vitamin C"}
+    assert grouped["Other nutrients"][0]["value"] == "8 mg"
+    html = preview.build_recipe_preview_pdf_html(response["recipe"], resolved, response["options"])
+    assert "Not provided" in html
+    assert "Fats &amp; cholesterol" in html
+    assert "Vitamin C" in html
+    assert "Custom nutrient" in html
+    assert "Nutrition is not recalculated for ingredient choices." in html
+
+
 @pytest.mark.parametrize("scale", [0, -1, "invalid", float("inf"), 1001])
 def test_invalid_scale_is_rejected(recipe, scale):
     with pytest.raises(preview.RecipePreviewError):

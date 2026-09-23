@@ -174,7 +174,7 @@ function renderIntegratedRecipePreview(state) {
             </section>
             <section class="recipe-preview-instructions"><h2>Instructions</h2><ol>${(r.instructions || []).map((step,index) => `<li><span class="recipe-preview-step-number" aria-hidden="true">${index+1}</span><div>${step.section ? `<strong class="recipe-preview-step-section">${esc(step.section)}</strong>` : ''}${esc(step.instruction || step.text || '')}${recipePreviewInstructionMetadata(step)}</div></li>`).join('') || '<li>No instructions specified.</li>'}</ol></section>
         </div>
-        <section class="recipe-preview-nutrition" data-preview-nutrition><div class="recipe-preview-section-heading"><h2>Nutrition</h2><span>${esc(r.nutrition_basis || 'Basis not specified')}</span></div>${recipePreviewNutritionHtml(r.nutrition || [])}</section>`;
+        <section class="recipe-preview-nutrition" data-preview-nutrition><div class="recipe-preview-section-heading"><h2>Nutrition</h2><span class="recipe-preview-nutrition-basis">${esc(r.nutrition_basis || 'Basis not specified')}</span><span class="recipe-preview-nutrition-yield">Recipe yield: ${esc(String(r.servings || 'Not specified'))}</span></div>${recipePreviewNutritionHtml(r)}</section>`;
     const input = state.page.querySelector('#recipePreviewServings');
     const servings = recipeEditServingsParts(r.servings).number;
     input.value = Number.isFinite(servings) ? servings : '';
@@ -195,17 +195,12 @@ function recipePreviewInstructionMetadata(step) {
     return values.length ? `<small class="recipe-preview-step-meta">${escapeHtml(values.join(' · '))}</small>` : '';
 }
 
-function recipePreviewNutritionHtml(rows) {
-    if (!rows.length) return '<p class="recipe-preview-empty">Nutrition is not available for this recipe.</p>';
-    const primary = [], secondary = [];
-    rows.forEach(row => {
-        const name = String(row.key || row.name || '');
-        const match = /^(calories|energy|carbohydrates?|carbohydrateContent|carbs|protein|proteinContent|fat|fatContent|totalfat)$/i.test(name.replace(/\s/g,''));
-        (match && primary.length < 4 ? primary : secondary).push(row);
-    });
-    const label = key => String(key).replace(/_/g, ' ').replace(/^./, char => char.toUpperCase());
-    const icon = key => /^(calories|energy)$/i.test(key) ? 'calories' : /^carb/i.test(key) ? 'carbs' : /^protein/i.test(key) ? 'protein' : 'fat';
-    return `${primary.length ? `<div class="recipe-preview-nutrient-grid">${primary.map(row => `<div>${recipePreviewIcon(icon(row.key))}<span><strong>${escapeHtml(String(row.value ?? ''))}</strong><span>${escapeHtml(label(row.key))}</span></span></div>`).join('')}</div>` : ''}${secondary.length ? `<p class="recipe-preview-nutrients">${secondary.map(row => `${escapeHtml(label(row.key))} ${escapeHtml(String(row.value ?? ''))}`).join(' <span aria-hidden="true">·</span> ')}</p>` : ''}`;
+function recipePreviewNutritionHtml(recipe) {
+    if (!recipe.nutrition?.length) return '<p class="recipe-preview-empty">Nutrition is not available for this recipe.</p>';
+    const summary = recipe.nutrition_summary, esc = escapeHtml;
+    return `<div class="recipe-preview-nutrient-grid">${summary.primary.map(row => `<div>${recipePreviewIcon(row.icon)}<span><strong>${esc(row.value || 'Not provided')}</strong><span>${esc(row.label)}</span></span></div>`).join('')}</div>
+        <div class="recipe-preview-nutrient-details">${summary.groups.map(group => `<section class="recipe-preview-nutrient-group"><h3>${esc(group.label)}</h3><dl>${group.rows.map(row => `<div><dt>${esc(row.label)}</dt><dd>${esc(row.value)}</dd></div>`).join('')}</dl></section>`).join('')}</div>
+        <p class="recipe-preview-nutrition-note">${esc(summary.note)}</p>`;
 }
 
 function syncRecipePreviewOptions() {
