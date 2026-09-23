@@ -1,11 +1,15 @@
 import json
 import os
 import re
+from collections import Counter
 from fractions import Fraction
 
 from openai import OpenAI
 
 from PushShoppingList.services.ingredient_unit_service import display_unit
+from PushShoppingList.services.ingredient_option_service import ingredient_requirements
+from PushShoppingList.services.ingredient_option_service import resolve_ingredient_requirements
+from PushShoppingList.services.recipe_ingredient_requirement_service import recipe_data_with_sql_requirements
 from PushShoppingList.services.openai_throttle_service import throttled_chat_completion
 from PushShoppingList.services.openai_usage_service import record_openai_usage
 from PushShoppingList.services.recipe_extract_service import (
@@ -16,6 +20,7 @@ from PushShoppingList.services.recipe_url_service import normalize_recipe_url_ke
 from PushShoppingList.services.recipe_url_service import normalize_recipe_quantity
 from PushShoppingList.services.recipe_ingredient_service import load_recipe_ingredients
 from PushShoppingList.services.recipe_ingredient_service import save_recipe_ingredients
+from PushShoppingList.services.shopping_list_service import load_recipe_option_selections
 
 
 MODEL = "gpt-4o-mini"
@@ -35,7 +40,9 @@ def get_openai_client():
 def update_recipe_quantity(url, quantity):
     quantity = normalize_recipe_quantity(quantity)
     recipe_data = load_saved_recipe_output(url)
-    scaled = calculate_scaled_recipe_values(recipe_data, quantity)
+    recipe_data = recipe_data_with_sql_requirements(url, recipe_data)
+    selections = load_recipe_option_selections(url)
+    scaled = calculate_scaled_recipe_values(recipe_data, quantity, selections)
 
     data = load_recipe_ingredients()
     key = normalize_recipe_url_key(url)
@@ -113,14 +120,24 @@ def update_recipe_ingredient_quantity(url, ingredient_name, quantity, unit):
     }
 
 
-def calculate_scaled_recipe_values(recipe_data, quantity):
+def calculate_scaled_recipe_values(recipe_data, quantity, selections=None):
     if not recipe_data:
         return {
             "servings": None,
             "ingredients": {},
         }
 
-    local_scaled = calculate_scaled_values_locally(recipe_data, quantity)
+    local_scaled = calculate_scaled_values_locally(recipe_data, quantity, selections)
+
+    # Choice components carry their own amounts. Deterministic scaling keeps
+    # unspecified amounts empty and avoids a name-keyed AI response combining
+    # a standard ingredient with another occurrence in a selected bundle.
+    if any(
+        len(requirement["options"]) > 1
+        or any(len(option["items"]) > 1 for option in requirement["options"])
+        for requirement in ingredient_requirements(recipe_data)
+    ):
+        return local_scaled
 
     if os.getenv("OPENAI_API_KEY"):
         try:
@@ -240,15 +257,27 @@ Output shape:
     return normalize_scaled_values(data)
 
 
-def calculate_scaled_values_locally(recipe_data, quantity):
+def calculate_scaled_values_locally(recipe_data, quantity, selections=None):
     scaled_ingredients = {}
+    ingredients = resolve_ingredient_requirements(recipe_data, selections)["items"]
+    name_counts = Counter(
+        ingredient_key(item.get("ingredient"))
+        for item in ingredients
+        if isinstance(item, dict)
+    )
 
-    for item in recipe_data.get("ingredients", []):
+    for item in ingredients:
         if not isinstance(item, dict):
             continue
 
         name = str(item.get("ingredient", "") or "").strip()
         if not name:
+            continue
+
+        # This compatibility cache is keyed by name, not by ingredient row.
+        # Ambiguous names must fall back to each row's own quantity rather
+        # than overwriting one occurrence with another's amount.
+        if name_counts[ingredient_key(name)] > 1:
             continue
 
         scaled_quantity = scale_quantity(

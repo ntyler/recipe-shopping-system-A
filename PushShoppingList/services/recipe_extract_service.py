@@ -10367,9 +10367,8 @@ def normalize_substitution_option_row(option, parent_item=None, source_note=""):
             "normalized_name": clean_recipe_text(raw_option.get("normalized_name") or normalize_ingredient_for_shopping_list(item_name)),
             "preparation": clean_recipe_text(
                 raw_option.get("preparation")
-                or raw_option.get("notes")
-                or raw_option.get("reason")
-                or ""
+                if "preparation" in raw_option
+                else raw_option.get("notes") or raw_option.get("reason") or ""
             ),
             "size": clean_recipe_text(raw_option.get("size") or ""),
             "notes": clean_recipe_text(raw_option.get("notes") or ""),
@@ -10439,8 +10438,16 @@ def normalize_ingredient_substitutions(value, parent_item=None):
         for row in normalize_substitution_option_row(option, parent_item=parent_item):
             ingredient_key = normalize_ingredient_key(row.get("ingredient"))
             alternative_id = clean_recipe_text(row.get("alternative_id") or "")
+            # Authored bundles may intentionally repeat an ingredient with a
+            # separate quantity or preparation. Their component positions are
+            # distinct rows; only legacy unpositioned repeats are duplicates.
             key = (
-                ("grouped", alternative_id, ingredient_key)
+                (
+                    "grouped",
+                    alternative_id,
+                    str(row.get("alternative_component_order", "")),
+                    ingredient_key,
+                )
                 if alternative_id
                 else ("legacy", ingredient_key)
             )

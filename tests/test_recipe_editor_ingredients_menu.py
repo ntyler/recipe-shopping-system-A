@@ -13056,8 +13056,9 @@ def test_ingredient_view_menu_replaces_upper_switcher_and_stays_inside_ingredien
         "Recipe",
         "Smart",
         "Table",
+        "Ingredient Choices",
     ]
-    assert [option.get("aria-checked") for option in options] == ["false", "false", "true"]
+    assert [option.get("aria-checked") for option in options] == ["false", "false", "true", "false"]
 
     tab_bar_start = template.index('class="recipe-edit-tab-bar"')
     tab_list_start = template.index('class="recipe-edit-tab-list"', tab_bar_start)
@@ -13863,7 +13864,7 @@ def test_recipe_editor_ingredient_views_share_the_existing_table_and_phase_two_r
         assert f'data-recipe-ingredient-view-option="{view}"' in ingredient_section
         assert f'data-recipe-ingredient-view-panel="{view}"' in ingredient_section
         assert f'aria-label="{view.title()} ingredient view"' in ingredient_section
-    assert ingredient_section.count('role="menuitemradio"') == 3
+    assert ingredient_section.count('role="menuitemradio"') == 4
     assert ingredient_section.count('aria-checked="true"') == 1
     assert ingredient_section.count('id="recipeEditIngredients"') == 1
     assert "Recipe View will be implemented in Phase 2." not in ingredient_section
@@ -13879,7 +13880,7 @@ def test_recipe_editor_ingredient_views_share_the_existing_table_and_phase_two_r
     assert ingredient_section.count("addRecipeIngredientFromCurrentView()") == 6
 
     assert 'const RECIPE_EDIT_INGREDIENT_VIEW_STORAGE_KEY = "ai-pantry-ingredient-view";' in script
-    assert 'new Set(["recipe", "smart", "table"])' in script
+    assert 'new Set(["recipe", "smart", "table", "choices"])' in script
     assert 'let recipeEditIngredientView = "table";' in script
     assert "function initRecipeEditIngredientViews()" in script
     assert "function addEmptyRecipeIngredientRow()" in script

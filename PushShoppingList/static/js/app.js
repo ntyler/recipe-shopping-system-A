@@ -23322,7 +23322,7 @@ const RECIPE_EDIT_INGREDIENT_DISPLAY_PREFERENCES_STORAGE_KEY =
 const RECIPE_EDIT_TIME_BREAKDOWN_STORAGE_KEY =
     "ai-pantry:recipe-editor:time-breakdown:v1";
 const recipeEditTotalTimeCalculationStates = new WeakMap();
-const RECIPE_EDIT_INGREDIENT_VIEWS = new Set(["recipe", "smart", "table"]);
+const RECIPE_EDIT_INGREDIENT_VIEWS = new Set(["recipe", "smart", "table", "choices"]);
 const RECIPE_EDIT_INGREDIENT_COLUMN_ORDER = [
     "media",
     "ingredient",
@@ -34965,6 +34965,9 @@ function setRecipeEditIngredientView(value, options = {}) {
     if (!section || !menu) return false;
 
     const view = normalizeRecipeEditIngredientView(value);
+    if (recipeEditIngredientView === "choices" && view !== "choices") {
+        recipeEditIngredientRows().forEach(row => updateRecipeIngredientSummary(row));
+    }
     const scrollState = recipeEditIngredientViewScrollState();
     const tablePanel = section.querySelector('[data-recipe-ingredient-view-panel="table"]');
     if (view !== "table" && tablePanel && !tablePanel.hidden) {
@@ -34986,6 +34989,8 @@ function setRecipeEditIngredientView(value, options = {}) {
         renderRecipeIngredientRecipeView();
     } else if (view === "smart") {
         renderRecipeIngredientSmartView();
+    } else if (view === "choices" && typeof renderRecipeIngredientChoicesView === "function") {
+        renderRecipeIngredientChoicesView();
     }
     menu.querySelectorAll("[data-recipe-ingredient-view-option]").forEach(option => {
         const selected = option.dataset.recipeIngredientViewOption === view;
@@ -45667,6 +45672,7 @@ function validateRecipeEditScaleField(errors) {
 function validateRecipeEditor(form, payload) {
     clearRecipeEditorValidation(form);
     const errors = [];
+    if (typeof validateRecipeIngredientChoices === "function") validateRecipeIngredientChoices(errors);
     validateRecipeEditScaleField(errors);
     const recipe = payload && payload.recipe && typeof payload.recipe === "object" ? payload.recipe : {};
     const title = recipeEditCanonicalTitleControl();
@@ -47090,6 +47096,7 @@ function applyRecipeScaleValue(input, multiplier) {
             applyRecipeScaleToIngredientRow(optionRow, multiplier);
         });
     });
+    if (typeof renderRecipeIngredientChoicesView === "function") renderRecipeIngredientChoicesView();
 }
 
 function applyRecipeScaleToIngredientRow(row, multiplier) {
@@ -51602,7 +51609,7 @@ function recipeIngredientSubstitutionRows(item = {}) {
                     || option.sourceNote
                     || option.text
                     || ingredient,
-                preparation: option.preparation || option.notes || option.reason || "",
+                preparation: option.preparation ?? option.notes ?? option.reason ?? "",
                 purchasable_item:
                     option.purchasable_item
                     || option.purchasableItem
@@ -52918,6 +52925,7 @@ function addRecipeIngredientRow(item = {}, options = {}) {
         <input type="hidden" data-original-option-id value="${escapeAttribute(originalOptionId)}">
         <input type="hidden" data-field="original_is_default" value="${escapeAttribute(originalIsDefault ? "true" : "false")}">
         <input type="hidden" data-field="selection_required" value="${escapeAttribute(selectionRequired ? "true" : "false")}">
+        <input type="hidden" data-field="requirement_label" value="${escapeAttribute(item.requirement_label || "")}">
         <input type="hidden" data-field="ingredient_id" value="${escapeAttribute(item.ingredient_id || item.master_ingredient_id || "")}">
         <input type="hidden" data-field="base_quantity" value="${escapeAttribute(baseQuantity || "")}">
         <input type="hidden" data-field="base_unit" value="${escapeAttribute(baseUnit || "")}">
@@ -56493,6 +56501,7 @@ function updateRecipeIngredientSummary(row) {
         }
         renderRecipeIngredientRecipeView();
         renderRecipeIngredientSmartView();
+        if (typeof renderRecipeIngredientChoicesView === "function") renderRecipeIngredientChoicesView();
     }
 }
 
@@ -56542,6 +56551,7 @@ function updateRecipeIngredientRowIndexes() {
     }
     renderRecipeIngredientRecipeView();
     renderRecipeIngredientSmartView();
+    if (typeof renderRecipeIngredientChoicesView === "function") renderRecipeIngredientChoicesView();
     updateRecipeEditIngredientGallery();
     updateRecipeEditorHealth();
 }
@@ -61650,6 +61660,8 @@ function normalizeRecipeEditorSnapshot(recipe) {
         cook_time: String(recipe.cook_time || "").trim(),
         scaling: normalizeRecipeScalingSnapshot(recipe.scaling || {}),
         ingredients: (recipe.ingredients || []).map(item => ({
+            requirement_label: String(item.requirement_label || "").trim(),
+            default_option_id: String(item.default_option_id || "").trim(),
             ingredient: String(item.ingredient || "").trim(),
             quantity: String(item.quantity || "").trim(),
             quantity_text: String(item.quantity_text || "").trim(),
@@ -61697,6 +61709,8 @@ function normalizeRecipeEditorSnapshot(recipe) {
 
 function normalizeRecipeIngredientAlternativeSnapshot(option = {}) {
     return {
+        option_type: String(option.option_type || "").trim(),
+        is_default: recipeIngredientMatchFlag(option.is_default),
         id: String(option.id || "").trim(),
         substitution_id: String(option.substitution_id || "").trim(),
         alternative_id: String(option.alternative_id || "").trim(),

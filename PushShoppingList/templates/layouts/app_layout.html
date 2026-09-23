@@ -10,6 +10,7 @@
     {% include "includes/public_theme_head.html" %}
     {% block app_head %}{% endblock %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v=app_css_version) }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/ingredient-choices.css', v=app_css_version) }}">
     {% block app_styles %}{% endblock %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/light-mode.css', v=app_css_version) }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/light-mode-recipes.css', v=app_css_version) }}">
@@ -55,6 +56,7 @@
 <script src="{{ url_for('static', filename='js/cuisine-icon-visuals.js', v=cuisine_icon_visuals_js_version|default(app_js_version)) }}"
         data-cuisine-flag-sprite-url="{{ url_for('static', filename='vendor/flag-icons/flags-4x3.svg', v=app_js_version) }}"></script>
 <script src="{{ url_for('static', filename='js/app.js', v=app_js_version) }}"></script>
+<script src="{{ url_for('static', filename='js/ingredient-choices.js', v=app_js_version) }}"></script>
 {% endif %}
 {% block app_scripts %}{% endblock %}
 </body>

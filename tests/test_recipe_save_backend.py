@@ -2087,3 +2087,219 @@ def test_sql_first_save_restores_previous_requirements_when_json_write_fails(
     )
     assert raw_output["recipe_title"] == "Original"
     assert raw_output["ingredients"][0]["quantity"] == "1"
+
+
+def test_ingredient_choices_reopen_preserves_labels_bundles_and_independent_amounts(
+    monkeypatch, tmp_path,
+):
+    from copy import deepcopy
+    from PushShoppingList.services.ingredient_option_service import ingredient_requirement
+    from PushShoppingList.services.ingredient_option_service import resolve_ingredient_requirements
+
+    configure_recipe_save_storage(monkeypatch, tmp_path)
+    url = "https://example.test/ingredient-choices-authoring"
+    seed_recipe(url)
+    butter = {
+        "recipe_ingredient_id": "requirement-butter",
+        "ingredient": "butter",
+        "original_text": "1/2 cup butter (melted)",
+        "source_text": "1/2 cup butter (melted)",
+        "requirement_label": "1/2 cup butter (melted)",
+        "quantity": "1/2",
+        "unit": "cup",
+        "preparation": "melted",
+        "selection_required": True,
+        "default_option_id": "butter-and-egg",
+        "substitutions": [
+            {
+                "id": "component-unsalted-butter",
+                "ingredient": "unsalted butter",
+                "quantity": "1/4",
+                "unit": "cup",
+                "notes": "Cool before mixing.",
+                "alternative_id": "butter-and-egg",
+                "alternative_label": "Option 1",
+                "alternative_order": 0,
+                "alternative_component_order": 0,
+                "option_type": "original",
+                "is_default": True,
+            },
+            {
+                "id": "component-extra-egg",
+                "ingredient": "egg",
+                "notes": "Beat separately.",
+                "alternative_id": "butter-and-egg",
+                "alternative_label": "Option 1",
+                "alternative_order": 0,
+                "alternative_component_order": 1,
+                "option_type": "original",
+                "is_default": True,
+            },
+            {
+                "id": "component-butter",
+                "ingredient": "butter",
+                "alternative_id": "butter-alone",
+                "alternative_label": "Option 2",
+                "alternative_order": 1,
+                "alternative_component_order": 0,
+                "option_type": "recipe_choice",
+            },
+        ],
+    }
+    standard = {
+        "recipe_ingredient_id": "requirement-standard-egg",
+        "ingredient": "egg", "quantity": "2", "unit": "",
+    }
+    first_result = recipe_edit_service.save_editable_recipe(
+        url, editable_payload(url, ingredients=[standard, butter]), require_existing=True,
+    )
+    assert first_result["ok"] is True
+    reopened = recipe_edit_service.load_recipe_output(url)
+    editor = recipe_edit_service.normalize_edit_ingredients(reopened["ingredients"])
+    choice = editor[1]
+    assert choice["requirement_label"] == "1/2 cup butter (melted)"
+    assert choice["source_text"] == "1/2 cup butter (melted)"
+    options = ingredient_requirement(choice)["options"]
+    assert [option["id"] for option in options] == ["butter-and-egg", "butter-alone"]
+    assert [[row["ingredient"] for row in option["items"]] for option in options] == [
+        ["unsalted butter", "egg"], ["butter"],
+    ]
+    assert options[0]["items"][0]["quantity"] == "1/4"
+    assert options[0]["items"][0]["unit"] == "cup"
+    assert options[0]["items"][0]["notes"] == "Cool before mixing."
+    assert options[0]["items"][1]["quantity"] == ""
+    assert options[0]["items"][1]["unit"] == ""
+    assert options[0]["items"][1]["notes"] == "Beat separately."
+    assert options[1]["items"][0]["quantity"] == ""
+    selected = resolve_ingredient_requirements(reopened, require_all=True)["items"]
+    assert [row["ingredient"] for row in selected] == ["egg", "unsalted butter", "egg"]
+    assert [row.get("quantity") for row in selected] == ["2", "1/4", ""]
+
+    # Reorder both groups and bundle components, rename a group/option, and
+    # choose a different default. Stale legacy flags must not add a second one.
+    changed = deepcopy(choice)
+    changed["requirement_label"] = "Butter for the batter"
+    changed["default_option_id"] = "butter-alone"
+    changed["original_is_default"] = False
+    changed["substitutions"] = [
+        changed["substitutions"][2],
+        changed["substitutions"][1],
+        changed["substitutions"][0],
+    ]
+    for index, row in enumerate(changed["substitutions"]):
+        row["alternative_order"] = 0 if index == 0 else 1
+        row["alternative_component_order"] = max(0, index - 1)
+        row["preferred"] = True
+    changed["substitutions"][0]["alternative_label"] = "Butter only"
+    second_result = recipe_edit_service.save_editable_recipe(
+        url, editable_payload(url, ingredients=[changed, editor[0]]), require_existing=True,
+    )
+    assert second_result["ok"] is True
+    second = recipe_edit_service.load_recipe_output(url)
+    assert [row["recipe_ingredient_id"] for row in second["ingredients"]] == [
+        "requirement-butter", "requirement-standard-egg",
+    ]
+    choice = second["ingredients"][0]
+    assert choice["requirement_label"] == "Butter for the batter"
+    assert choice["source_text"] == "1/2 cup butter (melted)"
+    requirement = ingredient_requirement(choice)
+    assert requirement["default_option_id"] == "butter-alone"
+    assert [option["id"] for option in requirement["options"]] == ["butter-alone", "butter-and-egg"]
+    assert [option["is_default"] for option in requirement["options"]] == [True, False]
+    assert requirement["options"][0]["label"] == "Butter only"
+    assert [row["id"] for row in requirement["options"][1]["items"]] == [
+        "component-extra-egg", "component-unsalted-butter",
+    ]
+    assert [row["ingredient"] for row in resolve_ingredient_requirements(second, require_all=True)["items"]] == [
+        "butter", "egg",
+    ]
+    assert [row["preferred"] for row in choice["substitutions"]] == [True, False, False]
+
+
+def test_bundle_normalization_preserves_repeated_ingredient_rows_and_their_metadata():
+    rows = [
+        {
+            "id": "onion-raw", "ingredient": "onion", "quantity": "1",
+            "preparation": "diced", "notes": "Fold in at the end.",
+            "alternative_id": "corn-mix", "alternative_component_order": 0,
+        },
+        {
+            "id": "onion-cooked", "ingredient": "onion", "quantity": "2",
+            "preparation": "caramelized", "notes": "Cook until golden.",
+            "alternative_id": "corn-mix", "alternative_component_order": 1,
+        },
+    ]
+    normalized = recipe_edit_service.normalize_ingredient_substitutions(rows)
+    assert [row["id"] for row in normalized] == ["onion-raw", "onion-cooked"]
+    assert [row["quantity"] for row in normalized] == ["1", "2"]
+    assert [row["preparation"] for row in normalized] == ["diced", "caramelized"]
+    assert [row["notes"] for row in normalized] == ["Fold in at the end.", "Cook until golden."]
+
+
+def test_bundle_component_blank_edits_and_omitted_values_survive_reopening(monkeypatch, tmp_path):
+    from copy import deepcopy
+
+    configure_recipe_save_storage(monkeypatch, tmp_path)
+    url = "https://example.test/ingredient-choice-clear-details"
+    seed_recipe(url)
+    parent = {
+        "recipe_ingredient_id": "butter-requirement",
+        "ingredient": "butter",
+        "source_text": "1/2 cup butter (melted)",
+        "default_option_id": "butter-egg",
+        "substitutions": [
+            {
+                "id": "egg-component", "alternative_id": "butter-egg",
+                "alternative_order": 0, "alternative_component_order": 0,
+                "option_type": "original", "ingredient": "egg",
+                "quantity": "2", "unit": "piece", "size": "large",
+                "preparation": "", "notes": "Whisk in a separate bowl.",
+            },
+            {
+                "id": "butter-component", "alternative_id": "butter-egg",
+                "alternative_order": 0, "alternative_component_order": 1,
+                "option_type": "original", "ingredient": "unsalted butter",
+                "quantity": "1/4", "unit": "cup", "preparation": "softened",
+                "notes": "Bring to room temperature.",
+            },
+            {
+                "id": "plain-butter-component", "alternative_id": "butter-only",
+                "alternative_order": 1, "alternative_component_order": 0,
+                "option_type": "recipe_choice", "ingredient": "butter",
+            },
+        ],
+    }
+    saved = recipe_edit_service.save_editable_recipe(
+        url, editable_payload(url, ingredients=[parent]), require_existing=True,
+    )
+    assert saved["ok"] is True
+    reopened = recipe_edit_service.load_recipe_output(url)["ingredients"][0]
+    egg = reopened["substitutions"][0]
+    assert egg["notes"] == "Whisk in a separate bowl."
+    assert egg["preparation"] == ""
+
+    # Sparse component updates retain omitted authored fields. Explicit blanks
+    # clear both displayed fields and obsolete amount metadata used by scaling.
+    reopened = deepcopy(reopened)
+    reopened["substitutions"] = [
+        {
+            "id": "egg-component", "alternative_id": "butter-egg", "ingredient": "egg",
+            "quantity": "", "unit": "", "size": "", "preparation": "", "notes": "",
+        },
+        {
+            "id": "butter-component", "alternative_id": "butter-egg", "ingredient": "unsalted butter",
+        },
+        reopened["substitutions"][2],
+    ]
+    saved = recipe_edit_service.save_editable_recipe(
+        url, editable_payload(url, ingredients=[reopened]), require_existing=True,
+    )
+    assert saved["ok"] is True
+    reopened = recipe_edit_service.load_recipe_output(url)["ingredients"][0]
+    egg, butter = reopened["substitutions"][:2]
+    for field in ("quantity", "recipe_qty", "base_quantity", "unit", "unit_raw", "base_unit", "size", "preparation", "notes"):
+        assert not egg.get(field), field
+    assert butter["quantity"] == "1/4"
+    assert butter["unit"] == "cup"
+    assert butter["preparation"] == "softened"
+    assert butter["notes"] == "Bring to room temperature."

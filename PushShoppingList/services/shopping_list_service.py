@@ -8,6 +8,7 @@ from PushShoppingList.services.recipe_ingredient_requirement_service import (
     recipe_data_with_sql_requirements,
 )
 from PushShoppingList.services.recipe_extract_service import normalize_ingredient_for_shopping_list
+from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
 from PushShoppingList.services.storage_service import scoped_package_path
 from PushShoppingList.services import durable_document_runtime_service as durable_runtime
 
@@ -83,6 +84,12 @@ def save_recipe_option_selections(recipe_url, selections):
         return {}
     with SHOPPING_LIST_LOCK:
         payload = load_recipe_selections()
+        recipe_key = normalize_recipe_url_key(recipe_url)
+        payload["recipes"] = {
+            url: value
+            for url, value in payload["recipes"].items()
+            if normalize_recipe_url_key(url) != recipe_key
+        }
         payload["recipes"][recipe_url] = {
             str(requirement_id): str(option_id)
             for requirement_id, option_id in selections.items()
@@ -90,6 +97,15 @@ def save_recipe_option_selections(recipe_url, selections):
         }
         save_recipe_selections(payload)
         return dict(payload["recipes"][recipe_url])
+
+
+def load_recipe_option_selections(recipe_url):
+    """Return the shopping instance's choices, independent of recipe defaults."""
+    recipe_key = normalize_recipe_url_key(recipe_url)
+    for url, selections in load_recipe_selections()["recipes"].items():
+        if normalize_recipe_url_key(url) == recipe_key:
+            return dict(selections) if isinstance(selections, dict) else {}
+    return {}
 
 
 def _resolved_item_names(new_items):

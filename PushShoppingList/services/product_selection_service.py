@@ -29,6 +29,8 @@ from openai import OpenAI
 from PushShoppingList.services.food_rules_service import annotate_product_food_rules
 from PushShoppingList.services.food_rules_service import load_food_rules
 from PushShoppingList.services.home_address_service import load_home_address
+from PushShoppingList.services.ingredient_option_service import ingredient_requirements
+from PushShoppingList.services.ingredient_option_service import resolve_ingredient_requirements
 from PushShoppingList.services.item_state_service import load_item_state
 from PushShoppingList.services.item_state_service import save_item_store
 from PushShoppingList.services.job_runtime_context import model_value_for_env as job_model_value_for_env
@@ -39,6 +41,7 @@ from PushShoppingList.services.purchase_mapping_service import purchase_group_re
 from PushShoppingList.services.purchase_mapping_service import purchase_mapping_for_item
 from PushShoppingList.services.purchase_mapping_service import purchase_mapping_for_recipe_ingredient
 from PushShoppingList.services.recipe_ingredient_service import load_recipe_ingredients
+from PushShoppingList.services.recipe_ingredient_requirement_service import recipe_data_with_sql_requirements
 from PushShoppingList.services.openai_model_service import supports_custom_temperature
 from PushShoppingList.services.recipe_quantity_service import effective_recipe_quantity
 from PushShoppingList.services.recipe_quantity_service import format_quantity_display
@@ -52,6 +55,7 @@ from PushShoppingList.services.recipe_url_service import normalize_recipe_url_ke
 from PushShoppingList.services.recipe_url_service import recipe_url_rows
 from PushShoppingList.services.rules_display_service import load_rules_display
 from PushShoppingList.services.shopping_list_service import load_items
+from PushShoppingList.services.shopping_list_service import load_recipe_option_selections
 from PushShoppingList.services.store_settings_service import load_store_settings
 from PushShoppingList.services.storage_service import active_user_id
 from PushShoppingList.services.storage_service import scoped_extractor_data_path
@@ -387,14 +391,24 @@ def load_item_quantity_context(items=None):
         recipe_data = load_saved_recipe_output(recipe.get("url", ""))
         if not recipe_data:
             continue
+        recipe_data = recipe_data_with_sql_requirements(recipe.get("url", ""), recipe_data)
+        selections = load_recipe_option_selections(recipe.get("url", ""))
+        resolved_ingredients = resolve_ingredient_requirements(recipe_data, selections)["items"]
         recipe_quantity = effective_recipe_quantity(recipe.get("quantity") or 1, recipe_data)
 
         meta = recipe_meta.get(normalize_recipe_url_key(recipe.get("url", "")), {})
-        use_scaled_meta = scaled_recipe_metadata_matches(meta, recipe_quantity)
+        # Saved quantity maps cannot distinguish identical names in different
+        # options, or a standard row from a component with the same name.
+        has_choices = any(
+            len(requirement["options"]) > 1
+            or any(len(option["items"]) > 1 for option in requirement["options"])
+            for requirement in ingredient_requirements(recipe_data)
+        )
+        use_scaled_meta = not has_choices and scaled_recipe_metadata_matches(meta, recipe_quantity)
         scaled_ingredients = meta.get("scaled_ingredients", {}) if use_scaled_meta else {}
         recipe_label = recipe.get("name") or recipe_data.get("recipe_title") or "Recipe"
 
-        for ingredient in recipe_data.get("ingredients", []) or []:
+        for ingredient in resolved_ingredients:
             if not isinstance(ingredient, dict):
                 continue
 

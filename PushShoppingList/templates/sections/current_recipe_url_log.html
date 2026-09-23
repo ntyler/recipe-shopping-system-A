@@ -1869,6 +1869,13 @@
                                     <span class="recipe-edit-ingredient-view-check" aria-hidden="true">&#10003;</span>
                                     <span>Table</span>
                                 </button>
+                                <button type="button" role="menuitemradio" aria-checked="false" tabindex="-1"
+                                        data-recipe-ingredient-view-option="choices"
+                                        onclick="return chooseRecipeEditIngredientView(this)"
+                                        onkeydown="return handleRecipeEditIngredientViewMenuKeydown(event)">
+                                    <span class="recipe-edit-ingredient-view-check" aria-hidden="true">&#10003;</span>
+                                    <span>Ingredient Choices</span>
+                                </button>
                             </div>
                         </div>
                         <button type="button"
@@ -2028,6 +2035,10 @@
                         </button>
                     </div>
                 </div>
+                <div id="recipeEditIngredientViewChoices"
+                     class="recipe-edit-ingredient-view-panel recipe-choices-view"
+                     role="region" aria-label="Ingredient Choices"
+                     data-recipe-ingredient-view-panel="choices" hidden></div>
                 <div id="recipeEditIngredientViewSmart"
                      class="recipe-edit-ingredient-view-panel recipe-edit-ingredient-smart-view"
                      role="region"

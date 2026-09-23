@@ -547,6 +547,54 @@ def test_derived_recipe_record_contains_selected_components_not_group_container(
     assert "Corn choice" not in record["ingredients"]
 
 
+@pytest.mark.parametrize("remove_selected_option", [False, True])
+def test_recipe_edit_keeps_shopping_selection_and_index_in_sync(
+    monkeypatch, tmp_path, remove_selected_option,
+):
+    recipe_url = "recipe://shopping-choice-edit"
+    list_file = tmp_path / "shopping_list.txt"
+    list_file.write_text("corn\n", encoding="utf-8")
+    monkeypatch.setattr(shopping_list_service, "SHOPPING_LIST_FILE", list_file)
+    monkeypatch.setattr(
+        shopping_list_service, "SHOPPING_LIST_SELECTIONS_FILE", tmp_path / "selections.json",
+    )
+    monkeypatch.setattr(
+        recipe_edit_service.recipe_ingredient_requirement_service,
+        "recipe_data_with_sql_requirements", lambda _url, recipe: recipe,
+    )
+    records = {}
+    monkeypatch.setattr(recipe_edit_service, "load_recipe_ingredients", lambda: records)
+    monkeypatch.setattr(recipe_edit_service, "save_recipe_ingredients", lambda payload: records.update(payload))
+    monkeypatch.setattr(recipe_edit_service, "sort_ingredients", lambda: None)
+    monkeypatch.setattr(recipe_edit_service, "sync_meal_recipe_ingredients", lambda *_args: 0)
+    recipe = {"source_url": recipe_url, "ingredients": [grouped_corn_requirement()]}
+    selection = {"ingredient-corn": "corn-frozen"}
+    shopping_list_service.save_recipe_option_selections(recipe_url, selection)
+    previous_names = recipe_edit_service.resolved_recipe_shopping_item_names(recipe)
+    assert previous_names == ["corn"]
+
+    edited = json.loads(json.dumps(recipe))
+    if remove_selected_option:
+        edited["ingredients"][0]["substitutions"].pop()
+        expected_names = ["corn", "onion"]
+    else:
+        component = edited["ingredients"][0]["substitutions"][-1]
+        component["ingredient"] = "Frozen peas"
+        component["purchasable_item"] = "peas"
+        expected_names = ["peas"]
+
+    recipe_edit_service.update_recipe_ingredient_record(recipe_url, 2, edited, sync_master=False)
+    recipe_edit_service.sync_saved_recipe_with_shopping_list(edited, previous_names)
+
+    assert next(iter(records.values()))["ingredients"] == expected_names
+    assert shopping_list_service.load_items() == expected_names
+    assert shopping_list_service.load_recipe_option_selections(recipe_url) == (
+        {} if remove_selected_option else selection
+    )
+    assert edited["ingredients"][0]["default_option_id"] == "corn-default"
+    assert recipe_edit_service.resolved_recipe_shopping_item_names(edited) == expected_names
+
+
 def test_editor_uses_nested_table_rows_instead_of_cards_or_radio_choices():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")

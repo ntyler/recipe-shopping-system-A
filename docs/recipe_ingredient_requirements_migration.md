@@ -14,6 +14,22 @@ Complete recipe output JSON remains a backward-compatible export/cache. Its `ing
 
 There is no startup or deployment-time bulk production backfill. The command below is a dry-run unless `--apply` is explicitly supplied. Existing JSON-only recipes remain readable; opening or saving one recipe may lazily synchronize that recipe through the normal application flow, but it does not initiate an all-user migration.
 
+## Ingredient Choices editor
+
+The Ingredient Choices view uses the existing tables and compatibility shape; it requires no new schema or bulk migration. Standard ingredients remain ordinary top-level requirements. A choice group remains one requirement and is never also emitted as a standard ingredient.
+
+- `source_text` preserves the original recipe requirement. `requirement_label` is its editable display heading; neither is a purchasable option component.
+- Every explicit option is represented by one or more flat `substitutions` rows sharing `alternative_id`, `alternative_order`, and `alternative_label`. `alternative_component_order` preserves the ingredients' order within that option, including repeated ingredient names with separate quantities or preparation.
+- One explicit option has `option_type: "original"`. This compatibility marker suppresses the synthetic option derived from the top-level source row; it does not require that option to be the default. Other authored options use `recipe_choice`.
+- `default_option_id` selects exactly one option. The saved `preferred` and `is_default` component flags are synchronized to that ID. Shopping/meal selections can override the default without changing it.
+- Quantities, units, preparation, and notes belong to each component. Missing component amounts remain unspecified, even if the source requirement contains an amount. No quantity is inherited from the group heading.
+
+The editor requires two or more nonempty options for an authored choice group. Persistence remains compatible with older single-option and unresolved-choice records; these are not silently deleted or rewritten during bulk reads. Existing legacy alternatives become explicit bundles when edited in the new view. Saves and reopen operations continue through the existing SQL hierarchy and JSON compatibility export.
+
+Saving recipe edits retains valid shopping-instance selections and updates their selected ingredient names and derived quantities together. If an option or group is removed, its obsolete shopping selection is cleared so the recipe's current default can apply. Editing the recipe default does not change a shopping instance that already selected another valid option.
+
+The legacy `scaled_ingredients` cache is keyed by ingredient name and cannot represent two separate rows named, for example, `egg`. Choice scaling therefore uses selected component rows directly, leaves unspecified quantities blank, and omits ambiguous duplicate-name cache entries. Shopping quantity calculation scales those rows individually before aggregation. This requires no database migration, but callers must not treat the legacy name-keyed cache as the authoritative bundle structure.
+
 ## Before applying
 
 Run commands from the repository root. Stop application processes before copying or restoring the database. The default database is `PushShoppingList/user_data/recipe_master.sqlite3`; use the path in `SHOPPING_APP_RECIPE_MASTER_DB` instead when that variable is set.

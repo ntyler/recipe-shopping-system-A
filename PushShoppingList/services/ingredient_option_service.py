@@ -647,6 +647,17 @@ def migrate_ingredient_requirement(item, index=0):
             else ""
         )
     migrated["default_option_id"] = default_option_id
+    # The requirement's selected default is authoritative. Older editors can
+    # leave preferred/is_default flags on a previously selected bundle; do not
+    # persist several defaults when a user changes the selection.
+    valid_option_ids = {group["id"] for group in groups}
+    if not explicit_original_group:
+        valid_option_ids.add(original_option_id(migrated, index))
+    if default_option_id in valid_option_ids:
+        for row in flat_rows:
+            is_default = row.get("alternative_id") == default_option_id
+            row["is_default"] = is_default
+            row["preferred"] = is_default
     return migrated
 
 

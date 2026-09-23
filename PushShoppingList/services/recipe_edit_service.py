@@ -49,6 +49,7 @@ from PushShoppingList.services.cookbook_service import cookbook_recipe_assignmen
 from PushShoppingList.services.cookbook_service import recipe_cookbook_assignments
 from PushShoppingList.services.ingredient_text_review_service import annotate_ingredients_for_food_review
 from PushShoppingList.services.ingredient_option_service import migrate_ingredient_requirement
+from PushShoppingList.services.ingredient_option_service import ingredient_requirements
 from PushShoppingList.services.ingredient_option_service import migrate_recipe_ingredient_options
 from PushShoppingList.services.ingredient_option_service import original_option_id
 from PushShoppingList.services.ingredient_option_service import resolve_ingredient_requirements
@@ -122,6 +123,8 @@ from PushShoppingList.services.recipe_master_data_service import resolve_ingredi
 from PushShoppingList.services.recipe_master_data_service import selected_ingredient_master_metadata
 from PushShoppingList.services.recipe_master_data_service import sync_recipe_master_records
 from PushShoppingList.services.shopping_list_service import add_items
+from PushShoppingList.services.shopping_list_service import load_recipe_option_selections
+from PushShoppingList.services.shopping_list_service import save_recipe_option_selections
 from PushShoppingList.services.restaurant_hours_service import normalize_weekly_hours
 from PushShoppingList.services.restaurant_hours_service import parse_weekly_hours_text
 from PushShoppingList.services.restaurant_hours_service import weekly_hours_to_text
@@ -4826,23 +4829,29 @@ def backfill_editable_restaurant_sources():
     return summary
 
 
-def canonical_recipe_ingredient_for_scale(item, recipe_data):
+def canonical_recipe_ingredient_for_scale(item, recipe_data, *, authoring_payload=False):
     if not isinstance(item, dict):
         return item
 
     canonical = dict(item)
     quantity = recipe_base_ingredient_quantity(item, recipe_data)
     unit = recipe_base_ingredient_unit(item, recipe_data)
-    canonical["quantity"] = quantity
-    canonical["recipe_qty"] = quantity
-    canonical["unit"] = unit
-    canonical["base_quantity"] = quantity
-    canonical["base_unit"] = unit
+    if not authoring_payload or any(field in item for field in ("quantity", "recipe_qty", "base_quantity")):
+        if authoring_payload and "quantity" in item and item["quantity"] in (None, ""):
+            quantity = ""
+        canonical["quantity"] = quantity
+        canonical["recipe_qty"] = quantity
+        canonical["base_quantity"] = quantity
+    if not authoring_payload or any(field in item for field in ("unit", "base_unit")):
+        if authoring_payload and "unit" in item and item["unit"] in (None, ""):
+            unit = ""
+        canonical["unit"] = unit
+        canonical["base_unit"] = unit
 
     substitutions = canonical.get("substitutions")
     if isinstance(substitutions, list):
         canonical["substitutions"] = [
-            canonical_recipe_ingredient_for_scale(option, recipe_data)
+            canonical_recipe_ingredient_for_scale(option, recipe_data, authoring_payload=authoring_payload)
             for option in substitutions
         ]
     return canonical
@@ -4860,7 +4869,7 @@ def canonicalize_recipe_scale_payload(payload):
 
     if "ingredients" in canonical and isinstance(canonical.get("ingredients"), list):
         canonical["ingredients"] = [
-            canonical_recipe_ingredient_for_scale(item, original_scale_state)
+            canonical_recipe_ingredient_for_scale(item, original_scale_state, authoring_payload=True)
             for item in canonical["ingredients"]
         ]
 
@@ -10864,6 +10873,25 @@ def normalize_estimated_nutrition_value(key, value):
     return str(value or "").strip()
 
 
+def saved_recipe_shopping_selections(recipe_data, *, persist=False):
+    """Keep an existing shopping instance's valid choices across recipe edits."""
+    recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
+    source_url = str(recipe_data.get("source_url") or "").strip()
+    saved = load_recipe_option_selections(source_url) if source_url else {}
+    valid = {
+        requirement["id"]: saved[requirement["id"]]
+        for requirement in ingredient_requirements(recipe_data)
+        if saved.get(requirement["id"]) in {
+            option["id"] for option in requirement["options"]
+        }
+    }
+    # Removing an option invalidates only that shopping selection. The recipe's
+    # current default then applies consistently to names and scaled quantities.
+    if persist and saved != valid:
+        save_recipe_option_selections(source_url, valid)
+    return valid
+
+
 def resolved_recipe_shopping_items(recipe_data, selections=None):
     preferred_recipe_data = recipe_data
     source_url = (
@@ -10884,6 +10912,8 @@ def resolved_recipe_shopping_items(recipe_data, selections=None):
                 "Normalized ingredient requirements could not be loaded for shopping resolution of %s; using JSON ingredients.",
                 source_url,
             )
+    if selections is None:
+        selections = saved_recipe_shopping_selections(preferred_recipe_data)
     return resolve_ingredient_requirements(preferred_recipe_data, selections)["items"]
 
 
@@ -10896,7 +10926,8 @@ def resolved_recipe_shopping_item_names(recipe_data, selections=None):
 
 
 def sync_saved_recipe_with_shopping_list(recipe_data, previous_ingredients):
-    ingredients = resolved_recipe_shopping_item_names(recipe_data)
+    selections = saved_recipe_shopping_selections(recipe_data, persist=True)
+    ingredients = resolved_recipe_shopping_item_names(recipe_data, selections)
 
     if ingredients:
         add_items(ingredients)
@@ -11380,7 +11411,8 @@ def update_recipe_ingredient_record(
     cover_image = recipe_data.get("cover_image")
     if not cover_image and preserve_existing_cover:
         cover_image = existing.get("cover_image")
-    resolved_items = resolved_recipe_shopping_items(recipe_data)
+    selections = saved_recipe_shopping_selections(recipe_data, persist=True)
+    resolved_items = resolved_recipe_shopping_items(recipe_data, selections)
     resolved_names = [
         shopping_item_name(item)
         for item in resolved_items
@@ -11809,6 +11841,7 @@ def normalize_edit_ingredients(ingredients, recipe_url=None):
             "section": recipe_ingredient_type_value(item),
             "original_text": item.get("original_text") or "",
             "source_text": item.get("source_text") or item.get("original_text") or "",
+            "requirement_label": item.get("requirement_label") or "",
             "default_option_id": item.get("default_option_id") or "",
             "original_option_id": original_option_id(item, index),
             "original_is_default": truthy(item.get("original_is_default")),
@@ -12060,6 +12093,50 @@ def normalize_ingredient_substitutions(value, existing_value=None, parent_item=N
     candidates = value
     if candidates is None:
         candidates = existing_value
+    elif existing_value:
+        existing_options = flatten_ingredient_substitution_alternatives(existing_value)
+        existing_by_id = {}
+        existing_by_position = {}
+        for option in existing_options:
+            if not isinstance(option, dict):
+                continue
+            for field in ("id", "substitution_id"):
+                if option.get(field):
+                    existing_by_id[str(option[field])] = option
+            existing_by_position[(
+                str(option.get("alternative_id") or ""),
+                str(option.get("alternative_component_order", "")),
+                instruction_match_text_key(option.get("ingredient") or option.get("name")),
+            )] = option
+        merged_candidates = []
+        for option in flatten_ingredient_substitution_alternatives(candidates):
+            if not isinstance(option, dict):
+                merged_candidates.append(option)
+                continue
+            existing = next((
+                existing_by_id[str(option[field])]
+                for field in ("id", "substitution_id")
+                if option.get(field) and str(option[field]) in existing_by_id
+            ), None)
+            if existing is None:
+                existing = existing_by_position.get((
+                    str(option.get("alternative_id") or ""),
+                    str(option.get("alternative_component_order", "")),
+                    instruction_match_text_key(option.get("ingredient") or option.get("name")),
+                ), {})
+            # Merge before extraction normalization: omitted authoring fields
+            # retain their prior values, while explicitly blank values clear.
+            merged_option = {**existing, **option}
+            if "quantity" in option and not str(option.get("quantity") or "").strip():
+                for field in ("quantity", "recipe_qty", "base_quantity"):
+                    merged_option[field] = ""
+            if "unit" in option and not str(option.get("unit") or "").strip():
+                for field in ("unit", "unit_id", "unit_raw", "base_unit", "unit_review_value"):
+                    merged_option[field] = ""
+                merged_option["unit_review_required"] = False
+                merged_option["unit_custom"] = False
+            merged_candidates.append(merged_option)
+        candidates = merged_candidates
 
     normalized = normalize_ingredient_substitution_options(candidates, parent_item=parent_item)
     parent_identity_keys = {
@@ -12097,7 +12174,11 @@ def normalize_ingredient_substitutions(value, existing_value=None, parent_item=N
             key = instruction_match_text_key(name)
             if key:
                 alternative_id = str(option.get("alternative_id") or "").strip()
-                metadata_key = (alternative_id, key)
+                metadata_key = (
+                    alternative_id,
+                    str(option.get("alternative_component_order", "")),
+                    key,
+                )
                 metadata_lookup = (
                     metadata_by_group_and_name
                     if alternative_id
@@ -12114,7 +12195,11 @@ def normalize_ingredient_substitutions(value, existing_value=None, parent_item=N
         name_key = instruction_match_text_key(row.get("ingredient"))
         alternative_id = str(row.get("alternative_id") or "").strip()
         metadata = (
-            metadata_by_group_and_name.get((alternative_id, name_key), {})
+            metadata_by_group_and_name.get((
+                alternative_id,
+                str(row.get("alternative_component_order", "")),
+                name_key,
+            ), {})
             if alternative_id
             else metadata_by_name.get(name_key, {})
         )
@@ -12386,6 +12471,11 @@ def sanitize_ingredients(value, existing_value=None):
                 item.get("source_text")
                 or existing.get("source_text")
                 or original_text
+            ),
+            "requirement_label": nullable_string(
+                item.get("requirement_label")
+                if "requirement_label" in item
+                else existing.get("requirement_label")
             ),
             "default_option_id": nullable_string(
                 item.get("default_option_id")
