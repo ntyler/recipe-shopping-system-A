@@ -110,6 +110,14 @@ def test_preview_retains_original_corn_requirement_as_heading_not_duplicate_ingr
     assert group["source_text"] == source
     assert [row["ingredient"] for row in group["items"]] == names
     assert group["items"][0]["quantity"] == "2"
+    bundles = {option["id"]: option for option in group["options"]}
+    assert [row["ingredient"] for row in bundles["bundle"]["items"]] == ["corn", "cumin", "onion"]
+    assert [row["quantity"] for row in bundles["bundle"]["items"]] == ["2", None, "2"]
+    assert bundles["bundle"]["is_default"] is True
+    assert bundles["simple"]["is_default"] is False
+    assert bundles["simple"]["items"][0]["quantity"] == "2"
+    assert bundles["simple"]["items"][0]["preparation"] == "frozen"
+    assert group["selected_option_id"] == selected
     assert [row["ingredient"] for row in resolved["ingredients"]] == ["egg", *names]
     assert len(view["ingredients"]) == 1 + len(names)
     if selected == "bundle":
@@ -118,6 +126,8 @@ def test_preview_retains_original_corn_requirement_as_heading_not_duplicate_ingr
     html = preview.build_recipe_preview_pdf_html(view, resolved, response["options"])
     assert html.count(f"<h3>{source}</h3>") == 1
     assert f"<td>{source}</td>" not in html
+    assert ("cumin" in html) == (selected == "bundle")
+    assert ("frozen</td>" in html) == (selected == "simple")
     assert recipe == original
 
 

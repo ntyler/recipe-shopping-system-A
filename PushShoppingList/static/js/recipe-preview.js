@@ -134,8 +134,10 @@ async function refreshIntegratedRecipePreview() {
         state.selections = data.ingredient_option_selections;
         state.projectionReady = true;
         const nutritionFocus = document.activeElement?.dataset.previewNutritionMode;
+        const choiceFocus = document.activeElement?.matches('[data-preview-choice-option]') ? {requirement: document.activeElement.dataset.previewRequirement, option: document.activeElement.value} : null;
         renderIntegratedRecipePreview(state);
         if (nutritionFocus) state.page.querySelector(`[data-preview-nutrition-mode="${nutritionFocus}"]`)?.focus({preventScroll: true});
+        if (choiceFocus) [...state.page.querySelectorAll('[data-preview-choice-option]')].find(node => node.dataset.previewRequirement === choiceFocus.requirement && node.value === choiceFocus.option)?.focus({preventScroll: true});
         recipePreviewStatus('');
         state.page.querySelector('[data-preview-action="pdf"]').disabled = Boolean(state.pdfBusy);
         state.page.querySelector('[data-preview-action="print"]').disabled = false;
@@ -193,17 +195,21 @@ function renderIntegratedRecipePreview(state) {
 }
 
 function recipePreviewIngredientsHtml(recipe, url, expandedChoices = new Set()) {
-    const ingredientRow = (item, index) => {
+    const ingredientRow = (item, index, active = true) => {
         const key = `ingredient|${url}|${item.requirement_id || index}|${item.option_id || ''}|${item.component_index ?? index}`;
         const notes = [...new Set([item.preparation,item.notes].filter(Boolean))].join(' · ');
-        return `<li class="recipe-task-row"><input type="checkbox" class="recipe-task-check" aria-label="Mark ${escapeAttribute(item.ingredient)} as prepared" data-task-key="${escapeAttribute(key)}"><div class="recipe-task-text"><span class="recipe-preview-amount">${escapeHtml([item.quantity,item.unit].filter(value => value != null && String(value).trim() !== '').join(' '))}</span><span>${escapeHtml(item.ingredient)}${notes ? `<small>${escapeHtml(notes)}</small>` : ''}</span></div></li>`;
+        return `<li class="${active ? 'recipe-task-row' : 'recipe-preview-option-item'}">${active ? `<input type="checkbox" class="recipe-task-check" aria-label="Mark ${escapeAttribute(item.ingredient)} as prepared" data-task-key="${escapeAttribute(key)}">` : ''}<div class="${active ? 'recipe-task-text' : 'recipe-preview-option-text'}"><span class="recipe-preview-amount">${escapeHtml([item.quantity,item.unit].filter(value => value != null && String(value).trim() !== '').join(' '))}</span><span>${escapeHtml(item.ingredient)}${notes ? `<small>${escapeHtml(notes)}</small>` : ''}</span></div></li>`;
     };
     return (recipe.ingredient_groups || []).map(group => {
         const rows = group.items.map(ingredientRow).join('');
         if (!group.is_choice) return rows;
+        const options = group.options.map((option, index) => {
+            const selected = option.id === group.selected_option_id;
+            return `<div class="recipe-preview-choice-option" data-selected="${selected}"><label class="recipe-preview-option-heading"><input type="radio" name="preview-choice-${escapeAttribute(group.requirement_id)}" value="${escapeAttribute(option.id)}" data-preview-choice-option data-preview-requirement="${escapeAttribute(group.requirement_id)}" ${selected ? 'checked' : ''}><span>${escapeHtml(option.label || `Option ${index + 1}`)}</span>${option.is_default ? '<small>Default</small>' : ''}${selected ? '<small class="recipe-preview-option-selected">Selected</small>' : ''}</label><ul>${option.items.map((item, itemIndex) => ingredientRow(item, itemIndex, selected)).join('')}</ul></div>`;
+        }).join('');
         return `<li class="recipe-preview-choice-group"><input type="checkbox" data-preview-choice-check aria-label="Mark all selected ingredients for ${escapeAttribute(group.source_text)} as prepared"><details data-preview-choice="${escapeAttribute(group.requirement_id)}" ${expandedChoices.has(group.requirement_id) ? 'open' : ''}>
-            <summary title="Original recipe wording. Expand to see the selected ingredients at the current scale."><span class="recipe-preview-choice-title">${escapeHtml(group.source_text)}</span><span class="recipe-preview-choice-count">${group.items.length} selected</span><span class="recipe-preview-choice-chevron" aria-hidden="true">›</span></summary>
-            <ul aria-label="Selected ingredients for ${escapeAttribute(group.source_text)}">${rows}</ul></details></li>`;
+            <summary title="Expand to compare bundles and choose one option."><span class="recipe-preview-choice-title">${escapeHtml(group.source_text)}</span><span class="recipe-preview-choice-count">${group.options.length} options</span><span class="recipe-preview-choice-chevron" aria-hidden="true">›</span></summary>
+            <div class="recipe-preview-choice-options" role="radiogroup" aria-label="Choose one bundle for ${escapeAttribute(group.source_text)}">${options}</div></details></li>`;
     }).join('') || '<li>No ingredients specified.</li>';
 }
 
@@ -249,6 +255,10 @@ function syncRecipePreviewOptions() {
 function handleRecipePreviewChange(event) {
     const state = integratedRecipePreview;
     if (!state) return;
+    if (event.target.matches('[data-preview-choice-option]') && event.target.checked) {
+        state.selections = {...state.selections, [event.target.dataset.previewRequirement]: event.target.value};
+        return refreshIntegratedRecipePreview();
+    }
     if (event.target.matches('[data-preview-choice-check]')) {
         const group = event.target.closest('.recipe-preview-choice-group');
         const checked = event.target.checked;

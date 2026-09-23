@@ -70,6 +70,22 @@ def preview_options(value, recipe=None):
     }
 
 
+def preview_option_items(recipe, requirement_id, option, scale):
+    """Scale one bundle for display without borrowing its source requirement's amount."""
+    rows = []
+    for component_index, component in enumerate(option["items"]):
+        item = deepcopy(component)
+        item["quantity"] = scale_quantity(recipe_base_ingredient_quantity(component, recipe), scale)
+        item["unit"] = recipe_base_ingredient_unit(component, recipe)
+        item["base_quantity"] = item["quantity"]
+        item["base_unit"] = item["unit"]
+        item["requirement_id"] = requirement_id
+        item["option_id"] = option["id"]
+        item["component_index"] = component_index
+        rows.append(item)
+    return rows
+
+
 def resolve_preview_recipe(recipe, scale, selections=None):
     """Return resolved/scaled recipe data and the actual selection map, without writes."""
     requirements = ingredient_requirements(recipe)
@@ -95,16 +111,7 @@ def resolve_preview_recipe(recipe, scale, selections=None):
     for requirement in requirements:
         option_id = resolution["selected_options"][requirement["id"]]
         option = next(item for item in requirement["options"] if item["id"] == option_id)
-        for component_index, component in enumerate(option["items"]):
-            item = deepcopy(component)
-            item["quantity"] = scale_quantity(recipe_base_ingredient_quantity(component, recipe), scale)
-            item["unit"] = recipe_base_ingredient_unit(component, recipe)
-            item["base_quantity"] = item["quantity"]
-            item["base_unit"] = item["unit"]
-            item["requirement_id"] = requirement["id"]
-            item["option_id"] = option_id
-            item["component_index"] = component_index
-            rows.append(item)
+        rows.extend(preview_option_items(recipe, requirement["id"], option, scale))
     resolved = deepcopy(recipe)
     resolved["ingredients"] = rows
     resolved["servings"] = scale_servings(recipe_base_servings(recipe), scale)
@@ -113,7 +120,7 @@ def resolve_preview_recipe(recipe, scale, selections=None):
     return resolved, resolution["selected_options"]
 
 
-def preview_ingredient_groups(recipe, rows, selected):
+def preview_ingredient_groups(recipe, rows, selected, scale):
     """Keep authored requirement headings separate from the purchasable bundle."""
     by_requirement = {}
     for row in rows:
@@ -122,6 +129,10 @@ def preview_ingredient_groups(recipe, rows, selected):
              "is_choice": len(requirement["options"]) > 1,
              "source_text": requirement["source_text"] or requirement["label"],
              "selected_option_id": selected[requirement["id"]],
+             "options": [{"id": option["id"], "label": option["label"],
+                          "is_default": option["id"] == requirement["default_option_id"],
+                          "items": preview_option_items(recipe, requirement["id"], option, scale)}
+                         for option in requirement["options"]],
              "items": by_requirement.get(requirement["id"], [])}
             for requirement in ingredient_requirements(recipe)]
 
@@ -298,7 +309,7 @@ def prepare_recipe_preview(payload):
         "ingredients": [{**row, "ingredient": text(row.get("ingredient")),
                          "preparation": text(row.get("preparation")), "notes": text(row.get("notes"))}
                         for row in resolved["ingredients"]],
-        "ingredient_groups": preview_ingredient_groups(recipe, resolved["ingredients"], selected),
+        "ingredient_groups": preview_ingredient_groups(recipe, resolved["ingredients"], selected, options["scale"]),
         "instructions": instructions,
         "nutrition": nutrition,
         "nutrition_summary": preview_nutrition_summary(nutrition),
