@@ -88,6 +88,39 @@ def test_explicit_selected_option_and_stale_selection_fallback(recipe):
     assert stale["ingredient_option_selections"]["butter-choice"] == "bundle"
 
 
+@pytest.mark.parametrize("selected, names", [("bundle", ["corn", "cumin", "onion"]), ("simple", ["corn"])])
+def test_preview_retains_original_corn_requirement_as_heading_not_duplicate_ingredient(recipe, selected, names):
+    source = "1 cup fresh or frozen corn"
+    recipe["ingredients"][1] = {
+        "recipe_ingredient_id": "corn-choice", "ingredient": "corn", "source_text": source,
+        "quantity": "1", "unit": "cup", "default_option_id": "bundle",
+        "substitutions": [
+            {"ingredient": "corn", "quantity": "1", "unit": "cup", "preparation": "fresh", "alternative_id": "bundle", "option_type": "original"},
+            {"ingredient": "cumin", "alternative_id": "bundle", "option_type": "original"},
+            {"ingredient": "onion", "quantity": "1", "unit": "cup", "notes": "chopped", "alternative_id": "bundle", "option_type": "original"},
+            {"ingredient": "corn", "quantity": "1", "unit": "cup", "preparation": "frozen", "alternative_id": "simple", "option_type": "recipe_choice"},
+        ],
+    }
+    original = deepcopy(recipe)
+    response, resolved = preview.prepare_recipe_preview({"url": URL, "options": {"scale": 2, "show_image": False},
+        "ingredient_option_selections": {"corn-choice": selected}})
+    view = response["recipe"]
+    group = view["ingredient_groups"][1]
+    assert group["is_choice"] is True
+    assert group["source_text"] == source
+    assert [row["ingredient"] for row in group["items"]] == names
+    assert group["items"][0]["quantity"] == "2"
+    assert [row["ingredient"] for row in resolved["ingredients"]] == ["egg", *names]
+    assert len(view["ingredients"]) == 1 + len(names)
+    if selected == "bundle":
+        assert not group["items"][1].get("quantity")
+        assert group["items"][2]["notes"] == "chopped"
+    html = preview.build_recipe_preview_pdf_html(view, resolved, response["options"])
+    assert html.count(f"<h3>{source}</h3>") == 1
+    assert f"<td>{source}</td>" not in html
+    assert recipe == original
+
+
 def test_missing_required_default_is_reported_not_silently_dropped(recipe):
     recipe["ingredients"][1]["default_option_id"] = "invalid"
     with pytest.raises(preview.RecipePreviewError) as error:
@@ -260,7 +293,8 @@ def test_pdf_visibility_text_size_and_escaping_preserve_projection(recipe, monke
     assert '<figure class="title-image">' not in html
     assert "<h2>Nutrition" not in html
     assert "font: 13pt/1.5" in html
-    assert "source butter" not in html
+    assert "<h3>source butter</h3>" in html
+    assert "<td>source butter</td>" not in html
     assert "whisked" in html
     assert "room temperature" in html
     assert "unsalted butter" in html

@@ -168,11 +168,7 @@ function renderIntegratedRecipePreview(state) {
         <div class="recipe-preview-metrics">${metrics.map(([key,label,icon]) => `<div>${recipePreviewIcon(icon)}<span><span>${label}</span><strong>${esc(String(r[key] || 'Not specified'))}</strong></span></div>`).join('')}</div>
         <div class="recipe-preview-columns">
             <section class="recipe-preview-ingredients"><div class="recipe-preview-section-heading"><h2>Ingredients</h2><button type="button" data-preview-action="shopping">${recipePreviewIcon('plus')}Shopping List</button></div>
-                <ul>${(r.ingredients || []).map((item,index) => {
-                    const key = `ingredient|${state.url}|${item.requirement_id || index}|${item.option_id || ''}|${item.component_index ?? index}`;
-                    const notes = [...new Set([item.preparation,item.notes].filter(Boolean))].join(' · ');
-                    return `<li class="recipe-task-row"><input type="checkbox" class="recipe-task-check" aria-label="Mark ${escapeAttribute(item.ingredient)} as prepared" data-task-key="${escapeAttribute(key)}"><div class="recipe-task-text"><span class="recipe-preview-amount">${esc([item.quantity,item.unit].filter(value => value != null && String(value).trim() !== '').join(' '))}</span><span>${esc(item.ingredient)}${notes ? `<small>${esc(notes)}</small>` : ''}</span></div></li>`;
-                }).join('') || '<li>No ingredients specified.</li>'}</ul>
+                <ul>${recipePreviewIngredientsHtml(r, state.url)}</ul>
             </section>
             <section class="recipe-preview-instructions"><h2>Instructions</h2><ol>${(r.instructions || []).map((step,index) => `<li><span class="recipe-preview-step-number" aria-hidden="true">${index+1}</span><div>${step.section ? `<strong class="recipe-preview-step-section">${esc(step.section)}</strong>` : ''}${esc(step.instruction || step.text || '')}${recipePreviewInstructionMetadata(step)}</div></li>`).join('') || '<li>No instructions specified.</li>'}</ol></section>
         </div>
@@ -192,6 +188,19 @@ function renderIntegratedRecipePreview(state) {
     setRecipeFavoriteButtonState(state.page.querySelector('[data-recipe-favorite]'), favorite);
     syncRecipePreviewOptions();
     bindRecipeTaskChecks();
+}
+
+function recipePreviewIngredientsHtml(recipe, url) {
+    const ingredientRow = (item, index) => {
+        const key = `ingredient|${url}|${item.requirement_id || index}|${item.option_id || ''}|${item.component_index ?? index}`;
+        const notes = [...new Set([item.preparation,item.notes].filter(Boolean))].join(' · ');
+        return `<li class="recipe-task-row"><input type="checkbox" class="recipe-task-check" aria-label="Mark ${escapeAttribute(item.ingredient)} as prepared" data-task-key="${escapeAttribute(key)}"><div class="recipe-task-text"><span class="recipe-preview-amount">${escapeHtml([item.quantity,item.unit].filter(value => value != null && String(value).trim() !== '').join(' '))}</span><span>${escapeHtml(item.ingredient)}${notes ? `<small>${escapeHtml(notes)}</small>` : ''}</span></div></li>`;
+    };
+    return (recipe.ingredient_groups || []).map(group => {
+        const rows = group.items.map(ingredientRow).join('');
+        if (!group.is_choice) return rows;
+        return `<li class="recipe-preview-choice-group"><div class="recipe-preview-choice-heading"><small>Original recipe requirement</small><strong>${escapeHtml(group.source_text)}</strong><small>Selected bundle</small></div><ul>${rows}</ul></li>`;
+    }).join('') || '<li>No ingredients specified.</li>';
 }
 
 function recipePreviewInstructionMetadata(step) {

@@ -113,6 +113,19 @@ def resolve_preview_recipe(recipe, scale, selections=None):
     return resolved, resolution["selected_options"]
 
 
+def preview_ingredient_groups(recipe, rows, selected):
+    """Keep authored requirement headings separate from the purchasable bundle."""
+    by_requirement = {}
+    for row in rows:
+        by_requirement.setdefault(row["requirement_id"], []).append(row)
+    return [{"requirement_id": requirement["id"],
+             "is_choice": len(requirement["options"]) > 1,
+             "source_text": requirement["source_text"] or requirement["label"],
+             "selected_option_id": selected[requirement["id"]],
+             "items": by_requirement.get(requirement["id"], [])}
+            for requirement in ingredient_requirements(recipe)]
+
+
 def preview_nutrition(recipe, scale, requested_mode):
     source = recipe.get("nutrition")
     if isinstance(source, list):
@@ -285,6 +298,7 @@ def prepare_recipe_preview(payload):
         "ingredients": [{**row, "ingredient": text(row.get("ingredient")),
                          "preparation": text(row.get("preparation")), "notes": text(row.get("notes"))}
                         for row in resolved["ingredients"]],
+        "ingredient_groups": preview_ingredient_groups(recipe, resolved["ingredients"], selected),
         "instructions": instructions,
         "nutrition": nutrition,
         "nutrition_summary": preview_nutrition_summary(nutrition),
@@ -322,12 +336,27 @@ def build_recipe_preview_pdf_html(view, resolved, options):
     metrics = "".join(f'<div><small>{label}</small><strong>{escape(text(view.get(key))) or "Not specified"}</strong></div>'
                       for key, label in (("prep_time", "Prep Time"), ("cook_time", "Cook Time"),
                                          ("total_time", "Total Time"), ("servings", "Servings")))
-    print_ingredients = deepcopy(resolved["ingredients"])
-    for row in print_ingredients:
-        row["preparation"] = "; ".join(dict.fromkeys(
-            value for value in (text(row.get("preparation")), text(row.get("notes"))) if value
-        ))
-    ingredients = recipe_extract_service.format_video_recipe_ingredients_for_pdf(print_ingredients)
+    def ingredient_table(items):
+        print_ingredients = deepcopy(items)
+        for row in print_ingredients:
+            row["preparation"] = "; ".join(dict.fromkeys(
+                value for value in (text(row.get("preparation")), text(row.get("notes"))) if value
+            ))
+        return recipe_extract_service.format_video_recipe_ingredients_for_pdf(print_ingredients)
+
+    ingredient_blocks, standard = [], []
+    for group in view["ingredient_groups"]:
+        if not group["is_choice"]:
+            standard.extend(group["items"])
+            continue
+        if standard:
+            ingredient_blocks.append(ingredient_table(standard))
+            standard = []
+        ingredient_blocks.append('<div class="choice-heading"><small>Original recipe requirement · Selected bundle below</small>'
+                                 f'<h3>{escape(group["source_text"])}</h3></div>' + ingredient_table(group["items"]))
+    if standard:
+        ingredient_blocks.append(ingredient_table(standard))
+    ingredients = "".join(ingredient_blocks)
     instructions = recipe_extract_service.format_video_recipe_instructions_for_pdf(resolved["instructions"])
     nutrition = ""
     if options["show_nutrition"]:
@@ -355,6 +384,7 @@ header {{ min-height: 132px; }} .source {{ color: #52636a; font-size: .8em; }}
 .metrics {{ clear: both; display: flex; gap: 12px; border-block: 1px solid #ccd6d3; padding: 12px 0; margin: 18px 0; break-inside: avoid; }}
 .metrics div {{ flex: 1; }} .metrics small,.metrics strong {{ display: block; }} small {{ font-size: .8em; color: #52636a; font-weight: normal; }}
 .ingredients {{ margin-bottom: 22px; }} table {{ width: 100%; border-collapse: collapse; }} thead {{ display: table-header-group; }}
+.choice-heading {{ margin: 16px 0 8px; break-after: avoid; break-inside: avoid; }} .choice-heading h3 {{ margin: 4px 0; }}
 th,td {{ text-align: left; border-bottom: 1px solid #e3e8e6; padding: 7px; vertical-align: top; }} th {{ font-size: .8em; }}
 tr,li,.title-image {{ break-inside: avoid; }} li {{ padding-left: 6px; margin-bottom: 14px; white-space: pre-line; }} li::marker {{ color: #087958; font-weight: bold; }}
 .step-meta {{ font-size: .8em; color: #52636a; }} ol {{ padding-left: 24px; }}
