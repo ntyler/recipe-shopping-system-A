@@ -197,6 +197,7 @@ def prepare_recipe_preview(payload):
             "custom_tags", "tags", "servings", "quantity", "scaling", "rating",
             "level", "prep_time", "cook_time", "total_time", "inactive_time", "ingredients", "instructions",
             "nutrition", "nutrition_serving_basis", "menu_description", "equipment",
+            "cookbook_name", "menu_section", "menu_price", "menu_price_amount", "menu_price_currency",
         }
         recipe.update({key: deepcopy(value) for key, value in draft.items() if key in allowed})
         if "instructions" in draft:
@@ -219,6 +220,11 @@ def prepare_recipe_preview(payload):
         "author": text(author),
         "source_url": text(recipe.get("source_url")),
         "tags": preview_tags(recipe),
+        "cookbook_name": text(recipe.get("cookbook_name")),
+        "menu_section": text(recipe.get("menu_section")),
+        "menu_price": (" ".join(filter(None, [text(recipe.get("menu_price_amount")), text(recipe.get("menu_price_currency"))]))
+                       if text(recipe.get("menu_price_amount")) else "")
+                      if "menu_price_amount" in recipe else text(recipe.get("menu_price")),
         "prep_time": text(recipe.get("prep_time")),
         "cook_time": text(recipe.get("cook_time")),
         "total_time": text(recipe.get("total_time")),
@@ -252,6 +258,9 @@ def build_recipe_preview_pdf_html(view, resolved, options):
     description = f'<p class="description">{escape(view["description"])}</p>' if view["description"] else ""
     attribution = " · ".join(escape(value) for value in (view["author"], view["source_url"]) if value)
     tags = " ".join(f'<span>{escape(tag)}</span>' for tag in view["tags"])
+    assignment = " · ".join(f'{label}: {escape(view.get(key) or fallback)}' for key, label, fallback in (
+        ("cookbook_name", "Cookbook", "Unassigned"), ("menu_section", "Section", "Not specified"),
+        ("menu_price", "Menu Price (optional)", "Not set")))
     metrics = "".join(f'<div><small>{label}</small><strong>{escape(text(view.get(key))) or "Not specified"}</strong></div>'
                       for key, label in (("prep_time", "Prep Time"), ("cook_time", "Cook Time"),
                                          ("total_time", "Total Time"), ("servings", "Servings")))
@@ -287,7 +296,7 @@ tr,li,.title-image {{ break-inside: avoid; }} li {{ padding-left: 6px; margin-bo
 .step-meta {{ font-size: .8em; color: #52636a; }} ol {{ padding-left: 24px; }}
 .nutrition {{ border-top: 1px solid #ccd6d3; margin-top: 24px; padding-top: 16px; }} .nutrition h2 small {{ margin-left: 8px; }}
 .nutrients {{ display: flex; flex-wrap: wrap; gap: 12px 24px; }} .nutrients div {{ min-width: 105px; break-inside: avoid; }} .nutrients span,.nutrients strong {{ display: block; }} .nutrients span {{ font-size: .8em; }}
-</style></head><body><header>{image}<h1>{title}</h1><div class="source">{attribution}</div>{description}<div class="tags">{tags}</div></header>
+</style></head><body><header>{image}<h1>{title}</h1><div class="source">{attribution}</div>{description}<div class="tags">{tags}</div><p class="source">{assignment}</p></header>
 <div class="metrics">{metrics}</div><section class="ingredients"><h2>Ingredients</h2>{ingredients}</section>
 <section class="instructions"><h2>Instructions</h2>{instructions}</section>{nutrition}</body></html>'''
 

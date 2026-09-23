@@ -54,7 +54,8 @@ async function openIntegratedRecipePreview({history = true} = {}) {
     const state = integratedRecipePreview = {
         url: collected.original_url,
         draft: {...(recipeEditOriginalSnapshot || {}), ...collected.recipe,
-            ...collectRecipeEditorCategoryValues()},
+            ...collectRecipeEditorCategoryValues(),
+            cookbook_name: document.getElementById('recipeEditCookbookField')?.dataset.currentCookbookName || ''},
         options: {scale: currentRecipeEditScaleMultiplier(), show_image: true, show_nutrition: true, text_size: 'normal'},
         hidden, page, trigger: document.activeElement, title: document.title,
         contentLabel: content.getAttribute('aria-label'), scroll: content.scrollTop,
@@ -158,6 +159,7 @@ function renderIntegratedRecipePreview(state) {
             <div class="recipe-preview-summary-text"><h1>${esc(r.title)}</h1>
                 <div class="recipe-preview-rating" data-shared-rating-control data-rating-mode="recipe" role="radiogroup" aria-label="Recipe rating: ${currentRecipeRating()} out of 5">${[1,2,3,4,5].map(value => `<button type="button" class="recipe-edit-rating-star" data-rating-value="${value}" data-preview-rating="${value}" role="radio" aria-label="${value} star${value === 1 ? '' : 's'}" aria-checked="${currentRecipeRating() === value}">${value <= currentRecipeRating() ? '★' : '☆'}</button>`).join('')}<button type="button" class="recipe-preview-clear-rating" data-preview-rating="0" aria-label="Clear rating" ${currentRecipeRating() ? '' : 'hidden'}>Clear</button></div>
                 <div class="recipe-preview-tags">${(r.tags || []).map(tag => `<span>${esc(tag)}</span>`).join('')}</div>
+                <dl class="recipe-preview-assignment">${[['Cookbook',r.cookbook_name || 'Unassigned'],['Section',r.menu_section || 'Not specified'],['Menu Price (optional)',r.menu_price || 'Not set']].map(([label,value]) => `<div><dt>${label}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl>
                 ${author || source ? `<p class="recipe-preview-source">${author ? `By ${esc(author)}` : ''}${author && source ? ' · ' : ''}${source ? `<a href="${escapeAttribute(source)}" target="_blank" rel="noopener noreferrer">${esc(sourceLabel)}</a>` : ''}</p>` : ''}
                 ${r.description ? `<p class="recipe-preview-description">${esc(r.description)}</p>` : ''}</div>
         </header>

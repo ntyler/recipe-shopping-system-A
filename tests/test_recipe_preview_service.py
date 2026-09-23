@@ -58,6 +58,25 @@ def test_projection_resolves_complete_bundle_without_duplicate_or_invented_amoun
     assert recipe == original
 
 
+@pytest.mark.parametrize("amount, expected", [("12.50", "12.50 CAD"), (0, "0 CAD"), ("", "")])
+def test_preview_assignment_uses_draft_without_scaling_price_or_restoring_cleared_price(recipe, amount, expected):
+    recipe.update(cookbook_name="Saved cookbook", menu_section="Saved section", menu_price="$99")
+    original = deepcopy(recipe)
+    response, resolved = preview.prepare_recipe_preview({
+        "url": URL, "options": {"scale": 3, "show_image": False},
+        "recipe": {"cookbook_name": "Weeknight & weekend", "menu_section": "Sides",
+                   "menu_price_amount": amount, "menu_price_currency": "CAD"},
+    })
+    view = response["recipe"]
+    assert (view["cookbook_name"], view["menu_section"], view["menu_price"]) == (
+        "Weeknight & weekend", "Sides", expected)
+    html = preview.build_recipe_preview_pdf_html(view, resolved, response["options"])
+    assert "Cookbook: Weeknight &amp; weekend" in html
+    assert "Section: Sides" in html
+    assert f'Menu Price (optional): {expected or "Not set"}' in html
+    assert recipe == original
+
+
 def test_explicit_selected_option_and_stale_selection_fallback(recipe):
     selected = preview.build_recipe_preview({
         "url": URL, "ingredient_option_selections": {"butter-choice": "simple"},
