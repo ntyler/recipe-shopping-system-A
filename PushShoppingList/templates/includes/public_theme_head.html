@@ -35,6 +35,13 @@
             return systemQuery && systemQuery.matches ? "dark" : "light";
         }
 
+        function syncColorScheme() {
+            // Explicit Light also opts out of browser automatic darkening.
+            root.style.colorScheme = selectedTheme === "light"
+                ? "only light"
+                : resolvedTheme(selectedTheme);
+        }
+
         function syncControls() {
             document.querySelectorAll("[data-app-theme-choice]").forEach(function (control) {
                 control.checked = control.value === selectedTheme;
@@ -78,7 +85,7 @@
             } else {
                 root.dataset.publicAuthTheme = selectedTheme;
             }
-            root.style.colorScheme = resolvedTheme(selectedTheme);
+            syncColorScheme();
 
             if (settings.persist !== false) {
                 try {
@@ -114,7 +121,7 @@
             if (selectedTheme !== "system") {
                 return;
             }
-            root.style.colorScheme = resolvedTheme(selectedTheme);
+            syncColorScheme();
             announceThemeChange();
         }
 

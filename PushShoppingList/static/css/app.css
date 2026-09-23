@@ -36434,20 +36434,6 @@ img[data-deferred-src] {
         --app-radius-sm: 7px;
         --app-radius-md: 9px;
         --app-radius-lg: 12px;
-        --app-text: #17243a;
-        --app-text-strong: #0d1c31;
-        --app-muted: #5d6a80;
-        --app-border: #e1e7ec;
-        --app-border-strong: #cfd8df;
-        --app-bg: #ffffff;
-        --app-bg-soft: #f7f9fa;
-        --app-surface: #ffffff;
-        --app-surface-soft: #f9fbfa;
-        --app-surface-muted: #eff7f1;
-        --app-primary: #07852f;
-        --app-primary-hover: #056f28;
-        --app-primary-soft: #edf7ef;
-        --app-shadow-sm: 0 1px 2px rgba(12, 31, 48, 0.02), 0 6px 20px rgba(12, 31, 48, 0.035);
     }
 
     .app-shell-body {
@@ -37641,7 +37627,7 @@ img[data-deferred-src] {
 }
 
 @media (min-width: 1100px) and (prefers-color-scheme: dark) {
-    :root {
+    :root:where(:not([data-public-auth-theme="light"])) {
         --app-bg: #101415;
         --app-bg-soft: #151a1c;
         --app-surface: #171c1e;
@@ -37661,30 +37647,30 @@ img[data-deferred-src] {
         color-scheme: dark;
     }
 
-    .app-topbar {
+    :where(html:not([data-public-auth-theme="light"])) .app-topbar {
         background: rgba(23, 28, 30, .96);
     }
 
-    .app-toolbar-primary,
-    .app-shell-body:has(.app-home-dashboard:not([hidden])) .app-home-empty-state button,
-    .app-shell-body:has(.app-home-dashboard:not([hidden])) .app-home-empty-state a {
+    :where(html:not([data-public-auth-theme="light"])) .app-toolbar-primary,
+    :where(html:not([data-public-auth-theme="light"])) .app-shell-body:has(.app-home-dashboard:not([hidden])) .app-home-empty-state button,
+    :where(html:not([data-public-auth-theme="light"])) .app-shell-body:has(.app-home-dashboard:not([hidden])) .app-home-empty-state a {
         border-color: var(--app-border-strong);
         background: var(--app-surface-soft);
         color: var(--app-primary-hover);
     }
 
-    .app-shell-body:has(.app-home-dashboard:not([hidden])) .app-home-recipe-favorite,
-    .app-shell-body:has(.app-home-dashboard:not([hidden])) .app-home-recipe-menu-toggle {
+    :where(html:not([data-public-auth-theme="light"])) .app-shell-body:has(.app-home-dashboard:not([hidden])) .app-home-recipe-favorite,
+    :where(html:not([data-public-auth-theme="light"])) .app-shell-body:has(.app-home-dashboard:not([hidden])) .app-home-recipe-menu-toggle {
         border-color: rgba(255, 255, 255, .18);
         background: rgba(22, 27, 29, .88);
         color: #f6f8f7;
     }
 
-    .app-shell-body:has(.app-home-dashboard:not([hidden])) .app-home-recipe-favorite[aria-pressed="true"] {
+    :where(html:not([data-public-auth-theme="light"])) .app-shell-body:has(.app-home-dashboard:not([hidden])) .app-home-recipe-favorite[aria-pressed="true"] {
         color: #ef4444;
     }
 
-    .app-shell-body:has(.app-home-dashboard:not([hidden])) .app-home-recipe-rating .is-selected {
+    :where(html:not([data-public-auth-theme="light"])) .app-shell-body:has(.app-home-dashboard:not([hidden])) .app-home-recipe-rating .is-selected {
         color: #f2b529;
     }
 }
@@ -37883,7 +37869,7 @@ img[data-deferred-src] {
     }
 }
 
-/* Shared explicit appearance tokens; signed-out page rules remain scoped below. */
+/* Use the AI Pantry sign-in palette throughout the app in explicit Light mode. */
 html[data-public-auth-theme="light"] {
     --app-bg: #f8faf9;
     --app-bg-soft: #f1f5f3;
@@ -37907,7 +37893,7 @@ html[data-public-auth-theme="light"] {
     --app-focus: #2563eb;
     --app-shadow-sm: 0 1px 2px rgba(8, 22, 43, .04), 0 10px 30px rgba(8, 22, 43, .06);
     --app-shadow-md: 0 20px 48px rgba(8, 22, 43, .14);
-    color-scheme: light;
+    color-scheme: only light;
 }
 
 html[data-public-auth-theme="dark"] {

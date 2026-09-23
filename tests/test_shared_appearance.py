@@ -165,7 +165,7 @@ process.stdout.write(JSON.stringify({{ initial, light, system, dark }}));
     assert state["light"] == {
         "stored": "light",
         "attribute": "light",
-        "scheme": "light",
+        "scheme": "only light",
         "lightChecked": True,
     }
     assert state["system"] == {
