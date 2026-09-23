@@ -189,6 +189,7 @@ function renderIntegratedRecipePreview(state) {
     setRecipeFavoriteButtonState(state.page.querySelector('[data-recipe-favorite]'), favorite);
     syncRecipePreviewOptions();
     bindRecipeTaskChecks();
+    syncRecipePreviewChoiceChecks(state.page);
 }
 
 function recipePreviewIngredientsHtml(recipe, url, expandedChoices = new Set()) {
@@ -200,10 +201,24 @@ function recipePreviewIngredientsHtml(recipe, url, expandedChoices = new Set()) 
     return (recipe.ingredient_groups || []).map(group => {
         const rows = group.items.map(ingredientRow).join('');
         if (!group.is_choice) return rows;
-        return `<li class="recipe-preview-choice-group"><details data-preview-choice="${escapeAttribute(group.requirement_id)}" ${expandedChoices.has(group.requirement_id) ? 'open' : ''}>
-            <summary title="Original recipe wording. Expand to see the selected ingredients at the current scale."><span class="recipe-preview-choice-chevron" aria-hidden="true">›</span><span class="recipe-preview-choice-title">${escapeHtml(group.source_text)}</span><span class="recipe-preview-choice-count">${group.items.length} selected</span></summary>
+        return `<li class="recipe-preview-choice-group"><input type="checkbox" data-preview-choice-check aria-label="Mark all selected ingredients for ${escapeAttribute(group.source_text)} as prepared"><details data-preview-choice="${escapeAttribute(group.requirement_id)}" ${expandedChoices.has(group.requirement_id) ? 'open' : ''}>
+            <summary title="Original recipe wording. Expand to see the selected ingredients at the current scale."><span class="recipe-preview-choice-title">${escapeHtml(group.source_text)}</span><span class="recipe-preview-choice-count">${group.items.length} selected</span><span class="recipe-preview-choice-chevron" aria-hidden="true">›</span></summary>
             <ul aria-label="Selected ingredients for ${escapeAttribute(group.source_text)}">${rows}</ul></details></li>`;
     }).join('') || '<li>No ingredients specified.</li>';
+}
+
+function syncRecipePreviewChoiceChecks(scope) {
+    if (!scope) return;
+    const groups = scope.matches('.recipe-preview-choice-group') ? [scope] : scope.querySelectorAll('.recipe-preview-choice-group');
+    groups.forEach(group => {
+        const checkbox = group.querySelector('[data-preview-choice-check]');
+        const items = [...group.querySelectorAll('.recipe-task-check')];
+        const checked = items.filter(item => item.checked).length;
+        checkbox.checked = items.length > 0 && checked === items.length;
+        checkbox.indeterminate = checked > 0 && checked < items.length;
+        checkbox.disabled = items.length === 0;
+        group.querySelector('.recipe-preview-choice-title').classList.toggle('checked-item-text', checkbox.checked);
+    });
 }
 
 function recipePreviewInstructionMetadata(step) {
@@ -234,6 +249,21 @@ function syncRecipePreviewOptions() {
 function handleRecipePreviewChange(event) {
     const state = integratedRecipePreview;
     if (!state) return;
+    if (event.target.matches('[data-preview-choice-check]')) {
+        const group = event.target.closest('.recipe-preview-choice-group');
+        const checked = event.target.checked;
+        group.querySelectorAll('.recipe-task-check').forEach(item => {
+            if (item.checked === checked) return;
+            item.checked = checked;
+            item.dispatchEvent(new Event('change', {bubbles: true}));
+        });
+        syncRecipePreviewChoiceChecks(group);
+        return;
+    }
+    if (event.target.matches('.recipe-task-check')) {
+        syncRecipePreviewChoiceChecks(event.target.closest('.recipe-preview-choice-group'));
+        return;
+    }
     if (event.target.dataset.previewOption) {
         state.options[event.target.dataset.previewOption] = event.target.checked;
         syncRecipePreviewOptions();

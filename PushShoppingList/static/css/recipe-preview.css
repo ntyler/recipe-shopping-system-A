@@ -73,15 +73,15 @@ body.recipe-preview-active { overflow: auto; }
 .recipe-preview-amount:not(:empty) { margin-right: .35em; }
 .recipe-preview-ingredients small { display: block; color: var(--app-muted); font-size: .85em; }
 .recipe-preview-ingredients .recipe-task-text small { display: inline; margin-left: .4em; font-style: italic; }
-.recipe-preview-ingredients li.recipe-preview-choice-group { display: block; margin: 0; padding: 0; }
-.recipe-preview-choice-group details { margin: 0; padding: 0; border: 0; background: transparent; }
+.recipe-preview-ingredients li.recipe-preview-choice-group { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 12px; align-items: start; margin: 0; padding: 0; }
+.recipe-preview-choice-group details { min-width: 0; margin: 0; padding: 0; border: 0; background: transparent; }
 .recipe-preview-choice-group summary { display: flex; align-items: baseline; gap: 12px; margin: 0; padding: 0; list-style: none; cursor: pointer; border-radius: 3px; font-weight: normal; }
 .recipe-preview-choice-group summary::-webkit-details-marker { display: none; }
 .recipe-preview-choice-chevron { width: 18px; flex: 0 0 18px; text-align: center; color: var(--app-muted); transition: transform .15s; }
 .recipe-preview-choice-group details[open] .recipe-preview-choice-chevron { transform: rotate(90deg); }
 .recipe-preview-choice-title { overflow-wrap: anywhere; }
 .recipe-preview-choice-count { color: var(--app-muted); font-size: .8em; white-space: nowrap; }
-.recipe-preview-choice-group details > ul { margin: 9px 0 9px 30px; }
+.recipe-preview-choice-group details > ul { margin: 9px 0; }
 .recipe-preview-instructions { min-width: 0; }
 .recipe-preview-instructions ol { display: grid; gap: 24px; padding: 0; margin: 18px 0 0; list-style: none; }
 .recipe-preview-instructions li { display: grid; grid-template-columns: 34px minmax(0,1fr); align-items: start; gap: 14px; }
@@ -183,4 +183,5 @@ body.recipe-preview-active { overflow: auto; }
     #recipePreviewPage .recipe-preview-nutrition-toggle { display: none; }
     #recipePreviewPage .recipe-preview-choice-count, #recipePreviewPage .recipe-preview-choice-chevron { display: none; }
     #recipePreviewPage .recipe-preview-choice-group summary { font-weight: 600; }
+    #recipePreviewPage li.recipe-preview-choice-group { display: block; }
 }
