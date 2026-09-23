@@ -92,6 +92,7 @@ body.recipe-preview-active { overflow: auto; }
 .recipe-preview-ingredients .recipe-preview-option-item { padding-left: 30px; }
 .recipe-preview-option-text { min-width: 0; overflow-wrap: anywhere; }
 .recipe-preview-option-text small { display: inline; margin-left: .4em; font-style: italic; color: var(--app-muted); }
+.recipe-preview-ingredients small.recipe-preview-buy-as { font-style: normal; }
 .recipe-preview-equipment { min-width: 0; padding-right: 24px; border-right: 1px solid var(--app-border-strong); }
 .recipe-preview-equipment .recipe-preview-section-heading { min-height: 34px; }
 .recipe-preview-equipment ul { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }

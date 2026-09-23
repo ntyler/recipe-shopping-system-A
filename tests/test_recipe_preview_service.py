@@ -67,6 +67,47 @@ def test_equipment_preview_normalizes_saved_rows_without_scaling_or_mutating(rec
     assert recipe == original
 
 
+@pytest.mark.parametrize("fields, expected", [
+    ({}, ""),
+    ({"purchasable_item": "   "}, ""),
+    ({"purchasable_item": " EGG "}, ""),
+    ({"purchasable_item": "large free-range eggs"}, "large free-range eggs"),
+    ({"buy_as": "large eggs"}, "large eggs"),
+    ({"purchasable_item": "large eggs", "buy_as": "legacy name"}, "large eggs"),
+])
+def test_buy_as_label_omits_blank_and_matching_names_without_replacing_ingredient(recipe, fields, expected):
+    recipe["ingredients"][0].update(fields)
+    original = deepcopy(recipe)
+    response, resolved = preview.prepare_recipe_preview({"url": URL, "options": {"scale": 2, "show_image": False}})
+    row = response["recipe"]["ingredients"][0]
+    assert row["ingredient"] == "egg"
+    assert row["buy_as_label"] == expected
+    assert row["quantity"] == "4"
+    assert response["recipe"]["ingredient_groups"][0]["items"][0]["buy_as_label"] == expected
+    html = preview.build_recipe_preview_pdf_html(response["recipe"], resolved, response["options"])
+    assert ("(Buy as:" in html) == bool(expected)
+    if expected:
+        assert f"egg (Buy as: {expected})" in html
+    assert recipe == original
+
+
+def test_buy_as_labels_follow_selected_bundle_and_escape_pdf_text(recipe):
+    recipe["ingredients"][1]["substitutions"][0]["purchasable_item"] = 'butter <special> & cream'
+    recipe["ingredients"][1]["substitutions"][2]["buy_as"] = 'salted butter'
+    original = deepcopy(recipe)
+    response, resolved = preview.prepare_recipe_preview({"url": URL, "options": {"show_image": False}})
+    group = response["recipe"]["ingredient_groups"][1]
+    assert group["items"][0]["buy_as_label"] == 'butter <special> & cream'
+    assert group["options"][1]["items"][0]["buy_as_label"] == 'salted butter'
+    html = preview.build_recipe_preview_pdf_html(response["recipe"], resolved, response["options"])
+    assert '(Buy as: butter &lt;special&gt; &amp; cream)' in html
+    assert '<special>' not in html
+    assert '(Buy as: salted butter)' not in html
+    selected = preview.build_recipe_preview({"url": URL, "ingredient_option_selections": {"butter-choice": "simple"}})
+    assert selected["recipe"]["ingredients"][1]["buy_as_label"] == 'salted butter'
+    assert recipe == original
+
+
 @pytest.mark.parametrize("equipment, expected", [
     ([{"text": "9-inch pan <oven safe>", "row_id": "pan"}], ["9-inch pan <oven safe>"]),
     ([], []),

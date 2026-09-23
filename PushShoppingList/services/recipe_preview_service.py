@@ -70,6 +70,14 @@ def preview_options(value, recipe=None):
     }
 
 
+def preview_buy_as_name(item):
+    buy_as = text(item.get("purchasable_item")) or text(item.get("buy_as"))
+    ingredient = text(item.get("ingredient"))
+    if " ".join(buy_as.casefold().split()) == " ".join(ingredient.casefold().split()):
+        return ""
+    return buy_as
+
+
 def preview_option_items(recipe, requirement_id, option, scale):
     """Scale one bundle for display without borrowing its source requirement's amount."""
     rows = []
@@ -82,6 +90,7 @@ def preview_option_items(recipe, requirement_id, option, scale):
         item["requirement_id"] = requirement_id
         item["option_id"] = option["id"]
         item["component_index"] = component_index
+        item["buy_as_label"] = preview_buy_as_name(item)
         rows.append(item)
     return rows
 
@@ -353,6 +362,9 @@ def build_recipe_preview_pdf_html(view, resolved, options):
     def ingredient_table(items):
         print_ingredients = deepcopy(items)
         for row in print_ingredients:
+            buy_as = preview_buy_as_name(row)
+            if buy_as:
+                row["ingredient"] = f'{text(row.get("ingredient"))} (Buy as: {buy_as})'
             row["preparation"] = "; ".join(dict.fromkeys(
                 value for value in (text(row.get("preparation")), text(row.get("notes"))) if value
             ))
