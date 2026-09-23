@@ -71,6 +71,7 @@ body.recipe-preview-active { overflow: auto; }
 .recipe-preview-ingredients .recipe-task-text { display: block; flex: 1; min-width: 0; cursor: pointer; overflow-wrap: anywhere; }
 .recipe-preview-amount { font-variant-numeric: tabular-nums; }
 .recipe-preview-amount:not(:empty) { margin-right: .35em; }
+.recipe-preview-ingredient-type { display: inline-block; margin-left: .5em; padding: 1px 6px; border: 1px solid var(--app-border-strong); border-radius: 4px; color: var(--app-muted); font-size: .78em; line-height: 1.4; vertical-align: baseline; overflow-wrap: anywhere; }
 .recipe-preview-ingredients small { display: block; color: var(--app-muted); font-size: .85em; }
 .recipe-preview-ingredients .recipe-task-text small { display: inline; margin-left: .4em; font-style: italic; }
 .recipe-preview-ingredients li.recipe-preview-choice-group { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 12px; align-items: start; margin: 0; padding: 0; }

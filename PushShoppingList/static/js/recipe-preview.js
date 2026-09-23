@@ -198,7 +198,9 @@ function recipePreviewIngredientsHtml(recipe, url, expandedChoices = new Set()) 
     const ingredientRow = (item, index, active = true) => {
         const key = `ingredient|${url}|${item.requirement_id || index}|${item.option_id || ''}|${item.component_index ?? index}`;
         const notes = [...new Set([item.preparation,item.notes].filter(Boolean))].join(' · ');
-        return `<li class="${active ? 'recipe-task-row' : 'recipe-preview-option-item'}">${active ? `<input type="checkbox" class="recipe-task-check" aria-label="Mark ${escapeAttribute(item.ingredient)} as prepared" data-task-key="${escapeAttribute(key)}">` : ''}<div class="${active ? 'recipe-task-text' : 'recipe-preview-option-text'}"><span class="recipe-preview-amount">${escapeHtml([item.quantity,item.unit].filter(value => value != null && String(value).trim() !== '').join(' '))}</span><span>${escapeHtml(item.ingredient)}${notes ? `<small>${escapeHtml(notes)}</small>` : ''}</span></div></li>`;
+        const type = recipeIngredientTypeKey(recipeIngredientTypeValue(item)) === 'main' ? '' : recipeIngredientTypeLabel(item);
+        const typeBadge = type ? `<span class="recipe-preview-ingredient-type" aria-label="Type: ${escapeAttribute(type)}">${escapeHtml(type)}</span>` : '';
+        return `<li class="${active ? 'recipe-task-row' : 'recipe-preview-option-item'}">${active ? `<input type="checkbox" class="recipe-task-check" aria-label="Mark ${escapeAttribute(item.ingredient)} as prepared" data-task-key="${escapeAttribute(key)}">` : ''}<div class="${active ? 'recipe-task-text' : 'recipe-preview-option-text'}"><span class="recipe-preview-amount">${escapeHtml([item.quantity,item.unit].filter(value => value != null && String(value).trim() !== '').join(' '))}</span><span>${escapeHtml(item.ingredient)}${typeBadge}${notes ? `<small>${escapeHtml(notes)}</small>` : ''}</span></div></li>`;
     };
     return (recipe.ingredient_groups || []).map(group => {
         const rows = group.items.map(ingredientRow).join('');
