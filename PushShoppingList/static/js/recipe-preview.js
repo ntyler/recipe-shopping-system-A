@@ -1,4 +1,4 @@
-/* A read projection of the mounted editor. Preview never saves or discards the draft. */
+/* Preview shares the mounted editor's draft. Changes persist through Save Recipe. */
 let integratedRecipePreview = null;
 
 function recipePreviewIcon(name) {
@@ -205,7 +205,7 @@ function recipePreviewIngredientsHtml(recipe, url, expandedChoices = new Set()) 
         if (!group.is_choice) return rows;
         const options = group.options.map((option, index) => {
             const selected = option.id === group.selected_option_id;
-            return `<div class="recipe-preview-choice-option" data-selected="${selected}"><label class="recipe-preview-option-heading"><input type="radio" name="preview-choice-${escapeAttribute(group.requirement_id)}" value="${escapeAttribute(option.id)}" data-preview-choice-option data-preview-requirement="${escapeAttribute(group.requirement_id)}" ${selected ? 'checked' : ''}><span>${escapeHtml(option.label || `Option ${index + 1}`)}</span>${option.is_default ? '<small>Default</small>' : ''}${selected ? '<small class="recipe-preview-option-selected">Selected</small>' : ''}</label><ul>${option.items.map((item, itemIndex) => ingredientRow(item, itemIndex, selected)).join('')}</ul></div>`;
+            return `<div class="recipe-preview-choice-option" data-selected="${selected}"><label class="recipe-preview-option-heading" title="Choose this bundle as the recipe default"><input type="radio" name="preview-choice-${escapeAttribute(group.requirement_id)}" value="${escapeAttribute(option.id)}" data-preview-choice-option data-preview-requirement="${escapeAttribute(group.requirement_id)}" ${selected ? 'checked' : ''}><span>Bundle ${index + 1}</span>${option.is_default ? '<small class="recipe-preview-option-selected">Default</small>' : ''}</label><ul>${option.items.map((item, itemIndex) => ingredientRow(item, itemIndex, selected)).join('')}</ul></div>`;
         }).join('');
         return `<li class="recipe-preview-choice-group"><input type="checkbox" data-preview-choice-check aria-label="Mark all selected ingredients for ${escapeAttribute(group.source_text)} as prepared"><details data-preview-choice="${escapeAttribute(group.requirement_id)}" ${expandedChoices.has(group.requirement_id) ? 'open' : ''}>
             <summary title="Expand to compare bundles and choose one option."><span class="recipe-preview-choice-title">${escapeHtml(group.source_text)}</span><span class="recipe-preview-choice-count">${group.options.length} options</span><span class="recipe-preview-choice-chevron" aria-hidden="true">›</span></summary>
@@ -252,12 +252,32 @@ function syncRecipePreviewOptions() {
     state.page.querySelectorAll('[data-preview-size]').forEach(button => button.setAttribute('aria-pressed', button.dataset.previewSize === state.options.text_size ? 'true' : 'false'));
 }
 
-function handleRecipePreviewChange(event) {
+async function handleRecipePreviewChange(event) {
     const state = integratedRecipePreview;
     if (!state) return;
     if (event.target.matches('[data-preview-choice-option]') && event.target.checked) {
-        state.selections = {...state.selections, [event.target.dataset.previewRequirement]: event.target.value};
-        return refreshIntegratedRecipePreview();
+        const requirementId = event.target.dataset.previewRequirement;
+        const optionId = event.target.value;
+        const rows = recipeEditIngredientRows().filter(row => {
+            const values = fieldValuesFromRow(row);
+            return values.ingredient || values.original_text;
+        });
+        const row = rows.find(row => {
+            const values = fieldValuesFromRow(row);
+            return String(values.ingredient_requirement_id || values.recipe_ingredient_id || values.row_id || values.id || '') === requirementId;
+        }) || rows[state.model.ingredient_groups.findIndex(group => group.requirement_id === requirementId)];
+        // Reuse the editor handler so parent/default/preferred flags and all
+        // ingredient views agree, including legacy rows without explicit IDs.
+        if (!applyRecipeIngredientOptionSelection(row, optionId)) {
+            renderIntegratedRecipePreview(state);
+            recipePreviewStatus('Unable to change this bundle. Please choose its default in the editor.', true);
+            return;
+        }
+        state.draft.ingredients = collectRecipeIngredientRows();
+        state.selections = {...state.selections, [requirementId]: optionId};
+        await refreshIntegratedRecipePreview();
+        if (integratedRecipePreview === state && state.projectionReady) recipePreviewStatus('Default bundle updated. Use Back to Editor, then Save Recipe to keep this change.');
+        return;
     }
     if (event.target.matches('[data-preview-choice-check]')) {
         const group = event.target.closest('.recipe-preview-choice-group');
