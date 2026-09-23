@@ -149,6 +149,7 @@ async function refreshIntegratedRecipePreview() {
 
 function renderIntegratedRecipePreview(state) {
     const r = state.model, esc = escapeHtml;
+    const expandedChoices = new Set([...state.page.querySelectorAll('details[data-preview-choice][open]')].map(node => node.dataset.previewChoice));
     const favorite = document.getElementById('recipeEditFavoriteButton')?.getAttribute('aria-pressed') === 'true';
     const author = r.author && typeof r.author === 'object' ? r.author.name : r.author;
     const source = isLegitimateWebUrl(r.source_url || '') ? r.source_url : '';
@@ -168,7 +169,7 @@ function renderIntegratedRecipePreview(state) {
         <div class="recipe-preview-metrics">${metrics.map(([key,label,icon]) => `<div>${recipePreviewIcon(icon)}<span><span>${label}</span><strong>${esc(String(r[key] || 'Not specified'))}</strong></span></div>`).join('')}</div>
         <div class="recipe-preview-columns">
             <section class="recipe-preview-ingredients"><div class="recipe-preview-section-heading"><h2>Ingredients</h2><button type="button" data-preview-action="shopping">${recipePreviewIcon('plus')}Shopping List</button></div>
-                <ul>${recipePreviewIngredientsHtml(r, state.url)}</ul>
+                <ul>${recipePreviewIngredientsHtml(r, state.url, expandedChoices)}</ul>
             </section>
             <section class="recipe-preview-instructions"><h2>Instructions</h2><ol>${(r.instructions || []).map((step,index) => `<li><span class="recipe-preview-step-number" aria-hidden="true">${index+1}</span><div>${step.section ? `<strong class="recipe-preview-step-section">${esc(step.section)}</strong>` : ''}${esc(step.instruction || step.text || '')}${recipePreviewInstructionMetadata(step)}</div></li>`).join('') || '<li>No instructions specified.</li>'}</ol></section>
         </div>
@@ -190,7 +191,7 @@ function renderIntegratedRecipePreview(state) {
     bindRecipeTaskChecks();
 }
 
-function recipePreviewIngredientsHtml(recipe, url) {
+function recipePreviewIngredientsHtml(recipe, url, expandedChoices = new Set()) {
     const ingredientRow = (item, index) => {
         const key = `ingredient|${url}|${item.requirement_id || index}|${item.option_id || ''}|${item.component_index ?? index}`;
         const notes = [...new Set([item.preparation,item.notes].filter(Boolean))].join(' · ');
@@ -199,7 +200,9 @@ function recipePreviewIngredientsHtml(recipe, url) {
     return (recipe.ingredient_groups || []).map(group => {
         const rows = group.items.map(ingredientRow).join('');
         if (!group.is_choice) return rows;
-        return `<li class="recipe-preview-choice-group"><div class="recipe-preview-choice-heading"><small>Original recipe requirement</small><strong>${escapeHtml(group.source_text)}</strong><small>Selected bundle</small></div><ul>${rows}</ul></li>`;
+        return `<li class="recipe-preview-choice-group"><details data-preview-choice="${escapeAttribute(group.requirement_id)}" ${expandedChoices.has(group.requirement_id) ? 'open' : ''}>
+            <summary title="Original recipe wording. Expand to see the selected ingredients at the current scale."><span class="recipe-preview-choice-chevron" aria-hidden="true">›</span><span class="recipe-preview-choice-title">${escapeHtml(group.source_text)}</span><span class="recipe-preview-choice-count">${group.items.length} selected</span></summary>
+            <ul aria-label="Selected ingredients for ${escapeAttribute(group.source_text)}">${rows}</ul></details></li>`;
     }).join('') || '<li>No ingredients specified.</li>';
 }
 
@@ -322,4 +325,18 @@ async function performRecipePreviewAction(button) {
 window.addEventListener('popstate', () => {
     if (integratedRecipePreview && !window.history.state?.recipePreview) closeIntegratedRecipePreview({history: false});
     else if (!integratedRecipePreview && window.history.state?.recipePreview && document.getElementById('recipeEditForm')) openIntegratedRecipePreview({history: false});
+});
+
+// Printed recipes include the actual selected ingredients even when the screen
+// uses compact, collapsed groups. Restore the reader's choices after printing.
+window.addEventListener('beforeprint', () => {
+    const state = integratedRecipePreview;
+    if (!state || state.printChoices) return;
+    state.printChoices = [...state.page.querySelectorAll('details[data-preview-choice]')].map(node => ({node, open: node.open}));
+    state.printChoices.forEach(({node}) => { node.open = true; });
+});
+window.addEventListener('afterprint', () => {
+    const state = integratedRecipePreview;
+    state?.printChoices?.forEach(({node, open}) => { node.open = open; });
+    if (state) delete state.printChoices;
 });
