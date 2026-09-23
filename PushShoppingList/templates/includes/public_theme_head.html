@@ -36,10 +36,12 @@
         }
 
         function syncColorScheme() {
-            // Explicit Light also opts out of browser automatic darkening.
-            root.style.colorScheme = selectedTheme === "light"
-                ? "only light"
-                : resolvedTheme(selectedTheme);
+            // Expose the existing controller's resolution to light-only styles.
+            // Resolve before CSS loads and on system changes, without a second
+            // preference or independent theme listener.
+            var resolved = resolvedTheme(selectedTheme);
+            root.dataset.appResolvedTheme = resolved;
+            root.style.colorScheme = resolved === "light" ? "only light" : resolved;
         }
 
         function syncControls() {

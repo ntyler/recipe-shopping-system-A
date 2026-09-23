@@ -11,6 +11,9 @@
     {% block app_head %}{% endblock %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v=app_css_version) }}">
     {% block app_styles %}{% endblock %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/light-mode.css', v=app_css_version) }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/light-mode-recipes.css', v=app_css_version) }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/light-mode-reference.css', v=app_css_version) }}">
     <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='images/ai-pantry-logo.svg') }}">
 </head>
 <body class="app-shell-body{% if app_body_class|default("") %} {{ app_body_class }}{% endif %}"

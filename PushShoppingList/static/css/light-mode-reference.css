@@ -1,0 +1,706 @@
+/* Reference registries and account support use the existing resolved app theme.
+   Keep layout, row activation, disclosure and dark-mode rules in app.css. */
+html[data-app-resolved-theme="light"] .master-data-page {
+    color: var(--app-text);
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .master-data-header h1, .master-data-maintenance > summary,
+    .master-data-pagination strong, .master-data-item-copy strong,
+    .master-data-mobile-record-name, .master-data-user-cell strong,
+    .master-data-reference-header strong, .master-data-reference-main strong,
+    .master-data-reference-title-link, .master-data-backfill-progress-header strong,
+    .master-data-backfill-metrics strong, .master-data-current-backfill-item strong,
+    .master-data-backfill-item-title, .master-data-store-section-save-panel strong,
+    .master-data-misc-reclassification-copy strong,
+    .master-data-misc-reclassification-preview-header strong,
+    .master-data-misc-reclassification-result > strong,
+    .master-data-misc-ingredient-name,
+    .master-data-duplicate-header h2, .master-data-duplicate-selection-tools strong,
+    .master-data-duplicate-card > header strong,
+    .master-data-duplicate-ingredient-heading strong,
+    .master-data-ai-second-opinion > header strong,
+    .master-data-ai-second-opinion-recommendation strong,
+    .master-data-undo-dialog-header h2, .master-data-undo-preview h3,
+    .master-data-undo-history > header h3, .master-data-undo-history-date-summary strong,
+    .master-data-undo-history-item-header strong, .master-data-undo-preview-reference strong,
+    .master-data-store-section-undo-identity strong,
+    .master-data-store-section-undo-changes > summary > span:first-child > strong,
+    .master-data-store-section-undo-distribution small,
+    .master-data-review-history-date-group > header h3,
+    .master-data-review-history-item-heading strong,
+    .master-data-reference-dialog-header h2, .master-data-reference-column-header h3,
+    .master-data-merge-header h2, .master-data-merge-source strong,
+    .master-data-merge-selection strong, .master-data-merge-option-copy strong,
+    .master-data-mobile-reference-header h2,
+    .admin-support-detail-grid dd, .admin-support-audit-top strong,
+    .feedback-ticket-summary-subject, .feedback-ticket h4, .feedback-timeline li strong
+) {
+    color: var(--app-text-strong);
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .master-data-header p, .master-data-status span,
+    .master-data-filter-form label span, .master-data-filter-form .master-data-user-field-note,
+    .master-data-backfill-form div span, .master-data-image-form div span,
+    .master-data-results-summary, .master-data-thumbnail-size-label,
+    .master-data-store-section-save-panel span,
+    .master-data-backfill-progress-header div span, .master-data-backfill-metrics span,
+    .master-data-current-backfill-item span, .master-data-backfill-item-meta,
+    .master-data-usage-total span, .master-data-usage-breakdown,
+    .master-data-mobile-record-toggle, .master-data-mobile-section-summary,
+    .master-data-mobile-usage-label, .master-data-reference-usage-breakdown,
+    .master-data-reference-usage-breakdown > span,
+    .master-data-reference-usage-breakdown small,
+    .master-data-reference-header span, .master-data-reference-placeholder,
+    .master-data-reference-detail, .master-data-record-field > span,
+    .master-data-equipment-type-cell, .master-data-user-cell span,
+    .master-data-aliases > span, .master-data-updated-cell time,
+    .master-data-misc-reclassification-copy > span:last-child,
+    .master-data-misc-reclassification-preview-header span,
+    .master-data-misc-reclassification-columns, .master-data-misc-current-label,
+    .master-data-misc-no-result, .master-data-misc-review-cell > p,
+    .master-data-misc-classification-result > span:last-child:not(.master-data-section-pill),
+    .master-data-misc-reclassification-item > p, .master-data-misc-reclassification-details,
+    .master-data-misc-reclassification-details code,
+    .master-data-misc-reclassification-more, .master-data-misc-reclassification-empty,
+    .master-data-duplicate-header p, .master-data-duplicate-status,
+    .master-data-duplicate-scan-actions small, .master-data-duplicate-empty,
+    .master-data-duplicate-card > header small, .master-data-duplicate-select,
+    .master-data-duplicate-media, .master-data-duplicate-ingredient-copy small,
+    .master-data-ai-second-opinion-agreement, .master-data-ai-second-opinion-message,
+    .master-data-ai-second-opinion > footer small, .master-data-duplicate-reason,
+    .master-data-undo-dialog-header p, .master-data-undo-dialog-footer span,
+    .master-data-undo-preview-ingredient p, .master-data-undo-history-item-target,
+    .master-data-undo-history-item-meta, .master-data-undo-preview-status,
+    .master-data-undo-preview-meta, .master-data-undo-preview-ingredient > span,
+    .master-data-undo-preview-direction, .master-data-undo-preview-aliases em,
+    .master-data-undo-preview-reference span, .master-data-undo-preview-reference small,
+    .master-data-store-section-undo-transition > div > span:first-child,
+    .master-data-store-section-undo-state > span, .master-data-store-section-undo-state p,
+    .master-data-store-section-undo-distribution > span.is-more,
+    .master-data-store-section-undo-direction,
+    .master-data-store-section-undo-changes > summary small,
+    .master-data-store-section-undo-identity span,
+    .master-data-review-history-date-group > header span,
+    .master-data-review-history-item p, .master-data-review-history-item time,
+    .master-data-reference-dialog-pair small, .master-data-reference-dialog-header p,
+    .master-data-reference-column-header > div > span,
+    .master-data-reference-column-header p, .master-data-reference-dialog-footer span,
+    .master-data-merge-header span, .master-data-merge-source > span,
+    .master-data-merge-selection > span, .master-data-merge-search-label > span,
+    .master-data-merge-source small, .master-data-merge-selection small,
+    .master-data-merge-option-copy span, .master-data-merge-option-usage,
+    .master-data-merge-empty, .master-data-merge-explanation,
+    .admin-support-header p, .admin-support-form label span,
+    .admin-device-status-filter label span, .admin-device-status-filter-count,
+    .admin-device-status-filter [data-device-status-filter-count], .admin-device-status-empty,
+    .admin-support-selected-header span:not(.admin-support-role),
+    .admin-support-audit-top span, .admin-support-audit-meta,
+    .admin-device-status-meta, .admin-device-status-agent,
+    .feedback-support-header-count, .feedback-support-header p,
+    .feedback-form label span, .feedback-admin-form label span,
+    .feedback-comment-form label span, .feedback-form-attachments-heading,
+    .feedback-ticket-meta, .feedback-notification-update strong,
+    .feedback-admin-update strong, .feedback-resolution strong,
+    .feedback-attachments > strong, .feedback-comments > strong,
+    .feedback-admin-requester > strong, .feedback-timeline-wrap > strong,
+    .feedback-notification-update small, .feedback-admin-update small,
+    .feedback-admin-requester small, .feedback-comment small,
+    .feedback-attachment-list li > span, .feedback-timeline small,
+    .feedback-support-footer span
+) {
+    color: var(--app-muted);
+}
+
+/* Opaque panels remain quiet, while registry rows keep their existing transparent base. */
+html[data-app-resolved-theme="light"] :is(
+    .master-data-maintenance, .master-data-message, .master-data-empty-state,
+    .master-data-backfill-form, .master-data-image-form, .master-data-status,
+    .master-data-backfill-progress, .master-data-store-section-save-panel,
+    .master-data-misc-reclassification, .master-data-misc-reclassification-item,
+    .master-data-duplicate-review, .master-data-duplicate-card,
+    .master-data-duplicate-toolbar, .master-data-duplicate-status,
+    .master-data-duplicate-ingredient, .master-data-ai-second-opinion,
+    .master-data-undo-history, .master-data-undo-history-date-summary,
+    .master-data-undo-history-item, .master-data-undo-preview-ingredient,
+    .master-data-undo-preview-impact, .master-data-undo-preview-recipes,
+    .master-data-undo-preview-reference, .master-data-store-section-undo-state,
+    .master-data-store-section-undo-changes, .master-data-store-section-undo-change,
+    .master-data-review-history-status, .master-data-review-history-item,
+    .master-data-reference-column, .master-data-reference-item,
+    .master-data-merge-source, .master-data-merge-results,
+    .admin-support-form, .admin-support-selected, .admin-support-audit,
+    .admin-support-message, .feedback-message, .feedback-sign-in-panel,
+    .feedback-empty, .feedback-form, .feedback-ticket, .feedback-comment,
+    .feedback-attachment-list li, .feedback-timeline li, .feedback-support-footer
+) {
+    border-color: var(--app-border);
+    background: var(--app-surface);
+    color: var(--app-text);
+    box-shadow: none;
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .master-data-backfill-metrics div, .master-data-backfill-item,
+    .master-data-reference-panel, .master-data-mobile-reference-panel,
+    .master-data-undo-dialog-body, .master-data-reference-dialog-body,
+    .master-data-reference-column-header,
+    .admin-support-detail-grid div, .admin-support-audit-list li,
+    .feedback-ticket-description, .feedback-notification-update,
+    .feedback-admin-update, .feedback-resolution, .feedback-attachments,
+    .feedback-comments, .feedback-admin-requester, .feedback-comment-form,
+    .feedback-comment-support, .feedback-comment-user
+) {
+    border-color: var(--app-border-subtle);
+    background: var(--app-surface-soft);
+    color: var(--app-text);
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .master-data-misc-reclassification-preview, .master-data-misc-no-result,
+    .master-data-misc-reclassification-more, .master-data-misc-reclassification-empty,
+    .master-data-duplicate-empty, .master-data-duplicate-select,
+    .master-data-duplicate-bulk-actions, .master-data-ai-second-opinion > header,
+    .master-data-ai-second-opinion > footer, .master-data-undo-dialog-header,
+    .master-data-undo-dialog-footer, .master-data-undo-history > header,
+    .master-data-undo-preview-status, .master-data-review-history-date-group > header,
+    .master-data-reference-dialog-header, .master-data-reference-dialog-footer,
+    .master-data-merge-header, .master-data-merge-footer,
+    .master-data-mobile-reference-header, .master-data-mobile-reference-footer,
+    .master-data-store-section-undo-changes[open] .master-data-store-section-undo-change-list,
+    .admin-device-status-empty, .admin-feedback-section, .feedback-admin-ticket,
+    .feedback-comment-form
+) {
+    border-color: var(--app-border-subtle);
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .master-data-home-link, .master-data-status code,
+    .master-data-table code, .master-data-current-backfill-item code,
+    .master-data-reference-main code, .master-data-misc-reclassification-kicker,
+    .master-data-misc-ingredient-indicator, .master-data-misc-reclassification-details summary,
+    .master-data-duplicate-header-copy > span,
+    .master-data-duplicate-ingredient-heading span,
+    .master-data-duplicate-ingredient-copy code, .master-data-duplicate-view-references,
+    .master-data-ai-second-opinion > header small,
+    .master-data-undo-dialog-header > div > span, .master-data-undo-history > header span,
+    .master-data-undo-preview-meta strong, .master-data-undo-preview-direction span,
+    .master-data-undo-preview-recipes > header strong,
+    .master-data-store-section-undo-details-count, .master-data-store-section-undo-arrow,
+    .master-data-reference-dialog-header > div > span, .master-data-reference-dialog-pair span,
+    .master-data-mobile-reference-header span, .admin-support-detail-grid dt,
+    .feedback-support-contact a, .feedback-ticket-id,
+    .feedback-attachment-list a, .feedback-support-footer a
+) {
+    color: var(--app-primary-hover);
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .master-data-tabs a, .master-data-pagination a, .master-data-pagination span,
+    .master-data-thumbnail-size-button, .master-data-thumbnail-size-reset,
+    .master-data-thumbnail-size-value, .master-data-backfill-state,
+    .master-data-backfill-item-state, .master-data-section-pill.is-current,
+    .master-data-misc-reclassification-actions .master-data-action-secondary,
+    .master-data-misc-reclassification-actions .master-data-action-undo,
+    .master-data-misc-reclassification-ai-actions button, .master-data-misc-row-ai-button,
+    .master-data-duplicate-toolbar button, .master-data-duplicate-actions button,
+    .master-data-duplicate-scan-actions button.master-data-undo-merge,
+    .master-data-duplicate-status .master-data-duplicate-status-undo,
+    .master-data-ai-second-opinion button, .master-data-undo-dialog-close,
+    .master-data-undo-dialog-footer button, .master-data-reference-dialog-close,
+    .master-data-reference-dialog-footer button, .master-data-merge-close,
+    .master-data-merge-footer button, .master-data-mobile-reference-footer button,
+    .admin-support-card .user-admin-support-close,
+    .feedback-support-card .user-push-panel-close, .feedback-secondary-btn,
+    .feedback-collapse-all-btn, .user-account-form .feedback-collapse-all-btn
+) {
+    border-color: var(--app-border);
+    background: var(--app-surface-soft);
+    color: var(--app-text);
+    box-shadow: none;
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .master-data-tabs a, .master-data-pagination a,
+    .master-data-misc-reclassification-actions .master-data-action-secondary,
+    .master-data-misc-reclassification-actions .master-data-action-undo,
+    .master-data-misc-reclassification-ai-actions button, .master-data-misc-row-ai-button,
+    .master-data-duplicate-toolbar button, .master-data-duplicate-actions button,
+    .master-data-duplicate-scan-actions button.master-data-undo-merge,
+    .master-data-duplicate-status .master-data-duplicate-status-undo,
+    .master-data-ai-second-opinion button, .master-data-mobile-reference-footer button,
+    .admin-support-card .user-admin-support-close,
+    .feedback-support-card .user-push-panel-close, .feedback-secondary-btn,
+    .feedback-collapse-all-btn, .user-account-form .feedback-collapse-all-btn
+):is(:hover, :focus-visible):not(:disabled) {
+    border-color: var(--app-primary);
+    background: var(--app-hover-bg);
+    color: var(--app-primary-hover);
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .master-data-tabs a.active, .master-data-message.success,
+    .master-data-status strong.ready, .master-data-store-section-save-panel.has-changes,
+    .master-data-misc-reclassification.is-applied, .master-data-misc-ai-status.is-agree,
+    .master-data-section-pill.is-proposed, .master-data-section-pill.is-restored,
+    .master-data-section-pill.is-ai, .master-data-misc-ai-status.is-suggestion,
+    .master-data-misc-ai-status.is-unresolved, .master-data-backfill-state.complete,
+    .master-data-backfill-item-state.done, .master-data-current-backfill-item,
+    .master-data-duplicate-header-copy > span, .master-data-duplicate-classification,
+    .master-data-duplicate-ingredient.is-suggested, .master-data-ai-second-opinion.is-agree,
+    .master-data-undo-history > header strong,
+    .master-data-undo-history-item:not(.is-blocked) .master-data-undo-history-item-badge,
+    .master-data-undo-preview-ingredient.is-restored, .master-data-undo-preview-next,
+    .master-data-store-section-undo-state.is-restored,
+    .master-data-store-section-undo-state.is-restored .master-data-store-section-undo-distribution > span,
+    .master-data-review-history-badge, .master-data-review-history-badge.is-related,
+    .master-data-reference-column.is-suggested .master-data-reference-column-header,
+    .master-data-reference-survivor, .master-data-reference-matches .is-buy-as,
+    .master-data-merge-selection, .master-data-merge-selection.is-complete,
+    .admin-support-count, .admin-support-role,
+    .admin-device-status-meta .admin-device-status-activity-active,
+    .admin-device-status-meta .admin-device-status-guest-active,
+    .feedback-message.success, .feedback-unread-total, .feedback-unread-badge,
+    .feedback-admin-count, .feedback-status, .feedback-priority-low
+) {
+    border-color: color-mix(in srgb, var(--app-primary) 28%, var(--app-border));
+    background: var(--app-primary-soft);
+    color: var(--app-primary-hover);
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .master-data-backfill-form button, .master-data-image-form button,
+    .master-data-filter-form button[type="submit"], .master-data-store-section-save-panel button,
+    .master-data-misc-reclassification-actions .master-data-action-primary,
+    .master-data-misc-row-apply-button, .master-data-duplicate-scan-actions button:not(.master-data-undo-merge),
+    .master-data-duplicate-toolbar button.primary, .master-data-duplicate-actions button.primary,
+    .master-data-reference-link, .master-data-review-history-item-action button,
+    .master-data-merge-footer button.primary, .admin-support-submit-btn, .feedback-submit-btn
+) {
+    border-color: var(--app-primary);
+    background: var(--app-primary);
+    color: var(--app-on-primary);
+    box-shadow: none;
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .master-data-backfill-form button, .master-data-image-form button,
+    .master-data-filter-form button[type="submit"], .master-data-store-section-save-panel button,
+    .master-data-misc-reclassification-actions .master-data-action-primary,
+    .master-data-misc-row-apply-button, .master-data-duplicate-scan-actions button:not(.master-data-undo-merge),
+    .master-data-duplicate-toolbar button.primary, .master-data-duplicate-actions button.primary,
+    .master-data-reference-link, .master-data-review-history-item-action button,
+    .master-data-merge-footer button.primary, .admin-support-submit-btn, .feedback-submit-btn
+):is(:hover, :focus-visible):not(:disabled) {
+    border-color: var(--app-primary-hover);
+    background: var(--app-primary-hover);
+    color: var(--app-on-primary);
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .master-data-maintenance, .master-data-merge-dialog, .master-data-filter-form,
+    .admin-support-form, .admin-device-status-filter,
+    .feedback-form, .feedback-admin-form, .feedback-comment-form
+) :is(input:not([type="checkbox"]), select, textarea) {
+    border-color: var(--app-border);
+    background: var(--app-input-bg);
+    color: var(--app-text-strong);
+    color-scheme: light;
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .master-data-maintenance, .master-data-merge-dialog, .master-data-filter-form,
+    .admin-support-form, .admin-device-status-filter,
+    .feedback-form, .feedback-admin-form, .feedback-comment-form
+) :is(input:not([type="checkbox"]), select, textarea):focus-visible {
+    border-color: var(--app-focus);
+    outline-color: var(--app-focus);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-focus) 16%, transparent);
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .master-data-maintenance, .master-data-merge-dialog,
+    .admin-support-card, .feedback-support-card
+) :is(button, input, select, textarea):disabled {
+    border-color: var(--app-border-subtle);
+    background: var(--app-disabled-bg);
+    color: var(--app-disabled-text);
+    opacity: 1;
+}
+
+html[data-app-resolved-theme="light"] .master-data-pagination [aria-disabled="true"] {
+    background: var(--app-disabled-bg);
+    color: var(--app-disabled-text);
+}
+
+/* Existing inline row fields/states are token-based. Avoid form-wide overrides here. */
+html[data-app-resolved-theme="light"] .master-data-page :is(
+    .ingredient-row-name, .ingredient-row-section,
+    [data-unit-row-name], [data-unit-row-category],
+    [data-type-master-row-name], [data-type-master-create-name],
+    [data-cuisine-category-master-row-name], [data-cuisine-category-master-row-abbreviation],
+    [data-cuisine-category-master-create-name], [data-cuisine-category-master-create-abbreviation]
+),
+html[data-app-resolved-theme="light"] .store-section-master-row .store-section-master-identity input {
+    border-color: transparent;
+    background: transparent;
+    color: var(--app-text-strong);
+    box-shadow: none;
+}
+
+html[data-app-resolved-theme="light"] .master-data-page :is(
+    .ingredient-row-name, .ingredient-row-section,
+    [data-unit-row-name], [data-unit-row-category],
+    [data-type-master-row-name], [data-type-master-create-name],
+    [data-cuisine-category-master-row-name], [data-cuisine-category-master-row-abbreviation],
+    [data-cuisine-category-master-create-name], [data-cuisine-category-master-create-abbreviation]
+):hover:where(:not(:disabled)),
+html[data-app-resolved-theme="light"] .store-section-master-row .store-section-master-identity input:hover {
+    border-color: var(--app-border);
+}
+
+html[data-app-resolved-theme="light"] .master-data-page :is(
+    .ingredient-row-name, .ingredient-row-section,
+    [data-unit-row-name], [data-unit-row-category],
+    [data-type-master-row-name], [data-type-master-create-name],
+    [data-cuisine-category-master-row-name], [data-cuisine-category-master-row-abbreviation],
+    [data-cuisine-category-master-create-name], [data-cuisine-category-master-create-abbreviation]
+):focus,
+html[data-app-resolved-theme="light"] .store-section-master-row .store-section-master-identity input:focus {
+    border-color: var(--app-focus);
+    outline-color: var(--app-focus);
+    box-shadow: none;
+}
+
+html[data-app-resolved-theme="light"] .master-data-page :is(
+    .ingredient-row-name, .ingredient-row-section,
+    [data-unit-row-name], [data-unit-row-category],
+    [data-type-master-row-name], [data-type-master-create-name],
+    [data-cuisine-category-master-row-name], [data-cuisine-category-master-row-abbreviation],
+    [data-cuisine-category-master-create-name], [data-cuisine-category-master-create-abbreviation]
+)[aria-invalid="true"],
+html[data-app-resolved-theme="light"] .store-section-master-row .store-section-master-identity input[aria-invalid="true"] {
+    border-color: var(--app-danger);
+    outline-color: var(--app-danger);
+}
+
+html[data-app-resolved-theme="light"] .master-data-table :is(th, td) {
+    border-color: var(--app-border-subtle);
+    color: var(--app-text);
+}
+
+html[data-app-resolved-theme="light"] .master-data-table thead th {
+    background: var(--app-surface-soft);
+    color: var(--app-muted);
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .master-data-table-wrap, .master-data-registry-category,
+    .master-data-inline-page .master-data-ingredients-table,
+    .master-data-inline-page .master-data-ingredients-table :is([data-ingredient-master-row], [data-equipment-master-row]) > td
+) {
+    border-color: var(--app-border-subtle);
+    background: transparent;
+}
+
+html[data-app-resolved-theme="light"] .master-data-table .master-data-section-row th {
+    border-color: var(--app-border-subtle);
+    background: var(--app-surface-soft);
+    color: var(--app-text-strong);
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .master-data-reference-row td, .master-data-reference-panel,
+    .master-data-mobile-reference-header, .master-data-mobile-reference-footer
+) {
+    border-color: var(--app-border-subtle);
+    background: var(--app-surface-soft);
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .master-data-reference-matches span, .master-data-aliases code,
+    .master-data-duplicate-signals span, .master-data-ai-second-opinion-recommendation span,
+    .master-data-undo-history-date-summary span, .master-data-undo-history-item-badge,
+    .master-data-undo-preview-aliases span, .master-data-store-section-undo-montage > strong,
+    .master-data-store-section-undo-distribution > span, .admin-device-status-meta span,
+    .feedback-priority
+) {
+    border-color: var(--app-border);
+    background: var(--app-surface-muted);
+    color: var(--app-text);
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .master-data-thumbnail, .master-data-no-image, .master-data-reference-title-image,
+    .master-data-duplicate-media, .master-data-merge-option-media,
+    .master-data-undo-preview-image, .master-data-store-section-undo-image,
+    .master-data-store-section-undo-montage > span,
+    .master-data-misc-reference-heading > img, .master-data-misc-reference-heading > span
+) {
+    border-color: var(--app-border);
+    background: var(--app-surface-muted);
+    color: var(--app-muted);
+    box-shadow: none;
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .master-data-usage-button, .master-data-record-field input,
+    .master-data-record-field.is-normalized input, .master-data-merge-option,
+    .master-data-undo-preview-impact ul, .master-data-ai-second-opinion-evidence,
+    .feedback-comment p
+) {
+    color: var(--app-text);
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .master-data-merge-option, .master-data-undo-history-item,
+    .master-data-undo-history-date-summary, .master-data-duplicate-ingredient-open
+):is(:hover, :focus-visible),
+html[data-app-resolved-theme="light"] .master-data-merge-option[aria-selected="true"],
+html[data-app-resolved-theme="light"] .master-data-undo-history-item[aria-current="true"] {
+    border-color: var(--app-primary);
+    background: var(--app-selected-bg);
+    color: var(--app-text);
+    box-shadow: none;
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .master-data-duplicate-card.is-selected, .master-data-reference-column.is-suggested,
+    .feedback-ticket.has-unread
+) {
+    border-color: var(--app-primary);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--app-primary) 12%, transparent);
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .master-data-undo-dialog, .master-data-reference-dialog, .master-data-merge-dialog,
+    .master-data-mobile-reference-dialog, .unit-master-dialog, .unit-master-usage-dialog,
+    .master-data-usage-dialog, .equipment-master-display-dialog,
+    .store-section-master-usage-dialog, .unit-category-dialog
+) {
+    border-color: var(--app-border);
+    background: var(--app-surface);
+    color: var(--app-text);
+    box-shadow: 0 18px 50px color-mix(in srgb, var(--app-text-strong) 15%, transparent);
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .master-data-undo-dialog, .master-data-reference-dialog, .master-data-merge-dialog,
+    .master-data-mobile-reference-dialog, .unit-master-dialog, .unit-master-usage-dialog,
+    .master-data-usage-dialog, .equipment-master-display-dialog,
+    .store-section-master-usage-dialog, .unit-category-dialog
+)::backdrop {
+    background: color-mix(in srgb, var(--app-text-strong) 32%, transparent);
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .cuisine-category-master-icon-menu, .store-section-master-icon-menu,
+    .store-section-master-columns-menu, .equipment-type-menu, .unit-category-menu,
+    .unit-master-page--registry-v2 .unit-master-alias-popover,
+    .master-data-inline-page .unit-master-alias-popover
+) {
+    border-color: var(--app-border);
+    background: var(--app-surface);
+    color: var(--app-text-strong);
+    box-shadow: 0 8px 24px color-mix(in srgb, var(--app-text-strong) 10%, transparent);
+}
+
+html[data-app-resolved-theme="light"] .equipment-type-label {
+    --equipment-type-accent: var(--app-primary);
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .master-data-page .recipe-edit-store-section-icon,
+    .store-section-master-icon-menu .recipe-edit-store-section-icon,
+    .cuisine-category-master-icon-menu .recipe-edit-store-section-icon,
+    .unit-master-source-badge, .store-section-master-routing-badge.is-manual,
+    .master-data-misc-ingredient-name:is(:hover, :focus-visible) > span:first-child,
+    .master-data-reference-title-link:is(:hover, :focus-visible),
+    .master-data-ai-second-opinion.is-agree .master-data-ai-second-opinion-agreement,
+    .master-data-undo-preview-ingredient.is-restored > span,
+    .master-data-store-section-undo-state.is-restored > span,
+    .feedback-attachment-list a:is(:hover, :focus-visible)
+) {
+    color: var(--app-primary-hover);
+}
+
+html[data-app-resolved-theme="light"] .store-section-master-routing-badge.is-manual {
+    border-color: var(--app-border);
+    background: var(--app-surface-muted);
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .master-data-progress-bar-wrap, .feedback-timeline::before
+) {
+    border-color: var(--app-border);
+    background: var(--app-surface-muted);
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .master-data-progress-bar-wrap span, .master-data-duplicate-status::before
+) {
+    background: var(--app-primary);
+    box-shadow: none;
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .master-data-maintenance-chevron, .master-data-undo-history-date-summary::before,
+    .feedback-ticket-chevron, .feedback-timeline li::before
+) {
+    border-color: var(--app-primary);
+}
+
+html[data-app-resolved-theme="light"] .feedback-timeline li::before {
+    background: var(--app-surface);
+}
+
+html[data-app-resolved-theme="light"] .master-data-store-section-undo-direction svg {
+    stroke: var(--app-primary);
+}
+
+/* Review queues use the same surfaces; warnings keep their semantic distinction. */
+html[data-app-resolved-theme="light"] :is(
+    .equipment-normalization-review, .equipment-normalization-review-item
+) {
+    border-color: var(--app-border);
+    background: var(--app-surface);
+    color: var(--app-text);
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .equipment-normalization-requirements article,
+    .equipment-normalization-requirements code
+) {
+    background: var(--app-surface-soft);
+    color: var(--app-text);
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .equipment-normalization-review > header > div > span,
+    .equipment-normalization-review-status
+) {
+    color: var(--app-primary-hover);
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .equipment-normalization-review-item > summary small,
+    .equipment-normalization-requirements article header span,
+    .equipment-normalization-requirements li span,
+    .equipment-normalization-requirements li small,
+    .equipment-normalization-review-empty
+) {
+    color: var(--app-muted);
+}
+
+html[data-app-resolved-theme="light"] .equipment-normalization-review-item > footer {
+    border-color: var(--app-border);
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .master-data-message.warning, .master-data-misc-ai-status.is-disagree,
+    .master-data-backfill-state.skipped, .master-data-backfill-item-state.skipped,
+    .master-data-ai-second-opinion.is-disagree,
+    .master-data-ai-second-opinion.is-insufficient_evidence,
+    .master-data-ai-second-opinion.is-stale, .master-data-ai-second-opinion-warning,
+    .master-data-duplicate-quality-warning, .master-data-undo-preview-next.is-blocked,
+    .master-data-undo-history-item.is-blocked[aria-current="true"],
+    .master-data-review-history-item.is-blocked,
+    .admin-device-status-meta .admin-device-status-unlinked-match,
+    .feedback-priority-high, .equipment-normalization-review-lock
+) {
+    border-color: color-mix(in srgb, var(--app-warning) 35%, var(--app-border));
+    background: var(--app-warning-soft);
+    color: var(--app-warning);
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .master-data-misc-decision small, .master-data-duplicate-scope-note,
+    .master-data-duplicate-status.is-warning, .master-data-duplicate-quality-warning strong,
+    .master-data-ai-second-opinion.is-disagree .master-data-ai-second-opinion-agreement,
+    .master-data-ai-second-opinion.is-insufficient_evidence .master-data-ai-second-opinion-agreement
+) {
+    color: var(--app-warning);
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .master-data-message.error, .master-data-status strong.missing,
+    .master-data-backfill-state.failed, .master-data-backfill-item-state.failed,
+    .master-data-store-section-save-panel.has-error, .master-data-review-history-status.is-error,
+    .master-data-merge-error, .admin-support-message.error, .feedback-message.error,
+    .admin-device-status-meta .admin-device-status-activity-inactive,
+    .admin-device-status-meta .admin-device-status-guest-expired, .feedback-priority-critical
+) {
+    border-color: color-mix(in srgb, var(--app-danger) 35%, var(--app-border));
+    background: var(--app-danger-soft);
+    color: var(--app-danger);
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .master-data-misc-decision .master-data-misc-row-apply-error,
+    .master-data-reference-error, .master-data-duplicate-status.is-error,
+    .master-data-undo-preview-status.is-error
+) {
+    color: var(--app-danger);
+    border-color: var(--app-danger);
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .master-data-undo-dialog-footer button.danger, .admin-access-revoke-btn
+) {
+    border-color: var(--app-danger);
+    background: var(--app-danger);
+    color: var(--app-on-primary);
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .master-data-undo-dialog-footer button.danger, .admin-access-revoke-btn
+):is(:hover, :focus-visible):not(:disabled) {
+    background: color-mix(in srgb, var(--app-danger) 85%, var(--app-text-strong));
+    color: var(--app-on-primary);
+}
+
+html[data-app-resolved-theme="light"] .master-data-duplicate-status.is-error::before {
+    background: var(--app-danger);
+}
+
+html[data-app-resolved-theme="light"] .master-data-duplicate-status.is-warning::before {
+    background: var(--app-warning);
+}
+
+html[data-app-resolved-theme="light"] .master-data-image-lightbox {
+    background: color-mix(in srgb, var(--app-text-strong) 32%, transparent);
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .master-data-lightbox-empty,
+    .master-data-image-lightbox .recipe-image-lightbox-actions
+) {
+    border-color: var(--app-border);
+    background: var(--app-surface);
+    color: var(--app-text);
+}
+
+html[data-app-resolved-theme="light"] .master-data-image-lightbox [data-master-image-status] {
+    color: var(--app-text);
+}
+
+html[data-app-resolved-theme="light"] .master-data-image-lightbox .recipe-image-lightbox-actions button {
+    border-color: var(--app-border);
+    background: var(--app-surface-soft);
+    color: var(--app-text);
+}
+
+html[data-app-resolved-theme="light"] .master-data-image-lightbox .recipe-image-lightbox-actions button:is(:hover, :focus-visible) {
+    border-color: var(--app-primary);
+    background: var(--app-hover-bg);
+}
+
+html[data-app-resolved-theme="light"] .master-data-image-lightbox .recipe-image-lightbox-actions button.is-remove {
+    border-color: var(--app-danger);
+    color: var(--app-danger);
+}
+
+html[data-app-resolved-theme="light"] .master-data-image-lightbox button:focus-visible {
+    outline-color: var(--app-focus);
+}

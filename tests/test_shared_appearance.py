@@ -1,4 +1,5 @@
 import json
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -22,6 +23,10 @@ def test_shared_appearance_bootstrap_is_loaded_before_css_on_every_app_layout_pa
     include = '{% include "includes/public_theme_head.html" %}'
     assert layout.count(include) == 1
     assert layout.index(include) < layout.index('filename=\'css/app.css\'')
+    for stylesheet in ("light-mode.css", "light-mode-recipes.css", "light-mode-reference.css"):
+        link = f"filename='css/{stylesheet}'"
+        assert layout.index(include) < layout.index(link)
+        assert layout.index("{% block app_styles %}") < layout.index(link)
     assert include not in public_auth
     assert include not in legal_page
     assert 'var STORAGE_KEY = "ai-pantry-public-theme";' in theme_head
@@ -112,6 +117,7 @@ globalThis.window = {{
 const initial = {{
     preference: window.aiPantryTheme.getPreference(),
     attribute: root.dataset.publicAuthTheme,
+    resolvedAttribute: root.dataset.appResolvedTheme,
     scheme: root.style.colorScheme,
     darkChecked: choices[2].checked,
 }};
@@ -119,15 +125,23 @@ window.aiPantryTheme.setPreference("light");
 const light = {{
     stored: stored.get("ai-pantry-public-theme"),
     attribute: root.dataset.publicAuthTheme,
+    resolvedAttribute: root.dataset.appResolvedTheme,
     scheme: root.style.colorScheme,
     lightChecked: choices[1].checked,
 }};
 window.aiPantryTheme.setPreference("system");
+const systemLight = {{
+    preference: window.aiPantryTheme.getPreference(),
+    resolvedAttribute: root.dataset.appResolvedTheme,
+    scheme: root.style.colorScheme,
+    stored: stored.get("ai-pantry-public-theme"),
+}};
 systemQuery.matches = true;
 systemQuery.listener({{ matches: true }});
 const system = {{
     stored: stored.get("ai-pantry-public-theme"),
     hasAttribute: Object.prototype.hasOwnProperty.call(root.dataset, "publicAuthTheme"),
+    resolvedAttribute: root.dataset.appResolvedTheme,
     scheme: root.style.colorScheme,
     systemChecked: choices[0].checked,
     resolved: window.aiPantryTheme.getResolvedTheme(),
@@ -141,11 +155,39 @@ const dark = {{
     stored: stored.get("ai-pantry-public-theme"),
     preference: window.aiPantryTheme.getPreference(),
     attribute: root.dataset.publicAuthTheme,
+    resolvedAttribute: root.dataset.appResolvedTheme,
     scheme: root.style.colorScheme,
     darkChecked: choices[2].checked,
     ignoredSystemEvent: dispatched.length === darkEventCount,
 }};
-process.stdout.write(JSON.stringify({{ initial, light, system, dark }}));
+window.aiPantryTheme.setPreference("light");
+const lightEventCount = dispatched.length;
+systemQuery.matches = true;
+systemQuery.listener({{ matches: true }});
+const explicitLight = {{
+    resolvedAttribute: root.dataset.appResolvedTheme,
+    scheme: root.style.colorScheme,
+    stored: stored.get("ai-pantry-public-theme"),
+    ignoredSystemEvent: dispatched.length === lightEventCount,
+}};
+// A fresh document resolves the persisted preference while the OS is dark.
+root.dataset = {{}};
+root.style = {{}};
+choices.forEach(choice => {{ choice.dataset = {{}}; }});
+{source}
+const reloaded = {{
+    preference: window.aiPantryTheme.getPreference(),
+    resolvedAttribute: root.dataset.appResolvedTheme,
+    scheme: root.style.colorScheme,
+}};
+// Another tab changing the shared preference updates this tab immediately.
+windowListeners.storage({{key: "ai-pantry-public-theme", newValue: "dark"}});
+const crossTab = {{
+    preference: window.aiPantryTheme.getPreference(),
+    resolvedAttribute: root.dataset.appResolvedTheme,
+    scheme: root.style.colorScheme,
+}};
+process.stdout.write(JSON.stringify({{ initial, light, systemLight, system, dark, explicitLight, reloaded, crossTab }}));
 """
     result = subprocess.run(
         [node, "-e", harness],
@@ -159,18 +201,27 @@ process.stdout.write(JSON.stringify({{ initial, light, system, dark }}));
     assert state["initial"] == {
         "preference": "dark",
         "attribute": "dark",
+        "resolvedAttribute": "dark",
         "scheme": "dark",
         "darkChecked": True,
     }
     assert state["light"] == {
         "stored": "light",
         "attribute": "light",
+        "resolvedAttribute": "light",
         "scheme": "only light",
         "lightChecked": True,
+    }
+    assert state["systemLight"] == {
+        "preference": "system",
+        "resolvedAttribute": "light",
+        "scheme": "only light",
+        "stored": "system",
     }
     assert state["system"] == {
         "stored": "system",
         "hasAttribute": False,
+        "resolvedAttribute": "dark",
         "scheme": "dark",
         "systemChecked": True,
         "resolved": "dark",
@@ -179,9 +230,27 @@ process.stdout.write(JSON.stringify({{ initial, light, system, dark }}));
         "stored": "dark",
         "preference": "dark",
         "attribute": "dark",
+        "resolvedAttribute": "dark",
         "scheme": "dark",
         "darkChecked": True,
         "ignoredSystemEvent": True,
+    }
+
+    assert state["explicitLight"] == {
+        "resolvedAttribute": "light",
+        "scheme": "only light",
+        "stored": "light",
+        "ignoredSystemEvent": True,
+    }
+    assert state["reloaded"] == {
+        "preference": "light",
+        "resolvedAttribute": "light",
+        "scheme": "only light",
+    }
+    assert state["crossTab"] == {
+        "preference": "dark",
+        "resolvedAttribute": "dark",
+        "scheme": "dark",
     }
 
 
@@ -206,3 +275,60 @@ def test_recipe_editor_theme_tokens_follow_the_shared_root_preference():
     assert "--recipe-editor-border: #343b3d;" not in workspace
     assert "--recipe-editor-border-soft: #2a3234;" not in workspace
     assert "color-scheme: inherit;" in workspace
+
+
+@pytest.mark.parametrize("filename", [
+    "light-mode.css", "light-mode-recipes.css", "light-mode-reference.css",
+])
+def test_light_styles_cannot_match_dark_pages(filename):
+    """Guard the user requirement that new rules never participate in Dark Mode."""
+    css = read_text(f"PushShoppingList/static/css/{filename}")
+    css = re.sub(r"/\*.*?\*/", "", css, flags=re.DOTALL)
+    rules = re.findall(r"([^{}]+)\{", css)
+    assert rules, f"{filename} has no style rules"
+    for prelude in rules:
+        prelude = prelude.strip()
+        if prelude.startswith("@"):
+            assert prelude.startswith(("@media ", "@supports ", "@container ")), prelude
+            continue
+        # Commas inside :is(), :where(), and :not() do not start a selector.
+        depth, start = 0, 0
+        selectors = []
+        for index, character in enumerate(prelude):
+            if character in "([":
+                depth += 1
+            elif character in ")]":
+                depth -= 1
+            elif character == "," and depth == 0:
+                selectors.append(prelude[start:index].strip())
+                start = index + 1
+        selectors.append(prelude[start:].strip())
+        for selector in selectors:
+            assert selector.startswith('html[data-app-resolved-theme="light"]'), (
+                f"{filename} can leak into Dark Mode: {selector}"
+            )
+
+
+def test_light_palette_text_and_actions_have_readable_contrast():
+    css = read_text("PushShoppingList/static/css/light-mode.css")
+    tokens = dict(re.findall(r"(--app-[\w-]+):\s*(#[0-9a-fA-F]{6})\s*;", css))
+
+    def luminance(token):
+        color = tokens[token].lstrip("#")
+        channels = [int(color[index:index + 2], 16) / 255 for index in (0, 2, 4)]
+        linear = [value / 12.92 if value <= 0.04045 else ((value + 0.055) / 1.055) ** 2.4 for value in channels]
+        return sum(value * weight for value, weight in zip(linear, (0.2126, 0.7152, 0.0722)))
+
+    for foreground, background in [
+        ("--app-text", "--app-bg"),
+        ("--app-text-soft", "--app-surface"),
+        ("--app-muted", "--app-surface-soft"),
+        ("--app-primary", "--app-surface"),
+        ("--app-on-primary", "--app-primary"),
+        ("--app-primary-hover", "--app-primary-soft"),
+        ("--app-danger", "--app-danger-soft"),
+        ("--app-disabled-text", "--app-disabled-bg"),
+    ]:
+        light, dark = sorted((luminance(foreground), luminance(background)), reverse=True)
+        ratio = (light + 0.05) / (dark + 0.05)
+        assert ratio >= 4.5, f"{foreground} on {background}: {ratio:.2f}:1"

@@ -1,0 +1,443 @@
+/* Light counterpart of the existing AI Pantry palette. The shared appearance
+   controller resolves both explicit Light and System; no Dark rules live here. */
+html[data-app-resolved-theme="light"] {
+    --app-bg: #f8fbf9;
+    --app-bg-soft: #f0f6f2;
+    --app-surface: #ffffff;
+    --app-surface-soft: #f5faf7;
+    --app-surface-muted: #edf5ef;
+    --app-text: #17233a;
+    --app-text-strong: #08162b;
+    --app-text-soft: #43594f;
+    --app-muted: #596c65;
+    --app-border: #dce5e1;
+    --app-border-subtle: #e2ebe5;
+    --app-border-strong: #b9c8c1;
+    --app-primary: #07872f;
+    --app-primary-hover: #057226;
+    --app-primary-soft: #eaf7ed;
+    --app-on-primary: #ffffff;
+    --app-success: #087a35;
+    --app-danger: #b42332;
+    --app-danger-soft: #fff1f2;
+    --app-warning: #855600;
+    --app-warning-soft: #fff8e8;
+    --app-focus: var(--app-primary);
+    --app-input-bg: var(--app-surface);
+    --app-hover-bg: #f0f8f3;
+    --app-selected-bg: var(--app-primary-soft);
+    --app-disabled-bg: #edf2ef;
+    --app-disabled-text: #5f7068;
+    --app-shadow-sm: 0 1px 3px rgb(8 22 43 / 4%);
+    --app-shadow-md: 0 8px 28px rgb(8 22 43 / 10%);
+    --app-shadow-lg: 0 16px 44px rgb(8 22 43 / 14%);
+    color-scheme: only light;
+}
+
+/* The OS dark preference must not replace the selected application palette. */
+html[data-app-resolved-theme="light"]:not([data-darkreader-mode]) {
+    --app-border-subtle: #e2ebe5;
+}
+
+html[data-app-resolved-theme="light"] body {
+    background-color: var(--app-bg);
+    color: var(--app-text);
+    color-scheme: only light;
+    accent-color: var(--app-primary);
+}
+
+html[data-app-resolved-theme="light"] .app-shell-body :is(.app-sidebar, .app-topbar, .app-mobile-bottom-nav, .app-mobile-nav-drawer) {
+    background: var(--app-surface);
+    border-color: var(--app-border-subtle);
+}
+
+html[data-app-resolved-theme="light"] .app-sidebar-promo {
+    background: linear-gradient(135deg, var(--app-primary-soft), var(--app-surface));
+    border-color: var(--app-border-subtle);
+}
+
+html[data-app-resolved-theme="light"] :is(.app-nav-section-title, .app-nav-group-label, .app-global-search-shortcut) {
+    color: var(--app-muted);
+}
+
+html[data-app-resolved-theme="light"] :is(.app-nav-link, .app-mobile-nav-link):is(:hover, :focus-visible) {
+    background: var(--app-hover-bg);
+    color: var(--app-primary-hover);
+}
+
+html[data-app-resolved-theme="light"] :is(.app-nav-link, .app-mobile-nav-link):is(.is-active, [aria-current="page"]) {
+    background: var(--app-selected-bg);
+    color: var(--app-primary-hover);
+    border-color: transparent;
+}
+
+html[data-app-resolved-theme="light"] .app-sidebar-collapse {
+    box-shadow: var(--app-shadow-sm);
+}
+
+html[data-app-resolved-theme="light"] .app-sidebar-collapse:is(:hover, :focus-visible) {
+    transform: none;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-focus) 16%, transparent);
+}
+
+html[data-app-resolved-theme="light"] .app-shell-body .guest-demo-banner {
+    background: var(--app-primary-soft);
+    border-color: var(--app-border);
+    color: var(--app-text);
+}
+
+html[data-app-resolved-theme="light"] .app-shell-body .guest-demo-banner :is(strong, .guest-demo-expiry) {
+    color: var(--app-text-strong);
+}
+
+/* Legacy forms share the same native-control palette, including lazy panels. */
+html[data-app-resolved-theme="light"] .app-shell-body :is(input:where(:not([type="checkbox"], [type="radio"], [type="submit"], [type="button"], [type="range"], [type="color"])), select, textarea) {
+    background-color: var(--app-input-bg);
+    color: var(--app-text);
+    border-color: var(--app-border);
+    color-scheme: only light;
+}
+
+html[data-app-resolved-theme="light"] .app-shell-body :is(input, textarea)::placeholder {
+    color: var(--app-muted);
+    opacity: 1;
+}
+
+html[data-app-resolved-theme="light"] .app-shell-body :is(input, select, textarea):focus-visible {
+    border-color: var(--app-focus);
+    outline-color: var(--app-focus);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-focus) 14%, transparent);
+}
+
+html[data-app-resolved-theme="light"] .app-shell-body :is(input, select, textarea)[aria-invalid="true"] {
+    border-color: var(--app-danger);
+    box-shadow: none;
+}
+
+html[data-app-resolved-theme="light"] .app-shell-body :is(input, select, textarea, button):disabled {
+    color: var(--app-disabled-text);
+    opacity: 1;
+    text-shadow: none;
+}
+
+html[data-app-resolved-theme="light"] .app-shell-body :is(input, select, textarea):disabled {
+    background-color: var(--app-disabled-bg);
+}
+
+html[data-app-resolved-theme="light"] :is(.app-toolbar-primary, .extract-btn, .save-btn, .nearest-stores-btn, .ai-pantry-action-btn, .feedback-submit-btn):disabled {
+    background: var(--app-disabled-bg);
+    border-color: var(--app-border);
+}
+
+html[data-app-resolved-theme="light"] .app-shell-body :is(.app-home-recipe-rating, .app-recipe-card-rating) .is-selected {
+    color: var(--app-primary);
+}
+
+/* Legacy shopping, import, store and account dialogs were authored in dark. */
+html[data-app-resolved-theme="light"] .app-shell-body :is(
+    .store-edit-modal, .store-add-modal, .item-qty-modal-card,
+    .product-prompt-modal, .bulk-alt-modal, .test-grab-modal,
+    .extraction-modal-card, .overflow-menu, .user-account-menu-panel
+) {
+    background: var(--app-surface);
+    color: var(--app-text);
+    border-color: var(--app-border);
+    box-shadow: var(--app-shadow-md);
+}
+
+html[data-app-resolved-theme="light"] .app-shell-body :is(
+    .store-edit-modal, .store-add-modal, .item-qty-modal-card,
+    .product-prompt-modal, .bulk-alt-modal, .test-grab-modal, .extraction-modal-card
+) :is(h2, h3, label) {
+    color: var(--app-text-strong);
+}
+
+/* Restaurant/menu builders have a separate legacy stylesheet. Keep their
+   structure and print/PDF templates while bringing screen surfaces into theme. */
+html[data-app-resolved-theme="light"].menu-builder-document,
+html[data-app-resolved-theme="light"] .menu-builder-page {
+    background: var(--app-bg);
+    color: var(--app-text);
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .menu-panel, .menu-preview-summary, .restaurant-menu-toolbar,
+    .menu-pdf-log-panel, .restaurant-info-card, .restaurant-section-nav,
+    .restaurant-menu-section, .menu-preview-item, .menu-progress-card
+) {
+    background: var(--app-surface);
+    border-color: var(--app-border-subtle);
+    box-shadow: var(--app-shadow-sm);
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .menu-preview-summary div, .menu-builder-source-options label,
+    .menu-builder-toggle-grid label, .menu-builder-public,
+    .cookbook-builder-category-grid label, .cookbook-builder-recipe-grid label
+) {
+    background: var(--app-surface-soft);
+    border-color: var(--app-border-subtle);
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .menu-preview-header h1, .menu-panel h2, .restaurant-menu-hero h1,
+    .menu-preview-item-topline strong, .restaurant-menu-item-title h3,
+    .restaurant-info-card dd, .menu-preview-summary strong,
+    .cookbook-builder-category-grid span, .cookbook-builder-recipe-grid span,
+    .menu-builder-source-options span, .menu-progress-card h3
+) { color: var(--app-text-strong); }
+
+html[data-app-resolved-theme="light"] :is(
+    .menu-page-subtitle, .menu-preview-summary span, .menu-builder-grid span,
+    .menu-preview-section p, .restaurant-section-description, .restaurant-menu-toolbar p,
+    .menu-preview-item small, .menu-preview-description, .restaurant-menu-item p,
+    .menu-progress-description, .restaurant-menu-hero p, .restaurant-info-card dt,
+    .restaurant-menu-footer, .cookbook-builder-category-grid small,
+    .cookbook-builder-recipe-grid small, .menu-progress-card-header p,
+    .menu-progress-checks span, .menu-pdf-log-empty
+) { color: var(--app-muted); }
+
+html[data-app-resolved-theme="light"] :is(
+    .cookbook-builder-picker label, .menu-builder-grid label,
+    .menu-builder-toggle-grid label, .menu-builder-public,
+    .menu-progress-checks label, .menu-pdf-log-table
+) { color: var(--app-text); }
+
+html[data-app-resolved-theme="light"] :is(
+    .menu-back-link, .menu-preview-summary a, .menu-preview-section h3,
+    .restaurant-menu-section h2, .menu-preview-item-topline span,
+    .restaurant-menu-item-title strong, .menu-progress-card-header strong,
+    .restaurant-menu-item-select, .menu-progress-card h4,
+    .cookbook-menu-pdf-log-panel summary, .menu-pdf-log-table code
+) { color: var(--app-primary-hover); }
+
+html[data-app-resolved-theme="light"] :is(
+    .menu-primary-btn, .restaurant-menu-actions button, .menu-pdf-log-actions button
+) {
+    background: var(--app-primary);
+    border-color: var(--app-primary);
+    color: var(--app-on-primary);
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .menu-primary-btn, .restaurant-menu-actions button, .menu-pdf-log-actions button
+):hover:not(:disabled) {
+    background: var(--app-primary-hover);
+    border-color: var(--app-primary-hover);
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .menu-secondary-btn, .menu-secondary-link, .menu-action-link,
+    .restaurant-menu-actions a, .restaurant-menu-toolbar-actions button,
+    .menu-pdf-log-actions a, .restaurant-section-nav a, .restaurant-menu-badges span,
+    .cookbook-restaurant-menu-links a, .menu-disclosure
+) {
+    background: var(--app-primary-soft);
+    color: var(--app-primary-hover);
+    border-color: var(--app-border);
+}
+
+html[data-app-resolved-theme="light"] :is(.menu-secondary-btn, .menu-secondary-link, .menu-action-link, .restaurant-section-nav a):hover {
+    background: var(--app-hover-bg);
+    color: var(--app-primary-hover);
+}
+
+html[data-app-resolved-theme="light"] .restaurant-menu-hero {
+    background: linear-gradient(135deg, var(--app-primary-soft), var(--app-surface));
+    border-color: var(--app-border-subtle);
+}
+
+html[data-app-resolved-theme="light"] .restaurant-menu-actions {
+    background: var(--app-surface-soft);
+    border-color: var(--app-border-subtle);
+}
+
+html[data-app-resolved-theme="light"] .menu-sticky-actions {
+    background: linear-gradient(180deg, transparent, var(--app-surface) 28%);
+}
+
+html[data-app-resolved-theme="light"] :is(
+    .menu-preview-section, .restaurant-menu-item, .cookbook-menu-pdf-log-panel,
+    .menu-pdf-log-table th, .menu-pdf-log-table td, .menu-pdf-log-empty
+) { border-color: var(--app-border-subtle); }
+
+html[data-app-resolved-theme="light"] .menu-pdf-log-table th {
+    background: var(--app-surface-soft);
+    color: var(--app-muted);
+}
+
+html[data-app-resolved-theme="light"] .menu-pdf-status {
+    background: var(--app-surface-muted);
+    color: var(--app-text);
+}
+
+html[data-app-resolved-theme="light"] .menu-pdf-status-uploaded {
+    background: var(--app-primary-soft);
+    color: var(--app-primary-hover);
+}
+
+html[data-app-resolved-theme="light"] :is(.menu-alert, .menu-pdf-status-failed, .menu-pdf-log-actions button.danger) {
+    background: var(--app-danger-soft);
+    color: var(--app-danger);
+    border-color: color-mix(in srgb, var(--app-danger) 30%, var(--app-border));
+}
+
+html[data-app-resolved-theme="light"] .menu-inline-status { color: var(--app-danger); }
+
+/* Pantry and shopping tools share the same screen palette at every width. */
+html[data-app-resolved-theme="light"] .app-shell-body :is(
+    .grab-products-btn, .move-bought-pantry-btn, .ai-pantry-action-btn,
+    .ai-pantry-location-save-btn, .ai-pantry-submit-btn, .ai-pantry-placeholder-actions a
+) {
+    background: var(--app-primary);
+    border-color: var(--app-primary);
+    color: var(--app-on-primary);
+}
+
+html[data-app-resolved-theme="light"] .app-shell-body :is(
+    .grab-products-btn, .move-bought-pantry-btn, .ai-pantry-action-btn,
+    .ai-pantry-location-save-btn, .ai-pantry-submit-btn, .ai-pantry-placeholder-actions a
+):hover:not(:disabled) {
+    background: var(--app-primary-hover);
+    border-color: var(--app-primary-hover);
+    color: var(--app-on-primary);
+}
+
+html[data-app-resolved-theme="light"] .app-shell-body :is(
+    .ai-pantry-action-btn.secondary, .user-push-panel-close,
+    .ai-pantry-location-choice, .ai-pantry-location-pill, .ai-pantry-confidence-toggle,
+    .ai-pantry-inventory-filter-btn, .ai-pantry-source-filter-chip,
+    .ai-pantry-name-question-nav, .ai-pantry-name-question-nav-btn,
+    .ai-pantry-nav a, .ai-pantry-use-soon-actions button
+) {
+    background: var(--app-surface-soft);
+    color: var(--app-text);
+    border-color: var(--app-border);
+    box-shadow: none;
+}
+
+html[data-app-resolved-theme="light"] .app-shell-body :is(
+    .ai-pantry-inventory-filter-btn, .ai-pantry-source-filter-chip,
+    .ai-pantry-location-choice
+):is(.is-active, .is-selected, [aria-pressed="true"], :has(input:checked)) {
+    background: var(--app-selected-bg);
+    color: var(--app-primary-hover);
+    border-color: var(--app-primary);
+}
+
+html[data-app-resolved-theme="light"] .app-shell-body :is(
+    .ai-pantry-item, .ai-pantry-recipe-card, .ai-pantry-missing-row,
+    .ai-pantry-history-row, .ai-pantry-form-surface, .ai-pantry-location-manager,
+    .ai-pantry-inventory-row, .ai-pantry-review-row, .ai-pantry-use-soon-row,
+    .ai-pantry-source-filter-group, .ai-pantry-image-panel,
+    .cookbook-card, .cookbook-recipe-card, .cookbook-menu-heading
+) {
+    background: var(--app-surface);
+    color: var(--app-text);
+    border-color: var(--app-border-subtle);
+    box-shadow: var(--app-shadow-sm);
+}
+
+html[data-app-resolved-theme="light"] .app-shell-body :is(
+    .ai-pantry-inventory-section-toggle, .cookbook-recipe-sort-section-heading
+) {
+    background: var(--app-surface-soft);
+    border-color: var(--app-border-subtle);
+    color: var(--app-primary-hover);
+}
+
+html[data-app-resolved-theme="light"] .app-shell-body :is(
+    .ai-pantry-item-main h4, .ai-pantry-recipe-card h4, .ai-pantry-history h4,
+    .ai-pantry-section-header h3, .ai-pantry-inventory-header .recipe-edit-section-title h3,
+    .ai-pantry-use-soon-row strong, .cookbook-card h3,
+    .cookbook-create-form label, .cookbook-menu-mode-control span,
+    .cookbook-category-grid label span, .cookbook-menu-heading h3
+) { color: var(--app-text-strong); }
+
+html[data-app-resolved-theme="light"] .app-shell-body :is(
+    .ai-pantry-item-main span, .ai-pantry-recipe-meta, .ai-pantry-missing-row span,
+    .ai-pantry-source-filter-heading, .ai-pantry-source-filter-empty,
+    .ai-pantry-item-meta, .ai-pantry-form-field > span, .ai-pantry-add-date-label span,
+    .ai-pantry-use-soon-row span, .ai-pantry-use-soon-row small,
+    .cookbook-menu-heading p, .cookbook-card span
+) { color: var(--app-muted); }
+
+html[data-app-resolved-theme="light"] .app-shell-body :is(
+    .ai-pantry-status, .confidence-pill, .ai-pantry-lifecycle-summary span,
+    .ai-pantry-inventory-section-count,
+    .pantry-lifecycle-badge, .user-account-avatar-fallback, .user-role-badge,
+    .user-account-meta span
+) {
+    background: var(--app-primary-soft);
+    color: var(--app-primary-hover);
+    border-color: var(--app-border);
+}
+
+html[data-app-resolved-theme="light"] .app-shell-body :is(
+    .pantry-lifecycle-neutral, .confidence-pill:not(.confidence-high):not(.confidence-medium):not(.confidence-low)
+) {
+    background: var(--app-surface-muted);
+    color: var(--app-muted);
+}
+
+html[data-app-resolved-theme="light"] .app-shell-body :is(.pantry-lifecycle-urgent, .pantry-lifecycle-soon, .confidence-medium) {
+    background: var(--app-warning-soft);
+    color: var(--app-warning);
+    border-color: color-mix(in srgb, var(--app-warning) 25%, var(--app-border));
+}
+
+html[data-app-resolved-theme="light"] .app-shell-body :is(
+    .pantry-lifecycle-expired, .confidence-low, .ai-pantry-location-remove-btn,
+    .ai-pantry-message.error
+) {
+    background: var(--app-danger-soft);
+    color: var(--app-danger);
+    border-color: color-mix(in srgb, var(--app-danger) 25%, var(--app-border));
+}
+
+html[data-app-resolved-theme="light"] .app-shell-body :is(
+    .ai-pantry-action-btn, .ai-pantry-location-remove-btn, .ai-pantry-location-save-btn,
+    .cookbook-action-btn, .menu-primary-btn, .menu-secondary-btn
+):disabled {
+    background: var(--app-disabled-bg);
+    color: var(--app-disabled-text);
+    border-color: var(--app-border);
+}
+
+html[data-app-resolved-theme="light"] .app-shell-body :is(
+    .ai-pantry-inventory-count, .ai-pantry-empty, .ai-pantry-location-form label > span,
+    .ai-pantry-feeling-form label > span, .view-control-title, .cookbooks-header-count
+) { color: var(--app-muted); }
+
+html[data-app-resolved-theme="light"] .ai-pantry-empty {
+    background: var(--app-surface-soft);
+    border-color: var(--app-border);
+}
+
+html[data-app-resolved-theme="light"] .settings-profile-avatar {
+    color: var(--app-primary-hover);
+}
+
+html[data-app-resolved-theme="light"] .app-search-submit {
+    background: var(--app-primary);
+    color: var(--app-on-primary);
+}
+
+html[data-app-resolved-theme="light"] .app-shell-body :is(.ai-pantry-section-header, .ai-pantry-inventory-header) .recipe-edit-section-icon {
+    color: var(--app-primary);
+}
+
+html[data-app-resolved-theme="light"] .app-shell-body :is(.view-control-section, .user-ai-pantry-divider, .ai-pantry-section) {
+    border-color: var(--app-border-subtle);
+}
+
+html[data-app-resolved-theme="light"] .app-shell-body :is(.ai-pantry-status-line, .ai-pantry-nav a:hover, .ai-pantry-inventory-section-toggle:hover) {
+    color: var(--app-primary-hover);
+}
+
+html[data-app-resolved-theme="light"] .app-shell-body .ai-pantry-status-line.error {
+    color: var(--app-danger);
+}
+
+
+
