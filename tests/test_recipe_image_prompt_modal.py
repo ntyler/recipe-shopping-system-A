@@ -14,7 +14,9 @@ def _recipe_image_prompt_functions():
     script = SCRIPT_PATH.read_text(encoding="utf-8")
     start = script.index("function recipeImagePromptModal()")
     end = script.index("function setRecipeEditorCoverImageViewLoaded", start)
-    return script[start:end]
+    upload_start = script.index("function openRecipeCoverUpload()")
+    upload_end = script.index("async function uploadRecipeCoverImage(", upload_start)
+    return script[start:end] + script[upload_start:upload_end]
 
 
 def _run_modal_scenario(scenario):
@@ -45,6 +47,9 @@ const focusLog = [];
 const statusMessages = [];
 const dirtyArguments = [];
 let imageChangeCloseCount = 0;
+let coverDialog = null;
+const coverDialogEvents = [];
+const uploadInput = {click() { coverDialogEvents.push({event: "upload", dialogOpen: coverDialog?.open}); }};
 
 let document;
 
@@ -143,6 +148,8 @@ document = {
     getElementById(id) {
         if (id === "recipeEditCoverPromptText") return promptText;
         if (id === "recipeEditForm") return recipeEditForm;
+        if (id === "recipeEditCoverDialog") return coverDialog;
+        if (id === "recipeEditCoverUpload") return uploadInput;
         return null;
     },
     addEventListener(type, handler) {
@@ -162,6 +169,12 @@ const window = {
 
 function closeRecipeImageChangeActions() {
     imageChangeCloseCount += 1;
+}
+
+function openRecipeEditCoverDialog() {
+    coverDialogEvents.push({event: "dialog", promptHidden: modal.hidden});
+    coverDialog.open = true;
+    return false;
 }
 
 function recipeEditorPersistableText(value) {
@@ -399,4 +412,64 @@ process.stdout.write(JSON.stringify({
             "focusedElement": "trigger",
             "triggerFocusOptions": {"preventScroll": True},
         },
+    }
+
+
+def test_external_prompt_action_opens_cover_dialog_before_showing_and_focusing_prompt():
+    result = _run_modal_scenario(
+        r"""
+coverDialog = {open: false};
+promptText.textContent = "Existing prompt";
+openRecipeImagePromptModal(trigger);
+drainAnimationFrames();
+const opened = {
+    dialogOpen: coverDialog.open,
+    promptVisible: !modal.hidden,
+    prompt: draft.value,
+    focusedElement: document.activeElement.name,
+};
+dispatchKey("Escape");
+const closedPrompt = {
+    dialogOpen: coverDialog.open,
+    promptHidden: modal.hidden,
+    focusedElement: document.activeElement.name,
+};
+openRecipeImagePromptModal(trigger);
+process.stdout.write(JSON.stringify({opened, closedPrompt, events: coverDialogEvents}));
+"""
+    )
+
+    assert result == {
+        "opened": {
+            "dialogOpen": True,
+            "promptVisible": True,
+            "prompt": "Existing prompt",
+            "focusedElement": "draft",
+        },
+        "closedPrompt": {
+            "dialogOpen": True,
+            "promptHidden": True,
+            "focusedElement": "trigger",
+        },
+        "events": [{"event": "dialog", "promptHidden": True}],
+    }
+
+
+def test_external_cover_upload_opens_cover_dialog_before_file_picker_without_reopening_it():
+    result = _run_modal_scenario(
+        r"""
+coverDialog = {open: false};
+openRecipeCoverUpload();
+openRecipeCoverUpload();
+process.stdout.write(JSON.stringify({events: coverDialogEvents, promptHidden: modal.hidden}));
+"""
+    )
+
+    assert result == {
+        "events": [
+            {"event": "dialog", "promptHidden": True},
+            {"event": "upload", "dialogOpen": True},
+            {"event": "upload", "dialogOpen": True},
+        ],
+        "promptHidden": True,
     }

@@ -15,7 +15,6 @@ function organizeRecipeEditCompactSections() {
     if (!tabsRoot || !tabList || !panelsRoot) return false;
 
     const definitions = [
-        ["recipeimage", "RecipeImage", "Recipe Image"],
         ["recipeinformation", "RecipeInformation", "Recipe Information"],
         ["cookbookassignment", "CookbookAssignment", "Cookbook Assignment"],
         ["sourceinformation", "SourceInformation", "Source Information"],
@@ -77,9 +76,15 @@ function organizeRecipeEditCompactSections() {
     const priceField = recipeEditFieldContainer("recipeEditMenuPrice");
     if (priceField) assignment.appendChild(priceField);
 
-    move(sections.recipeimage, ".recipe-edit-image-card");
-    move(sections.recipeimage, "[data-recipe-edit-mobile-image-slot]");
-    move(sections.recipeimage, ".recipe-edit-ingredient-gallery-card");
+    // Preserve the canonical image inputs inside the recipe form. The cover
+    // dialog will move the desktop card out of this storage when initialized.
+    const coverControls = document.createElement("div");
+    coverControls.id = "recipeEditCoverControls";
+    coverControls.hidden = true;
+    tabsRoot.appendChild(coverControls);
+    move(coverControls, ".recipe-edit-image-card");
+    move(coverControls, "[data-recipe-edit-mobile-image-slot]");
+    document.querySelector(".recipe-edit-ingredient-gallery-card")?.remove();
 
     [".recipe-edit-source-documents-card", ".recipe-edit-restaurant-card"].forEach(selector => {
         const card = move(sections.sourceinformation, selector);

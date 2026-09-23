@@ -15,6 +15,7 @@ def test_compact_sections_move_live_controls_and_share_accessible_tab_navigation
         pytest.skip("Node.js is required for the editor DOM behavior test")
     app = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     tab_functions = app[app.index("function recipeEditTabKey("):app.index("function recipeEditInputValue(")]
+    scroll_function = app[app.index("function scrollRecipeEditorToSection("):app.index("function normalizeIngredientJumpKey(")]
     sections = (ROOT / "PushShoppingList/static/js/recipe-edit-sections.js").read_text(encoding="utf-8")
     harness = r'''
 const assert = require("node:assert/strict");
@@ -36,6 +37,10 @@ class Element {
         this.children.push(child); child.parentElement = this; return child;
     }
     append(...children) { children.forEach(child => this.appendChild(child)); }
+    remove() {
+        if (this.parentElement) this.parentElement.children = this.parentElement.children.filter(value => value !== this);
+        this.parentElement = null;
+    }
     setAttribute(name, value) { this.attributes[name] = value; }
     addEventListener(name, listener) { (this.listeners[name] ||= []).push(listener); }
     fire(name, event = {}) { (this.listeners[name] || []).forEach(listener => listener(event)); }
@@ -77,6 +82,7 @@ const menuSection = new Element(); menuSection.value = "desserts";
 const priceField = new Element(); priceField.value = "12.50";
 info.append(cookbook, menuSection, priceField);
 const image = new Element("section");
+const summaryThumbnail = new Element("button");
 const mobileImage = new Element();
 const gallery = new Element("details");
 const source = new Element("details");
@@ -94,6 +100,7 @@ const controls = new Map([
     ["#recipeEditCookbookField", cookbook],
     ["#recipeEditCategoryMenuSectionField", menuSection],
     [".recipe-edit-image-card", image],
+    ["[data-summary-cover-dialog]", summaryThumbnail],
     ["[data-recipe-edit-mobile-image-slot]", mobileImage],
     [".recipe-edit-ingredient-gallery-card", gallery],
     [".recipe-edit-source-documents-card", source],
@@ -103,7 +110,9 @@ const controls = new Map([
     [".recipe-edit-confidence-card", confidence],
     [".recipe-edit-context-sidebar", sidebar],
 ]);
-const document = { body, querySelector: selector => controls.get(selector) || null, createElement: tag => new Element(tag) };
+const document = { body, activeElement: cookbook, querySelector: selector => controls.get(selector) || null, createElement: tag => new Element(tag) };
+const coverDialogTriggers = [];
+function openRecipeEditCoverDialog(trigger) { coverDialogTriggers.push(trigger); return true; }
 function recipeEditorStandalonePageIsActive() { return standalone; }
 function recipeEditFieldContainer(id) { return id === "recipeEditMenuPrice" ? priceField : null; }
 function clearRecipeIngredientScrollReserve() {}
@@ -121,7 +130,7 @@ cookbook.addEventListener("click", () => cookbookClicks++);
 assert.equal(organizeRecipeEditCompactSections(), true);
 assert.equal(organizeRecipeEditCompactSections(), false, "organizer is idempotent");
 assert.deepEqual(tabList.children.map(tab => tab.dataset.recipeEditTab), [
-    ...oldTabs, "recipeimage", "recipeinformation", "cookbookassignment", "sourceinformation",
+    ...oldTabs, "recipeinformation", "cookbookassignment", "sourceinformation",
 ]);
 assert.equal(tabList.children[4].attributes["aria-selected"], "true", "late tab binding preserves current selection");
 const panels = Object.fromEntries(panelsRoot.children.map(panel => [panel.dataset.recipeEditTabPanel, panel]));
@@ -142,13 +151,19 @@ assert.equal(cookbook.value, "existing-cookbook");
 assert.equal(menuSection.value, "desserts");
 assert.equal(priceField.value, "12.50");
 cookbook.fire("click"); assert.equal(cookbookClicks, 1, "existing handlers survive the move");
-assert(inPanel(image, "recipeimage")); assert(inPanel(mobileImage, "recipeimage")); assert(inPanel(gallery, "recipeimage"));
+const coverControls = tabsRoot.children.find(child => child.id === "recipeEditCoverControls");
+assert(coverControls, "canonical image controls remain under the form's tabs root");
+assert.equal(coverControls.hidden, true);
+assert.equal(image.parentElement, coverControls);
+assert.equal(mobileImage.parentElement, coverControls);
+assert.equal(gallery.parentElement, null, "only the gallery presentation is removed");
+assert.equal(panels.recipeimage, undefined, "the image dialog does not leave a dead tab panel");
 assert(inPanel(source, "sourceinformation")); assert(inPanel(restaurant, "sourceinformation"));
 assert.equal(source.open, true); assert.equal(restaurant.open, true);
 assert.equal(dialog.parentElement, tabsRoot, "dialogs have no hidden tab ancestor");
 assert.equal(dialog.hidden, true, "dialog open state is preserved");
 assert.equal(sidebar.children.length, 0); assert.equal(sidebar.hidden, true);
-for (const key of ["recipeimage", "recipeinformation", "cookbookassignment", "sourceinformation"]) {
+for (const key of ["recipeinformation", "cookbookassignment", "sourceinformation"]) {
     const tab = tabList.children.find(button => button.dataset.recipeEditTab === key);
     assert.equal(tab.listeners.click.length, 1);
     assert.equal(tab.attributes["aria-controls"], panels[key].id);
@@ -158,7 +173,7 @@ for (const key of ["recipeimage", "recipeinformation", "cookbookassignment", "so
     assert.equal(panels[key].hidden, false);
     assert.equal(panelsRoot.children.filter(panel => !panel.hidden).length, 1);
 }
-const sourceTab = tabList.children[8];
+const sourceTab = tabList.children[7];
 let prevented = false;
 sourceTab.fire("keydown", {key: "ArrowRight", preventDefault() { prevented = true; }});
 assert.equal(prevented, true); assert.equal(focused, tabList.children[0]);
@@ -166,8 +181,16 @@ tabList.children[0].fire("keydown", {key: "End", preventDefault() {}});
 assert.equal(focused, sourceTab); assert.equal(panels.sourceinformation.hidden, false);
 revealRecipeEditControlPanel(cookbook);
 assert.equal(panels.cookbookassignment.hidden, false, "validation and AI field focus reveal the target section");
+assert.equal(setRecipeEditActiveTab("recipeimage", {trigger: image}), true);
+assert.equal(coverDialogTriggers.at(-1), image);
+assert.equal(panels.cookbookassignment.hidden, false, "opening the image dialog preserves the active tab");
+assert.equal(scrollRecipeEditorToSection("Recipe Image"), true);
+assert.equal(scrollRecipeEditorToSection("image"), true);
+assert.equal(coverDialogTriggers.length, 3);
+assert.equal(coverDialogTriggers.at(-1), summaryThumbnail, "section links return focus to a visible image control");
+assert.equal(panels.cookbookassignment.hidden, false);
 console.log(JSON.stringify({tabs: tabList.children.length, panels: panelsRoot.children.length}));
 '''
-    result = subprocess.run([node, "-e", harness + tab_functions + sections + assertions], capture_output=True, text=True)
+    result = subprocess.run([node, "-e", harness + tab_functions + scroll_function + sections + assertions], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
-    assert json.loads(result.stdout) == {"tabs": 9, "panels": 9}
+    assert json.loads(result.stdout) == {"tabs": 8, "panels": 8}

@@ -92,8 +92,6 @@ body[data-recipe-edit-compact="true"] .recipe-edit-secondary-panel-body { displa
 body[data-recipe-edit-compact="true"] .recipe-edit-secondary-panel-body .recipe-edit-info-panel { padding: 0; margin: 0; border: 0; background: transparent; }
 body[data-recipe-edit-compact="true"] .recipe-edit-secondary-panel-body .recipe-edit-context-card { position: static; margin: 0; padding: 14px; }
 body[data-recipe-edit-compact="true"] .recipe-edit-compact-assignment-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-body[data-recipe-edit-compact="true"] #recipeEditPanelRecipeImage .recipe-edit-image-card { max-width: 560px; width: 100%; box-sizing: border-box; }
-body[data-recipe-edit-compact="true"] #recipeEditPanelRecipeImage .recipe-edit-cover-preview { max-height: 340px; }
 @media (max-width: 1199px) and (min-width: 768px) {
     body[data-recipe-edit-compact="true"] .recipe-edit-compact-summary { grid-template-columns: 140px minmax(0, 1fr); }
     body[data-recipe-edit-compact="true"] .recipe-edit-summary-photo { grid-row: 1 / 3; }

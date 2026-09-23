@@ -173,6 +173,7 @@ def test_summary_note_and_field_actions_use_existing_editor_controls():
     result = run_summary_javascript(r"""
 const actions = [];
 function setRecipeEditActiveTab(tab) { actions.push(['tab', tab]); }
+function openRecipeEditCoverDialog() { actions.push(['cover-dialog']); }
 function addRecipeReflectionNoteRow() {
     actions.push(['add-reflection-note']);
     return {querySelector(selector) {
@@ -194,7 +195,7 @@ process.stdout.write(JSON.stringify(actions));
         ["tab", "notes"], ["add-reflection-note"], ["focus-note"],
         ["tab", "recipeinformation"], ["focus-time", {"preventScroll": True}],
         ["scroll-time", {"block": "nearest", "behavior": "smooth"}],
-        ["tab", "recipeimage"],
+        ["cover-dialog"],
     ]
 
 

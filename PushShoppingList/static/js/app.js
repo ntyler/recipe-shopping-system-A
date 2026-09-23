@@ -26390,6 +26390,11 @@ function recipeEditTabKey(value) {
 
 function setRecipeEditActiveTab(tabKey, options = {}) {
     const activeKey = recipeEditTabKey(tabKey);
+    if (activeKey === "recipeimage" && recipeEditorStandalonePageIsActive()) {
+        return typeof openRecipeEditCoverDialog === "function"
+            ? openRecipeEditCoverDialog(options.trigger || document.querySelector("[data-summary-cover-dialog]"))
+            : false;
+    }
     const tabsRoot = document.querySelector("[data-recipe-edit-tabs]");
 
     if (!tabsRoot) {
@@ -46099,6 +46104,10 @@ function openRecipeImagePromptModal(trigger = null) {
     const promptText = document.getElementById("recipeEditCoverPromptText");
     if (!modal || !draft || !promptText) return false;
 
+    const coverDialog = document.getElementById("recipeEditCoverDialog");
+    if (coverDialog && !coverDialog.open && typeof openRecipeEditCoverDialog === "function") {
+        openRecipeEditCoverDialog();
+    }
     closeRecipeImageChangeActions();
     if (trigger && !modal.contains(trigger)) recipeEditImagePromptTrigger = trigger;
     draft.value = String(promptText.textContent || "");
@@ -46635,6 +46644,10 @@ document.addEventListener("focusin", event => {
 
 function openRecipeCoverUpload() {
     const input = document.getElementById("recipeEditCoverUpload");
+    const coverDialog = document.getElementById("recipeEditCoverDialog");
+    if (coverDialog && !coverDialog.open && typeof openRecipeEditCoverDialog === "function") {
+        openRecipeEditCoverDialog();
+    }
 
     closeRecipeImageChangeActions();
 
@@ -47292,6 +47305,9 @@ function ingredientJumpMatchScore(targetKey, ingredientKey, originalTextKey) {
 
 function scrollRecipeEditorToSection(sectionKey) {
     const normalized = String(sectionKey || "").trim().toLowerCase().replace(/[^a-z]+/g, "");
+    if (recipeEditTabKey(normalized) === "recipeimage" && recipeEditorStandalonePageIsActive()) {
+        return setRecipeEditActiveTab(normalized);
+    }
     setRecipeEditActiveTab(normalized);
     const selector = {
         ingredients: ".recipe-edit-ingredients-section",
@@ -47300,7 +47316,6 @@ function scrollRecipeEditorToSection(sectionKey) {
         nutrition: ".recipe-edit-nutrition-section",
         notes: ".recipe-edit-reflection-section",
         reflection: ".recipe-edit-reflection-section",
-        recipeimage: "#recipeEditPanelRecipeImage",
         recipeinformation: "#recipeEditPanelRecipeInformation",
         cookbookassignment: "#recipeEditPanelCookbookAssignment",
         sourceinformation: "#recipeEditPanelSourceInformation",
@@ -56656,7 +56671,7 @@ function positionRecipeEditPopupMenu(menu, button) {
         || menu.classList.contains("recipe-edit-ingredient-master-menu");
     const margin = isIngredientOptionsMenu ? 16 : 8;
     const gap = isIngredientOptionsMenu ? 10 : 6;
-    const dialog = button.closest(".recipe-edit-dialog, [data-recipe-ingredient-edit-panel][open]");
+    const dialog = button.closest(".recipe-edit-dialog, [data-recipe-ingredient-edit-panel][open], [data-recipe-edit-cover-dialog][open]");
     const dialogRect = dialog
         ? dialog.getBoundingClientRect()
         : { top: 0, bottom: window.innerHeight };
@@ -56734,7 +56749,7 @@ function portalRecipeEditPopupMenu(menu, button) {
 
     menu.recipeEditAnchorButton = button || menu.recipeEditAnchorButton || null;
     const ingredientDialog = button
-        ? button.closest("[data-recipe-ingredient-edit-panel][open]")
+        ? button.closest("[data-recipe-ingredient-edit-panel][open], [data-recipe-edit-cover-dialog][open]")
         : null;
     const portalHost = ingredientDialog || document.body;
 

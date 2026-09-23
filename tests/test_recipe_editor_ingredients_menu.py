@@ -8922,7 +8922,7 @@ def test_recipe_editor_ingredient_modal_keeps_image_workflow_compact_and_portals
         script.index("function portalRecipeEditPopupMenu"):
         script.index("function restoreRecipeEditPopupMenu")
     ]
-    assert 'button.closest("[data-recipe-ingredient-edit-panel][open]")' in portal
+    assert 'button.closest("[data-recipe-ingredient-edit-panel][open], [data-recipe-edit-cover-dialog][open]")' in portal
     assert "const portalHost = ingredientDialog || document.body;" in portal
     assert "portalHost.appendChild(menu);" in portal
 

@@ -23,6 +23,7 @@ function recipeEditCompactSummaryValues() {
 }
 
 function openRecipeEditSummaryField(tab, fieldId) {
+    if (tab === "recipeimage") return openRecipeEditCoverDialog();
     setRecipeEditActiveTab(tab);
     const field = document.getElementById(fieldId);
     if (field) {
@@ -86,11 +87,13 @@ function organizeRecipeEditCompactSummary() {
     summary.className = "recipe-edit-compact-summary";
     summary.setAttribute("aria-label", "Recipe summary");
     summary.innerHTML = `
-        <button type="button" class="recipe-edit-summary-photo" data-recipe-edit-cover-view
-            data-summary-tab="recipeimage" aria-label="Edit recipe image">
-            <img data-recipe-edit-cover-image alt="Recipe image" hidden>
-            <span data-recipe-edit-cover-empty>Add recipe image</span>
-        </button>
+        <div class="recipe-edit-summary-media">
+            <button type="button" class="recipe-edit-summary-photo" data-recipe-edit-cover-view
+                data-summary-cover-dialog aria-label="Edit recipe image" aria-haspopup="dialog" aria-controls="recipeEditCoverDialog">
+                <img data-recipe-edit-cover-image alt="Recipe image" hidden>
+                <span data-recipe-edit-cover-empty>Add recipe image</span>
+            </button>
+        </div>
         <div class="recipe-edit-summary-content">
             <h1 class="recipe-edit-summary-title"><button type="button" data-summary-tab="recipeinformation"
                 data-summary-field="recipeEditDisplayName" data-summary-value="title">Recipe</button></h1>
@@ -124,11 +127,14 @@ function organizeRecipeEditCompactSummary() {
     });
     const rating = document.getElementById("recipeEditRating")?.closest(".recipe-edit-rating-field");
     if (rating) summary.querySelector(".recipe-edit-summary-rating-row").prepend(rating);
+    const favorite = document.getElementById("recipeEditFavoriteButton");
+    if (favorite) summary.querySelector(".recipe-edit-summary-media").appendChild(favorite);
     const image = summary.querySelector("img");
     image.addEventListener("load", () => handleRecipeEditorCoverImageLoad(image));
     image.addEventListener("error", () => handleRecipeEditorCoverImageError(image));
     summary.addEventListener("click", event => {
-        const target = event.target.closest("[data-summary-tab], [data-summary-add-note]");
+        const target = event.target.closest("[data-summary-tab], [data-summary-add-note], [data-summary-cover-dialog]");
+        if (target?.hasAttribute("data-summary-cover-dialog")) return openRecipeEditCoverDialog(target);
         if (target?.hasAttribute("data-summary-add-note")) addRecipeEditSummaryNote();
         else if (target) openRecipeEditSummaryField(target.dataset.summaryTab, target.dataset.summaryField);
     });
