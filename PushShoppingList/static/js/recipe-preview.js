@@ -151,6 +151,8 @@ async function refreshIntegratedRecipePreview() {
 
 function renderIntegratedRecipePreview(state) {
     const r = state.model, esc = escapeHtml;
+    // Browser Save as PDF uses the document title as its suggested filename.
+    document.title = r.title.replace(/[<>:"/\\|?*]/g, '') || 'Recipe';
     const expandedChoices = new Set([...state.page.querySelectorAll('details[data-preview-choice][open]')].map(node => node.dataset.previewChoice));
     const favorite = document.getElementById('recipeEditFavoriteButton')?.getAttribute('aria-pressed') === 'true';
     const author = r.author && typeof r.author === 'object' ? r.author.name : r.author;
