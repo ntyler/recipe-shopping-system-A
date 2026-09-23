@@ -230,6 +230,8 @@ recipe_bp = Blueprint("recipe_bp", __name__)
 
 PRIVATE_RECIPE_RESOURCE_ENDPOINTS = {
     "recipe_bp.edit_recipe_page_route",
+    "recipe_bp.api_recipe_preview_route",
+    "recipe_bp.api_recipe_preview_pdf_route",
     "recipe_bp.structured_equipment_canary_page_route",
     "recipe_bp.structured_equipment_canary_run_event_route",
     "recipe_bp.recipe_archive_pdf_route",
@@ -4698,6 +4700,38 @@ def api_recipe_image_progress_route():
     return jsonify(load_recipe_image_progress(url=url or None))
 
 
+@recipe_bp.route("/api/recipe_preview", methods=["POST"])
+def api_recipe_preview_route():
+    from PushShoppingList.services.recipe_preview_service import (
+        RecipePreviewError, build_recipe_preview,
+    )
+    try:
+        return jsonify(build_recipe_preview(request.get_json(silent=True) or {}))
+    except RecipePreviewError as exc:
+        return jsonify({"ok": False, "error": str(exc), **exc.details}), exc.status
+
+
+@recipe_bp.route("/api/recipe_preview/pdf", methods=["POST"])
+def api_recipe_preview_pdf_route():
+    from PushShoppingList.services.recipe_preview_service import (
+        RecipePreviewError, create_recipe_preview_pdf,
+    )
+    try:
+        content, title = create_recipe_preview_pdf(request.get_json(silent=True) or {})
+    except RecipePreviewError as exc:
+        return jsonify({"ok": False, "error": str(exc), **exc.details}), exc.status
+    except Exception:
+        current_app.logger.exception("Recipe preview PDF rendering failed")
+        return jsonify({
+            "ok": False,
+            "error": "The recipe PDF could not be generated. Try Print to save a PDF from your browser.",
+        }), 503
+    return send_file(
+        content, mimetype="application/pdf", as_attachment=True,
+        download_name=f"{secure_filename(title) or 'recipe'}-preview.pdf", max_age=0,
+    )
+
+
 @recipe_bp.route("/api/recipe_pdf", methods=["POST"])
 def api_recipe_pdf_route():
     data = request.get_json(silent=True) or {}
@@ -4743,6 +4777,19 @@ def api_recipe_favorite_route():
         "favorite": favorite,
         "url": recipe_data.get("source_url") or url,
     })
+
+
+@recipe_bp.route("/api/recipe_preview/shopping-list", methods=["POST"])
+def api_recipe_preview_shopping_list_route():
+    from PushShoppingList.services.recipe_preview_service import RecipePreviewError
+    from PushShoppingList.services.recipe_preview_shopping_service import add_preview_to_shopping_list
+
+    try:
+        return jsonify(add_preview_to_shopping_list(request.get_json(silent=True) or {}))
+    except RecipePreviewError as error:
+        return jsonify({"ok": False, "error": str(error), **error.details}), error.status
+    except ValueError as error:
+        return jsonify({"ok": False, "error": str(error)}), 400
 
 
 @recipe_bp.route("/api/recipe_pdf/delete", methods=["POST"])

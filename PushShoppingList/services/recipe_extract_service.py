@@ -5779,9 +5779,10 @@ def promote_lazy_tag_attribute(tag, target_attr, source_attrs):
             return
 
 
-def print_current_browser_page_to_pdf(driver, pdf_path):
+def print_current_browser_page_to_pdf(driver, pdf_path, print_options=None):
     driver.execute_cdp_cmd("Page.enable", {})
-    print_options = build_continuous_pdf_print_options(driver)
+    continuous = print_options is None
+    print_options = dict(print_options) if print_options is not None else build_continuous_pdf_print_options(driver)
     pdf_bytes = b""
     page_count = None
 
@@ -5796,7 +5797,7 @@ def print_current_browser_page_to_pdf(driver, pdf_path):
             raise RuntimeError("Chrome returned an empty recipe PDF.")
 
         page_count = count_pdf_pages_from_bytes(pdf_bytes)
-        if page_count is None or page_count <= 1:
+        if not continuous or page_count is None or page_count <= 1:
             break
 
         if attempt_number == 4:
@@ -5812,7 +5813,7 @@ def print_current_browser_page_to_pdf(driver, pdf_path):
 
     pdf_path.write_bytes(pdf_bytes)
 
-    if page_count and page_count > 1:
+    if continuous and page_count and page_count > 1:
         print(f"PDF continuous warning: saved {page_count} pages after retry limit.")
 
 
@@ -6554,6 +6555,7 @@ def write_recipe_page_pdf(
     expected_recipe=None,
     expected_title="",
     require_recipe_evidence=None,
+    print_options=None,
 ):
     driver = None
     last_error = None
@@ -6600,7 +6602,10 @@ def write_recipe_page_pdf(
                 ensure_browser_page_is_printable(driver, target)
                 prepare_page_for_pdf_print(driver)
                 ensure_browser_page_is_printable(driver, target)
-                print_current_browser_page_to_pdf(driver, staging_pdf_path)
+                if print_options is None:
+                    print_current_browser_page_to_pdf(driver, staging_pdf_path)
+                else:
+                    print_current_browser_page_to_pdf(driver, staging_pdf_path, print_options=print_options)
                 validation = validate_generated_recipe_pdf(
                     staging_pdf_path,
                     expected_recipe=expected_recipe,

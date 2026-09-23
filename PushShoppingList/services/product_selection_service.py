@@ -388,15 +388,20 @@ def load_item_quantity_context(items=None):
     recipe_meta = load_recipe_ingredients()
 
     for recipe in recipe_url_rows():
-        recipe_data = load_saved_recipe_output(recipe.get("url", ""))
+        meta = recipe_meta.get(normalize_recipe_url_key(recipe.get("url", "")), {})
+        preview_snapshot = meta.get("shopping_preview_recipe")
+        has_preview_snapshot = isinstance(preview_snapshot, dict)
+        recipe_data = preview_snapshot if has_preview_snapshot else load_saved_recipe_output(recipe.get("url", ""))
         if not recipe_data:
             continue
-        recipe_data = recipe_data_with_sql_requirements(recipe.get("url", ""), recipe_data)
-        selections = load_recipe_option_selections(recipe.get("url", ""))
-        resolved_ingredients = resolve_ingredient_requirements(recipe_data, selections)["items"]
+        if has_preview_snapshot:
+            resolved_ingredients = recipe_data.get("ingredients", [])
+        else:
+            recipe_data = recipe_data_with_sql_requirements(recipe.get("url", ""), recipe_data)
+            selections = load_recipe_option_selections(recipe.get("url", ""))
+            resolved_ingredients = resolve_ingredient_requirements(recipe_data, selections)["items"]
         recipe_quantity = effective_recipe_quantity(recipe.get("quantity") or 1, recipe_data)
 
-        meta = recipe_meta.get(normalize_recipe_url_key(recipe.get("url", "")), {})
         # Saved quantity maps cannot distinguish identical names in different
         # options, or a standard row from a component with the same name.
         has_choices = any(
@@ -404,7 +409,7 @@ def load_item_quantity_context(items=None):
             or any(len(option["items"]) > 1 for option in requirement["options"])
             for requirement in ingredient_requirements(recipe_data)
         )
-        use_scaled_meta = not has_choices and scaled_recipe_metadata_matches(meta, recipe_quantity)
+        use_scaled_meta = not has_preview_snapshot and not has_choices and scaled_recipe_metadata_matches(meta, recipe_quantity)
         scaled_ingredients = meta.get("scaled_ingredients", {}) if use_scaled_meta else {}
         recipe_label = recipe.get("name") or recipe_data.get("recipe_title") or "Recipe"
 

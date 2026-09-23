@@ -39,14 +39,17 @@ def get_openai_client():
 
 def update_recipe_quantity(url, quantity):
     quantity = normalize_recipe_quantity(quantity)
-    recipe_data = load_saved_recipe_output(url)
-    recipe_data = recipe_data_with_sql_requirements(url, recipe_data)
-    selections = load_recipe_option_selections(url)
-    scaled = calculate_scaled_recipe_values(recipe_data, quantity, selections)
-
     data = load_recipe_ingredients()
     key = normalize_recipe_url_key(url)
     recipe_record = data.get(key, {"url": url, "ingredients": []})
+    preview_snapshot = recipe_record.get("shopping_preview_recipe")
+    if isinstance(preview_snapshot, dict):
+        scaled = calculate_scaled_values_locally(preview_snapshot, quantity)
+    else:
+        recipe_data = load_saved_recipe_output(url)
+        recipe_data = recipe_data_with_sql_requirements(url, recipe_data)
+        selections = load_recipe_option_selections(url)
+        scaled = calculate_scaled_recipe_values(recipe_data, quantity, selections)
     recipe_record["url"] = url
     recipe_record["quantity"] = quantity
     recipe_record["scaled_servings"] = scaled.get("servings")
@@ -475,7 +478,14 @@ def scale_quantity_part(value, multiplier):
     if parsed is None:
         return value
 
-    return format_fraction(parsed * multiplier)
+    # JSON scales arrive as floats. Multiplying a Fraction by a float loses
+    # rational precision (2/3 * 2.0 becomes an enormous binary denominator).
+    # Recover recurring serving ratios such as 1/12 before doing exact math.
+    factor = Fraction(str(multiplier))
+    recurring = factor.limit_denominator(1_000_000)
+    if abs(recurring - factor) <= abs(factor) / 1_000_000_000_000:
+        factor = recurring
+    return format_fraction(parsed * factor)
 
 
 def parse_quantity_fraction(value):

@@ -45100,6 +45100,10 @@ function initRecipeEditContextPanels() {
 }
 
 function previewRecipeFromEditor() {
+    if (typeof openIntegratedRecipePreview === "function") {
+        openIntegratedRecipePreview();
+        return false;
+    }
     const url = recipeEditorCurrentUrl();
 
     if (!url) {

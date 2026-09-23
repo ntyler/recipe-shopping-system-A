@@ -505,9 +505,11 @@ def recipe_quantity_rows(recipe_urls):
     recipe_ingredient_data = load_recipe_ingredients()
 
     for index, recipe in enumerate(recipe_urls, start=1):
-        recipe_data = load_saved_recipe_output(recipe["url"])
-        recipe_quantity = effective_recipe_quantity(recipe.get("quantity") or 1, recipe_data)
         recipe_meta = recipe_ingredient_data.get(normalize_recipe_url_key(recipe["url"]), {})
+        recipe_data = recipe_meta.get("shopping_preview_recipe")
+        if not isinstance(recipe_data, dict):
+            recipe_data = load_saved_recipe_output(recipe["url"])
+        recipe_quantity = effective_recipe_quantity(recipe.get("quantity") or 1, recipe_data)
         use_scaled_meta = scaled_recipe_metadata_matches(recipe_meta, recipe_quantity)
         scaled_ingredients = recipe_meta.get("scaled_ingredients", {}) if use_scaled_meta else {}
 
@@ -3900,9 +3902,19 @@ def recipe_view_rows(recipe_urls, food_rules=None, image_variants=None, include_
     recipe_ingredient_data = load_recipe_ingredients()
 
     for index, recipe in enumerate(recipe_urls, start=1):
-        recipe_data = load_saved_recipe_output(recipe["url"])
-        recipe_quantity = effective_recipe_quantity(recipe.get("quantity") or 1, recipe_data)
         recipe_meta = recipe_ingredient_data.get(normalize_recipe_url_key(recipe["url"]), {})
+        recipe_data = recipe_meta.get("shopping_preview_recipe")
+        if not isinstance(recipe_data, dict):
+            recipe_data = load_saved_recipe_output(recipe["url"])
+        else:
+            recipe_data = deepcopy(recipe_data)
+            saved_recipe = load_saved_recipe_output(recipe["url"])
+            recipe_data["favorite"] = bool(saved_recipe.get("favorite"))
+            # Cover edits persist immediately, independently of the captured
+            # shopping ingredients. Suppress the metadata fallback on removal.
+            recipe_data["cover_image"] = deepcopy(saved_recipe.get("cover_image") or {})
+            recipe_meta = {**recipe_meta, "cover_image": recipe_data["cover_image"]}
+        recipe_quantity = effective_recipe_quantity(recipe.get("quantity") or 1, recipe_data)
         cover_image = recipe_cover_image_for_view(
             recipe["url"],
             recipe_data,

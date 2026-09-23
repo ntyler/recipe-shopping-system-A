@@ -4,6 +4,16 @@ from PushShoppingList.services import product_selection_service
 from PushShoppingList.services import recipe_quantity_service
 
 
+def test_float_preview_scales_keep_recipe_fractions_readable():
+    scale = recipe_quantity_service.scale_quantity
+    assert scale("2/3", 2.0) == "1 1/3"
+    assert scale("2/3", 3.0) == "2"
+    assert scale("3/4", 1 / 12) == "1/16"
+    assert scale("1", 0.0000001) == "1/10000000"
+    assert scale("1/3 to 2/3", 1.5) == "1/2 to 1"
+    assert scale("", 2.0) == ""
+
+
 def legacy_materialized_recipe():
     return {
         "source_url": "https://example.test/soup",
