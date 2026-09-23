@@ -32,28 +32,34 @@ body.recipe-edit-standalone-page #recipeEditCoverDialog::backdrop { background: 
 #recipeEditCoverDialog .recipe-edit-image-card { display: block; margin: 0; padding: 0; width: 100%; max-width: none; border: 0; background: transparent; overflow: visible; }
 #recipeEditCoverDialog .recipe-edit-image-card > .recipe-edit-context-card-heading { display: none; }
 #recipeEditCoverDialog .recipe-edit-image-card-content { padding: 0; }
-#recipeEditCoverDialog #recipeEditCoverField { display: grid; gap: 14px; margin: 0; padding: 0; }
+#recipeEditCoverDialog #recipeEditCoverField { display: grid; gap: 0; margin: 0; padding: 0; isolation: isolate; }
 #recipeEditCoverDialog #recipeEditCoverPreview {
-    display: grid; place-items: center; width: 100%; height: auto; min-height: 160px;
+    grid-area: 1 / 1; display: grid; place-items: center; width: 100%; height: auto; min-height: 200px;
     aspect-ratio: auto; max-height: none; overflow: hidden; border: 1px solid var(--app-border);
     border-radius: 9px; background: var(--app-bg-soft);
 }
-#recipeEditCoverDialog #recipeEditCoverImage { display: block; width: 100%; height: auto; max-height: min(54dvh, 520px); object-fit: contain; cursor: default; }
+#recipeEditCoverDialog #recipeEditCoverImage { display: block; width: 100%; height: auto; max-height: min(68dvh, 620px); object-fit: contain; cursor: default; }
 #recipeEditCoverDialog #recipeEditCoverImage[hidden],
 #recipeEditCoverDialog [data-cover-dialog-status][hidden],
 #recipeEditCoverDialog .recipe-edit-cover-remove-button[hidden] { display: none; }
-#recipeEditCoverDialog .recipe-edit-cover-empty { padding: 32px 20px; color: var(--app-muted); font-size: 14px; }
-#recipeEditCoverDialog .recipe-edit-cover-details { display: grid; gap: 12px; min-width: 0; }
+#recipeEditCoverDialog .recipe-edit-cover-empty { padding: 32px 20px 88px; color: var(--app-muted); font-size: 14px; }
+#recipeEditCoverDialog .recipe-edit-cover-details {
+    grid-area: 1 / 1; align-self: end; justify-self: stretch; z-index: 1;
+    display: grid; justify-items: center; min-width: 0; width: 100%; box-sizing: border-box;
+    margin: 0; padding: 38px 12px 12px; border-radius: 0 0 9px 9px;
+    background: linear-gradient(transparent, rgba(0, 5, 9, .82)); pointer-events: none;
+}
 #recipeEditCoverDialog :is(.recipe-edit-cover-label, .recipe-edit-cover-status) { display: none; }
-#recipeEditCoverDialog .recipe-edit-cover-primary-actions { display: flex; gap: 10px; }
+#recipeEditCoverDialog .recipe-edit-cover-primary-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; pointer-events: auto; }
 #recipeEditCoverDialog .recipe-edit-cover-primary-actions > .recipe-edit-cover-upload-button {
     display: inline-flex; align-items: center; justify-content: center; gap: 8px;
     width: auto; min-height: 42px; height: auto; margin: 0; padding: 10px 12px;
     border: 1px solid var(--app-border-strong); border-radius: 8px;
-    background: var(--app-surface-soft); color: var(--app-text); font-size: 13px;
+    background: #101c25; color: #f1f5f9; font-size: 13px;
 }
 #recipeEditCoverDialog .recipe-edit-cover-primary-actions > .recipe-edit-cover-remove-button { flex: 0 1 auto; color: #ff7785; }
-#recipeEditCoverDialog .recipe-image-prompt-toggle { width: 100%; min-height: 42px; margin: 0; font-size: 13px; }
+/* Keep the saved prompt in the form for generation and persistence, without a prompt control in this popup. */
+#recipeEditCoverDialog .recipe-edit-cover-prompt { display: none !important; }
 #recipeEditCoverDialog [data-cover-dialog-status] { margin: 12px 0 0; color: var(--app-muted); font-size: 13px; line-height: 1.4; }
 #recipeEditCoverDialog [data-cover-dialog-status].error { color: #ff7785; }
 #recipeEditCoverDialog .recipe-edit-image-change-actions.recipe-edit-floating-menu {
