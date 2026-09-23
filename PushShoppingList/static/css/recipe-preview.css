@@ -210,12 +210,14 @@ body.recipe-preview-active { overflow: auto; }
     #recipePreviewPage .recipe-preview-ingredient-type::before { content: '('; }
     #recipePreviewPage .recipe-preview-ingredient-type::after { content: ')'; }
     #recipePreviewPage .recipe-preview-choice-count, #recipePreviewPage .recipe-preview-choice-chevron, #recipePreviewPage .recipe-preview-option-heading { display: none; }
-    #recipePreviewPage li.recipe-preview-choice-group { display: block; margin-left: -5mm; break-inside: auto; }
-    #recipePreviewPage .recipe-preview-choice-group summary { display: block; min-height: 0; margin: 1.5mm 0 .7mm; font-size: .9em; font-weight: 600; break-after: avoid; }
+    #recipePreviewPage li.recipe-preview-choice-group { display: list-item; margin-left: 0; break-inside: auto; }
+    #recipePreviewPage .recipe-preview-choice-group summary { display: block; min-height: 0; margin: 0 0 .7mm; font-size: 1em; font-weight: 400; break-after: avoid; }
     #recipePreviewPage .recipe-preview-choice-title { color: #333; text-decoration: none; opacity: 1; }
     #recipePreviewPage .recipe-preview-choice-options { display: block; margin: 0; }
     #recipePreviewPage .recipe-preview-choice-option[data-selected="false"] { display: none; }
     #recipePreviewPage .recipe-preview-choice-option { border: 0; padding: 0; background: transparent; }
+    /* Bundle additions nest below the first ingredient; optional rows remain peers. */
+    #recipePreviewPage .recipe-preview-choice-option li + li:not([data-preview-ingredient-type="optional"]) { margin-left: 5mm; list-style-type: circle; }
     #recipePreviewPage .recipe-preview-instructions ol { display: block; list-style: decimal outside; margin: 0; padding: 0 0 0 2.5em; }
     #recipePreviewPage .recipe-preview-instructions li { display: list-item; padding: 0; margin: 0 0 2mm; break-inside: avoid; orphans: 3; widows: 3; }
     #recipePreviewPage .recipe-preview-instructions li > div { line-height: 1.35; }
