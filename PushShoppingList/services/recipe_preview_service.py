@@ -6,6 +6,7 @@ requested multiplier once. Neither a preview nor an export saves the draft.
 """
 
 from copy import deepcopy
+from decimal import Decimal
 from html import escape
 from io import BytesIO
 import math
@@ -57,11 +58,15 @@ def preview_options(value, recipe=None):
     size = value.get("text_size", "normal")
     if size not in {"smaller", "normal", "larger"}:
         raise RecipePreviewError("Choose smaller, normal, or larger recipe text.")
+    nutrition_mode = value.get("nutrition_mode", "per_serving")
+    if nutrition_mode not in {"per_serving", "whole_recipe"}:
+        raise RecipePreviewError("Choose per serving or whole recipe nutrition.")
     return {
         "scale": scale,
         "show_image": value.get("show_image") is not False,
         "show_nutrition": value.get("show_nutrition") is not False,
         "text_size": size,
+        "nutrition_mode": nutrition_mode,
     }
 
 
@@ -108,7 +113,7 @@ def resolve_preview_recipe(recipe, scale, selections=None):
     return resolved, resolution["selected_options"]
 
 
-def preview_nutrition(recipe, scale):
+def preview_nutrition(recipe, scale, requested_mode):
     source = recipe.get("nutrition")
     if isinstance(source, list):
         rows = [
@@ -124,20 +129,40 @@ def preview_nutrition(recipe, scale):
                         if key not in present and source.get(key) == 0 and not isinstance(source.get(key), bool))
     basis = next((text(row.get("value")) for row in rows if row.get("key") == "serving_basis"), "")
     basis = basis or text(recipe.get("nutrition_serving_basis"))
-    # Match the existing nutrition tracker: whole/full/entire/total recipe
-    # nutrients scale with the batch; values per serving remain unchanged.
-    whole_recipe = any(token in basis.lower() for token in ("whole", "full", "entire", "total recipe"))
+    normalized_basis = basis.lower().strip()
+    whole_recipe = bool(re.fullmatch(r"(?:per |for (?:the )?)?(?:whole|full|entire|total) recipe", normalized_basis))
+    per_serving = normalized_basis in {"per serving", "per portion", "1 serving", "one serving"}
+    source_mode = "whole_recipe" if whole_recipe else "per_serving" if per_serving else None
+    count_match = re.fullmatch(r"(\d+(?:\.\d+)?)\s*(?:servings?|portions?|people)?", text(recipe_base_servings(recipe)), re.I)
+    count = Decimal(count_match[1]) if count_match else None
+    valid_count = count is not None and count > 0
+    modes = (["per_serving", "whole_recipe"] if valid_count else [source_mode]) if source_mode else []
+    mode = requested_mode if requested_mode in modes else source_mode
+    notice = ("Set the saved nutrition basis to per serving or whole recipe to enable conversion." if not source_mode
+              else "Set a valid base serving count to convert nutrition between per serving and whole recipe." if not valid_count else "")
+    factor = Decimal(1)
+    if mode == "whole_recipe":
+        factor = Decimal(str(scale)) * (count if per_serving else 1)
+    elif mode == "per_serving" and whole_recipe:
+        factor = Decimal(1) / count
     result = []
     for row in rows:
         key, value = text(row.get("key")), text(row.get("value"))
         if not key or not value or key == "serving_basis":
             continue
-        if whole_recipe and scale != 1:
-            match = re.fullmatch(r"\s*(\d+(?:\.\d+)?)\s*([^\d]*)", value)
+        if factor != 1:
+            match = re.fullmatch(r"([<>≤≥]?)\s*(\d+(?:,\d{3})*(?:\.\d+)?)\s*(kcal|cal|kj|g|mg|mcg|µg|μg|ug|iu)?", value, re.I)
             if match:
-                value = f"{float(match.group(1)) * scale:g}{(' ' + match.group(2).strip()) if match.group(2).strip() else ''}"
+                number = Decimal(match[2].replace(",", "")) * factor
+                formatted = format(Decimal(format(number, ".10g")), "f")
+                if "." in formatted:
+                    formatted = formatted.rstrip("0").rstrip(".")
+                value = f"{match[1]}{formatted}{(' ' + match[3]) if match[3] else ''}"
+            else:
+                value = f"Not converted (saved: {value})"
         result.append({"key": key, "value": value})
-    return result, basis or "Serving basis not specified"
+    label = {"per_serving": "Per serving", "whole_recipe": "Whole recipe"}.get(mode, basis or "Serving basis not specified")
+    return result, label, mode, modes, notice
 
 
 def preview_nutrition_summary(rows):
@@ -230,7 +255,7 @@ def prepare_recipe_preview(payload):
             recipe["instructions"] = preview_instruction_rows(draft["instructions"], saved.get("instructions", []))
     options = preview_options(payload.get("options"), recipe)
     resolved, selected = resolve_preview_recipe(recipe, options["scale"], payload.get("ingredient_option_selections"))
-    nutrition, basis = preview_nutrition(recipe, options["scale"])
+    nutrition, basis, nutrition_mode, nutrition_modes, nutrition_notice = preview_nutrition(recipe, options["scale"], options["nutrition_mode"])
     cover = saved.get("cover_image") if isinstance(saved.get("cover_image"), dict) else {}
     image_url = recipe_cover_image_url(url) if cover.get("path") else text(cover.get("url") or cover.get("src"))
     author = recipe.get("author") or recipe.get("author_name") or recipe.get("recipe_author")
@@ -264,6 +289,12 @@ def prepare_recipe_preview(payload):
         "nutrition": nutrition,
         "nutrition_summary": preview_nutrition_summary(nutrition),
         "nutrition_basis": basis,
+        "nutrition_mode": nutrition_mode,
+        "nutrition_modes": nutrition_modes,
+        "nutrition_notice": nutrition_notice,
+        "nutrition_context": (("Total for " if nutrition_mode == "whole_recipe" else "Per serving · Makes " if nutrition_mode == "per_serving" else "Recipe yield: ")
+                              + text(resolved["servings"]) + (" servings" if re.fullmatch(r"\d+(?:\.\d+)?", text(resolved["servings"])) else ""))
+                             if text(resolved["servings"]) else "Recipe yield not specified",
         "favorite": bool(saved.get("favorite")),
         "rating": recipe.get("rating") or 0,
     }
@@ -305,7 +336,8 @@ def build_recipe_preview_pdf_html(view, resolved, options):
         groups = "".join(f'<div class="nutrient-group"><h3>{escape(group["label"])}</h3><dl>' +
                          "".join(f'<div><dt>{escape(row["label"])}</dt><dd>{escape(row["value"])}</dd></div>' for row in group["rows"]) + '</dl></div>' for group in summary["groups"])
         nutrition = (f'<section class="nutrition"><h2>Nutrition <small>{escape(view["nutrition_basis"])}</small></h2>'
-                     f'<p class="source">Recipe yield: {escape(text(view["servings"]) or "Not specified")}</p>'
+                     f'<p class="source">{escape(view["nutrition_context"])}</p>'
+                     + (f'<p class="source">{escape(view["nutrition_notice"])}</p>' if view["nutrition_notice"] else '') +
                      f'<div class="nutrients">{rows}</div><div class="nutrient-details">{groups}</div><p class="source">{escape(summary["note"])}</p></section>'
                      if view["nutrition"] else '<section><h2>Nutrition</h2><p>Nutrition information is not available.</p></section>')
     size = {"smaller": "10pt", "normal": "11.5pt", "larger": "13pt"}[options["text_size"]]

@@ -165,16 +165,62 @@ def test_saved_scaled_recipe_is_scaled_from_its_base_exactly_once(recipe):
     assert [row["quantity"] for row in view["ingredients"]] == ["6", "3/4", None]
 
 
-@pytest.mark.parametrize("basis, calories", [("per serving", "200 kcal"), ("full recipe", "600 kcal")])
-def test_nutrition_basis_controls_scaling_without_inventing_data(recipe, basis, calories):
+@pytest.mark.parametrize("basis, mode, calories", [
+    ("per serving", "per_serving", "200 kcal"),
+    ("per serving", "whole_recipe", "2400 kcal"),
+    ("full recipe", "per_serving", "50 kcal"),
+    ("full recipe", "whole_recipe", "600 kcal"),
+])
+def test_nutrition_basis_controls_scaling_without_inventing_data(recipe, basis, mode, calories):
     recipe["nutrition"]["serving_basis"] = basis
-    result = preview.build_recipe_preview({"url": URL, "options": {"scale": 3}})["recipe"]
-    assert result["nutrition_basis"] == basis
+    original = deepcopy(recipe)
+    response, resolved = preview.prepare_recipe_preview({"url": URL, "options": {"scale": 3, "nutrition_mode": mode}})
+    result = response["recipe"]
+    assert result["nutrition_mode"] == mode
+    assert result["nutrition_modes"] == ["per_serving", "whole_recipe"]
     assert {row["key"]: row["value"] for row in result["nutrition"]}["calories"] == calories
     assert {row["key"]: row["value"] for row in result["nutrition"]}["sugar"] == "0"
+    assert ("Total for 12 servings" if mode == "whole_recipe" else "Per serving · Makes 12 servings") == result["nutrition_context"]
+    assert calories in preview.build_recipe_preview_pdf_html(result, resolved, response["options"])
+    assert recipe == original
     del recipe["nutrition"]["serving_basis"]
     unknown = preview.build_recipe_preview({"url": URL})["recipe"]
     assert unknown["nutrition_basis"] == "Serving basis not specified"
+    assert unknown["nutrition_modes"] == []
+
+
+@pytest.mark.parametrize("servings", ["", "0", "4–6 servings", "one loaf"])
+@pytest.mark.parametrize("basis, available", [("per serving", "per_serving"), ("whole recipe", "whole_recipe")])
+def test_nutrition_missing_count_keeps_known_basis_and_disables_conversion(recipe, servings, basis, available):
+    recipe["servings"] = servings
+    recipe["nutrition"]["serving_basis"] = basis
+    view = preview.build_recipe_preview({"url": URL, "options": {"nutrition_mode": "whole_recipe" if available == "per_serving" else "per_serving"}})["recipe"]
+    assert view["nutrition_modes"] == [available]
+    assert view["nutrition_mode"] == available
+    assert "serving count" in view["nutrition_notice"]
+
+
+def test_nutrition_does_not_scale_unknown_basis_or_nonnumeric_amounts(recipe):
+    recipe["nutrition"].update(serving_basis="per 100 g", calories="200 kcal")
+    view = preview.build_recipe_preview({"url": URL, "options": {"scale": 3, "nutrition_mode": "whole_recipe"}})["recipe"]
+    assert view["nutrition_modes"] == []
+    assert view["nutrition_basis"] == "per 100 g"
+    assert view["nutrition"][0]["value"] == "200 kcal"
+    recipe["nutrition"].update(serving_basis="per serving", fat="trace", sodium="<1 mg")
+    view = preview.build_recipe_preview({"url": URL, "options": {"scale": .5, "nutrition_mode": "whole_recipe"}})["recipe"]
+    values = {row["key"]: row["value"] for row in view["nutrition"]}
+    assert values["calories"] == "400 kcal"
+    assert values["fat"] == "Not converted (saved: trace)"
+    assert values["sodium"] == "<2 mg"
+
+
+def test_nutrition_uses_base_servings_and_rejects_invalid_mode(recipe):
+    recipe.update(servings="8 servings", scaling={"base_servings": "4 servings", "selected_multiplier": 2})
+    recipe["nutrition"]["serving_basis"] = "whole recipe"
+    result = preview.build_recipe_preview({"url": URL, "options": {"scale": 3}})["recipe"]
+    assert result["nutrition"][0]["value"] == "50 kcal"
+    with pytest.raises(preview.RecipePreviewError):
+        preview.build_recipe_preview({"url": URL, "options": {"nutrition_mode": "anything"}})
 
 
 def test_nutrition_groups_keep_zero_unknowns_and_missing_macros_distinct(recipe):
@@ -222,7 +268,7 @@ def test_pdf_visibility_text_size_and_escaping_preserve_projection(recipe, monke
     response["options"].update(show_image=True, show_nutrition=True)
     visible = preview.build_recipe_preview_pdf_html(response["recipe"], resolved, response["options"])
     assert '<figure class="title-image">' in visible
-    assert "Nutrition <small>per serving" in visible
+    assert "Nutrition <small>Per serving" in visible
     assert "200 kcal" in visible
 
 

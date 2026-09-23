@@ -56,7 +56,7 @@ async function openIntegratedRecipePreview({history = true} = {}) {
         draft: {...(recipeEditOriginalSnapshot || {}), ...collected.recipe,
             ...collectRecipeEditorCategoryValues(),
             cookbook_name: document.getElementById('recipeEditCookbookField')?.dataset.currentCookbookName || ''},
-        options: {scale: currentRecipeEditScaleMultiplier(), show_image: true, show_nutrition: true, text_size: 'normal'},
+        options: {scale: currentRecipeEditScaleMultiplier(), show_image: true, show_nutrition: true, text_size: 'normal', nutrition_mode: 'per_serving'},
         hidden, page, trigger: document.activeElement, title: document.title,
         contentLabel: content.getAttribute('aria-label'), scroll: content.scrollTop,
         shellScroll: document.querySelector('[data-app-main-shell]')?.scrollTop || 0,
@@ -133,7 +133,9 @@ async function refreshIntegratedRecipePreview() {
         state.model = data.recipe;
         state.selections = data.ingredient_option_selections;
         state.projectionReady = true;
+        const nutritionFocus = document.activeElement?.dataset.previewNutritionMode;
         renderIntegratedRecipePreview(state);
+        if (nutritionFocus) state.page.querySelector(`[data-preview-nutrition-mode="${nutritionFocus}"]`)?.focus({preventScroll: true});
         recipePreviewStatus('');
         state.page.querySelector('[data-preview-action="pdf"]').disabled = Boolean(state.pdfBusy);
         state.page.querySelector('[data-preview-action="print"]').disabled = false;
@@ -174,7 +176,10 @@ function renderIntegratedRecipePreview(state) {
             </section>
             <section class="recipe-preview-instructions"><h2>Instructions</h2><ol>${(r.instructions || []).map((step,index) => `<li><span class="recipe-preview-step-number" aria-hidden="true">${index+1}</span><div>${step.section ? `<strong class="recipe-preview-step-section">${esc(step.section)}</strong>` : ''}${esc(step.instruction || step.text || '')}${recipePreviewInstructionMetadata(step)}</div></li>`).join('') || '<li>No instructions specified.</li>'}</ol></section>
         </div>
-        <section class="recipe-preview-nutrition" data-preview-nutrition><div class="recipe-preview-section-heading"><h2>Nutrition</h2><span class="recipe-preview-nutrition-basis">${esc(r.nutrition_basis || 'Basis not specified')}</span><span class="recipe-preview-nutrition-yield">Recipe yield: ${esc(String(r.servings || 'Not specified'))}</span></div>${recipePreviewNutritionHtml(r)}</section>`;
+        <section class="recipe-preview-nutrition" data-preview-nutrition><div class="recipe-preview-section-heading"><h2>Nutrition</h2>
+            <div class="recipe-preview-segment recipe-preview-nutrition-toggle" role="group" aria-label="Nutrition display">${[['per_serving','Per serving'],['whole_recipe','Whole recipe']].map(([mode,label]) => `<button type="button" data-preview-nutrition-mode="${mode}" aria-pressed="${r.nutrition_mode === mode}" ${r.nutrition_modes.includes(mode) ? '' : 'disabled'}>${label}</button>`).join('')}</div>
+            <span class="recipe-preview-nutrition-yield" aria-live="polite">${esc(r.nutrition_context)}</span></div>
+            ${r.nutrition_notice ? `<p class="recipe-preview-nutrition-note">${esc(r.nutrition_basis)}. ${esc(r.nutrition_notice)}</p>` : ''}${recipePreviewNutritionHtml(r)}</section>`;
     const input = state.page.querySelector('#recipePreviewServings');
     const servings = recipeEditServingsParts(r.servings).number;
     input.value = Number.isFinite(servings) ? servings : '';
@@ -243,6 +248,10 @@ async function handleRecipePreviewClick(event) {
     if (button.dataset.previewSize) {
         state.options.text_size = button.dataset.previewSize;
         return syncRecipePreviewOptions();
+    }
+    if (button.dataset.previewNutritionMode) {
+        state.options.nutrition_mode = button.dataset.previewNutritionMode;
+        return refreshIntegratedRecipePreview();
     }
     if (button.hasAttribute('data-preview-rating')) {
         setRecipeRating(button.dataset.previewRating);
