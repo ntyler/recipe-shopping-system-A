@@ -216,8 +216,6 @@ body.recipe-preview-active { overflow: auto; }
     #recipePreviewPage .recipe-preview-choice-options { display: block; margin: 0; }
     #recipePreviewPage .recipe-preview-choice-option[data-selected="false"] { display: none; }
     #recipePreviewPage .recipe-preview-choice-option { border: 0; padding: 0; background: transparent; }
-    /* Bundle additions nest below the first ingredient; optional rows remain peers. */
-    #recipePreviewPage .recipe-preview-choice-option li + li:not([data-preview-ingredient-type="optional"]) { margin-left: 5mm; list-style-type: circle; }
     #recipePreviewPage .recipe-preview-instructions ol { display: block; list-style: decimal outside; margin: 0; padding: 0 0 0 2.5em; }
     #recipePreviewPage .recipe-preview-instructions li { display: list-item; padding: 0; margin: 0 0 2mm; break-inside: avoid; orphans: 3; widows: 3; }
     #recipePreviewPage .recipe-preview-instructions li > div { line-height: 1.35; }
