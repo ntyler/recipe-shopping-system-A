@@ -25016,6 +25016,7 @@ function populateRecipeEditor(recipe, originalUrl, options = {}) {
     updateRecipeEditContextPanels();
     initializeRecipeEditTotalTimeCalculation();
     updateRecipeEditStickyOffsets();
+    if (typeof syncRecipeEditCompactSummary === "function") syncRecipeEditCompactSummary();
     if (preserveSavedState) {
         recipeEditOriginalSnapshot = previousOriginalSnapshot;
         setValue("recipeEditId", previousRecipeId);
@@ -26376,6 +26377,14 @@ function recipeEditTabKey(value) {
         note: "notes",
         notes: "notes",
         reflection: "notes",
+        recipeimage: "recipeimage",
+        image: "recipeimage",
+        recipeinformation: "recipeinformation",
+        information: "recipeinformation",
+        cookbookassignment: "cookbookassignment",
+        cookbook: "cookbookassignment",
+        sourceinformation: "sourceinformation",
+        source: "sourceinformation",
     }[normalized] || "ingredients";
 }
 
@@ -26412,13 +26421,16 @@ function setRecipeEditActiveTab(tabKey, options = {}) {
 function initRecipeEditTabs() {
     const tabsRoot = document.querySelector("[data-recipe-edit-tabs]");
 
-    if (!tabsRoot || tabsRoot.dataset.recipeEditTabsBound === "1") {
+    if (!tabsRoot) {
         return;
     }
 
+    const firstInitialization = tabsRoot.dataset.recipeEditTabsBound !== "1";
     tabsRoot.dataset.recipeEditTabsBound = "1";
 
     tabsRoot.querySelectorAll("[data-recipe-edit-tab]").forEach(tab => {
+        if (tab.dataset.recipeEditTabBound === "1") return;
+        tab.dataset.recipeEditTabBound = "1";
         tab.addEventListener("click", () => {
             setRecipeEditActiveTab(tab.dataset.recipeEditTab, { focus: false });
         });
@@ -26444,7 +26456,7 @@ function initRecipeEditTabs() {
         });
     });
 
-    setRecipeEditActiveTab("ingredients");
+    if (firstInitialization) setRecipeEditActiveTab("ingredients");
 }
 
 function recipeEditInputValue(id) {
@@ -44897,7 +44909,9 @@ function runRecipeAiQualityReportAction(button) {
         if (action === "switch_tab") {
             setRecipeEditActiveTab(target, { focus: true });
         } else if (action === "focus_field") {
-            document.getElementById(target)?.focus({ preventScroll: false });
+            const control = document.getElementById(target);
+            if (typeof revealRecipeEditControlPanel === "function") revealRecipeEditControlPanel(control);
+            control?.focus({ preventScroll: false });
         } else if (["review_ingredient", "change_match"].includes(action)) {
             focusRecipeAiQualityIngredient(index, "ingredient");
         } else if (action === "normalize_unit") {
@@ -44906,6 +44920,7 @@ function runRecipeAiQualityReportAction(button) {
             focusRecipeAiQualityIngredient(index, "quantity");
         } else if (action === "open_source_documents") {
             const card = document.querySelector("[data-source-documents-card]");
+            if (typeof revealRecipeEditControlPanel === "function") revealRecipeEditControlPanel(card);
             if (card) { card.open = true; card.scrollIntoView({ block: "center" }); card.querySelector("summary")?.focus(); }
         } else if (["edit_restaurant", "refresh_restaurant"].includes(action)) {
             document.querySelector(".recipe-edit-restaurant-edit")?.click();
@@ -45008,6 +45023,7 @@ async function applyRecipeAiQualitySafeFixes(button) {
 }
 
 function updateRecipeEditContextPanels() {
+    if (typeof syncRecipeEditCompactSummary === "function") syncRecipeEditCompactSummary();
     syncRecipeEditDocumentRows();
     updateRecipeEditRestaurantCard();
     updateRecipeEditIngredientGallery();
@@ -45419,6 +45435,7 @@ function rememberRecipeEditorCoverImageAsSaved(form = document.getElementById("r
 }
 
 function updateRecipeEditorDirtyState(form = document.getElementById("recipeEditForm")) {
+    if (typeof syncRecipeEditCompactSummary === "function") syncRecipeEditCompactSummary();
     if (!form || !recipeEditSavedFormSnapshots.has(form)) {
         return false;
     }
@@ -45595,6 +45612,7 @@ function showRecipeEditorValidationErrors(errors, options = {}) {
     summary.hidden = false;
 
     const firstErrorControl = safeErrors.map(error => error.control).find(Boolean);
+    if (typeof revealRecipeEditControlPanel === "function") revealRecipeEditControlPanel(firstErrorControl);
     const optionRow = firstErrorControl && firstErrorControl.closest
         ? firstErrorControl.closest("[data-substitution-option-row]")
         : null;
@@ -47282,6 +47300,10 @@ function scrollRecipeEditorToSection(sectionKey) {
         nutrition: ".recipe-edit-nutrition-section",
         notes: ".recipe-edit-reflection-section",
         reflection: ".recipe-edit-reflection-section",
+        recipeimage: "#recipeEditPanelRecipeImage",
+        recipeinformation: "#recipeEditPanelRecipeInformation",
+        cookbookassignment: "#recipeEditPanelCookbookAssignment",
+        sourceinformation: "#recipeEditPanelSourceInformation",
     }[normalized];
     const section = selector ? document.querySelector(selector) : null;
 

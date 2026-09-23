@@ -16,24 +16,33 @@ data-is-guest-demo="{{ 'true' if is_guest_demo else 'false' }}"
 
 {% block app_content_attributes %}aria-label="Recipe editor"{% endblock %}
 
+{% block app_styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/recipe-edit-summary.css', v=app_css_version) }}">
+{% endblock %}
+
 {% block app_content %}
     {% set recipe_edit_only = true %}
     {% include "sections/current_recipe_url_log.html" %}
 {% endblock %}
 
 {% block app_scripts %}
+<script src="{{ url_for('static', filename='js/recipe-edit-summary.js', v=app_js_version) }}"></script>
+<script src="{{ url_for('static', filename='js/recipe-edit-sections.js', v=app_js_version) }}"></script>
 <script>
 window.addEventListener("DOMContentLoaded", () => {
     const recipeUrl = document.body ? document.body.dataset.recipeEditUrl || "" : "";
     if (typeof organizeRecipeEditStandaloneWorkspace === "function") {
         organizeRecipeEditStandaloneWorkspace();
     }
+    organizeRecipeEditCompactSummary();
+    organizeRecipeEditCompactSections();
 
     if (recipeUrl && typeof openRecipeEditor === "function") {
         const pendingOptions = typeof consumeRecipeEditPendingAction === "function"
             ? consumeRecipeEditPendingAction(recipeUrl)
             : {};
         openRecipeEditor({ dataset: { recipeUrl } }, pendingOptions).then(() => {
+            syncRecipeEditCompactSummary();
             if (typeof openRecipeIngredientUsageTarget === "function") {
                 openRecipeIngredientUsageTarget(window.location.hash);
             }
