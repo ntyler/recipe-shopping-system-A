@@ -173,8 +173,9 @@ function renderIntegratedRecipePreview(state) {
             <section class="recipe-preview-ingredients"><div class="recipe-preview-section-heading"><h2>Ingredients</h2><button type="button" data-preview-action="shopping">${recipePreviewIcon('plus')}Shopping List</button></div>
                 <ul>${recipePreviewIngredientsHtml(r, state.url, expandedChoices)}</ul>
             </section>
-            <section class="recipe-preview-instructions"><h2>Instructions</h2><ol>${(r.instructions || []).map((step,index) => `<li><span class="recipe-preview-step-number" aria-hidden="true">${index+1}</span><div>${step.section ? `<strong class="recipe-preview-step-section">${esc(step.section)}</strong>` : ''}${esc(step.instruction || step.text || '')}${recipePreviewInstructionMetadata(step)}</div></li>`).join('') || '<li>No instructions specified.</li>'}</ol></section>
+            <section class="recipe-preview-equipment"><div class="recipe-preview-section-heading"><h2>Equipment</h2></div>${recipePreviewEquipmentHtml(r, state.url)}</section>
         </div>
+        <section class="recipe-preview-instructions"><h2>Instructions</h2><ol>${(r.instructions || []).map((step,index) => `<li><span class="recipe-preview-step-number" aria-hidden="true">${index+1}</span><div>${step.section ? `<strong class="recipe-preview-step-section">${esc(step.section)}</strong>` : ''}${esc(step.instruction || step.text || '')}${recipePreviewInstructionMetadata(step)}</div></li>`).join('') || '<li>No instructions specified.</li>'}</ol></section>
         <section class="recipe-preview-nutrition" data-preview-nutrition><div class="recipe-preview-section-heading"><h2>Nutrition</h2>
             <div class="recipe-preview-segment recipe-preview-nutrition-toggle" role="group" aria-label="Nutrition display">${[['per_serving','Per serving'],['whole_recipe','Whole recipe']].map(([mode,label]) => `<button type="button" data-preview-nutrition-mode="${mode}" aria-pressed="${r.nutrition_mode === mode}" ${r.nutrition_modes.includes(mode) ? '' : 'disabled'}>${label}</button>`).join('')}</div>
             <span class="recipe-preview-nutrition-yield" aria-live="polite">${esc(r.nutrition_context)}</span></div>
@@ -214,6 +215,11 @@ function recipePreviewIngredientsHtml(recipe, url, expandedChoices = new Set()) 
             <summary title="Expand to compare bundles and choose one bundle."><span class="recipe-preview-choice-title">${escapeHtml(group.source_text)}</span><span class="recipe-preview-choice-count">${group.options.length} bundles</span><span class="recipe-preview-choice-chevron" aria-hidden="true">›</span></summary>
             <div class="recipe-preview-choice-options" role="radiogroup" aria-label="Choose one bundle for ${escapeAttribute(group.source_text)}">${options}</div></details></li>`;
     }).join('') || '<li>No ingredients specified.</li>';
+}
+
+function recipePreviewEquipmentHtml(recipe, url) {
+    if (!recipe.equipment?.length) return '<p class="recipe-preview-empty">No equipment specified.</p>';
+    return `<ul>${recipe.equipment.map(item => `<li class="recipe-task-row"><input type="checkbox" class="recipe-task-check" aria-label="Mark ${escapeAttribute(item.name)} as ready" data-task-key="${escapeAttribute(`equipment|${url}|${item.id}`)}"><span class="recipe-task-text">${escapeHtml(item.name)}</span></li>`).join('')}</ul>`;
 }
 
 function syncRecipePreviewChoiceChecks(scope) {

@@ -310,6 +310,9 @@ def prepare_recipe_preview(payload):
                          "preparation": text(row.get("preparation")), "notes": text(row.get("notes"))}
                         for row in resolved["ingredients"]],
         "ingredient_groups": preview_ingredient_groups(recipe, resolved["ingredients"], selected, options["scale"]),
+        "equipment": [{"id": text(row.get("equipment_row_id") or row.get("row_id") or row.get("id")) or str(index),
+                       "name": row["equipment"]}
+                      for index, row in enumerate(recipe_edit_service.normalize_equipment_records(recipe.get("equipment", [])), start=1)],
         "instructions": instructions,
         "nutrition": nutrition,
         "nutrition_summary": preview_nutrition_summary(nutrition),
@@ -368,6 +371,7 @@ def build_recipe_preview_pdf_html(view, resolved, options):
     if standard:
         ingredient_blocks.append(ingredient_table(standard))
     ingredients = "".join(ingredient_blocks)
+    equipment = recipe_extract_service.format_video_recipe_equipment_for_pdf(view.get("equipment", [])) or '<p class="source">No equipment specified.</p>'
     instructions = recipe_extract_service.format_video_recipe_instructions_for_pdf(resolved["instructions"])
     nutrition = ""
     if options["show_nutrition"]:
@@ -395,6 +399,8 @@ header {{ min-height: 132px; }} .source {{ color: #52636a; font-size: .8em; }}
 .metrics {{ clear: both; display: flex; gap: 12px; border-block: 1px solid #ccd6d3; padding: 12px 0; margin: 18px 0; break-inside: avoid; }}
 .metrics div {{ flex: 1; }} .metrics small,.metrics strong {{ display: block; }} small {{ font-size: .8em; color: #52636a; font-weight: normal; }}
 .ingredients {{ margin-bottom: 22px; }} table {{ width: 100%; border-collapse: collapse; }} thead {{ display: table-header-group; }}
+.preparation {{ display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 24px; }}
+.preparation > section {{ min-width: 0; }} .equipment-list {{ padding-left: 20px; margin-top: 0; }} .equipment-list li {{ margin-bottom: 6px; }}
 .choice-heading {{ margin: 16px 0 8px; break-after: avoid; break-inside: avoid; }} .choice-heading h3 {{ margin: 4px 0; }}
 th,td {{ text-align: left; border-bottom: 1px solid #e3e8e6; padding: 7px; vertical-align: top; }} th {{ font-size: .8em; }}
 tr,li,.title-image {{ break-inside: avoid; }} li {{ padding-left: 6px; margin-bottom: 14px; white-space: pre-line; }} li::marker {{ color: #087958; font-weight: bold; }}
@@ -403,7 +409,8 @@ tr,li,.title-image {{ break-inside: avoid; }} li {{ padding-left: 6px; margin-bo
 .nutrients {{ display: flex; flex-wrap: wrap; gap: 12px 24px; }} .nutrients div {{ min-width: 105px; break-inside: avoid; }} .nutrients span,.nutrients strong {{ display: block; }} .nutrients span {{ font-size: .8em; }}
 .nutrient-details {{ display: flex; flex-wrap: wrap; gap: 18px; margin-top: 18px; }} .nutrient-group {{ flex: 1 1 170px; break-inside: avoid; }} .nutrient-group h3 {{ margin-bottom: 8px; }} .nutrient-group dl {{ margin: 0; }} .nutrient-group dl div {{ display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-bottom: 1px solid #e3e8e6; }} .nutrient-group dd {{ margin: 0; white-space: nowrap; }}
 </style></head><body><header>{image}<h1>{title}</h1><div class="source">{attribution}</div>{description}<div class="tags">{tags}</div><p class="source">{assignment}</p></header>
-<div class="metrics">{metrics}</div><section class="ingredients"><h2>Ingredients</h2>{ingredients}</section>
+<div class="metrics">{metrics}</div><div class="preparation"><section class="ingredients"><h2>Ingredients</h2>{ingredients}</section>
+<section class="equipment"><h2>Equipment</h2>{equipment}</section></div>
 <section class="instructions"><h2>Instructions</h2>{instructions}</section>{nutrition}</body></html>'''
 
 

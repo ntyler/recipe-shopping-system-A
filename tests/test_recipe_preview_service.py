@@ -58,6 +58,37 @@ def test_projection_resolves_complete_bundle_without_duplicate_or_invented_amoun
     assert recipe == original
 
 
+def test_equipment_preview_normalizes_saved_rows_without_scaling_or_mutating(recipe):
+    recipe["equipment"] = ["mixing bowl", {"name": "oven"}, {"equipment": "2 whisks", "equipment_row_id": "whisks"}, ""]
+    original = deepcopy(recipe)
+    view = preview.build_recipe_preview({"url": URL, "options": {"scale": 3}})["recipe"]
+    assert [row["name"] for row in view["equipment"]] == ["mixing bowl", "oven", "2 whisks"]
+    assert view["equipment"][2]["id"] == "whisks"
+    assert recipe == original
+
+
+@pytest.mark.parametrize("equipment, expected", [
+    ([{"text": "9-inch pan <oven safe>", "row_id": "pan"}], ["9-inch pan <oven safe>"]),
+    ([], []),
+])
+def test_equipment_draft_and_pdf_honor_edits_and_explicit_removal(recipe, equipment, expected):
+    recipe["equipment"] = ["Saved mixing bowl"]
+    original = deepcopy(recipe)
+    response, resolved = preview.prepare_recipe_preview({
+        "url": URL, "recipe": {"equipment": equipment}, "options": {"show_image": False},
+    })
+    assert [row["name"] for row in response["recipe"]["equipment"]] == expected
+    html = preview.build_recipe_preview_pdf_html(response["recipe"], resolved, response["options"])
+    assert html.index("<h2>Ingredients</h2>") < html.index("<h2>Equipment</h2>") < html.index("<h2>Instructions</h2>")
+    assert "Saved mixing bowl" not in html
+    if expected:
+        assert "9-inch pan &lt;oven safe&gt;" in html
+        assert "<oven safe>" not in html
+    else:
+        assert "No equipment specified." in html
+    assert recipe == original
+
+
 @pytest.mark.parametrize("amount, expected", [("12.50", "12.50 CAD"), (0, "0 CAD"), ("", "")])
 def test_preview_assignment_uses_draft_without_scaling_price_or_restoring_cleared_price(recipe, amount, expected):
     recipe.update(cookbook_name="Saved cookbook", menu_section="Saved section", menu_price="$99")
