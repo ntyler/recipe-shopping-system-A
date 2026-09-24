@@ -111,7 +111,15 @@ async function openIntegratedRecipePreview({history = true} = {}) {
             </fieldset><p data-preview-meal-status role="status" aria-live="polite"></p>
         </form>
         <p id="recipePreviewStatus" class="recipe-preview-status" role="status" aria-live="polite">Loading recipe preview…</p>
-        <article class="recipe-preview-card" aria-label="Recipe" aria-busy="true"></article>`;
+        <article class="recipe-preview-card" aria-label="Recipe" aria-busy="true"></article>
+        <section class="recipe-preview-meal-planning" aria-labelledby="recipePreviewMealHeading">
+            <div class="recipe-preview-section-heading"><h2 id="recipePreviewMealHeading">Meal Planning</h2>
+                <button type="button" data-preview-action="meal-plan" aria-controls="recipePreviewMealPanel">Add to Meal Plan</button>
+                <button type="button" data-preview-action="refresh-meals">Refresh</button>
+                <a href="/#mealPlannerPage">View Meal Planner</a></div>
+            <p class="recipe-preview-status" data-preview-plans-status role="status" aria-live="polite"></p>
+            <div data-preview-planned-meals></div>
+        </section>`;
     syncRecipePreviewOptions();
     page.querySelector('[data-preview-breadcrumb]').textContent = state.draft.display_name || state.draft.recipe_title || 'Recipe';
     page.addEventListener('click', handleRecipePreviewClick);
@@ -133,7 +141,7 @@ async function openIntegratedRecipePreview({history = true} = {}) {
     content.scrollTop = 0;
     document.querySelector('[data-app-main-shell]')?.scrollTo(0, 0);
     page.querySelector('[data-preview-action="back"]').focus({preventScroll: true});
-    await refreshIntegratedRecipePreview();
+    await Promise.all([refreshIntegratedRecipePreview(), refreshRecipePreviewMeals(state)]);
 }
 
 function closeIntegratedRecipePreview({history = true} = {}) {
@@ -141,6 +149,7 @@ function closeIntegratedRecipePreview({history = true} = {}) {
     if (!state) return;
     integratedRecipePreview = null;
     state.abort?.abort();
+    state.mealsAbort?.abort();
     state.hidden.forEach(({node, hidden, inert}) => { node.hidden = hidden; node.inert = inert; });
     state.page.remove();
     document.body.classList.remove('recipe-preview-active');
@@ -197,8 +206,10 @@ function renderIntegratedRecipePreview(state) {
     const source = isLegitimateWebUrl(r.source_url || '') ? r.source_url : '';
     const sourceLabel = source ? new URL(source).hostname.replace(/^www\./, '') : '';
     const metrics = [['prep_time','Prep Time','clock'],['cook_time','Cook Time','cook'],['total_time','Total Time','clock'],['servings','Servings','servings']];
-    const printMetadata = [['course','Course'],['cuisine','Cuisine'],['author','Author']]
-        .filter(([key]) => r[key]).map(([key,label]) => `<span><span class="recipe-preview-metadata-label">${label}:</span> ${esc(r[key])}</span>`).join('');
+    const printMetadata = [['course','Course'],['cuisine','Cuisine'],['dietary_preferences','Dietary Preferences'],
+        ['main_ingredient','Main Ingredient'],['cooking_method','Cooking Method'],['occasion','Occasion'],
+        ['custom_tags','Custom Tags'],['prep_time_group','Prep Time Group'],['author','Author']]
+        .filter(([key]) => r[key]).map(([key,label]) => `<div class="recipe-preview-metadata-field" data-field="${key}"><span class="recipe-preview-metadata-label">${label}</span><span class="recipe-preview-metadata-value">${esc(r[key])}</span></div>`).join('');
     state.page.querySelector('.recipe-preview-card').innerHTML = `
         <header class="recipe-preview-summary">
             <div class="recipe-preview-photo" data-preview-image>${r.image_url ? `<img src="${escapeAttribute(r.image_url)}" alt="${escapeAttribute(r.title)}">` : `<span class="recipe-preview-no-image">${recipePreviewIcon('image')}No recipe image</span>`}
@@ -317,6 +328,34 @@ function openRecipePreviewMealPanel() {
     form.elements.date.focus();
 }
 
+async function refreshRecipePreviewMeals(state = integratedRecipePreview) {
+    if (!state) return;
+    state.mealsAbort?.abort();
+    const abort = state.mealsAbort = new AbortController();
+    const status = state.page.querySelector('[data-preview-plans-status]');
+    status.textContent = 'Loading planned meals…';
+    try {
+        const response = await fetch(`/api/meal-plan?recipe_url=${encodeURIComponent(state.url)}`, {signal: abort.signal});
+        const result = await response.json();
+        if (!response.ok || !result.ok) throw new Error(result.error || 'Unable to load planned meals. Use Refresh to try again.');
+        if (integratedRecipePreview !== state || abort.signal.aborted) return;
+        const esc = escapeHtml;
+        state.page.querySelector('[data-preview-planned-meals]').innerHTML = result.meals.length
+            ? `<ul class="recipe-preview-planned-meals">${result.meals.map(meal => {
+                const date = new Date(`${meal.date}T12:00:00`).toLocaleDateString(undefined, {weekday:'short', year:'numeric', month:'short', day:'numeric'});
+                const mealName = meal.meal_type[0].toUpperCase() + meal.meal_type.slice(1);
+                return `<li><div class="recipe-preview-planned-meal-summary"><strong><time datetime="${escapeAttribute(meal.date)}">${esc(date)}</time> · ${esc(mealName)}</strong>
+                    <span>${meal.planned_servings ? `${esc(String(meal.planned_servings))} servings` : 'Servings not set'}</span>
+                    <a href="/?meal_week=${encodeURIComponent(meal.date)}#mealPlannerPage">View in Meal Planner</a></div>
+                    ${meal.prep_notes ? `<p class="recipe-preview-prep-notes"><strong>Meal-prep notes</strong>${esc(meal.prep_notes)}</p>` : ''}</li>`;
+            }).join('')}</ul>`
+            : '<p class="recipe-preview-empty">This recipe has no planned meals yet. Add a date, meal, and servings to get started.</p>';
+        status.textContent = '';
+    } catch (error) {
+        if (integratedRecipePreview === state && !abort.signal.aborted) status.textContent = error.message;
+    }
+}
+
 async function submitRecipePreviewMeal(event) {
     event.preventDefault();
     const state = integratedRecipePreview, form = event.currentTarget;
@@ -337,6 +376,13 @@ async function submitRecipePreviewMeal(event) {
         link.href = `/?meal_week=${encodeURIComponent(data.get('date'))}#mealPlannerPage`;
         link.textContent = 'View Meal Planner';
         status.append(link);
+        if (integratedRecipePreview === state) {
+            await refreshRecipePreviewMeals(state);
+            form.hidden = true;
+            const section = state.page.querySelector('.recipe-preview-meal-planning');
+            section.scrollIntoView({block: 'start'});
+            section.querySelector('[data-preview-action="meal-plan"]').focus({preventScroll: true});
+        }
     } catch (error) { status.textContent = error.message; }
     finally { state.mealBusy = false; form.querySelector('fieldset').disabled = false; }
 }
@@ -499,6 +545,7 @@ async function handleRecipePreviewClick(event) {
     switch (button.dataset.previewAction) {
         case 'back': return closeIntegratedRecipePreview();
         case 'meal-plan': return openRecipePreviewMealPanel();
+        case 'refresh-meals': return refreshRecipePreviewMeals();
         case 'cancel-meal':
             state.page.querySelector('#recipePreviewMealPanel').hidden = true;
             state.page.querySelector('[data-preview-action="meal-plan"]').focus();

@@ -237,6 +237,18 @@ def preview_tags(recipe):
     return list(dict.fromkeys(text(value) for value in values if text(value)))
 
 
+def preview_classification_text(*values):
+    labels, seen = [], set()
+    for value in values:
+        for row in recipe_edit_service.normalize_text_rows(value):
+            for label in re.split(r"[,;]", row):
+                label = text(label)
+                if label and label.casefold() not in seen:
+                    labels.append(label)
+                    seen.add(label.casefold())
+    return ", ".join(labels)
+
+
 def preview_instruction_rows(draft, saved):
     """Retain step metadata by identity, never by its old list position."""
     existing = recipe_edit_service.normalize_instruction_records(saved)
@@ -278,7 +290,7 @@ def prepare_recipe_preview(payload):
     if draft:
         allowed = {
             "recipe_title", "display_name", "description", "source_url", "author", "author_name",
-            "recipe_author", "cuisine", "cuisine_tags", "dietary_preferences", "recipe_categories", "categories",
+            "recipe_author", "cuisine", "cuisine_tags", "dietary_preferences", "dietary_preference", "recipe_categories", "categories", "prep_time_group",
             "meal_type", "course", "main_ingredient", "cooking_method", "occasion", "custom_categories",
             "custom_tags", "tags", "servings", "quantity", "scaling", "rating",
             "level", "prep_time", "cook_time", "total_time", "inactive_time", "ingredients", "instructions",
@@ -303,6 +315,10 @@ def prepare_recipe_preview(payload):
     categories = categories if isinstance(categories, dict) else {}
     course = recipe.get("course") or recipe.get("meal_type") or categories.get("meal_type")
     cuisine = recipe.get("cuisine") or categories.get("cuisine") or recipe.get("cuisine_tags") or categories.get("cuisine_tags")
+    if isinstance(draft, dict) and "cuisine_tags" in draft:
+        cuisine = draft["cuisine_tags"]
+    elif not (isinstance(draft, dict) and "cuisine" in draft):
+        cuisine = recipe.get("cuisine_tags") or categories.get("cuisine_tags") or cuisine
     view = {
         "title": text(recipe.get("display_name") or recipe.get("recipe_title")) or "Recipe",
         "description": text(recipe.get("description") if "description" in recipe else recipe.get("menu_description")),
@@ -311,7 +327,13 @@ def prepare_recipe_preview(payload):
         "recipe_notes": recipe_edit_service.normalize_recipe_note_sections(recipe.get("recipe_notes") if "recipe_notes" in recipe else recipe.get("recipe_note_sections") or recipe.get("source_notes") or []),
         "saved_recipe_notes": recipe_edit_service.normalize_recipe_note_sections(saved.get("recipe_notes") if "recipe_notes" in saved else saved.get("recipe_note_sections") or saved.get("source_notes") or []),
         "course": ", ".join(recipe_edit_service.normalize_text_rows(course)),
-        "cuisine": ", ".join(recipe_edit_service.normalize_text_rows(cuisine)),
+        "cuisine": preview_classification_text(cuisine),
+        "dietary_preferences": preview_classification_text(recipe.get("dietary_preferences", categories.get("dietary_preferences")), recipe.get("dietary_preference", categories.get("dietary_preference"))),
+        "main_ingredient": preview_classification_text(recipe.get("main_ingredient", categories.get("main_ingredient"))),
+        "cooking_method": preview_classification_text(recipe.get("cooking_method", categories.get("cooking_method"))),
+        "occasion": preview_classification_text(recipe.get("occasion", categories.get("occasion"))),
+        "custom_tags": preview_classification_text(recipe.get("custom_categories", categories.get("custom_categories")), recipe.get("custom_tags", categories.get("custom_tags")), recipe.get("tags", categories.get("tags"))),
+        "prep_time_group": preview_classification_text(recipe.get("prep_time_group", categories.get("prep_time_group"))),
         "source_url": text(recipe.get("source_url")),
         "tags": preview_tags(recipe),
         "cookbook_name": text(recipe.get("cookbook_name")),
@@ -362,10 +384,11 @@ def build_recipe_preview_pdf_html(view, resolved, options):
     image = recipe_extract_service.format_video_recipe_title_image_for_pdf(resolved) if options["show_image"] else ""
     description = f'<p class="description">{escape(view["description"])}</p>' if view["description"] else ""
     attribution = escape(view["source_url"])
-    metadata = "".join(f'<span>{label}: {escape(view[key])}</span>'
-                       for key, label in (("course", "Course"), ("cuisine", "Cuisine"), ("author", "Author")) if view.get(key))
+    metadata = "".join(f'<div class="metadata-field" data-field="{key}"><span class="metadata-label">{label}</span><span class="metadata-value">{escape(view[key])}</span></div>'
+                       for key, label in (("course", "Course"), ("cuisine", "Cuisine"), ("dietary_preferences", "Dietary Preferences"),
+                                          ("main_ingredient", "Main Ingredient"), ("cooking_method", "Cooking Method"), ("occasion", "Occasion"),
+                                          ("custom_tags", "Custom Tags"), ("prep_time_group", "Prep Time Group"), ("author", "Author")) if view.get(key))
     metadata = f'<div class="recipe-metadata">{metadata}</div>' if metadata else ""
-    tags = " ".join(f'<span>{escape(tag)}</span>' for tag in view["tags"])
     assignment = " · ".join(f'{label}: {escape(view.get(key) or fallback)}' for key, label, fallback in (
         ("cookbook_name", "Cookbook", "Unassigned"), ("menu_section", "Section", "Not specified"),
         ("menu_price", "Menu Price (optional)", "Not set")))
@@ -429,10 +452,11 @@ h1 {{ font-size: 2em; line-height: 1.15; margin: 0 0 8px; }} h2 {{ font-size: 1.
 h3 {{ font-size: 1em; break-after: avoid; }} p {{ margin: 8px 0; }}
 header {{ min-height: 132px; }} .source {{ color: #52636a; font-size: .8em; }}
 .title-image {{ float: right; margin: 0 0 14px 20px; }} .title-image img {{ width: 140px; height: 140px; object-fit: cover; border-radius: 8px; }}
-.tags {{ display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }} .tags span {{ border: 1px solid #c5d5d0; padding: 2px 8px; border-radius: 20px; font-size: .8em; }}
 .metrics {{ clear: both; display: flex; gap: 12px; border-block: 1px solid #ccd6d3; padding: 12px 0; margin: 18px 0; break-inside: avoid; }}
 .metrics div {{ flex: 1; }} .metrics small,.metrics strong {{ display: block; }} small {{ font-size: .8em; color: #52636a; font-weight: normal; }}
-.recipe-metadata {{ display: flex; flex-wrap: wrap; gap: 4px 18px; margin: -8px 0 18px; font-size: .9em; break-inside: avoid; }}
+.recipe-metadata {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2.5mm 5mm; clear: both; margin: -2mm 0 4mm; padding-bottom: 3mm; border-bottom: 1px solid #ddd; font-size: .9em; break-inside: avoid; }}
+.metadata-field {{ min-width: 0; overflow-wrap: anywhere; }} .metadata-field[data-field="custom_tags"] {{ grid-column: span 2; }} .metadata-field[data-field="author"] {{ grid-column: 1 / -1; }}
+.metadata-label {{ display: block; margin-bottom: .6mm; color: #555; font-size: .8em; font-weight: 600; line-height: 1.2; }} .metadata-value {{ display: block; color: #333; line-height: 1.3; }}
 .ingredients {{ margin-bottom: 22px; }} table {{ width: 100%; border-collapse: collapse; }} thead {{ display: table-header-group; }}
 .preparation {{ display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 24px; }}
 .preparation > section {{ min-width: 0; }} .equipment-list {{ padding-left: 20px; margin-top: 0; }} .equipment-list li {{ margin-bottom: 6px; }}
@@ -443,7 +467,7 @@ tr,li,.title-image {{ break-inside: avoid; }} li {{ padding-left: 6px; margin-bo
 .nutrition {{ border-top: 1px solid #ccd6d3; margin-top: 24px; padding-top: 16px; }} .nutrition h2 small {{ margin-left: 8px; }}
 .nutrients {{ display: flex; flex-wrap: wrap; gap: 12px 24px; }} .nutrients div {{ min-width: 105px; break-inside: avoid; }} .nutrients span,.nutrients strong {{ display: block; }} .nutrients span {{ font-size: .8em; }}
 .nutrient-details {{ display: flex; flex-wrap: wrap; gap: 18px; margin-top: 18px; }} .nutrient-group {{ flex: 1 1 170px; break-inside: avoid; }} .nutrient-group h3 {{ margin-bottom: 8px; }} .nutrient-group dl {{ margin: 0; }} .nutrient-group dl div {{ display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-bottom: 1px solid #e3e8e6; }} .nutrient-group dd {{ margin: 0; white-space: nowrap; }}
-</style></head><body><header>{image}<h1>{title}</h1><div class="source">{attribution}</div>{description}<div class="tags">{tags}</div><p class="source">{assignment}</p></header>
+</style></head><body><header>{image}<h1>{title}</h1><div class="source">{attribution}</div>{description}<p class="source">{assignment}</p></header>
 <div class="metrics">{metrics}</div>{metadata}<div class="preparation"><section class="ingredients"><h2>Ingredients</h2>{ingredients}</section>
 <section class="equipment"><h2>Equipment</h2>{equipment}</section></div>
 <section class="instructions"><h2>Instructions</h2>{instructions}</section>{notes}{nutrition}</body></html>'''

@@ -408,17 +408,17 @@ def test_print_metadata_uses_saved_and_draft_categories(recipe):
     view = response["recipe"]
     assert (view["course"], view["cuisine"], view["author"]) == ("Side Dish", "American", "Test cook")
     html = preview.build_recipe_preview_pdf_html(view, resolved, response["options"])
-    assert "Course: Side Dish" in html
-    assert "Cuisine: American" in html
-    assert "Author: Test cook" in html
+    assert 'Course</span><span class="metadata-value">Side Dish' in html
+    assert 'Cuisine</span><span class="metadata-value">American' in html
+    assert 'Author</span><span class="metadata-value">Test cook' in html
     assert html.index('class="metrics"') < html.index('class="recipe-metadata"') < html.index('class="preparation"')
     response, resolved = preview.prepare_recipe_preview({"url": URL, "recipe": {
         "course": ["Side <Dish>", "Lunch"], "cuisine": "French & Italian", "author": [{"name": "A & B"}],
     }, "options": {"show_image": False}})
     html = preview.build_recipe_preview_pdf_html(response["recipe"], resolved, response["options"])
-    assert "Course: Side &lt;Dish&gt;, Lunch" in html
-    assert "Cuisine: French &amp; Italian" in html
-    assert "Author: A &amp; B" in html
+    assert 'Course</span><span class="metadata-value">Side &lt;Dish&gt;, Lunch' in html
+    assert 'Cuisine</span><span class="metadata-value">French &amp; Italian' in html
+    assert 'Author</span><span class="metadata-value">A &amp; B' in html
 
 
 def test_print_metadata_omits_missing_values(recipe):
@@ -427,6 +427,35 @@ def test_print_metadata_omits_missing_values(recipe):
     response, resolved = preview.prepare_recipe_preview({"url": URL, "options": {"show_image": False}})
     assert not any(response["recipe"][key] for key in ("course", "cuisine", "author"))
     assert 'class="recipe-metadata"' not in preview.build_recipe_preview_pdf_html(response["recipe"], resolved, response["options"])
+
+
+def test_print_metadata_includes_all_draft_classifications(recipe):
+    response, resolved = preview.prepare_recipe_preview({"url": URL, "recipe": {
+        "meal_type": "Dinner", "cuisine_tags": ["American", "French"], "cuisine": "American",
+        "dietary_preferences": ["Dairy Free"], "dietary_preference": "Dairy Free",
+        "main_ingredient": "Vegetarian", "cooking_method": "Oven Baked", "occasion": "Family Dinner",
+        "custom_categories": "Comfort Food, Casserole; Vegetarian Side", "custom_tags": ["Casserole", "Easy & <quick>"],
+        "prep_time_group": "Under 1 hour",
+    }, "options": {"show_image": False}})
+    view = response["recipe"]
+    assert view["cuisine"] == "American, French"
+    assert view["dietary_preferences"] == "Dairy Free"
+    assert view["custom_tags"] == "Comfort Food, Casserole, Vegetarian Side, Easy & <quick>"
+    html = preview.build_recipe_preview_pdf_html(view, resolved, response["options"])
+    for expected in ("Course: Dinner", "Cuisine: American, French", "Dietary Preferences: Dairy Free",
+                     "Main Ingredient: Vegetarian", "Cooking Method: Oven Baked", "Occasion: Family Dinner",
+                     "Custom Tags: Comfort Food, Casserole, Vegetarian Side, Easy &amp; &lt;quick&gt;", "Prep Time Group: Under 1 hour"):
+        label, value = expected.split(": ", 1)
+        assert f'{label}</span><span class="metadata-value">{value}</span>' in html
+
+
+def test_print_classifications_support_category_fallback_and_explicit_clear(recipe):
+    recipe["categories"] = {"main_ingredient": "Vegetarian", "cooking_method": "Oven Baked", "occasion": "Family Dinner"}
+    response = preview.build_recipe_preview({"url": URL})
+    assert response["recipe"]["main_ingredient"] == "Vegetarian"
+    response = preview.build_recipe_preview({"url": URL, "recipe": {"main_ingredient": "", "cuisine_tags": []}})
+    assert response["recipe"]["main_ingredient"] == ""
+    assert response["recipe"]["cuisine"] == ""
 
 
 @pytest.mark.parametrize("options, included", [({}, False), ({"print_notes": False}, False), ({"print_notes": True}, True)])

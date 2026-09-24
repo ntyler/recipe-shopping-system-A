@@ -33579,11 +33579,20 @@ img[data-deferred-src] {
 }
 
 .app-meal-planner-cell .app-meal-remove {
+    grid-column: -2 / -1;
+    grid-row: 1;
     position: static;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     background: var(--app-surface);
+}
+
+.app-meal-planner-cell .app-meal-prep-notes {
+    grid-column: 1 / -1;
+    margin: 4px 0 0;
+    font-size: 12px;
+    line-height: 1.4;
 }
 
 .app-meal-planner-cell .app-meal-add-slot {

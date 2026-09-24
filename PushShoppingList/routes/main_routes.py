@@ -5955,6 +5955,24 @@ def global_search_results_route():
     )
 
 
+@main_bp.route("/api/meal-plan", methods=["GET"])
+def recipe_meal_plan_entries_route():
+    if not current_public_user() and not is_guest_session():
+        return jsonify({"ok": False, "error": "Sign in or start a guest workspace to view meal plans."}), 403
+    recipe_key = normalize_recipe_url_key(request.args.get("recipe_url", ""))
+    if not recipe_key:
+        return jsonify({"ok": False, "error": "Choose a recipe to view its planned meals."}), 400
+    # load_meal_plan already resolves the active user's or guest's workspace.
+    meals = [
+        {key: meal.get(key) for key in ("id", "date", "meal_type", "planned_servings", "prep_notes")}
+        for meal in load_meal_plan()["meals"]
+        if normalize_recipe_url_key(meal.get("recipe_url")) == recipe_key
+    ]
+    meal_order = {name: index for index, name in enumerate(("breakfast", "lunch", "dinner", "snack"))}
+    meals.sort(key=lambda meal: (meal["date"], meal_order.get(meal["meal_type"], 4), meal["id"]))
+    return jsonify({"ok": True, "meals": meals})
+
+
 @main_bp.route("/api/meal-plan", methods=["POST"])
 def add_meal_plan_entry_route():
     if not current_public_user() and not is_guest_session():

@@ -79,6 +79,32 @@ def test_meal_prep_notes_belong_to_individual_scheduled_meals(isolated_meal_plan
     assert all("recipe_notes" not in meal for meal in meals)
 
 
+def test_recipe_meal_plan_read_route_filters_saved_meals_and_orders_slots(monkeypatch, isolated_meal_plan):
+    from flask import Flask
+    from PushShoppingList.routes import main_routes
+
+    monkeypatch.setattr(main_routes, "current_public_user", lambda: {"user_id": "test"})
+    app = Flask(__name__)
+    app.register_blueprint(main_routes.main_bp)
+    payload = {"date": "2026-09-23", "meal_type": "dinner", "recipe_url": "https://example.test/bread/", "recipe_name": "Bread", "planned_servings": 6, "prep_notes": "Prepare ahead\nBake at dinner"}
+    meal_plan_service.add_meal(payload)
+    meal_plan_service.add_meal({**payload, "meal_type": "breakfast", "planned_servings": 2, "prep_notes": "Toast leftovers"})
+    meal_plan_service.add_meal({**payload, "recipe_url": "https://example.test/soup", "recipe_name": "Soup"})
+    client = app.test_client()
+    response = client.get('/api/meal-plan', query_string={"recipe_url": "https://example.test/bread/"})
+    assert response.status_code == 200
+    meals = response.json["meals"]
+    assert [meal["meal_type"] for meal in meals] == ["breakfast", "dinner"]
+    assert [meal["planned_servings"] for meal in meals] == [2, 6]
+    assert meals[1]["prep_notes"] == "Prepare ahead\nBake at dinner"
+    assert all("ingredients" not in meal and "recipe_notes" not in meal for meal in meals)
+    assert client.get('/api/meal-plan', query_string={"recipe_url": "recipe://missing"}).json["meals"] == []
+    assert client.get('/api/meal-plan').status_code == 400
+    monkeypatch.setattr(main_routes, "current_public_user", lambda: None)
+    monkeypatch.setattr(main_routes, "is_guest_session", lambda: False)
+    assert client.get('/api/meal-plan', query_string={"recipe_url": payload["recipe_url"]}).status_code == 403
+
+
 def test_meal_plan_persists_numeric_and_fractional_planned_servings(isolated_meal_plan):
     fractional = meal_plan_service.add_meal({
         "date": "2026-07-06",
