@@ -6,6 +6,7 @@ import uuid
 from datetime import date
 from datetime import datetime
 from datetime import timedelta
+from decimal import Decimal
 from fractions import Fraction
 
 from PushShoppingList.services.ingredient_option_service import ingredient_name
@@ -64,7 +65,7 @@ def normalize_planned_servings(value):
 
     try:
         planned_servings = float(value)
-    except (TypeError, ValueError) as exc:
+    except (TypeError, ValueError, OverflowError) as exc:
         raise ValueError("Planned servings must be a number of 1 or more.") from exc
 
     if not math.isfinite(planned_servings) or planned_servings < 1:
@@ -173,7 +174,73 @@ def normalize_meal(meal):
     )
     if "ingredients" in meal:
         normalized["ingredients"] = normalize_meal_ingredients(meal.get("ingredients"))
+    if clean_text(meal.get("batch_id")):
+        normalized["batch_id"] = clean_text(meal.get("batch_id"))
     return normalized
+
+
+def normalize_prep_step(value):
+    if not isinstance(value, dict):
+        return None
+    step_date = parse_date(value.get("date"))
+    instruction = clean_text(value.get("instruction"))
+    if not step_date or not instruction:
+        return None
+    return {
+        "id": clean_text(value.get("id")) or uuid.uuid4().hex,
+        "date": step_date.isoformat(),
+        "instruction": instruction,
+        "completed": value.get("completed") is True,
+    }
+
+
+def normalize_meal_prep_batch(value):
+    if not isinstance(value, dict):
+        return None
+    recipe_url = clean_text(value.get("recipe_url"))
+    recipe_name = clean_text(value.get("recipe_name"))
+    try:
+        servings = normalize_planned_servings(value.get("batch_servings"))
+    except ValueError:
+        return None
+    if not recipe_url or not recipe_name:
+        return None
+    return {
+        "id": clean_text(value.get("id")) or uuid.uuid4().hex,
+        "recipe_url": recipe_url,
+        "recipe_name": recipe_name,
+        "batch_servings": servings,
+        "prep_notes": clean_text(value.get("prep_notes")),
+        "prep_steps": [
+            step
+            for item in (value.get("prep_steps") if isinstance(value.get("prep_steps"), list) else [])
+            for step in [normalize_prep_step(item)]
+            if step
+        ],
+        "created_at": clean_text(value.get("created_at"))
+        or datetime.utcnow().replace(microsecond=0).isoformat() + "Z",
+    }
+
+
+def meal_prep_batch_summary(batch, meals):
+    allocations = sorted(
+        [meal for meal in meals if meal.get("batch_id") == batch["id"]],
+        key=lambda meal: (meal["date"], MEAL_TYPES.index(meal["meal_type"]), meal["id"]),
+    )
+    allocated = allocated_batch_servings(allocations)
+    remaining = max(Decimal(0), Decimal(str(batch["batch_servings"])) - allocated)
+    return {
+        **batch,
+        "allocations": allocations,
+        "allocated_servings": int(allocated) if allocated == allocated.to_integral_value() else float(allocated),
+        "remaining_servings": int(remaining) if remaining == remaining.to_integral_value() else float(remaining),
+    }
+
+
+def allocated_batch_servings(meals):
+    # Decimal arithmetic keeps fractional portions such as 1.1 + 1.1 + 1.1
+    # equal to a 3.3-serving batch instead of slightly exceeding it.
+    return sum((Decimal(str(meal.get("planned_servings") or 0)) for meal in meals), Decimal(0))
 
 
 def load_meal_plan():
@@ -199,7 +266,13 @@ def load_meal_plan():
             normalized = normalize_meal(value) if isinstance(value, dict) else None
             if normalized:
                 meals.append(normalized)
-        return {"meals": meals}
+        batches = [
+            batch
+            for value in (payload.get("batches", []) if isinstance(payload, dict) else [])
+            for batch in [normalize_meal_prep_batch(value)]
+            if batch
+        ]
+        return {"meals": meals, "batches": batches}
 
 
 def save_meal_plan(payload):
@@ -210,7 +283,13 @@ def save_meal_plan(payload):
             if isinstance(meal, dict)
             for normalized_meal in [normalize_meal(meal)]
             if normalized_meal
-        ]
+        ],
+        "batches": [
+            batch
+            for value in payload.get("batches", [])
+            for batch in [normalize_meal_prep_batch(value)]
+            if batch
+        ],
     }
     with MEAL_PLAN_LOCK:
         return durable_runtime.save_json_document(
@@ -261,8 +340,103 @@ def delete_meal(meal_id):
         remaining = [meal for meal in payload["meals"] if meal["id"] != meal_id]
         if len(remaining) == len(payload["meals"]):
             return False
-        save_meal_plan({"meals": remaining})
+        payload["meals"] = remaining
+        save_meal_plan(payload)
     return True
+
+
+def add_meal_prep_batch(batch, allocations, ingredient_data=None):
+    """Validate and persist one batch and all meal allocations in one write."""
+    if not isinstance(batch, dict):
+        raise ValueError("Choose a recipe and total batch servings.")
+    batch = dict(batch)
+    try:
+        batch["batch_servings"] = normalize_planned_servings(batch.get("batch_servings"))
+    except ValueError as exc:
+        raise ValueError("Batch servings must be a number of 1 or more.") from exc
+    steps = batch.get("prep_steps", [])
+    if not isinstance(steps, list):
+        raise ValueError("Preparation steps must be a list of dated instructions.")
+    for step in steps:
+        if not normalize_prep_step(step):
+            raise ValueError("Each preparation step needs a valid date and instruction.")
+    batch["id"] = uuid.uuid4().hex
+    batch["prep_steps"] = [
+        {**step, "id": uuid.uuid4().hex, "completed": False} for step in steps
+    ]
+    normalized = normalize_meal_prep_batch(batch)
+    if not normalized:
+        raise ValueError("Choose a valid recipe for the batch.")
+    if not isinstance(allocations, list) or not allocations:
+        raise ValueError("Add at least one meal date for this batch.")
+    meals = []
+    slots = set()
+    for allocation in allocations:
+        if not isinstance(allocation, dict):
+            raise ValueError("Choose a valid date, meal type, and servings for every meal.")
+        servings = normalize_planned_servings(allocation.get("planned_servings"))
+        meal = normalize_meal({
+            **(ingredient_data or {}),
+            "id": uuid.uuid4().hex,
+            "date": allocation.get("date"),
+            "meal_type": allocation.get("meal_type"),
+            "planned_servings": servings,
+            "prep_notes": allocation.get("prep_notes"),
+            "recipe_url": normalized["recipe_url"],
+            "recipe_name": normalized["recipe_name"],
+            "batch_id": normalized["id"],
+            "created_at": normalized["created_at"],
+        })
+        if not meal:
+            raise ValueError("Choose a valid date, meal type, and servings for every meal.")
+        slot = (meal["date"], meal["meal_type"])
+        if slot in slots:
+            raise ValueError("Each meal date and meal type can appear only once in a batch.")
+        slots.add(slot)
+        meals.append(meal)
+    if allocated_batch_servings(meals) > Decimal(str(normalized["batch_servings"])):
+        raise ValueError("Planned meal servings cannot exceed total batch servings.")
+
+    with MEAL_PLAN_LOCK:
+        payload = load_meal_plan()
+        recipe_key = normalize_recipe_url_key(normalized["recipe_url"])
+        if any(
+            (meal["date"], meal["meal_type"]) in slots
+            and normalize_recipe_url_key(meal["recipe_url"]) == recipe_key
+            for meal in payload["meals"]
+        ):
+            raise ValueError("That recipe is already planned for one of these meals.")
+        payload["batches"].append(normalized)
+        payload["meals"].extend(meals)
+        save_meal_plan(payload)
+    return meal_prep_batch_summary(normalized, meals), meals
+
+
+def delete_meal_prep_batch(batch_id):
+    batch_id = clean_text(batch_id)
+    with MEAL_PLAN_LOCK:
+        payload = load_meal_plan()
+        remaining = [batch for batch in payload["batches"] if batch["id"] != batch_id]
+        if len(remaining) == len(payload["batches"]):
+            return False
+        payload["batches"] = remaining
+        payload["meals"] = [meal for meal in payload["meals"] if meal.get("batch_id") != batch_id]
+        save_meal_plan(payload)
+    return True
+
+
+def update_meal_prep_step(batch_id, step_id, completed):
+    if not isinstance(completed, bool):
+        raise ValueError("Completed must be true or false.")
+    with MEAL_PLAN_LOCK:
+        payload = load_meal_plan()
+        batch = next((item for item in payload["batches"] if item["id"] == clean_text(batch_id)), None)
+        step = next((item for item in batch["prep_steps"] if item["id"] == clean_text(step_id)), None) if batch else None
+        if not step:
+            return None
+        step["completed"] = completed
+        save_meal_plan(payload)
+        return step
 
 
 def update_meal_ingredient_option_selections(
@@ -429,7 +603,18 @@ def meal_plan_for_week(value=None, reference_date=None):
     selected_day = parse_date(value, fallback=reference_day)
     days = week_days(selected_day)
     day_keys = {day.isoformat() for day in days}
-    meals = [meal for meal in load_meal_plan()["meals"] if meal["date"] in day_keys]
+    payload = load_meal_plan()
+    meals = [meal for meal in payload["meals"] if meal["date"] in day_keys]
+    prep_steps_by_day = {day.isoformat(): [] for day in days}
+    for batch in payload["batches"]:
+        for step in batch["prep_steps"]:
+            if step["date"] in day_keys:
+                prep_steps_by_day[step["date"]].append({
+                    **step,
+                    "batch_id": batch["id"],
+                    "recipe_url": batch["recipe_url"],
+                    "recipe_name": batch["recipe_name"],
+                })
     meals_by_slot = {}
     meals_by_day = {day.isoformat(): {meal_type: [] for meal_type in MEAL_TYPES} for day in days}
     for meal in meals:
@@ -459,6 +644,7 @@ def meal_plan_for_week(value=None, reference_date=None):
         "meals": meals,
         "meals_by_slot": meals_by_slot,
         "meals_by_day": meals_by_day,
+        "prep_steps_by_day": prep_steps_by_day,
         "meal_count": len(meals),
         "unique_recipe_count": len({meal["recipe_url"] for meal in meals}),
     }

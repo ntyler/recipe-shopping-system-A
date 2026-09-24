@@ -675,6 +675,28 @@
                     </div>
                 {% endfor %}
 
+                <div class="app-meal-planner-row-label">Prep</div>
+                {% for day in meal_plan.days %}
+                    <div class="app-meal-planner-cell app-meal-prep-cell{% if day.is_past %} is-past{% endif %}{% if day.is_today %} is-today{% endif %}" data-meal-prep-date="{{ day.date }}">
+                        {% for step in meal_plan.get('prep_steps_by_day', {}).get(day.date, []) %}
+                            <article class="app-meal-prep-step{% if step.completed %} is-complete{% endif %}" data-meal-prep-step>
+                                <a href="#recipeView" data-recipe-url="{{ step.recipe_url }}" onclick="return jumpToRecipeViewRecipe(this, event)">{{ step.recipe_name }}</a>
+                                <label>
+                                    <input type="checkbox"
+                                           data-batch-id="{{ step.batch_id }}"
+                                           data-step-id="{{ step.id }}"
+                                           {% if step.completed %}checked{% endif %}
+                                           onchange="toggleMealPlannerPrepStep(this)">
+                                    <span class="app-meal-prep-instruction">{{ step.instruction }}</span>
+                                </label>
+                                <p class="app-meal-prep-status" data-meal-prep-status role="status" aria-live="polite" hidden></p>
+                            </article>
+                        {% else %}
+                            <span class="app-meal-prep-empty" aria-label="No prep steps for {{ day.weekday }} {{ day.day_label }}">&mdash;</span>
+                        {% endfor %}
+                    </div>
+                {% endfor %}
+
                 {% for meal_type in meal_plan.meal_types %}
                     <div class="app-meal-planner-row-label">{{ meal_type | title }}</div>
                     {% for day in meal_plan.days %}
@@ -687,6 +709,10 @@
                                             <img src="{{ meal.cover_image.thumb_url or meal.cover_image.card_url or meal.cover_image.src }}" alt="">
                                         {% endif %}
                                         <a href="#recipeView" data-recipe-url="{{ meal.recipe_url }}" onclick="return jumpToRecipeViewRecipe(this, event)">{{ meal.recipe_name }}</a>
+                                        {% if meal.planned_servings or meal.batch_id %}<p class="app-meal-plan-details">
+                                            {% if meal.planned_servings %}<span>{{ '%g' | format(meal.planned_servings | float) }} {{ 'serving' if meal.planned_servings == 1 else 'servings' }}</span>{% endif %}
+                                            {% if meal.batch_id %}<span class="app-meal-batch-label">From prep batch</span>{% endif %}
+                                        </p>{% endif %}
                                         {% if meal.prep_notes %}<p class="app-meal-prep-notes" style="white-space: pre-wrap; overflow-wrap: anywhere;">{{ meal.prep_notes }}</p>{% endif %}
                                         {% if meal.ingredient_selection_needed %}
                                             <span class="app-meal-selection-needed">Selection needed.</span>

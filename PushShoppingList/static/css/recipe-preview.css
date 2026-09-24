@@ -35,7 +35,29 @@ body.recipe-preview-active { overflow: auto; }
 .recipe-preview-meal-planning { margin-top: 18px; padding: 18px; border: 1px solid var(--app-border); border-radius: 12px; background: var(--app-surface); scroll-margin-top: 18px; }
 .recipe-preview-meal-planning h2 { margin: 0; font-size: 20px; }
 .recipe-preview-meal-planning a { color: var(--app-primary-hover); font-size: 13px; }
-.recipe-preview-meal-planning .recipe-preview-section-heading { flex-wrap: wrap; gap: 12px; }
+.recipe-preview-meal-planning .recipe-preview-section-heading { flex-wrap: wrap; justify-content: flex-start; gap: 12px; }
+.recipe-preview-meal-planning .recipe-preview-section-heading > :is(h2, h3, h4) { margin-right: auto; }
+.recipe-preview-meal-planning :is(h3, h4) { margin-top: 0; margin-bottom: 8px; }
+.recipe-preview-meal-planning h3 { font-size: 18px; }
+.recipe-preview-meal-planning h4 { font-size: 15px; }
+.recipe-preview-batch { padding: 16px; border: 1px solid var(--app-border-strong); border-radius: 10px; margin-top: 16px; margin-bottom: 20px; background: var(--app-surface-soft); }
+.recipe-preview-batch-balance { font-size: 13px; color: var(--app-muted); margin: 0 0 12px; }
+.recipe-preview-batch-columns { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1.3fr); gap: 24px; margin-top: 20px; }
+.recipe-preview-batch-columns > div { min-width: 0; }
+.recipe-preview-batch-columns .recipe-preview-planned-meals { margin-top: 0; }
+.recipe-preview-prep-timeline { padding: 0; margin: 0; list-style: none; display: grid; gap: 12px; }
+.recipe-preview-prep-timeline li { border-bottom: 1px solid var(--app-border); padding-bottom: 12px; }
+.recipe-preview-prep-timeline label { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
+.recipe-preview-prep-timeline input { flex: 0 0 auto; width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--app-primary); }
+.recipe-preview-prep-timeline time { display: block; font-size: 12px; color: var(--app-muted); margin-bottom: 4px; }
+.recipe-preview-prep-instruction { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; }
+.recipe-preview-prep-timeline .is-complete .recipe-preview-prep-instruction { text-decoration: line-through; color: var(--app-muted); }
+.recipe-preview-prep-timeline a { display: inline-block; margin: 6px 0 0 28px; }
+.recipe-preview-allocation { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) minmax(0,.6fr) auto; align-items: end; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--app-border); }
+.recipe-preview-allocation .recipe-preview-allocation-notes { grid-column: 1 / -1; }
+.recipe-preview-prep-row { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,2fr) auto; align-items: end; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--app-border); }
+#recipePreviewBatchPanel :is(.recipe-preview-allocation, .recipe-preview-prep-row) label { margin-bottom: 0; }
+#recipePreviewBatchPanel .recipe-preview-section-heading { margin-top: 20px; margin-bottom: 0; }
 .recipe-preview-planned-meals { display: grid; gap: 12px; list-style: none; padding: 0; margin: 16px 0 0; }
 .recipe-preview-planned-meals > li { min-width: 0; padding: 14px; border: 1px solid var(--app-border); border-radius: 8px; background: var(--app-surface-soft); }
 .recipe-preview-planned-meal-summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 20px; }
@@ -172,6 +194,9 @@ body.recipe-preview-active { overflow: auto; }
     .recipe-preview-ingredients, .recipe-preview-equipment { padding-right: 18px; }
 }
 @media (max-width: 700px) {
+    .recipe-preview-batch-columns { grid-template-columns: minmax(0,1fr); gap: 20px; }
+    .recipe-preview-allocation, .recipe-preview-prep-row { grid-template-columns: minmax(0,1fr); }
+    .recipe-preview-allocation button, .recipe-preview-prep-row button { justify-self: start; }
     .recipe-preview-page { padding-bottom: 80px; }
     .recipe-preview-actions { flex-wrap: wrap; width: 100%; gap: 7px; }
     .recipe-preview-actions button { flex: 1 1 auto; height: auto; min-height: 42px; font-size: 12px; padding: 9px; }

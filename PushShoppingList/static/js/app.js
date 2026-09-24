@@ -1687,6 +1687,43 @@ function setMealPlannerStatus(message, isError = false, selector = "[data-meal-p
     status.classList.toggle("error", Boolean(isError));
 }
 
+async function toggleMealPlannerPrepStep(input) {
+    const card = input?.closest("[data-meal-prep-step]");
+    const status = card?.querySelector("[data-meal-prep-status]");
+    const batchId = String(input?.dataset.batchId || "");
+    const stepId = String(input?.dataset.stepId || "");
+    if (!input || input.disabled) return;
+    const completed = input.checked;
+    input.disabled = true;
+    if (status) {
+        status.hidden = false;
+        status.textContent = "Saving...";
+        status.classList.remove("error");
+    }
+    try {
+        if (!batchId || !stepId) throw new Error("This prep step could not be identified. Refresh the planner and try again.");
+        const response = await fetch(`/api/meal-plan/batches/${encodeURIComponent(batchId)}/prep-steps/${encodeURIComponent(stepId)}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ completed }),
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload.ok) throw new Error(payload.error || "The prep step could not be saved.");
+        input.checked = payload.step?.completed ?? completed;
+        card?.classList.toggle("is-complete", input.checked);
+        if (status) status.textContent = input.checked ? "Completed." : "Marked incomplete.";
+    } catch (error) {
+        input.checked = !completed;
+        card?.classList.toggle("is-complete", input.checked);
+        if (status) {
+            status.textContent = error.message || "The prep step could not be saved. Try again.";
+            status.classList.add("error");
+        }
+    } finally {
+        input.disabled = false;
+    }
+}
+
 function formatMealPlannerServingNumber(value) {
     const numeric = Number(value);
     if (!Number.isFinite(numeric)) {
