@@ -175,7 +175,7 @@ async function refreshIntegratedRecipePreview() {
 function renderIntegratedRecipePreview(state) {
     const r = state.model, esc = escapeHtml;
     // Browser Save as PDF uses the document title as its suggested filename.
-    document.title = r.title.replace(/[<>:"/\\|?*]/g, '') || 'Recipe';
+    document.title = `${r.title.replace(/[<>:"/\\|?*]/g, '') || 'Recipe'} - AI Pantry`;
     const expandedChoices = new Set([...state.page.querySelectorAll('details[data-preview-choice][open]')].map(node => node.dataset.previewChoice));
     const favorite = document.getElementById('recipeEditFavoriteButton')?.getAttribute('aria-pressed') === 'true';
     const author = r.author && typeof r.author === 'object' ? r.author.name : r.author;
@@ -408,7 +408,7 @@ async function performRecipePreviewAction(button) {
             const blobUrl = URL.createObjectURL(await response.blob());
             const anchor = document.createElement('a');
             anchor.href = blobUrl;
-            anchor.download = `${state.model.title.replace(/[<>:"/\\|?*]/g, '') || 'Recipe'}.pdf`;
+            anchor.download = `${state.model.title.replace(/[<>:"/\\|?*]/g, '') || 'Recipe'} - AI Pantry.pdf`;
             anchor.click();
             setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
             if (integratedRecipePreview === state) recipePreviewStatus('PDF downloaded.');
