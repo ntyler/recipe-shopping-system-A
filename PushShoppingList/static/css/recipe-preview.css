@@ -130,6 +130,7 @@ body.recipe-preview-active { overflow: auto; }
 .recipe-preview-nutrient-group dd { margin: 0; font-weight: 600; text-align: right; overflow-wrap: anywhere; }
 .recipe-preview-nutrition-note { color: var(--app-muted); font-size: .85em; line-height: 1.6; margin: 14px 0 0; }
 .recipe-preview-print-nutrition { display: none; }
+.recipe-preview-print-metadata { display: none; }
 .recipe-preview-empty { color: var(--app-muted); margin: 8px 0; }
 .recipe-preview-assignment { display: flex; flex-wrap: wrap; gap: 10px 24px; margin: 12px 0; font-size: .9em; }
 .recipe-preview-assignment > div { display: flex; flex-wrap: wrap; gap: 5px; min-width: 0; }
@@ -199,6 +200,9 @@ body.recipe-preview-active { overflow: auto; }
     #recipePreviewPage .recipe-preview-photo img { border-radius: 0; }
     #recipePreviewPage .recipe-preview-photo:has(.recipe-preview-no-image), #recipePreviewPage .recipe-preview-photo:has(img[hidden]) { display: none; }
     #recipePreviewPage .recipe-preview-source { margin: 0 0 2mm; font-size: .85em; }
+    #recipePreviewPage :is(.recipe-preview-source-author, .recipe-preview-author-only) { display: none; }
+    #recipePreviewPage .recipe-preview-print-metadata { display: flex; flex-wrap: wrap; gap: 1mm 5mm; margin: -2mm 0 5mm; font-size: .9em; break-inside: avoid; }
+    #recipePreviewPage .recipe-preview-metadata-label { color: #666; }
     #recipePreviewPage .recipe-preview-description { margin: 0; line-height: 1.35; }
     #recipePreviewPage .recipe-preview-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; padding: 2mm 0; margin: 0 0 5mm; break-inside: avoid; }
     #recipePreviewPage .recipe-preview-metrics > div { display: block; padding: 0 2mm; text-align: center; border-left: 1px solid #bbb; }

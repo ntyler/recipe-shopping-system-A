@@ -182,6 +182,8 @@ function renderIntegratedRecipePreview(state) {
     const source = isLegitimateWebUrl(r.source_url || '') ? r.source_url : '';
     const sourceLabel = source ? new URL(source).hostname.replace(/^www\./, '') : '';
     const metrics = [['prep_time','Prep Time','clock'],['cook_time','Cook Time','cook'],['total_time','Total Time','clock'],['servings','Servings','servings']];
+    const printMetadata = [['course','Course'],['cuisine','Cuisine'],['author','Author']]
+        .filter(([key]) => r[key]).map(([key,label]) => `<span><span class="recipe-preview-metadata-label">${label}:</span> ${esc(r[key])}</span>`).join('');
     state.page.querySelector('.recipe-preview-card').innerHTML = `
         <header class="recipe-preview-summary">
             <div class="recipe-preview-photo" data-preview-image>${r.image_url ? `<img src="${escapeAttribute(r.image_url)}" alt="${escapeAttribute(r.title)}">` : `<span class="recipe-preview-no-image">${recipePreviewIcon('image')}No recipe image</span>`}
@@ -190,10 +192,11 @@ function renderIntegratedRecipePreview(state) {
                 <div class="recipe-preview-rating" data-shared-rating-control data-rating-mode="recipe" role="radiogroup" aria-label="Recipe rating: ${currentRecipeRating()} out of 5">${[1,2,3,4,5].map(value => `<button type="button" class="recipe-edit-rating-star" data-rating-value="${value}" data-preview-rating="${value}" role="radio" aria-label="${value} star${value === 1 ? '' : 's'}" aria-checked="${currentRecipeRating() === value}">${value <= currentRecipeRating() ? '★' : '☆'}</button>`).join('')}<button type="button" class="recipe-preview-clear-rating" data-preview-rating="0" aria-label="Clear rating" ${currentRecipeRating() ? '' : 'hidden'}>Clear</button></div>
                 <div class="recipe-preview-tags">${(r.tags || []).map(tag => `<span>${esc(tag)}</span>`).join('')}</div>
                 <dl class="recipe-preview-assignment">${[['Cookbook',r.cookbook_name || 'Unassigned'],['Section',r.menu_section || 'Not specified'],['Menu Price (optional)',r.menu_price || 'Not set']].map(([label,value]) => `<div><dt>${label}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl>
-                ${author || source ? `<p class="recipe-preview-source">${author ? `By ${esc(author)}` : ''}${author && source ? ' · ' : ''}${source ? `<a href="${escapeAttribute(source)}" target="_blank" rel="noopener noreferrer">${esc(sourceLabel)}</a>` : ''}</p>` : ''}
+                ${author || source ? `<p class="recipe-preview-source${source ? '' : ' recipe-preview-author-only'}">${author ? `<span class="recipe-preview-source-author">By ${esc(author)}${source ? ' · ' : ''}</span>` : ''}${source ? `<a href="${escapeAttribute(source)}" target="_blank" rel="noopener noreferrer">${esc(sourceLabel)}</a>` : ''}</p>` : ''}
                 ${r.description ? `<p class="recipe-preview-description">${esc(r.description)}</p>` : ''}</div>
         </header>
         <div class="recipe-preview-metrics">${metrics.map(([key,label,icon]) => `<div>${recipePreviewIcon(icon)}<span><span>${label}</span><strong>${esc(String(r[key] || 'Not specified'))}</strong></span></div>`).join('')}</div>
+        ${printMetadata ? `<div class="recipe-preview-print-metadata">${printMetadata}</div>` : ''}
         <div class="recipe-preview-columns">
             <section class="recipe-preview-ingredients"><div class="recipe-preview-section-heading"><h2>Ingredients</h2><button type="button" data-preview-action="shopping">${recipePreviewIcon('plus')}Shopping List</button></div>
                 <ul>${recipePreviewIngredientsHtml(r, state.url, expandedChoices)}</ul>

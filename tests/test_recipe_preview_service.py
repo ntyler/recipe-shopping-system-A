@@ -403,6 +403,32 @@ def test_print_bundle_info_controls_export_without_changing_projection(recipe, e
     assert ("Selected bundle below" in html) is enabled
 
 
+def test_print_metadata_uses_saved_and_draft_categories(recipe):
+    response, resolved = preview.prepare_recipe_preview({"url": URL, "options": {"show_image": False}})
+    view = response["recipe"]
+    assert (view["course"], view["cuisine"], view["author"]) == ("Side Dish", "American", "Test cook")
+    html = preview.build_recipe_preview_pdf_html(view, resolved, response["options"])
+    assert "Course: Side Dish" in html
+    assert "Cuisine: American" in html
+    assert "Author: Test cook" in html
+    assert html.index('class="metrics"') < html.index('class="recipe-metadata"') < html.index('class="preparation"')
+    response, resolved = preview.prepare_recipe_preview({"url": URL, "recipe": {
+        "course": ["Side <Dish>", "Lunch"], "cuisine": "French & Italian", "author": [{"name": "A & B"}],
+    }, "options": {"show_image": False}})
+    html = preview.build_recipe_preview_pdf_html(response["recipe"], resolved, response["options"])
+    assert "Course: Side &lt;Dish&gt;, Lunch" in html
+    assert "Cuisine: French &amp; Italian" in html
+    assert "Author: A &amp; B" in html
+
+
+def test_print_metadata_omits_missing_values(recipe):
+    for key in ("author", "meal_type", "cuisine_tags"):
+        recipe.pop(key)
+    response, resolved = preview.prepare_recipe_preview({"url": URL, "options": {"show_image": False}})
+    assert not any(response["recipe"][key] for key in ("course", "cuisine", "author"))
+    assert 'class="recipe-metadata"' not in preview.build_recipe_preview_pdf_html(response["recipe"], resolved, response["options"])
+
+
 def test_pdf_export_is_ephemeral_and_does_not_update_persisted_archive(recipe, monkeypatch):
     seen = {}
     def render(url, html, _source, path, **kwargs):

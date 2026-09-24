@@ -277,7 +277,7 @@ def prepare_recipe_preview(payload):
     if draft:
         allowed = {
             "recipe_title", "display_name", "description", "source_url", "author", "author_name",
-            "recipe_author", "cuisine_tags", "dietary_preferences", "recipe_categories", "categories",
+            "recipe_author", "cuisine", "cuisine_tags", "dietary_preferences", "recipe_categories", "categories",
             "meal_type", "course", "main_ingredient", "cooking_method", "occasion", "custom_categories",
             "custom_tags", "tags", "servings", "quantity", "scaling", "rating",
             "level", "prep_time", "cook_time", "total_time", "inactive_time", "ingredients", "instructions",
@@ -298,11 +298,17 @@ def prepare_recipe_preview(payload):
     elif isinstance(author, list):
         author = ", ".join(text(item.get("name") if isinstance(item, dict) else item) for item in author)
     instructions = recipe_edit_service.normalize_instruction_rows(recipe.get("instructions", []))
+    categories = recipe.get("recipe_categories") or recipe.get("categories") or {}
+    categories = categories if isinstance(categories, dict) else {}
+    course = recipe.get("course") or recipe.get("meal_type") or categories.get("meal_type")
+    cuisine = recipe.get("cuisine") or categories.get("cuisine") or recipe.get("cuisine_tags") or categories.get("cuisine_tags")
     view = {
         "title": text(recipe.get("display_name") or recipe.get("recipe_title")) or "Recipe",
         "description": text(recipe.get("description") if "description" in recipe else recipe.get("menu_description")),
         "image_url": image_url,
         "author": text(author),
+        "course": ", ".join(recipe_edit_service.normalize_text_rows(course)),
+        "cuisine": ", ".join(recipe_edit_service.normalize_text_rows(cuisine)),
         "source_url": text(recipe.get("source_url")),
         "tags": preview_tags(recipe),
         "cookbook_name": text(recipe.get("cookbook_name")),
@@ -352,7 +358,10 @@ def build_recipe_preview_pdf_html(view, resolved, options):
     title = escape(view["title"])
     image = recipe_extract_service.format_video_recipe_title_image_for_pdf(resolved) if options["show_image"] else ""
     description = f'<p class="description">{escape(view["description"])}</p>' if view["description"] else ""
-    attribution = " · ".join(escape(value) for value in (view["author"], view["source_url"]) if value)
+    attribution = escape(view["source_url"])
+    metadata = "".join(f'<span>{label}: {escape(view[key])}</span>'
+                       for key, label in (("course", "Course"), ("cuisine", "Cuisine"), ("author", "Author")) if view.get(key))
+    metadata = f'<div class="recipe-metadata">{metadata}</div>' if metadata else ""
     tags = " ".join(f'<span>{escape(tag)}</span>' for tag in view["tags"])
     assignment = " · ".join(f'{label}: {escape(view.get(key) or fallback)}' for key, label, fallback in (
         ("cookbook_name", "Cookbook", "Unassigned"), ("menu_section", "Section", "Not specified"),
@@ -414,6 +423,7 @@ header {{ min-height: 132px; }} .source {{ color: #52636a; font-size: .8em; }}
 .tags {{ display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }} .tags span {{ border: 1px solid #c5d5d0; padding: 2px 8px; border-radius: 20px; font-size: .8em; }}
 .metrics {{ clear: both; display: flex; gap: 12px; border-block: 1px solid #ccd6d3; padding: 12px 0; margin: 18px 0; break-inside: avoid; }}
 .metrics div {{ flex: 1; }} .metrics small,.metrics strong {{ display: block; }} small {{ font-size: .8em; color: #52636a; font-weight: normal; }}
+.recipe-metadata {{ display: flex; flex-wrap: wrap; gap: 4px 18px; margin: -8px 0 18px; font-size: .9em; break-inside: avoid; }}
 .ingredients {{ margin-bottom: 22px; }} table {{ width: 100%; border-collapse: collapse; }} thead {{ display: table-header-group; }}
 .preparation {{ display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 24px; }}
 .preparation > section {{ min-width: 0; }} .equipment-list {{ padding-left: 20px; margin-top: 0; }} .equipment-list li {{ margin-bottom: 6px; }}
@@ -425,7 +435,7 @@ tr,li,.title-image {{ break-inside: avoid; }} li {{ padding-left: 6px; margin-bo
 .nutrients {{ display: flex; flex-wrap: wrap; gap: 12px 24px; }} .nutrients div {{ min-width: 105px; break-inside: avoid; }} .nutrients span,.nutrients strong {{ display: block; }} .nutrients span {{ font-size: .8em; }}
 .nutrient-details {{ display: flex; flex-wrap: wrap; gap: 18px; margin-top: 18px; }} .nutrient-group {{ flex: 1 1 170px; break-inside: avoid; }} .nutrient-group h3 {{ margin-bottom: 8px; }} .nutrient-group dl {{ margin: 0; }} .nutrient-group dl div {{ display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-bottom: 1px solid #e3e8e6; }} .nutrient-group dd {{ margin: 0; white-space: nowrap; }}
 </style></head><body><header>{image}<h1>{title}</h1><div class="source">{attribution}</div>{description}<div class="tags">{tags}</div><p class="source">{assignment}</p></header>
-<div class="metrics">{metrics}</div><div class="preparation"><section class="ingredients"><h2>Ingredients</h2>{ingredients}</section>
+<div class="metrics">{metrics}</div>{metadata}<div class="preparation"><section class="ingredients"><h2>Ingredients</h2>{ingredients}</section>
 <section class="equipment"><h2>Equipment</h2>{equipment}</section></div>
 <section class="instructions"><h2>Instructions</h2>{instructions}</section>{nutrition}</body></html>'''
 
