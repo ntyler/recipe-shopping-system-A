@@ -1,6 +1,28 @@
 /* Preview shares the mounted editor's draft. Changes persist through Save Recipe. */
 let integratedRecipePreview = null;
 
+const RECIPE_PREVIEW_SAVED_OPTIONS = ['show_image', 'show_nutrition', 'print_bundle_info'];
+
+function recipePreviewPreferencesKey() {
+    return `recipe-preview-options:${document.body.dataset.viewerUserId || 'local'}`;
+}
+
+function loadRecipePreviewPreferences() {
+    let saved;
+    try {
+        saved = JSON.parse(localStorage.getItem(recipePreviewPreferencesKey()));
+    } catch (_) { /* Keep defaults when browser storage is unavailable or invalid. */ }
+    return Object.fromEntries(RECIPE_PREVIEW_SAVED_OPTIONS.map(key =>
+        [key, typeof saved?.[key] === 'boolean' ? saved[key] : true]));
+}
+
+function saveRecipePreviewPreferences(options) {
+    try {
+        localStorage.setItem(recipePreviewPreferencesKey(), JSON.stringify(
+            Object.fromEntries(RECIPE_PREVIEW_SAVED_OPTIONS.map(key => [key, options[key]]))));
+    } catch (_) { /* The controls still work when browser storage is unavailable. */ }
+}
+
 function recipePreviewIcon(name) {
     const paths = {
         back: '<path d="m12 5-7 7 7 7M5 12h15"/>',
@@ -56,7 +78,7 @@ async function openIntegratedRecipePreview({history = true} = {}) {
         draft: {...(recipeEditOriginalSnapshot || {}), ...collected.recipe,
             ...collectRecipeEditorCategoryValues(),
             cookbook_name: document.getElementById('recipeEditCookbookField')?.dataset.currentCookbookName || ''},
-        options: {scale: currentRecipeEditScaleMultiplier(), show_image: true, show_nutrition: true, print_bundle_info: true, text_size: 'normal', nutrition_mode: 'per_serving'},
+        options: {scale: currentRecipeEditScaleMultiplier(), ...loadRecipePreviewPreferences(), text_size: 'normal', nutrition_mode: 'per_serving'},
         hidden, page, trigger: document.activeElement, title: document.title,
         contentLabel: content.getAttribute('aria-label'), scroll: content.scrollTop,
         shellScroll: document.querySelector('[data-app-main-shell]')?.scrollTop || 0,
@@ -80,6 +102,7 @@ async function openIntegratedRecipePreview({history = true} = {}) {
         </div>
         <p id="recipePreviewStatus" class="recipe-preview-status" role="status" aria-live="polite">Loading recipe preview…</p>
         <article class="recipe-preview-card" aria-label="Recipe" aria-busy="true"></article>`;
+    syncRecipePreviewOptions();
     page.querySelector('[data-preview-breadcrumb]').textContent = state.draft.display_name || state.draft.recipe_title || 'Recipe';
     page.addEventListener('click', handleRecipePreviewClick);
     page.addEventListener('change', handleRecipePreviewChange);
@@ -258,6 +281,9 @@ function recipePreviewNutritionHtml(recipe) {
 function syncRecipePreviewOptions() {
     const state = integratedRecipePreview;
     if (!state) return;
+    state.page.querySelectorAll('[data-preview-option]').forEach(input => {
+        input.checked = state.options[input.dataset.previewOption];
+    });
     state.page.querySelector('[data-preview-image]')?.toggleAttribute('hidden', !state.options.show_image);
     state.page.querySelector('[data-preview-nutrition]')?.toggleAttribute('hidden', !state.options.show_nutrition);
     state.page.querySelector('.recipe-preview-summary')?.classList.toggle('without-image', !state.options.show_image);
@@ -311,6 +337,7 @@ async function handleRecipePreviewChange(event) {
     }
     if (event.target.dataset.previewOption) {
         state.options[event.target.dataset.previewOption] = event.target.checked;
+        saveRecipePreviewPreferences(state.options);
         syncRecipePreviewOptions();
     } else if (event.target.id === 'recipePreviewServings') {
         const servings = Number(event.target.value), base = recipeEditServingsParts(state.model?.base_servings).number;
