@@ -143,6 +143,7 @@ def normalize_meal(meal):
         "meal_type": meal_type,
         "recipe_url": recipe_url,
         "recipe_name": recipe_name,
+        "prep_notes": clean_text(meal.get("prep_notes")),
         "created_at": clean_text(meal.get("created_at"))
         or datetime.utcnow().replace(microsecond=0).isoformat() + "Z",
     }

@@ -1848,6 +1848,8 @@ function openMealPlannerDialog(dateValue = "", mealType = "") {
         typeInput.value = mealType;
     }
     setMealPlannerStatus("");
+    const prepNotesInput = dialog.querySelector('[name="prep_notes"]');
+    if (prepNotesInput) prepNotesInput.value = "";
     syncMealPlannerServingsFromRecipe();
     dialog.showModal();
     const recipeInput = dialog.querySelector('[name="recipe_url"]');
@@ -1891,6 +1893,7 @@ async function submitMealPlannerForm(event) {
                 recipe_url: formData.get("recipe_url"),
                 planned_servings: plannedServings,
                 ingredient_option_selections: collectMealPlannerIngredientOptionSelections(form),
+                prep_notes: formData.get("prep_notes"),
             }),
         });
         const payload = await response.json().catch(() => ({}));

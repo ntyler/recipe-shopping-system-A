@@ -429,6 +429,50 @@ def test_print_metadata_omits_missing_values(recipe):
     assert 'class="recipe-metadata"' not in preview.build_recipe_preview_pdf_html(response["recipe"], resolved, response["options"])
 
 
+@pytest.mark.parametrize("options, included", [({}, False), ({"print_notes": False}, False), ({"print_notes": True}, True)])
+def test_print_notes_only_exports_saved_notes(recipe, options, included):
+    recipe["recipe_notes"] = [{"heading": "Tips <saved>", "items": ["Chill & cover before baking."]}]
+    response, resolved = preview.prepare_recipe_preview({"url": URL, "recipe": {
+        "recipe_notes": [{"heading": "Draft", "items": ["Unsaved draft note."]}],
+    }, "options": {"show_image": False, **options}})
+    assert response["recipe"]["recipe_notes"][0]["heading"] == "Draft"
+    html = preview.build_recipe_preview_pdf_html(response["recipe"], resolved, response["options"])
+    assert ('<section class="recipe-notes">' in html) is included
+    assert ("Chill &amp; cover before baking." in html) is included
+    assert ("Tips &lt;saved&gt;" in html) is included
+    assert "Unsaved draft note." not in html
+
+
+def test_save_notes_route_preserves_recipe_and_checks_conflicts(recipe, monkeypatch):
+    original = deepcopy(recipe)
+    def save(_url, updated):
+        recipe.clear()
+        recipe.update(deepcopy(updated))
+    monkeypatch.setattr(preview.recipe_edit_service, "save_recipe_output", save)
+    app = Flask(__name__)
+    app.register_blueprint(recipe_bp)
+    client = app.test_client()
+    notes = [{"heading": "My tips", "items": ["Less sugar next time."]}]
+    response = client.patch('/api/recipe/notes', json={"url": URL, "recipe_notes": notes, "expected_notes": []})
+    assert response.status_code == 200
+    assert recipe["recipe_notes"] == notes
+    assert all(recipe[key] == value for key, value in original.items())
+    stale = client.patch('/api/recipe/notes', json={"url": URL, "recipe_notes": [], "expected_notes": []})
+    assert stale.status_code == 409
+    assert recipe["recipe_notes"] == notes
+    assert client.patch('/api/recipe/notes', json={"url": "missing", "recipe_notes": []}).status_code == 404
+    assert client.patch('/api/recipe/notes', json={"url": URL, "recipe_notes": "invalid"}).status_code == 400
+    cleared = client.patch('/api/recipe/notes', json={"url": URL, "recipe_notes": [], "expected_notes": notes})
+    assert cleared.status_code == 200
+    assert recipe["recipe_notes"] == []
+    def fail_save(*_args):
+        raise OSError("storage unavailable")
+    monkeypatch.setattr(preview.recipe_edit_service, "save_recipe_output", fail_save)
+    failed = client.patch('/api/recipe/notes', json={"url": URL, "recipe_notes": notes})
+    assert failed.status_code == 503
+    assert recipe["recipe_notes"] == []
+
+
 def test_pdf_export_is_ephemeral_and_does_not_update_persisted_archive(recipe, monkeypatch):
     seen = {}
     def render(url, html, _source, path, **kwargs):

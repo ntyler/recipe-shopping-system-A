@@ -687,6 +687,7 @@
                                             <img src="{{ meal.cover_image.thumb_url or meal.cover_image.card_url or meal.cover_image.src }}" alt="">
                                         {% endif %}
                                         <a href="#recipeView" data-recipe-url="{{ meal.recipe_url }}" onclick="return jumpToRecipeViewRecipe(this, event)">{{ meal.recipe_name }}</a>
+                                        {% if meal.prep_notes %}<p class="app-meal-prep-notes" style="white-space: pre-wrap; overflow-wrap: anywhere;">{{ meal.prep_notes }}</p>{% endif %}
                                         {% if meal.ingredient_selection_needed %}
                                             <span class="app-meal-selection-needed">Selection needed.</span>
                                         {% endif %}
@@ -805,6 +806,7 @@
                 <small id="mealPlannerServingsHelp" class="app-dialog-helper" data-meal-servings-help aria-live="polite">Select a recipe to use its default yield.</small>
             </div>
             <div class="app-dialog-status" data-meal-plan-status aria-live="polite"></div>
+            <label>Meal-prep notes <textarea name="prep_notes" rows="2" placeholder="Notes for this scheduled meal"></textarea></label>
             <div class="app-dialog-actions">
                 <button type="button" class="app-page-secondary-action" onclick="return closeMealPlannerDialog()">Cancel</button>
                 <button type="submit" class="app-page-primary-action" data-meal-plan-submit>Add Meal</button>

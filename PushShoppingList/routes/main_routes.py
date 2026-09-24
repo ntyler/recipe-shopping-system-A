@@ -4014,12 +4014,14 @@ def recipe_notes_for_view(recipe_data):
     recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
     sections = []
 
-    for key in ("recipe_notes", "recipe_note_sections", "source_notes"):
-        sections.extend(normalize_recipe_note_sections(recipe_data.get(key)))
-
-    raw = recipe_data.get("raw") if isinstance(recipe_data.get("raw"), dict) else {}
-    for key in ("recipe_notes", "recipe_note_sections", "source_notes"):
-        sections.extend(normalize_recipe_note_sections(raw.get(key)))
+    if "recipe_notes" in recipe_data:
+        sections = normalize_recipe_note_sections(recipe_data["recipe_notes"])
+    else:
+        for key in ("recipe_note_sections", "source_notes"):
+            sections.extend(normalize_recipe_note_sections(recipe_data.get(key)))
+        raw = recipe_data.get("raw") if isinstance(recipe_data.get("raw"), dict) else {}
+        for key in ("recipe_notes", "recipe_note_sections", "source_notes"):
+            sections.extend(normalize_recipe_note_sections(raw.get(key)))
 
     seen = set()
     unique_sections = []
@@ -5987,6 +5989,7 @@ def add_meal_plan_entry_route():
             "meal_type": payload.get("meal_type"),
             "recipe_url": recipe_url,
             "recipe_name": available_recipes[recipe_url]["name"],
+            "prep_notes": str(payload.get("prep_notes") or "").strip(),
             "planned_servings": planned_servings,
             "ingredient_option_selections": ingredient_resolution["selected_options"],
             "unresolved_ingredient_requirement_ids": [

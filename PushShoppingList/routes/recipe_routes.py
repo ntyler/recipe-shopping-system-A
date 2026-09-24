@@ -4711,6 +4711,20 @@ def api_recipe_preview_route():
         return jsonify({"ok": False, "error": str(exc), **exc.details}), exc.status
 
 
+@recipe_bp.route("/api/recipe/notes", methods=["PATCH"])
+def api_recipe_notes_route():
+    from PushShoppingList.services.recipe_edit_service import save_recipe_notes
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"ok": False, "error": "A JSON object is required."}), 400
+    try:
+        result = save_recipe_notes(str(data.get("url") or "").strip(), data.get("recipe_notes"), data.get("expected_notes"))
+    except Exception:
+        current_app.logger.exception("Recipe notes save failed")
+        return jsonify({"ok": False, "error": "Unable to save notes. Try again."}), 503
+    return jsonify(result), result.get("status_code", 200)
+
+
 @recipe_bp.route("/api/recipe_preview/pdf", methods=["POST"])
 def api_recipe_preview_pdf_route():
     from PushShoppingList.services.recipe_preview_service import (

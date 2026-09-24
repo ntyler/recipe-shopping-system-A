@@ -69,6 +69,16 @@ def test_meal_plan_rejects_invalid_and_duplicate_entries(isolated_meal_plan):
     assert meal_plan_service.add_meal(same_recipe_another_day)["date"] == "2026-07-11"
 
 
+def test_meal_prep_notes_belong_to_individual_scheduled_meals(isolated_meal_plan):
+    payload = {"date": "2026-09-23", "meal_type": "dinner", "recipe_url": "recipe://bread", "recipe_name": "Bread", "planned_servings": 6}
+    meal_plan_service.add_meal({**payload, "prep_notes": "  Mix Thursday\nBake Friday  "})
+    meal_plan_service.add_meal({**payload, "date": "2026-09-24"})
+    meals = meal_plan_service.load_meal_plan()["meals"]
+    assert meals[0]["prep_notes"] == "Mix Thursday\nBake Friday"
+    assert meals[1]["prep_notes"] == ""
+    assert all("recipe_notes" not in meal for meal in meals)
+
+
 def test_meal_plan_persists_numeric_and_fractional_planned_servings(isolated_meal_plan):
     fractional = meal_plan_service.add_meal({
         "date": "2026-07-06",

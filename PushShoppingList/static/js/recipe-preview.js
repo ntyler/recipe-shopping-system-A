@@ -1,7 +1,7 @@
 /* Preview shares the mounted editor's draft. Changes persist through Save Recipe. */
 let integratedRecipePreview = null;
 
-const RECIPE_PREVIEW_SAVED_OPTIONS = ['show_image', 'show_nutrition', 'print_bundle_info'];
+const RECIPE_PREVIEW_SAVED_OPTIONS = ['show_image', 'show_nutrition', 'print_bundle_info', 'print_notes'];
 
 function recipePreviewPreferencesKey() {
     return `recipe-preview-options:${document.body.dataset.viewerUserId || 'local'}`;
@@ -13,7 +13,7 @@ function loadRecipePreviewPreferences() {
         saved = JSON.parse(localStorage.getItem(recipePreviewPreferencesKey()));
     } catch (_) { /* Keep defaults when browser storage is unavailable or invalid. */ }
     return Object.fromEntries(RECIPE_PREVIEW_SAVED_OPTIONS.map(key =>
-        [key, typeof saved?.[key] === 'boolean' ? saved[key] : true]));
+        [key, typeof saved?.[key] === 'boolean' ? saved[key] : key !== 'print_notes']));
 }
 
 function saveRecipePreviewPreferences(options) {
@@ -95,17 +95,31 @@ async function openIntegratedRecipePreview({history = true} = {}) {
         <div class="recipe-preview-actions"><button type="button" data-preview-action="back">${recipePreviewIcon('back')}Back to Editor</button><button type="button" data-preview-action="pdf" disabled>${recipePreviewIcon('pdf')}Download PDF</button><button type="button" data-preview-action="print" class="is-primary" disabled>${recipePreviewIcon('print')}Print</button></div>
         </div>
         <div class="recipe-preview-options" aria-label="Preview options">
-            <div class="recipe-preview-visibility"><label><input type="checkbox" data-preview-option="show_image" checked>Recipe image</label><label><input type="checkbox" data-preview-option="show_nutrition" checked>Nutrition</label><label><input type="checkbox" data-preview-option="print_bundle_info" checked>Print Bundle Info</label></div>
+            <div class="recipe-preview-visibility"><label><input type="checkbox" data-preview-option="show_image" checked>Recipe image</label><label><input type="checkbox" data-preview-option="show_nutrition" checked>Nutrition</label><label><input type="checkbox" data-preview-option="print_bundle_info" checked>Print Bundle Info</label><label><input type="checkbox" data-preview-option="print_notes">Print Notes</label></div>
             <div class="recipe-preview-control"><label for="recipePreviewServings">Servings</label><div class="recipe-preview-segment"><button type="button" data-preview-action="less" aria-label="Decrease servings">${recipePreviewIcon('minus')}</button><input id="recipePreviewServings" type="number" min="0.01" step="any" aria-label="Servings" disabled><button type="button" data-preview-action="more" aria-label="Increase servings">${recipePreviewIcon('plus')}</button></div></div>
             <div class="recipe-preview-control"><span>Scale</span><div class="recipe-preview-segment" role="group" aria-label="Recipe scale">${[1,2,3].map(scale => `<button type="button" data-preview-scale="${scale}" aria-pressed="false">${scale}x</button>`).join('')}</div></div>
             <div class="recipe-preview-control"><span>Text size</span><div class="recipe-preview-segment" role="group" aria-label="Recipe text size">${['smaller','normal','larger'].map((size,index) => `<button type="button" data-preview-size="${size}" aria-label="${size[0].toUpperCase()+size.slice(1)} text" aria-pressed="${size === 'normal'}">${['A−','A','A+'][index]}</button>`).join('')}</div></div>
         </div>
+        <form id="recipePreviewMealPanel" class="recipe-preview-meal-panel" aria-label="Add to Meal Plan" hidden>
+            <h2>Add to Meal Plan</h2><fieldset><div class="recipe-preview-meal-fields">
+            <label>Date<input type="date" name="date" required></label>
+            <label>Meal<select name="meal_type" aria-label="Meal">${['breakfast','lunch','dinner','snack'].map(meal => `<option value="${meal}" ${meal === 'dinner' ? 'selected' : ''}>${meal[0].toUpperCase()+meal.slice(1)}</option>`).join('')}</select></label>
+            <label>Planned servings<input type="number" name="planned_servings" min="1" step="any" required></label></div>
+            <label>Meal-prep notes<textarea name="prep_notes" rows="2" placeholder="Notes for this scheduled meal only"></textarea></label>
+            <p>Uses the saved recipe and your selected ingredient bundles.</p>
+            <div class="recipe-preview-note-actions"><button type="submit">Add Meal</button><button type="button" data-preview-action="cancel-meal">Cancel</button></div>
+            </fieldset><p data-preview-meal-status role="status" aria-live="polite"></p>
+        </form>
         <p id="recipePreviewStatus" class="recipe-preview-status" role="status" aria-live="polite">Loading recipe preview…</p>
         <article class="recipe-preview-card" aria-label="Recipe" aria-busy="true"></article>`;
     syncRecipePreviewOptions();
     page.querySelector('[data-preview-breadcrumb]').textContent = state.draft.display_name || state.draft.recipe_title || 'Recipe';
     page.addEventListener('click', handleRecipePreviewClick);
     page.addEventListener('change', handleRecipePreviewChange);
+    page.addEventListener('input', event => {
+        if (event.target.matches('[data-preview-note-field]')) syncRecipePreviewNotesDraft();
+    });
+    page.querySelector('#recipePreviewMealPanel').addEventListener('submit', submitRecipePreviewMeal);
     page.addEventListener('keydown', event => {
         const rating = event.target.closest('[data-preview-rating]');
         if (rating && ['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) {
@@ -174,6 +188,7 @@ async function refreshIntegratedRecipePreview() {
 
 function renderIntegratedRecipePreview(state) {
     const r = state.model, esc = escapeHtml;
+    const notesOpen = state.page.querySelector('[data-preview-notes]')?.open;
     // Browser Save as PDF uses the document title as its suggested filename.
     document.title = `${r.title.replace(/[<>:"/\\|?*]/g, '') || 'Recipe'} - AI Pantry`;
     const expandedChoices = new Set([...state.page.querySelectorAll('details[data-preview-choice][open]')].map(node => node.dataset.previewChoice));
@@ -202,13 +217,22 @@ function renderIntegratedRecipePreview(state) {
                 <ul>${recipePreviewIngredientsHtml(r, state.url, expandedChoices)}</ul>
             </section>
             <section class="recipe-preview-equipment"><div class="recipe-preview-section-heading"><h2>Equipment</h2></div>${recipePreviewEquipmentHtml(r, state.url)}</section>
-        <section class="recipe-preview-instructions"><h2>Instructions</h2><ol>${(r.instructions || []).map((step,index) => `<li><span class="recipe-preview-step-number" aria-hidden="true">${index+1}</span><div>${step.section ? `<strong class="recipe-preview-step-section">${esc(step.section)}</strong>` : ''}${esc(step.instruction || step.text || '')}${recipePreviewInstructionMetadata(step)}</div></li>`).join('') || '<li>No instructions specified.</li>'}</ol></section>
+        <section class="recipe-preview-instructions"><h2>Instructions</h2><ol>${(r.instructions || []).map((step,index) => `<li><span class="recipe-preview-step-number" aria-hidden="true">${index+1}</span><div>${step.section ? `<strong class="recipe-preview-step-section">${esc(step.section)}</strong>` : ''}${esc(step.instruction || step.text || '')}${recipePreviewInstructionMetadata(step)}</div></li>`).join('') || '<li>No instructions specified.</li>'}</ol>
+            <details class="recipe-preview-notes" data-preview-notes ${notesOpen ? 'open' : ''}><summary>Recipe Notes</summary>
+                <p>Permanent recipe notes shared with the editor. Save Notes before printing.</p>
+                <fieldset ${state.notesBusy ? 'disabled' : ''}><div data-preview-note-rows>${(state.draft.recipe_notes || r.recipe_notes || []).map(recipePreviewNoteEditorHtml).join('')}</div>
+                <div class="recipe-preview-note-actions"><button type="button" data-preview-action="add-note">Add note section</button><button type="button" data-preview-action="save-notes">Save Notes</button></div></fieldset>
+                <p data-preview-notes-status role="status" aria-live="polite"></p>
+            </details></section>
         </div>
+        <section class="recipe-preview-print-notes" data-preview-print-notes><h2>Recipe Notes</h2>${recipePreviewSavedNotesHtml(r.saved_recipe_notes || [])}</section>
         <section class="recipe-preview-nutrition" data-preview-nutrition><div class="recipe-preview-section-heading"><h2>Nutrition</h2>
             <div class="recipe-preview-segment recipe-preview-nutrition-toggle" role="group" aria-label="Nutrition display">${[['per_serving','Per serving'],['whole_recipe','Whole recipe']].map(([mode,label]) => `<button type="button" data-preview-nutrition-mode="${mode}" aria-pressed="${r.nutrition_mode === mode}" ${r.nutrition_modes.includes(mode) ? '' : 'disabled'}>${label}</button>`).join('')}</div>
             <span class="recipe-preview-nutrition-yield" aria-live="polite">${esc(r.nutrition_context)}</span></div>
             ${r.nutrition_notice ? `<p class="recipe-preview-nutrition-note">${esc(r.nutrition_basis)}. ${esc(r.nutrition_notice)}</p>` : ''}${recipePreviewNutritionHtml(r)}</section>`;
     const input = state.page.querySelector('#recipePreviewServings');
+    const title = state.page.querySelector('.recipe-preview-summary h1');
+    title.insertAdjacentHTML('afterend', '<button type="button" class="recipe-preview-plan-button" data-preview-action="meal-plan" aria-controls="recipePreviewMealPanel">Add to Meal Plan</button>');
     const servings = recipeEditServingsParts(r.servings).number;
     input.value = Number.isFinite(servings) ? servings : '';
     input.disabled = !(recipeEditServingsParts(r.base_servings).number > 0);
@@ -221,6 +245,100 @@ function renderIntegratedRecipePreview(state) {
     syncRecipePreviewOptions();
     bindRecipeTaskChecks();
     syncRecipePreviewChoiceChecks(state.page);
+}
+
+function recipePreviewNoteEditorHtml(section) {
+    return `<div data-preview-note-row><label>Section heading<input data-preview-note-field="heading" value="${escapeAttribute(section.heading || '')}"></label>
+        <label>Notes (one per line)<textarea data-preview-note-field="items" rows="3">${escapeHtml((section.items || []).join('\n'))}</textarea></label>
+        <button type="button" data-preview-action="remove-note">Remove section</button></div>`;
+}
+
+function recipePreviewSavedNotesHtml(sections) {
+    return sections.map(section => `${section.heading ? `<h3>${escapeHtml(section.heading)}</h3>` : ''}<ul>${section.items.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`).join('');
+}
+
+function syncRecipePreviewNotesDraft() {
+    const state = integratedRecipePreview;
+    if (!state) return;
+    const sections = [...state.page.querySelectorAll('[data-preview-note-row]')].map(row => ({
+        heading: row.querySelector('[data-preview-note-field="heading"]').value.trim(),
+        items: normalizeRecipeNoteItemsForEditor(row.querySelector('[data-preview-note-field="items"]').value),
+    }));
+    state.draft.recipe_notes = sections;
+    replaceRecipeEditorRecipeNotes(sections);
+    state.page.querySelector('[data-preview-notes-status]').textContent = 'Unsaved notes. Print uses the last saved notes.';
+}
+
+async function saveRecipePreviewNotes() {
+    const state = integratedRecipePreview;
+    if (!state || state.notesBusy) return;
+    syncRecipePreviewNotesDraft();
+    state.notesBusy = true;
+    state.page.querySelector('[data-preview-notes] fieldset').disabled = true;
+    state.page.querySelector('[data-preview-notes-status]').textContent = 'Saving notes…';
+    try {
+        const response = await fetch('/api/recipe/notes', {method: 'PATCH', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({url: state.url, recipe_notes: state.draft.recipe_notes, expected_notes: state.model.saved_recipe_notes})});
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.error || 'Unable to save recipe notes.');
+        // Update the mounted editor even if the reader returned there during the request.
+        if (recipeEditorCurrentUrl() === state.url) {
+            replaceRecipeEditorRecipeNotes(data.recipe_notes);
+            if (recipeEditOriginalSnapshot) recipeEditOriginalSnapshot.recipe_notes = normalizeRecipeNoteSectionsSnapshot(data.recipe_notes);
+            rememberRecipeEditorFieldsAsSaved(document.getElementById('recipeEditForm'), ['recipe_notes']);
+            updateRecipeEditorDirtyState();
+        }
+        state.draft.recipe_notes = data.recipe_notes;
+        state.model.saved_recipe_notes = data.recipe_notes;
+        if (integratedRecipePreview === state) {
+            state.notesBusy = false;
+            renderIntegratedRecipePreview(state);
+            state.page.querySelector('[data-preview-notes-status]').textContent = 'Notes saved.';
+        }
+    } catch (error) {
+        if (integratedRecipePreview === state) state.page.querySelector('[data-preview-notes-status]').textContent = error.message;
+    } finally {
+        state.notesBusy = false;
+        if (integratedRecipePreview === state) state.page.querySelector('[data-preview-notes] fieldset').disabled = false;
+    }
+}
+
+function openRecipePreviewMealPanel() {
+    const state = integratedRecipePreview;
+    if (!state?.projectionReady) return;
+    const form = state.page.querySelector('#recipePreviewMealPanel');
+    if (!form.elements.date.value) {
+        const today = new Date();
+        form.elements.date.value = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+    }
+    form.elements.planned_servings.value = Math.max(1, recipeEditServingsParts(state.model.servings).number || 1);
+    form.hidden = false;
+    form.scrollIntoView({block:'nearest'});
+    form.elements.date.focus();
+}
+
+async function submitRecipePreviewMeal(event) {
+    event.preventDefault();
+    const state = integratedRecipePreview, form = event.currentTarget;
+    if (!state?.projectionReady || state.mealBusy || !form.reportValidity()) return;
+    const data = new FormData(form), status = form.querySelector('[data-preview-meal-status]');
+    state.mealBusy = true;
+    form.querySelector('fieldset').disabled = true;
+    status.textContent = 'Adding meal…';
+    try {
+        const response = await fetch('/api/meal-plan', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
+            recipe_url:state.url, date:data.get('date'), meal_type:data.get('meal_type'), planned_servings:Number(data.get('planned_servings')),
+            prep_notes:data.get('prep_notes'), ingredient_option_selections:state.selections,
+        })});
+        const result = await response.json();
+        if (!response.ok || !result.ok) throw new Error(result.error || 'Unable to add this meal.');
+        status.textContent = 'Meal added. ';
+        const link = document.createElement('a');
+        link.href = `/?meal_week=${encodeURIComponent(data.get('date'))}#mealPlannerPage`;
+        link.textContent = 'View Meal Planner';
+        status.append(link);
+    } catch (error) { status.textContent = error.message; }
+    finally { state.mealBusy = false; form.querySelector('fieldset').disabled = false; }
 }
 
 function recipePreviewIngredientsHtml(recipe, url, expandedChoices = new Set()) {
@@ -292,6 +410,7 @@ function syncRecipePreviewOptions() {
     state.page.querySelector('.recipe-preview-summary')?.classList.toggle('without-image', !state.options.show_image);
     state.page.querySelector('.recipe-preview-card').dataset.textSize = state.options.text_size;
     state.page.querySelector('.recipe-preview-card').dataset.printBundleInfo = state.options.print_bundle_info !== false;
+    state.page.querySelector('[data-preview-print-notes]')?.toggleAttribute('hidden', !state.options.print_notes || !state.model?.saved_recipe_notes?.length);
     state.page.querySelectorAll('[data-preview-scale]').forEach(button => button.setAttribute('aria-pressed', Number(button.dataset.previewScale) === state.options.scale ? 'true' : 'false'));
     state.page.querySelectorAll('[data-preview-size]').forEach(button => button.setAttribute('aria-pressed', button.dataset.previewSize === state.options.text_size ? 'true' : 'false'));
 }
@@ -379,6 +498,20 @@ async function handleRecipePreviewClick(event) {
     }
     switch (button.dataset.previewAction) {
         case 'back': return closeIntegratedRecipePreview();
+        case 'meal-plan': return openRecipePreviewMealPanel();
+        case 'cancel-meal':
+            state.page.querySelector('#recipePreviewMealPanel').hidden = true;
+            state.page.querySelector('[data-preview-action="meal-plan"]').focus();
+            break;
+        case 'add-note':
+            state.page.querySelector('[data-preview-note-rows]').insertAdjacentHTML('beforeend', recipePreviewNoteEditorHtml({heading: '', items: []}));
+            state.page.querySelector('[data-preview-note-rows]').lastElementChild.querySelector('input').focus();
+            break;
+        case 'remove-note':
+            button.closest('[data-preview-note-row]').remove();
+            syncRecipePreviewNotesDraft();
+            break;
+        case 'save-notes': return saveRecipePreviewNotes();
         case 'favorite': return toggleRecipeFavorite(button, event);
         case 'less': case 'more': {
             const input = state.page.querySelector('#recipePreviewServings');

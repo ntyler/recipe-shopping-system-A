@@ -66,6 +66,7 @@ def preview_options(value, recipe=None):
         "show_image": value.get("show_image") is not False,
         "show_nutrition": value.get("show_nutrition") is not False,
         "print_bundle_info": value.get("print_bundle_info") is not False,
+        "print_notes": value.get("print_notes") is True,
         "text_size": size,
         "nutrition_mode": nutrition_mode,
     }
@@ -281,7 +282,7 @@ def prepare_recipe_preview(payload):
             "meal_type", "course", "main_ingredient", "cooking_method", "occasion", "custom_categories",
             "custom_tags", "tags", "servings", "quantity", "scaling", "rating",
             "level", "prep_time", "cook_time", "total_time", "inactive_time", "ingredients", "instructions",
-            "nutrition", "nutrition_serving_basis", "menu_description", "equipment",
+            "nutrition", "nutrition_serving_basis", "menu_description", "equipment", "recipe_notes",
             "cookbook_name", "menu_section", "menu_price", "menu_price_amount", "menu_price_currency",
         }
         recipe.update({key: deepcopy(value) for key, value in draft.items() if key in allowed})
@@ -307,6 +308,8 @@ def prepare_recipe_preview(payload):
         "description": text(recipe.get("description") if "description" in recipe else recipe.get("menu_description")),
         "image_url": image_url,
         "author": text(author),
+        "recipe_notes": recipe_edit_service.normalize_recipe_note_sections(recipe.get("recipe_notes") if "recipe_notes" in recipe else recipe.get("recipe_note_sections") or recipe.get("source_notes") or []),
+        "saved_recipe_notes": recipe_edit_service.normalize_recipe_note_sections(saved.get("recipe_notes") if "recipe_notes" in saved else saved.get("recipe_note_sections") or saved.get("source_notes") or []),
         "course": ", ".join(recipe_edit_service.normalize_text_rows(course)),
         "cuisine": ", ".join(recipe_edit_service.normalize_text_rows(cuisine)),
         "source_url": text(recipe.get("source_url")),
@@ -398,6 +401,12 @@ def build_recipe_preview_pdf_html(view, resolved, options):
     ingredients = "".join(ingredient_blocks)
     equipment = recipe_extract_service.format_video_recipe_equipment_for_pdf(view.get("equipment", [])) or '<p class="source">No equipment specified.</p>'
     instructions = recipe_extract_service.format_video_recipe_instructions_for_pdf(resolved["instructions"])
+    notes = ""
+    if options.get("print_notes") and view.get("saved_recipe_notes"):
+        sections = "".join((f'<h3>{escape(section["heading"])}</h3>' if section.get("heading") else "") +
+                           '<ul>' + "".join(f'<li>{escape(item)}</li>' for item in section["items"]) + '</ul>'
+                           for section in view["saved_recipe_notes"])
+        notes = f'<section class="recipe-notes"><h2>Recipe Notes</h2>{sections}</section>'
     nutrition = ""
     if options["show_nutrition"]:
         summary = view["nutrition_summary"]
@@ -437,7 +446,7 @@ tr,li,.title-image {{ break-inside: avoid; }} li {{ padding-left: 6px; margin-bo
 </style></head><body><header>{image}<h1>{title}</h1><div class="source">{attribution}</div>{description}<div class="tags">{tags}</div><p class="source">{assignment}</p></header>
 <div class="metrics">{metrics}</div>{metadata}<div class="preparation"><section class="ingredients"><h2>Ingredients</h2>{ingredients}</section>
 <section class="equipment"><h2>Equipment</h2>{equipment}</section></div>
-<section class="instructions"><h2>Instructions</h2>{instructions}</section>{nutrition}</body></html>'''
+<section class="instructions"><h2>Instructions</h2>{instructions}</section>{notes}{nutrition}</body></html>'''
 
 
 def create_recipe_preview_pdf(payload):

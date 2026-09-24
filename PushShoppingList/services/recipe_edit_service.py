@@ -4938,9 +4938,8 @@ def load_editable_recipe(url):
     ).strip()
     category_metadata = recipe_category_metadata_for_editor(url, recipe_data, meta)
     recipe_notes = normalize_recipe_note_sections(
-        recipe_data.get("recipe_notes")
-        or recipe_data.get("recipe_note_sections")
-        or recipe_data.get("source_notes")
+        recipe_data.get("recipe_notes") if "recipe_notes" in recipe_data
+        else recipe_data.get("recipe_note_sections") or recipe_data.get("source_notes")
     )
     apply_recipe_note_substitutions_to_ingredients(
         recipe_data.get("ingredients", []),
@@ -7740,10 +7739,8 @@ def save_editable_recipe(original_url, payload, require_existing=False):
         payload.get("recipe_title") or existing_data.get("recipe_title") or "",
     )
     existing_recipe_notes = (
-        existing_data.get("recipe_notes")
-        or existing_data.get("recipe_note_sections")
-        or existing_data.get("source_notes")
-        or []
+        existing_data.get("recipe_notes") if "recipe_notes" in existing_data
+        else existing_data.get("recipe_note_sections") or existing_data.get("source_notes") or []
     )
     recipe_data = {
         **existing_data,
@@ -13043,6 +13040,23 @@ def sanitize_recipe_notes(value, existing_value=None):
         value = existing_value
 
     return normalize_recipe_note_sections(value)
+
+
+def save_recipe_notes(original_url, notes, expected_notes=None):
+    """Save only recipe notes, preserving recipe drafts and unrelated saved fields."""
+    if not original_url or not isinstance(notes, list):
+        return {"ok": False, "error": "Recipe URL and note sections are required.", "status_code": 400}
+    with _RECIPE_OUTPUT_WRITE_LOCK:
+        existing = load_recipe_output(original_url)
+        if not existing:
+            return {"ok": False, "error": "Recipe was not found.", "status_code": 404}
+        saved_notes = normalize_recipe_note_sections(existing.get("recipe_notes") if "recipe_notes" in existing else
+                                                    existing.get("recipe_note_sections") or existing.get("source_notes") or [])
+        if expected_notes is not None and normalize_recipe_note_sections(expected_notes) != saved_notes:
+            return {"ok": False, "error": "Recipe notes changed elsewhere. Reopen the recipe before saving your notes.", "status_code": 409}
+        normalized = sanitize_recipe_notes(notes)
+        save_recipe_output(original_url, {**existing, "recipe_notes": normalized, "updated_at": now_iso()})
+    return {"ok": True, "recipe_notes": normalized}
 
 
 def sanitize_reflection_notes(value, existing_value=None):

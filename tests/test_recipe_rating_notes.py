@@ -285,6 +285,15 @@ def test_recipe_extraction_prompt_preserves_notes_separately():
     assert '"substitutions": [' in prompt
 
 
+def test_saved_recipe_notes_override_legacy_notes_including_clear():
+    recipe = {"source_notes": ["Original source tip"], "raw": {"recipe_notes": ["Imported tip"]}}
+    assert main_routes.recipe_notes_for_view(recipe)
+    recipe["recipe_notes"] = [{"heading": "My notes", "items": ["Updated tip"]}]
+    assert main_routes.recipe_notes_for_view(recipe) == recipe["recipe_notes"]
+    recipe["recipe_notes"] = []
+    assert main_routes.recipe_notes_for_view(recipe) == []
+
+
 def test_ingredient_substitution_normalizer_preserves_unique_options():
     recipe = {
         "ingredients": [{
