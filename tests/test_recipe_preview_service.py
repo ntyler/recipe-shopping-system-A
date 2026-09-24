@@ -1,7 +1,10 @@
 """Preview and PDF must share draft-safe choice and scaling semantics."""
 
+from base64 import b64decode
 from copy import deepcopy
 from pathlib import Path
+import re
+from xml.etree import ElementTree
 
 from flask import Flask
 import pytest
@@ -38,6 +41,8 @@ def recipe(monkeypatch):
     }
     monkeypatch.setattr(preview.recipe_edit_service, "load_recipe_output", lambda url: value if url == URL else None)
     monkeypatch.setattr(preview.recipe_edit_service, "save_recipe_output", lambda *_a, **_k: pytest.fail("Preview must not save"))
+    monkeypatch.setattr(preview.cuisine_category_service, "cuisine_category_registry_payload",
+                        preview.cuisine_category_service.default_cuisine_category_registry_payload)
     return value
 
 
@@ -409,7 +414,8 @@ def test_print_metadata_uses_saved_and_draft_categories(recipe):
     assert (view["course"], view["cuisine"], view["author"]) == ("Side Dish", "American", "Test cook")
     html = preview.build_recipe_preview_pdf_html(view, resolved, response["options"])
     assert 'Course</span><span class="metadata-value">Side Dish' in html
-    assert 'Cuisine</span><span class="metadata-value">American' in html
+    assert 'Cuisine</span><span class="metadata-value"><span class="cuisine-item">' in html
+    assert 'American</span>' in html
     assert 'Author</span><span class="metadata-value">Test cook' in html
     assert html.index('class="metrics"') < html.index('class="recipe-metadata"') < html.index('class="preparation"')
     response, resolved = preview.prepare_recipe_preview({"url": URL, "recipe": {
@@ -417,7 +423,7 @@ def test_print_metadata_uses_saved_and_draft_categories(recipe):
     }, "options": {"show_image": False}})
     html = preview.build_recipe_preview_pdf_html(response["recipe"], resolved, response["options"])
     assert 'Course</span><span class="metadata-value">Side &lt;Dish&gt;, Lunch' in html
-    assert 'Cuisine</span><span class="metadata-value">French &amp; Italian' in html
+    assert 'Cuisine</span><span class="metadata-value"><span class="cuisine-item">French &amp; Italian</span>' in html
     assert 'Author</span><span class="metadata-value">A &amp; B' in html
 
 
@@ -442,11 +448,77 @@ def test_print_metadata_includes_all_draft_classifications(recipe):
     assert view["dietary_preferences"] == "Dairy Free"
     assert view["custom_tags"] == "Comfort Food, Casserole, Vegetarian Side, Easy & <quick>"
     html = preview.build_recipe_preview_pdf_html(view, resolved, response["options"])
-    for expected in ("Course: Dinner", "Cuisine: American, French", "Dietary Preferences: Dairy Free",
+    for expected in ("Course: Dinner", "Dietary Preferences: Dairy Free",
                      "Main Ingredient: Vegetarian", "Cooking Method: Oven Baked", "Occasion: Family Dinner",
                      "Custom Tags: Comfort Food, Casserole, Vegetarian Side, Easy &amp; &lt;quick&gt;", "Prep Time Group: Under 1 hour"):
         label, value = expected.split(": ", 1)
         assert f'{label}</span><span class="metadata-value">{value}</span>' in html
+    assert [item["label"] for item in view["cuisine_items"]] == ["American", "French"]
+    assert 'American</span>, <span class="cuisine-item">' in html
+    assert 'French</span>' in html
+
+
+def test_cuisine_flags_use_bundled_svg_in_projection_and_pdf(recipe):
+    response, resolved = preview.prepare_recipe_preview({"url": URL, "options": {"show_image": False}})
+    item, = response["recipe"]["cuisine_items"]
+    assert item["label"] == item["source_label"] == "American"
+    assert item["icon"] == "flag:us"
+    assert item["glyph"] == ""
+    assert item["image_url"].startswith("data:image/svg+xml;base64,")
+    svg = ElementTree.fromstring(b64decode(item["image_url"].split(",", 1)[1]))
+    assert svg.tag == "{http://www.w3.org/2000/svg}svg"
+    assert svg.get("viewBox") == "0 0 640 480"
+    assert len(svg) > 0
+    html = preview.build_recipe_preview_pdf_html(response["recipe"], resolved, response["options"])
+    assert f'<img class="cuisine-flag" src="{item["image_url"]}" alt=""> American' in html
+
+
+@pytest.mark.parametrize("code", ["US", "GB", "PE"])
+def test_exported_flag_svg_keeps_all_internal_artwork_references(code):
+    svg = ElementTree.fromstring(b64decode(preview.preview_flag_image_url(code).split(",", 1)[1]))
+    identifiers = {element.get("id") for element in svg.iter() if element.get("id")}
+    references = set()
+    for element in svg.iter():
+        for attribute, value in element.attrib.items():
+            if attribute.endswith("href"):
+                assert value.startswith("#")
+                references.add(value[1:])
+            references.update(re.findall(r"url\(#([^)]+)\)", value))
+    assert references <= identifiers
+
+
+def test_cuisine_icons_honor_workspace_overrides_aliases_and_explicit_clear(recipe, monkeypatch):
+    monkeypatch.setattr(preview.cuisine_category_service, "cuisine_category_registry_payload", lambda: {
+        "categories": [
+            {"value": "American", "icon": "", "aliases": []},
+            {"value": "House & <special>", "icon": "flag:ca", "aliases": ["Old House"]},
+            {"value": "Fusion", "icon": "symbol:globe", "aliases": []},
+        ],
+    })
+    response, resolved = preview.prepare_recipe_preview({"url": URL, "recipe": {
+        "cuisine_tags": ["American", "Old House", "Fusion"],
+    }, "options": {"show_image": False}})
+    american, custom, fusion = response["recipe"]["cuisine_items"]
+    assert american["icon"] == american["image_url"] == american["glyph"] == ""
+    assert custom["source_label"] == "Old House"
+    assert custom["label"] == "House & <special>"
+    assert custom["icon"] == "flag:ca" and custom["image_url"]
+    assert fusion["glyph"] == "\U0001f30d" and not fusion["image_url"]
+    html = preview.build_recipe_preview_pdf_html(response["recipe"], resolved, response["options"])
+    assert 'class="cuisine-item">American</span>' in html
+    assert "House &amp; &lt;special&gt;" in html
+    assert "House & <special>" not in html
+
+
+def test_cuisine_icons_support_legacy_labels_without_guessing_unknown_regions(recipe):
+    response = preview.build_recipe_preview({"url": URL, "recipe": {
+        "cuisine_tags": ["\U0001f1fa\U0001f1f8 American", "flag:fr French", "Mediterranean", "Mystery <style>"],
+    }})
+    items = response["recipe"]["cuisine_items"]
+    assert [item["label"] for item in items] == ["American", "French", "Mediterranean", "Mystery <style>"]
+    assert [item["icon"] for item in items] == ["flag:us", "flag:fr", "", ""]
+    assert all(item["image_url"] for item in items[:2])
+    assert not any(item["image_url"] for item in items[2:])
 
 
 def test_print_classifications_support_category_fallback_and_explicit_clear(recipe):
@@ -470,6 +542,8 @@ def test_print_notes_only_exports_saved_notes(recipe, options, included):
     assert ("Chill &amp; cover before baking." in html) is included
     assert ("Tips &lt;saved&gt;" in html) is included
     assert "Unsaved draft note." not in html
+    if included:
+        assert html.index('<section class="nutrition">') < html.index('<section class="recipe-notes">')
 
 
 def test_save_notes_route_preserves_recipe_and_checks_conflicts(recipe, monkeypatch):

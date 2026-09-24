@@ -5,15 +5,19 @@ amounts, so all consumers use the same base-quantity helpers before applying the
 requested multiplier once. Neither a preview nor an export saves the draft.
 """
 
+from base64 import b64encode
 from copy import deepcopy
 from decimal import Decimal
+from functools import lru_cache
 from html import escape
 from io import BytesIO
 import math
 from pathlib import Path
 import re
 from tempfile import TemporaryDirectory
+from xml.etree import ElementTree
 
+from PushShoppingList.services import cuisine_category_service
 from PushShoppingList.services import recipe_edit_service
 from PushShoppingList.services import recipe_extract_service
 from PushShoppingList.services.ingredient_option_service import (
@@ -249,6 +253,68 @@ def preview_classification_text(*values):
     return ", ".join(labels)
 
 
+@lru_cache(maxsize=1)
+def preview_flag_symbols():
+    """Read only the bundled artwork; PDF flags must not depend on emoji fonts."""
+    sprite = Path(__file__).resolve().parents[1] / "static/vendor/flag-icons/flags-4x3.svg"
+    root = ElementTree.parse(sprite).getroot()
+    return {symbol.get("id"): symbol for symbol in root}
+
+
+@lru_cache(maxsize=250)
+def preview_flag_image_url(country_code):
+    symbol = preview_flag_symbols().get(f"flag-icons-{country_code.lower()}")
+    if symbol is None:
+        return ""
+    svg = ElementTree.Element("{http://www.w3.org/2000/svg}svg", {
+        "viewBox": symbol.get("viewBox", "0 0 640 480"), "width": "640", "height": "480",
+    })
+    svg.extend(deepcopy(list(symbol)))
+    encoded = b64encode(ElementTree.tostring(svg, encoding="utf-8")).decode("ascii")
+    return f"data:image/svg+xml;base64,{encoded}"
+
+
+def preview_cuisine_items(value):
+    """Resolve the same workspace icons as the editor, including explicit no-icon choices."""
+    labels = preview_classification_text(value)
+    if not labels:
+        return []
+    registry = cuisine_category_service.cuisine_category_registry_payload()
+    lookup = {}
+    for category in registry.get("categories", []):
+        for alias in (category.get("value"), category.get("category_name"), category.get("name"),
+                      *category.get("aliases", [])):
+            _, plain = cuisine_category_service.split_legacy_cuisine_category_label(alias)
+            key = cuisine_category_service.cuisine_category_key(plain)
+            if key:
+                lookup[key] = category
+    items = []
+    for source_label in labels.split(", "):
+        _, plain = cuisine_category_service.split_legacy_cuisine_category_label(source_label)
+        category = lookup.get(cuisine_category_service.cuisine_category_key(plain))
+        parts = cuisine_category_service.resolve_cuisine_category_parts(
+            category.get("value") or category.get("category_name") or plain,
+            icon=category.get("icon", ""),
+        ) if category else cuisine_category_service.resolve_cuisine_category_parts(source_label)
+        country_code = cuisine_category_service.country_code_from_flag(parts["icon"])
+        items.append({
+            "label": parts["name"], "source_label": source_label, "icon": parts["icon"],
+            "image_url": preview_flag_image_url(country_code) if country_code else "",
+            "glyph": "" if country_code else cuisine_category_service.cuisine_category_icon_display(parts["icon"]),
+        })
+    return items
+
+
+def preview_cuisine_html(items):
+    result = []
+    for item in items:
+        image_url, glyph = text(item.get("image_url")), text(item.get("glyph"))
+        icon = (f'<img class="cuisine-flag" src="{escape(image_url, quote=True)}" alt=""> '
+                if image_url else f'{escape(glyph)} ' if glyph else "")
+        result.append(f'<span class="cuisine-item">{icon}{escape(text(item.get("label")))}</span>')
+    return ", ".join(result)
+
+
 def preview_instruction_rows(draft, saved):
     """Retain step metadata by identity, never by its old list position."""
     existing = recipe_edit_service.normalize_instruction_records(saved)
@@ -328,6 +394,7 @@ def prepare_recipe_preview(payload):
         "saved_recipe_notes": recipe_edit_service.normalize_recipe_note_sections(saved.get("recipe_notes") if "recipe_notes" in saved else saved.get("recipe_note_sections") or saved.get("source_notes") or []),
         "course": ", ".join(recipe_edit_service.normalize_text_rows(course)),
         "cuisine": preview_classification_text(cuisine),
+        "cuisine_items": preview_cuisine_items(cuisine),
         "dietary_preferences": preview_classification_text(recipe.get("dietary_preferences", categories.get("dietary_preferences")), recipe.get("dietary_preference", categories.get("dietary_preference"))),
         "main_ingredient": preview_classification_text(recipe.get("main_ingredient", categories.get("main_ingredient"))),
         "cooking_method": preview_classification_text(recipe.get("cooking_method", categories.get("cooking_method"))),
@@ -384,7 +451,8 @@ def build_recipe_preview_pdf_html(view, resolved, options):
     image = recipe_extract_service.format_video_recipe_title_image_for_pdf(resolved) if options["show_image"] else ""
     description = f'<p class="description">{escape(view["description"])}</p>' if view["description"] else ""
     attribution = escape(view["source_url"])
-    metadata = "".join(f'<div class="metadata-field" data-field="{key}"><span class="metadata-label">{label}</span><span class="metadata-value">{escape(view[key])}</span></div>'
+    cuisine_html = preview_cuisine_html(view.get("cuisine_items", [])) or escape(view.get("cuisine", ""))
+    metadata = "".join(f'<div class="metadata-field" data-field="{key}"><span class="metadata-label">{label}</span><span class="metadata-value">{cuisine_html if key == "cuisine" else escape(view[key])}</span></div>'
                        for key, label in (("course", "Course"), ("cuisine", "Cuisine"), ("dietary_preferences", "Dietary Preferences"),
                                           ("main_ingredient", "Main Ingredient"), ("cooking_method", "Cooking Method"), ("occasion", "Occasion"),
                                           ("custom_tags", "Custom Tags"), ("prep_time_group", "Prep Time Group"), ("author", "Author")) if view.get(key))
@@ -457,6 +525,7 @@ header {{ min-height: 132px; }} .source {{ color: #52636a; font-size: .8em; }}
 .recipe-metadata {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2.5mm 5mm; clear: both; margin: -2mm 0 4mm; padding-bottom: 3mm; border-bottom: 1px solid #ddd; font-size: .9em; break-inside: avoid; }}
 .metadata-field {{ min-width: 0; overflow-wrap: anywhere; }} .metadata-field[data-field="custom_tags"] {{ grid-column: span 2; }} .metadata-field[data-field="author"] {{ grid-column: 1 / -1; }}
 .metadata-label {{ display: block; margin-bottom: .6mm; color: #555; font-size: .8em; font-weight: 600; line-height: 1.2; }} .metadata-value {{ display: block; color: #333; line-height: 1.3; }}
+.cuisine-item {{ display: inline-block; }} .cuisine-flag {{ width: 1.33em; height: 1em; object-fit: contain; vertical-align: -.12em; }}
 .ingredients {{ margin-bottom: 22px; }} table {{ width: 100%; border-collapse: collapse; }} thead {{ display: table-header-group; }}
 .preparation {{ display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 24px; }}
 .preparation > section {{ min-width: 0; }} .equipment-list {{ padding-left: 20px; margin-top: 0; }} .equipment-list li {{ margin-bottom: 6px; }}
@@ -465,12 +534,13 @@ th,td {{ text-align: left; border-bottom: 1px solid #e3e8e6; padding: 7px; verti
 tr,li,.title-image {{ break-inside: avoid; }} li {{ padding-left: 6px; margin-bottom: 14px; white-space: pre-line; }} li::marker {{ color: #087958; font-weight: bold; }}
 .step-meta {{ font-size: .8em; color: #52636a; }} ol {{ padding-left: 24px; }}
 .nutrition {{ border-top: 1px solid #ccd6d3; margin-top: 24px; padding-top: 16px; }} .nutrition h2 small {{ margin-left: 8px; }}
+.recipe-notes {{ border-top: 1px solid #ccd6d3; margin-top: 24px; padding-top: 16px; }}
 .nutrients {{ display: flex; flex-wrap: wrap; gap: 12px 24px; }} .nutrients div {{ min-width: 105px; break-inside: avoid; }} .nutrients span,.nutrients strong {{ display: block; }} .nutrients span {{ font-size: .8em; }}
 .nutrient-details {{ display: flex; flex-wrap: wrap; gap: 18px; margin-top: 18px; }} .nutrient-group {{ flex: 1 1 170px; break-inside: avoid; }} .nutrient-group h3 {{ margin-bottom: 8px; }} .nutrient-group dl {{ margin: 0; }} .nutrient-group dl div {{ display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-bottom: 1px solid #e3e8e6; }} .nutrient-group dd {{ margin: 0; white-space: nowrap; }}
 </style></head><body><header>{image}<h1>{title}</h1><div class="source">{attribution}</div>{description}<p class="source">{assignment}</p></header>
 <div class="metrics">{metrics}</div>{metadata}<div class="preparation"><section class="ingredients"><h2>Ingredients</h2>{ingredients}</section>
 <section class="equipment"><h2>Equipment</h2>{equipment}</section></div>
-<section class="instructions"><h2>Instructions</h2>{instructions}</section>{notes}{nutrition}</body></html>'''
+<section class="instructions"><h2>Instructions</h2>{instructions}</section>{nutrition}{notes}</body></html>'''
 
 
 def create_recipe_preview_pdf(payload):

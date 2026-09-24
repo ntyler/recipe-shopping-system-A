@@ -195,6 +195,12 @@ async function refreshIntegratedRecipePreview() {
     }
 }
 
+function recipePreviewCuisineHtml(item) {
+    const icon = item.image_url ? `<img src="${escapeAttribute(item.image_url)}" alt="" aria-hidden="true">`
+        : item.glyph ? `${escapeHtml(item.glyph)} ` : '';
+    return `<span class="recipe-preview-cuisine">${icon}${escapeHtml(item.label)}</span>`;
+}
+
 function renderIntegratedRecipePreview(state) {
     const r = state.model, esc = escapeHtml;
     const notesOpen = state.page.querySelector('[data-preview-notes]')?.open;
@@ -209,14 +215,17 @@ function renderIntegratedRecipePreview(state) {
     const printMetadata = [['course','Course'],['cuisine','Cuisine'],['dietary_preferences','Dietary Preferences'],
         ['main_ingredient','Main Ingredient'],['cooking_method','Cooking Method'],['occasion','Occasion'],
         ['custom_tags','Custom Tags'],['prep_time_group','Prep Time Group'],['author','Author']]
-        .filter(([key]) => r[key]).map(([key,label]) => `<div class="recipe-preview-metadata-field" data-field="${key}"><span class="recipe-preview-metadata-label">${label}</span><span class="recipe-preview-metadata-value">${esc(r[key])}</span></div>`).join('');
+        .filter(([key]) => r[key]).map(([key,label]) => `<div class="recipe-preview-metadata-field" data-field="${key}"><span class="recipe-preview-metadata-label">${label}</span><span class="recipe-preview-metadata-value">${key === 'cuisine' && r.cuisine_items?.length ? r.cuisine_items.map(recipePreviewCuisineHtml).join(', ') : esc(r[key])}</span></div>`).join('');
     state.page.querySelector('.recipe-preview-card').innerHTML = `
         <header class="recipe-preview-summary">
             <div class="recipe-preview-photo" data-preview-image>${r.image_url ? `<img src="${escapeAttribute(r.image_url)}" alt="${escapeAttribute(r.title)}">` : `<span class="recipe-preview-no-image">${recipePreviewIcon('image')}No recipe image</span>`}
                 <button type="button" class="recipe-favorite-button recipe-preview-favorite" data-recipe-favorite data-recipe-url="${escapeAttribute(state.url)}" data-recipe-name="${escapeAttribute(r.title)}" aria-label="${favorite ? 'Remove from' : 'Add to'} favorites" aria-pressed="${favorite}" data-preview-action="favorite">${recipePreviewIcon('heart')}</button></div>
             <div class="recipe-preview-summary-text"><h1>${esc(r.title)}</h1>
                 <div class="recipe-preview-rating" data-shared-rating-control data-rating-mode="recipe" role="radiogroup" aria-label="Recipe rating: ${currentRecipeRating()} out of 5">${[1,2,3,4,5].map(value => `<button type="button" class="recipe-edit-rating-star" data-rating-value="${value}" data-preview-rating="${value}" role="radio" aria-label="${value} star${value === 1 ? '' : 's'}" aria-checked="${currentRecipeRating() === value}">${value <= currentRecipeRating() ? '★' : '☆'}</button>`).join('')}<button type="button" class="recipe-preview-clear-rating" data-preview-rating="0" aria-label="Clear rating" ${currentRecipeRating() ? '' : 'hidden'}>Clear</button></div>
-                <div class="recipe-preview-tags">${(r.tags || []).map(tag => `<span>${esc(tag)}</span>`).join('')}</div>
+                <div class="recipe-preview-tags">${(r.tags || []).map(tag => {
+                    const cuisine = r.cuisine_items?.find(item => item.source_label === tag || item.label === tag);
+                    return `<span>${cuisine ? recipePreviewCuisineHtml(cuisine) : esc(tag)}</span>`;
+                }).join('')}</div>
                 <dl class="recipe-preview-assignment">${[['Cookbook',r.cookbook_name || 'Unassigned'],['Section',r.menu_section || 'Not specified'],['Menu Price (optional)',r.menu_price || 'Not set']].map(([label,value]) => `<div><dt>${label}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl>
                 ${author || source ? `<p class="recipe-preview-source${source ? '' : ' recipe-preview-author-only'}">${author ? `<span class="recipe-preview-source-author">By ${esc(author)}${source ? ' · ' : ''}</span>` : ''}${source ? `<a href="${escapeAttribute(source)}" target="_blank" rel="noopener noreferrer">${esc(sourceLabel)}</a>` : ''}</p>` : ''}
                 ${r.description ? `<p class="recipe-preview-description">${esc(r.description)}</p>` : ''}</div>
@@ -228,19 +237,19 @@ function renderIntegratedRecipePreview(state) {
                 <ul>${recipePreviewIngredientsHtml(r, state.url, expandedChoices)}</ul>
             </section>
             <section class="recipe-preview-equipment"><div class="recipe-preview-section-heading"><h2>Equipment</h2></div>${recipePreviewEquipmentHtml(r, state.url)}</section>
-        <section class="recipe-preview-instructions"><h2>Instructions</h2><ol>${(r.instructions || []).map((step,index) => `<li><span class="recipe-preview-step-number" aria-hidden="true">${index+1}</span><div>${step.section ? `<strong class="recipe-preview-step-section">${esc(step.section)}</strong>` : ''}${esc(step.instruction || step.text || '')}${recipePreviewInstructionMetadata(step)}</div></li>`).join('') || '<li>No instructions specified.</li>'}</ol>
-            <details class="recipe-preview-notes" data-preview-notes ${notesOpen ? 'open' : ''}><summary>Recipe Notes</summary>
+        <section class="recipe-preview-instructions"><h2>Instructions</h2><ol>${(r.instructions || []).map((step,index) => `<li><span class="recipe-preview-step-number" aria-hidden="true">${index+1}</span><div>${step.section ? `<strong class="recipe-preview-step-section">${esc(step.section)}</strong>` : ''}${esc(step.instruction || step.text || '')}${recipePreviewInstructionMetadata(step)}</div></li>`).join('') || '<li>No instructions specified.</li>'}</ol></section>
+        </div>
+        <section class="recipe-preview-nutrition" data-preview-nutrition><div class="recipe-preview-section-heading"><h2>Nutrition</h2>
+            <div class="recipe-preview-segment recipe-preview-nutrition-toggle" role="group" aria-label="Nutrition display">${[['per_serving','Per serving'],['whole_recipe','Whole recipe']].map(([mode,label]) => `<button type="button" data-preview-nutrition-mode="${mode}" aria-pressed="${r.nutrition_mode === mode}" ${r.nutrition_modes.includes(mode) ? '' : 'disabled'}>${label}</button>`).join('')}</div>
+            <span class="recipe-preview-nutrition-yield" aria-live="polite">${esc(r.nutrition_context)}</span></div>
+            ${r.nutrition_notice ? `<p class="recipe-preview-nutrition-note">${esc(r.nutrition_basis)}. ${esc(r.nutrition_notice)}</p>` : ''}${recipePreviewNutritionHtml(r)}</section>
+        <details class="recipe-preview-notes" data-preview-notes ${notesOpen ? 'open' : ''}><summary>Recipe Notes</summary>
                 <p>Permanent recipe notes shared with the editor. Save Notes before printing.</p>
                 <fieldset ${state.notesBusy ? 'disabled' : ''}><div data-preview-note-rows>${(state.draft.recipe_notes || r.recipe_notes || []).map(recipePreviewNoteEditorHtml).join('')}</div>
                 <div class="recipe-preview-note-actions"><button type="button" data-preview-action="add-note">Add note section</button><button type="button" data-preview-action="save-notes">Save Notes</button></div></fieldset>
                 <p data-preview-notes-status role="status" aria-live="polite"></p>
-            </details></section>
-        </div>
-        <section class="recipe-preview-print-notes" data-preview-print-notes><h2>Recipe Notes</h2>${recipePreviewSavedNotesHtml(r.saved_recipe_notes || [])}</section>
-        <section class="recipe-preview-nutrition" data-preview-nutrition><div class="recipe-preview-section-heading"><h2>Nutrition</h2>
-            <div class="recipe-preview-segment recipe-preview-nutrition-toggle" role="group" aria-label="Nutrition display">${[['per_serving','Per serving'],['whole_recipe','Whole recipe']].map(([mode,label]) => `<button type="button" data-preview-nutrition-mode="${mode}" aria-pressed="${r.nutrition_mode === mode}" ${r.nutrition_modes.includes(mode) ? '' : 'disabled'}>${label}</button>`).join('')}</div>
-            <span class="recipe-preview-nutrition-yield" aria-live="polite">${esc(r.nutrition_context)}</span></div>
-            ${r.nutrition_notice ? `<p class="recipe-preview-nutrition-note">${esc(r.nutrition_basis)}. ${esc(r.nutrition_notice)}</p>` : ''}${recipePreviewNutritionHtml(r)}</section>`;
+        </details>
+        <section class="recipe-preview-print-notes" data-preview-print-notes><h2>Recipe Notes</h2>${recipePreviewSavedNotesHtml(r.saved_recipe_notes || [])}</section>`;
     const input = state.page.querySelector('#recipePreviewServings');
     const title = state.page.querySelector('.recipe-preview-summary h1');
     title.insertAdjacentHTML('afterend', '<button type="button" class="recipe-preview-plan-button" data-preview-action="meal-plan" aria-controls="recipePreviewMealPanel">Add to Meal Plan</button>');
