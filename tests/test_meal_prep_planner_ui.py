@@ -46,6 +46,20 @@ def test_weekly_grid_places_prep_steps_on_their_dates_and_labels_batch_meals():
     assert '1 serving' in legacy_html
     assert 'From prep batch' not in legacy_html
 
+    meal["member_portions"] = [
+        {"member_id": "adult", "name": "Updated <name>", "name_snapshot": "Previous name", "servings": 1},
+        {"member_id": "child", "name_snapshot": "Child", "servings": 0.5},
+    ]
+    meal["planned_servings"] = 1.5
+    family_html = template.render(meal_plan=context, meal_plan_recipe_options=[meal])
+    assert family_html.count('data-meal-plan-id="meal-1"') == 1
+    assert 'data-meal-family-details="meal-1"' in family_html
+    assert 'Family portions (2)' in family_html
+    assert 'Updated &lt;name&gt;' in family_html
+    assert 'Previous name' not in family_html
+    assert '<span>Child</span><span>0.5 servings</span>' in family_html
+    assert '<span>1 serving</span>' in family_html
+
 
 @pytest.mark.skipif(not shutil.which("node"), reason="Node.js is required for the interaction check")
 def test_weekly_prep_completion_commits_success_and_reverts_failures():
@@ -106,6 +120,80 @@ vm.runInContext(handler, ctx);
     assert.equal(input.checked, false, 'An offline save returns to incomplete');
     assert.equal(input.disabled, false);
     assert.equal(status.textContent, 'Network unavailable.');
+})().catch(error => {console.error(error); process.exitCode = 1;});
+"""
+    result = subprocess.run(
+        [shutil.which("node"), "-e", script, str(ROOT / "PushShoppingList/static/js/app.js")],
+        capture_output=True, text=True, timeout=15,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+@pytest.mark.skipif(not shutil.which("node"), reason="Node.js is required for the interaction check")
+def test_planner_refresh_preserves_preview_state_and_rejects_stale_responses():
+    script = r"""
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const source = fs.readFileSync(process.argv[1], 'utf8');
+const handler = source.slice(source.indexOf('let mealPlannerRefreshController'), source.indexOf('function openMealPlannerPageAndDialog'));
+const status = {hidden: true, textContent: '', classList: {add() {}}};
+const details = {dataset: {mealFamilyDetails: 'meal-1'}, open: true};
+let dialogOpen = false;
+const attrs = new Set();
+const page = {
+    dataset: {mealWeek: '2026-09-28'}, hidden: true, inert: true, innerHTML: 'original',
+    setAttribute: name => attrs.add(name), removeAttribute: name => attrs.delete(name),
+    querySelector: selector => selector === 'dialog[open]' ? dialogOpen : status,
+    querySelectorAll: () => [details],
+};
+let responseFactory, calls = [];
+const ctx = {
+    AbortController, Set, encodeURIComponent,
+    document: {getElementById: () => page},
+    withCanonicalViewerUserId: url => `${url}&viewer_user_id=test-user`,
+    initDeferredImages() {},
+    DOMParser: class {parseFromString(html) {return {getElementById: () => ({innerHTML: html, dataset: {mealWeek: '2026-10-05'}})}}},
+    fetch: async (url, options) => {calls.push({url, options}); return responseFactory()},
+};
+vm.createContext(ctx);
+vm.runInContext(handler, ctx);
+const ok = html => ({ok: true, redirected: false, text: async () => html});
+(async () => {
+    responseFactory = () => ok('fresh');
+    assert.equal(await ctx.refreshMealPlannerWorkspace({date: '2026-10-06'}), true);
+    assert.equal(calls[0].url, '/?meal_week=2026-10-06&viewer_user_id=test-user');
+    assert.equal(page.innerHTML, 'fresh');
+    assert.equal(page.hidden, true, 'Refreshing must not reveal the planner underneath the recipe preview');
+    assert.equal(page.inert, true);
+    assert.equal(details.open, true);
+    assert.equal(page.dataset.mealWeek, '2026-10-05');
+    assert.equal(page.dataset.mealPlannerStale, undefined);
+    assert.equal(attrs.has('aria-busy'), false);
+
+    responseFactory = () => ({ok: false});
+    assert.equal(await ctx.refreshMealPlannerWorkspace(), false);
+    assert.equal(page.innerHTML, 'fresh');
+    assert.equal(page.dataset.mealPlannerStale, '1');
+    assert.equal(status.hidden, false);
+    assert.match(status.textContent, /Unable to refresh/);
+
+    const requestCount = calls.length;
+    dialogOpen = true;
+    assert.equal(await ctx.refreshMealPlannerWorkspace(), false);
+    assert.equal(calls.length, requestCount, 'An open Add Meal form must not lose its inputs');
+    dialogOpen = false;
+
+    let releaseOld;
+    responseFactory = () => new Promise(resolve => {releaseOld = resolve});
+    const oldRequest = ctx.refreshMealPlannerWorkspace();
+    const oldSignal = calls.at(-1).options.signal;
+    responseFactory = () => ok('newest');
+    assert.equal(await ctx.refreshMealPlannerWorkspace(), true);
+    assert.equal(oldSignal.aborted, true);
+    releaseOld(ok('outdated'));
+    assert.equal(await oldRequest, false);
+    assert.equal(page.innerHTML, 'newest', 'An older response must not overwrite a newer plan');
 })().catch(error => {console.error(error); process.exitCode = 1;});
 """
     result = subprocess.run(

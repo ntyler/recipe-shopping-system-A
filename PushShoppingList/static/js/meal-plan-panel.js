@@ -1,0 +1,333 @@
+/* One scheduling panel shared by the recipe preview's planning entry points. */
+(function (root) {
+    'use strict';
+    const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[c]));
+    const title = value => value[0].toUpperCase() + value.slice(1);
+    const number = value => {
+        const n = Number(value);
+        if (!Number.isFinite(n)) return '—';
+        const whole = Math.floor(n), fraction = Math.round((n - whole) * 10000) / 10000;
+        const glyph = {0.25:'¼', 0.5:'½', 0.75:'¾'}[fraction];
+        return glyph ? `${whole || ''}${glyph}` : String(Math.round(n * 1000000) / 1000000);
+    };
+    const dateLabel = date => root.MealPlanSchedule.parseDate(date)?.toLocaleDateString(undefined, {weekday:'short', month:'short', day:'numeric', year:'numeric'}) || date;
+
+    class MealPlanPanel {
+        constructor(form, options) {
+            this.form = form;
+            this.options = options;
+            this.ui = {openDays:new Set(), openSections:new Set(), names:{}, newName:'', busy:false, memberBusy:false, loading:false, membersLoaded:false, message:'', error:false};
+            this.draft = root.MealPlanSchedule.create({today:options.today, servings:options.servings, members:[]});
+            this.form.classList.add('meal-schedule-panel');
+            form.addEventListener('submit', event => this.submit(event));
+            form.addEventListener('click', event => this.click(event));
+            form.addEventListener('change', event => this.change(event));
+            form.addEventListener('input', event => this.input(event));
+            this.render();
+        }
+
+        async open() {
+            this.form.hidden = false;
+            this.form.scrollIntoView({block:'start'});
+            this.form.querySelector('[data-schedule-mode][aria-pressed="true"]')?.focus({preventScroll:true});
+            if (!this.ui.membersLoaded && !this.ui.loading) await this.loadMembers();
+        }
+
+        async loadMembers() {
+            this.ui.loading = true;
+            this.render();
+            try {
+                const response = await fetch('/api/meal-plan/members');
+                const data = await response.json();
+                if (!response.ok || !data.ok) throw new Error(data.error || 'Unable to load family members.');
+                root.MealPlanSchedule.setMembers(this.draft, data.members);
+                this.ui.membersLoaded = true;
+                this.ui.message = '';
+                this.ui.error = false;
+            } catch (error) { this.setMessage(`${error.message} You can retry or use household totals.`, true); }
+            finally { this.ui.loading = false; this.render(); }
+        }
+
+        setMessage(message, error = false) { this.ui.message = message; this.ui.error = error; }
+
+        captureOpen() {
+            this.form.querySelectorAll('details[data-schedule-day]').forEach(item => {
+                this.ui.openDays[item.open ? 'add' : 'delete'](item.dataset.scheduleDay);
+            });
+            this.form.querySelectorAll('details[data-schedule-section]').forEach(item => {
+                this.ui.openSections[item.open ? 'add' : 'delete'](item.dataset.scheduleSection);
+            });
+        }
+
+        render() {
+            this.captureOpen();
+            const active = this.form.contains(document.activeElement) ? document.activeElement : null;
+            const key = active?.dataset.focusKey;
+            const position = active && ['text','search'].includes(active.type) ? active.selectionStart : null;
+            this.form.innerHTML = MealPlanPanel.html(this.draft, this.ui, this.options.title);
+            if (key) {
+                const replacement = [...this.form.querySelectorAll('[data-focus-key]')].find(node => node.dataset.focusKey === key);
+                replacement?.focus({preventScroll:true});
+            if (position !== null && replacement?.setSelectionRange) replacement.setSelectionRange(position, position);
+            }
+        }
+
+        static check(meal, enabled, action, extra = '') {
+            return `<label class="meal-schedule-check"><input type="checkbox" data-schedule-field="${action}" data-meal="${meal}" ${extra} ${enabled ? 'checked' : ''}><span>${title(meal)}</span></label>`;
+        }
+
+        static portion(value, {field, meal, member = '', date = '', enabled = true, checkbox = false, name = ''}) {
+            const key = [field,date,member,meal].join('|');
+            const attrs = `data-meal="${meal}" data-member="${esc(member)}" data-date="${date}"`;
+            const label = `${name ? name + ', ' : ''}${title(meal)} servings${date ? ', ' + dateLabel(date) : ''}`;
+            return `<div class="meal-schedule-portion">${checkbox ? `<input type="checkbox" data-schedule-field="${field}-enabled" ${attrs} data-focus-key="${esc(key)}-enabled" aria-label="Include ${esc(label)}" ${enabled ? 'checked' : ''}>` : ''}
+                <div class="meal-schedule-stepper"><button type="button" data-schedule-action="step" data-direction="-1" data-focus-key="${esc(key)}-less" ${enabled ? '' : 'disabled'} aria-label="Decrease ${esc(label)}">−</button>
+                <input type="number" min="0.01" step="any" inputmode="decimal" data-schedule-field="${field}" ${attrs} data-focus-key="${esc(key)}" aria-label="${esc(label)}" value="${esc(value)}" ${enabled ? 'required' : 'disabled'}>
+                <button type="button" data-schedule-action="step" data-direction="1" data-focus-key="${esc(key)}-more" ${enabled ? '' : 'disabled'} aria-label="Increase ${esc(label)}">+</button></div></div>`;
+        }
+
+        static portionsTable(draft, meals, date) {
+            if (!meals.length) return '<p>Select at least one meal.</p>';
+            if (draft.portionMode === 'household') return `<div class="meal-schedule-household">${meals.map(meal => `<label>${title(meal)} servings${MealPlanPanel.portion(date ? draft.days[date].household[meal] : draft.householdDefaults[meal], {field:date ? 'day-household' : 'household', meal, date})}</label>`).join('')}</div>`;
+            if (!draft.members.length) return '<p>Add a family member below to assign portions.</p>';
+            const portions = date ? draft.days[date].family : draft.familyDefaults;
+            return `<div class="meal-schedule-table-scroll" tabindex="0" role="region" aria-label="${date ? esc(dateLabel(date)) : 'Default'} family portions"><table class="meal-schedule-table"><thead><tr><th scope="col">Family member</th>${meals.map(meal => `<th scope="col">${title(meal)}</th>`).join('')}</tr></thead><tbody>${draft.members.map(member => `<tr><th scope="row">${esc(member.name)}</th>${meals.map(meal => {
+                const cell = portions[member.id]?.[meal] || {enabled:false, servings:1};
+                return `<td>${MealPlanPanel.portion(cell.servings, {field:date ? 'day-family' : 'family', meal, member:member.id, date, enabled:cell.enabled, checkbox:true, name:member.name})}</td>`;
+            }).join('')}</tr>`).join('')}</tbody><tfoot><tr><th scope="row">${date ? 'Meal totals' : 'Per day'}</th>${meals.map(meal => {
+                const total = draft.members.reduce((sum, member) => {
+                    const cell = portions[member.id]?.[meal], value = Number(cell?.servings);
+                    return sum + (cell?.enabled && Number.isFinite(value) && value > 0 ? value : 0);
+                }, 0);
+                return `<td data-portion-total="${meal}" data-date="${date || ''}">${number(total)} servings</td>`;
+            }).join('')}</tr></tfoot></table></div>`;
+        }
+
+        static html(draft, ui, recipeTitle = '') {
+            const model = root.MealPlanSchedule, totals = model.summary(draft);
+            const disabled = ui.busy || ui.memberBusy;
+            const dateModes = [['single','One day'],['range','Date range'],['days','Select days']];
+            let dates = draft.dateMode === 'single'
+                ? `<label>Date<input type="date" data-schedule-field="single-date" data-focus-key="single-date" value="${esc(draft.singleDate)}" required></label>`
+                : draft.dateMode === 'range' ? `<div class="meal-schedule-date-range"><label>Start date<input type="date" data-schedule-field="start-date" data-focus-key="start-date" value="${esc(draft.startDate)}" required></label><label>End date<input type="date" data-schedule-field="end-date" data-focus-key="end-date" value="${esc(draft.endDate)}" required></label></div>` : '';
+            if (draft.dateMode === 'days') {
+                const calendar = model.calendarMonth(draft.calendarMonth);
+                dates = `<div class="meal-schedule-calendar"><div class="meal-schedule-calendar-heading"><button type="button" data-schedule-action="month" data-direction="-1" data-focus-key="previous-month" aria-label="Previous month">‹</button><strong>${esc(calendar.label)}</strong><button type="button" data-schedule-action="month" data-direction="1" data-focus-key="next-month" aria-label="Next month">›</button></div>
+                    <div class="meal-schedule-calendar-grid">${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(day => `<span aria-hidden="true">${day}</span>`).join('')}${calendar.days.map(day => `<button type="button" data-schedule-action="date" data-date="${day.date}" data-focus-key="calendar-${day.date}" aria-label="${esc(dateLabel(day.date))}" aria-pressed="${draft.selectedDates.includes(day.date)}" class="${day.inMonth ? '' : 'is-other-month'}">${day.day}</button>`).join('')}</div>
+                    <p>Select any dates, including dates in other months.</p></div>`;
+            }
+            const dayCards = totals.days.map(day => {
+                const data = draft.days[day.date], meals = model.MEAL_TYPES.filter(meal => data.mealEnabled[meal]);
+                return `<details class="meal-schedule-day" data-schedule-day="${day.date}" ${ui.openDays.has(day.date) ? 'open' : ''}><summary><span><strong>${esc(dateLabel(day.date))}</strong><small data-day-summary="${day.date}">${day.meals.map(meal => `${title(meal.meal_type)}: ${number(meal.planned_servings)}`).join(' · ') || 'No meals selected'}</small></span><span data-day-total="${day.date}">${number(day.totalServings)} servings</span></summary>
+                    <div class="meal-schedule-day-body"><div class="meal-schedule-meals">${model.MEAL_TYPES.map(meal => MealPlanPanel.check(meal, data.mealEnabled[meal], 'day-meal', `data-date="${day.date}" data-focus-key="day-meal-${day.date}-${meal}"`)).join('')}</div>
+                    ${MealPlanPanel.portionsTable(draft, meals, day.date)}
+                    <label>Notes for this day (optional)<input type="text" data-schedule-field="day-notes" data-date="${day.date}" data-focus-key="day-notes-${day.date}" value="${esc(data.notes)}"></label>
+                    <p data-day-default-status="${day.date}">${day.customized ? 'Adjusted for this day.' : 'Using default portions.'}</p></div></details>`;
+            }).join('');
+            return `<div class="meal-schedule-heading"><div><h2>Add to Meal Plan</h2><p>${esc(recipeTitle)}</p></div><button type="button" data-schedule-action="cancel" aria-label="Close meal planning" ${disabled ? 'disabled' : ''}>×</button></div>
+                <fieldset ${disabled ? 'disabled' : ''}><div class="recipe-preview-segment meal-schedule-modes" role="group" aria-label="Date selection">${dateModes.map(([mode,label]) => `<button type="button" data-schedule-mode="${mode}" data-focus-key="mode-${mode}" aria-pressed="${draft.dateMode === mode}">${label}</button>`).join('')}</div>
+                <div class="meal-schedule-dates">${dates}</div>
+                <div class="meal-schedule-meals"><strong>Meals on selected days</strong>${model.MEAL_TYPES.map(meal => MealPlanPanel.check(meal, draft.mealTypes.includes(meal), 'meal', `data-focus-key="meal-${meal}"`)).join('')}</div>
+                <div class="meal-schedule-columns"><section><h3>Who is eating?</h3><div class="recipe-preview-segment meal-schedule-modes" role="group" aria-label="Portion allocation">${[['household','Household total'],['family','By family member']].map(([mode,label]) => `<button type="button" data-schedule-portion-mode="${mode}" data-focus-key="portion-mode-${mode}" aria-pressed="${draft.portionMode === mode}">${label}</button>`).join('')}</div>
+                <h3>Default portions</h3><p>Apply to selected dates. Adjust individual days on the right.</p>
+                ${MealPlanPanel.portionsTable(draft, draft.mealTypes)}
+                ${draft.portionMode === 'family' ? '<p>Unchecked means not eating this meal.</p>' : ''}
+                <button type="button" data-schedule-action="apply" data-focus-key="apply">Apply to selected days</button>
+                <details class="meal-schedule-members" data-schedule-section="members" ${ui.openSections.has('members') || (draft.portionMode === 'family' && !draft.members.length) ? 'open' : ''}><summary>Family members</summary>
+                    ${ui.loading ? '<p>Loading family members…</p>' : ''}
+                    ${!ui.membersLoaded && !ui.loading ? '<button type="button" data-schedule-action="retry-members">Retry loading members</button>' : ''}
+                    ${draft.members.map(member => `<div class="meal-schedule-member-row"><label>Name<input type="text" maxlength="100" data-member-name="${esc(member.id)}" data-focus-key="member-${esc(member.id)}" value="${esc(ui.names[member.id] ?? member.name)}"></label><button type="button" data-schedule-action="save-member" data-member="${esc(member.id)}">Save name</button></div>`).join('')}
+                    <div class="meal-schedule-member-row"><label>New family member<input type="text" maxlength="100" data-new-member data-focus-key="new-member" value="${esc(ui.newName)}" placeholder="Name"></label><button type="button" data-schedule-action="add-member" ${!ui.membersLoaded ? 'disabled' : ''}>Add member</button></div>
+                </details><label class="meal-schedule-notes">Meal-prep notes (optional)<textarea rows="2" data-schedule-field="notes" data-focus-key="notes" placeholder="Notes shared by this meal plan">${esc(draft.notes)}</textarea></label></section>
+                <section><h3>Scheduled meals</h3><p>Expand a day to adjust meals, people, and portions.</p><div class="meal-schedule-days">${dayCards || '<p>Select dates to build your schedule.</p>'}</div>
+                <details class="meal-schedule-prep" data-schedule-section="prep" ${ui.openSections.has('prep') ? 'open' : ''}><summary>Prep tasks (optional)</summary><p>Schedule preparation on its own dates.</p>${draft.prepSteps.map((step,index) => `<div class="meal-schedule-prep-row"><label>Prep date<input type="date" data-schedule-field="prep-date" data-step="${index}" data-focus-key="prep-date-${index}" value="${esc(step.date)}" required></label><label>Task<input type="text" maxlength="2000" data-schedule-field="prep-instruction" data-step="${index}" data-focus-key="prep-instruction-${index}" value="${esc(step.instruction)}" placeholder="e.g. Chop vegetables" required></label><button type="button" data-schedule-action="remove-prep" data-step="${index}" aria-label="Remove prep task ${index+1}">Remove</button></div>`).join('')}<button type="button" data-schedule-action="add-prep">Add prep task</button></details></section></div>
+                <div class="meal-schedule-summary" data-schedule-summary aria-live="polite">${MealPlanPanel.summaryHtml(draft, totals)}</div>
+                <p class="meal-schedule-errors" data-schedule-errors role="status">${esc(totals.errors.join(' '))}</p>
+                <div class="meal-schedule-footer"><button type="button" data-schedule-action="cancel">Cancel</button><button type="submit" class="is-primary" data-schedule-submit ${!totals.valid ? 'disabled' : ''}>${ui.busy ? 'Saving…' : `Add ${totals.mealCount} ${totals.mealCount === 1 ? 'meal' : 'meals'}`}</button></div></fieldset>
+                <p class="recipe-preview-status ${ui.error ? 'is-error' : ''}" data-schedule-status role="${ui.error ? 'alert' : 'status'}">${esc(ui.message)}</p>`;
+        }
+
+        static summaryHtml(draft, totals) {
+            return `<div><strong>${totals.dayCount} ${totals.dayCount === 1 ? 'day' : 'days'} · ${totals.mealCount} ${totals.mealCount === 1 ? 'meal' : 'meals'} · ${number(totals.totalServings)} servings</strong><span>Prepare one batch for these meals.</span></div>${draft.portionMode === 'family' ? `<p>${draft.members.filter(member => totals.memberTotals[member.id]).map(member => `${esc(member.name)}: ${number(totals.memberTotals[member.id])} servings`).join(' · ')}</p>` : ''}`;
+        }
+
+        updateTotals() {
+            const totals = root.MealPlanSchedule.summary(this.draft);
+            this.form.querySelector('[data-schedule-summary]').innerHTML = MealPlanPanel.summaryHtml(this.draft, totals);
+            this.form.querySelector('[data-schedule-errors]').textContent = totals.errors.join(' ');
+            const button = this.form.querySelector('[data-schedule-submit]');
+            button.disabled = !totals.valid || this.ui.busy;
+            button.textContent = `Add ${totals.mealCount} ${totals.mealCount === 1 ? 'meal' : 'meals'}`;
+            totals.days.forEach(day => {
+                const total = this.form.querySelector(`[data-day-total="${day.date}"]`);
+                if (total) total.textContent = `${number(day.totalServings)} servings`;
+                const summary = this.form.querySelector(`[data-day-summary="${day.date}"]`);
+                if (summary) summary.textContent = day.meals.map(meal => `${title(meal.meal_type)}: ${number(meal.planned_servings)}`).join(' · ') || 'No meals selected';
+                const label = this.form.querySelector(`[data-day-default-status="${day.date}"]`);
+                if (label) label.textContent = day.customized ? 'Adjusted for this day.' : 'Using default portions.';
+            });
+            this.form.querySelectorAll('[data-portion-total]').forEach(cell => {
+                const portions = cell.dataset.date ? this.draft.days[cell.dataset.date].family : this.draft.familyDefaults;
+                const total = this.draft.members.reduce((sum, member) => {
+                    const part = portions[member.id]?.[cell.dataset.portionTotal], value = Number(part?.servings);
+                    return sum + (part?.enabled && Number.isFinite(value) && value > 0 ? value : 0);
+                }, 0);
+                cell.textContent = `${number(total)} servings`;
+            });
+        }
+
+        syncPortionControls(active) {
+            this.form.querySelectorAll('input[type="number"][data-schedule-field]').forEach(input => {
+                if (input === active) return;
+                const {scheduleField:field, date, member, meal} = input.dataset;
+                let value;
+                if (field === 'household') value = this.draft.householdDefaults[meal];
+                if (field === 'family') value = this.draft.familyDefaults[member]?.[meal]?.servings;
+                if (field === 'day-household') value = this.draft.days[date].household[meal];
+                if (field === 'day-family') value = this.draft.days[date].family[member]?.[meal]?.servings;
+                if (value !== undefined) input.value = value;
+            });
+        }
+
+        updateField(input) {
+            const model = root.MealPlanSchedule, draft = this.draft;
+            const {scheduleField:field, meal, member, date, step} = input.dataset;
+            const value = input.value;
+            if (field === 'household') model.setHouseholdDefault(draft, meal, value);
+            if (field === 'family' || field === 'family-enabled') {
+                const current = draft.familyDefaults[member][meal];
+                model.setFamilyDefault(draft, member, meal, {...current, ...(field.endsWith('enabled') ? {enabled:input.checked} : {servings:value})});
+            }
+            if (field === 'day-household') model.setDayHousehold(draft, date, meal, value);
+            if (field === 'day-family' || field === 'day-family-enabled') {
+                const current = draft.days[date].family[member][meal];
+                model.setDayFamily(draft, date, member, meal, {...current, ...(field.endsWith('enabled') ? {enabled:input.checked} : {servings:value})});
+            }
+            if (field === 'notes') draft.notes = value;
+            if (field === 'day-notes') model.setDayNotes(draft, date, value);
+            if (field === 'prep-date') draft.prepSteps[step].date = value;
+            if (field === 'prep-instruction') draft.prepSteps[step].instruction = value;
+        }
+
+        input(event) {
+            const input = event.target;
+            if (this.ui.busy || this.ui.memberBusy) return;
+            if (input.hasAttribute('data-member-name')) this.ui.names[input.dataset.memberName] = input.value;
+            if (input.hasAttribute('data-new-member')) this.ui.newName = input.value;
+            if (input.dataset.scheduleField && !['single-date','start-date','end-date','meal','day-meal'].includes(input.dataset.scheduleField) && input.type !== 'checkbox') {
+                this.updateField(input);
+                this.updateTotals();
+                this.syncPortionControls(input);
+            }
+        }
+
+        change(event) {
+            const input = event.target, model = root.MealPlanSchedule, draft = this.draft;
+            if (this.ui.busy || this.ui.memberBusy || !input.dataset.scheduleField) return;
+            const field = input.dataset.scheduleField;
+            if (field === 'single-date') model.setSingleDate(draft, input.value);
+            else if (field === 'start-date') model.setRange(draft, input.value, draft.endDate);
+            else if (field === 'end-date') model.setRange(draft, draft.startDate, input.value);
+            else if (field === 'meal') model.setMeals(draft, [...this.form.querySelectorAll('[data-schedule-field="meal"]:checked')].map(node => node.dataset.meal));
+            else if (field === 'day-meal') model.setDayMeal(draft, input.dataset.date, input.dataset.meal, input.checked);
+            else this.updateField(input);
+            // Keep typed inputs mounted on blur: replacing them here can swallow
+            // a click on the adjacent stepper or submit button.
+            if (['household','family','day-household','day-family','notes','day-notes','prep-instruction'].includes(field)) {
+                this.updateTotals();
+                this.syncPortionControls(input);
+                return;
+            }
+            this.render();
+        }
+
+        async click(event) {
+            const button = event.target.closest('button');
+            if (!button || button.disabled || this.ui.busy || this.ui.memberBusy) return;
+            const model = root.MealPlanSchedule, draft = this.draft;
+            if (button.dataset.scheduleMode) model.setDateMode(draft, button.dataset.scheduleMode);
+            else if (button.dataset.schedulePortionMode) model.setPortionMode(draft, button.dataset.schedulePortionMode);
+            else switch (button.dataset.scheduleAction) {
+                case 'cancel': this.form.hidden = true; this.options.onCancel?.(); return;
+                case 'month': draft.calendarMonth = model.shiftMonth(draft.calendarMonth, Number(button.dataset.direction)); break;
+                case 'date': model.toggleDate(draft, button.dataset.date); break;
+                case 'apply': model.applyDefaults(draft); this.setMessage('Defaults applied to selected days.'); break;
+                case 'step': {
+                    const input = button.parentElement.querySelector('input');
+                    input.value = Math.max(0.01, Math.round(((Number(input.value) || 0) + Number(button.dataset.direction) * 0.5) * 100) / 100);
+                    this.updateField(input); break;
+                }
+                case 'add-prep':
+                    draft.prepSteps.push({date:draft.selectedDates[0] || this.options.today, instruction:''});
+                    this.form.querySelector('[data-schedule-section="prep"]').open = true;
+                    break;
+                case 'remove-prep': draft.prepSteps.splice(Number(button.dataset.step), 1); break;
+                case 'retry-members': await this.loadMembers(); return;
+                case 'add-member': await this.saveMember(); return;
+                case 'save-member': await this.saveMember(button.dataset.member); return;
+                default: return;
+            }
+            this.render();
+        }
+
+        async saveMember(id) {
+            const name = String(id ? this.ui.names[id] ?? this.draft.members.find(member => member.id === id)?.name : this.ui.newName).trim();
+            if (!name) { this.setMessage('Enter a family member’s name.', true); this.render(); return; }
+            this.ui.memberBusy = true;
+            this.setMessage('Saving family member…');
+            this.render();
+            try {
+                const response = await fetch(`/api/meal-plan/members${id ? '/' + encodeURIComponent(id) : ''}`, {method:id ? 'PATCH' : 'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name})});
+                const data = await response.json();
+                if (!response.ok || !data.ok) throw new Error(data.error || 'Unable to save this family member.');
+                const members = id ? this.draft.members.map(member => member.id === id ? data.member : member) : [...this.draft.members, data.member];
+                root.MealPlanSchedule.setMembers(this.draft, members);
+                if (id) delete this.ui.names[id]; else this.ui.newName = '';
+                this.setMessage('Family member saved.');
+                this.options.onMembersChanged?.();
+            } catch (error) { this.setMessage(error.message, true); }
+            finally { this.ui.memberBusy = false; this.render(); }
+        }
+
+        async submit(event) {
+            event.preventDefault();
+            if (this.ui.busy || this.ui.memberBusy) return;
+            let payload;
+            try { payload = root.MealPlanSchedule.payload(this.draft); }
+            catch (error) { this.setMessage(error.message, true); this.render(); return; }
+            if (!this.form.reportValidity()) return;
+            const context = this.options.getContext();
+            if (!context) return;
+            this.ui.busy = true;
+            this.setMessage('Saving meal plan…');
+            this.render();
+            let result;
+            try {
+                const response = await fetch('/api/meal-plan/batches', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({...payload, ...context})});
+                result = await response.json();
+                if (!response.ok || !result.ok) throw new Error(result.error || 'Unable to save this meal plan.');
+            } catch (error) {
+                this.setMessage(error.message, true);
+                this.ui.busy = false;
+                this.render();
+                return;
+            }
+            // A refresh failure must never turn a successful save into a retry.
+            const firstDate = this.draft.selectedDates[0];
+            const members = this.draft.members;
+            this.draft = root.MealPlanSchedule.create({today:this.options.today, servings:this.options.servings, members});
+            this.ui.busy = false;
+            this.ui.openDays.clear();
+            this.setMessage('Meal plan saved.');
+            this.render();
+            this.form.hidden = true;
+            try { await this.options.onSaved?.(result, firstDate); }
+            catch (_) {
+                this.setMessage('Meal plan saved. Reload to see the updated schedule.', true);
+                this.form.hidden = false;
+                this.render();
+            }
+        }
+    }
+    root.MealPlanPanel = MealPlanPanel;
+})(globalThis);

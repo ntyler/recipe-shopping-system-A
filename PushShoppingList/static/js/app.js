@@ -676,6 +676,9 @@ async function openAppPage(pageId, options = {}) {
     setUserAccountWorkspaceVisible(false);
     hideAppPageWorkspaces(page);
     page.hidden = false;
+    if (pageId === "mealPlannerPage" && page.dataset.mealPlannerStale === "1") {
+        await refreshMealPlannerWorkspace();
+    }
     initDeferredImages(page);
     appShellSetActivePageLink(pageId);
 
@@ -1637,6 +1640,55 @@ function setAppMobileNavigationOpen(open, options = {}) {
     }
 
     return false;
+}
+
+let mealPlannerRefreshController = null;
+
+async function refreshMealPlannerWorkspace({ date = "" } = {}) {
+    const page = document.getElementById("mealPlannerPage");
+    if (!page) return false;
+    page.dataset.mealPlannerStale = "1";
+    if (date) page.dataset.mealPendingWeek = date;
+    if (page.querySelector("dialog[open]")) return false;
+    mealPlannerRefreshController?.abort();
+    const controller = mealPlannerRefreshController = new AbortController();
+    page.setAttribute("aria-busy", "true");
+    const week = page.dataset.mealPendingWeek || page.dataset.mealWeek || "";
+    try {
+        const response = await fetch(withCanonicalViewerUserId(`/?meal_week=${encodeURIComponent(week)}`), {
+            cache: "no-store", signal: controller.signal,
+        });
+        if (!response.ok || response.redirected) throw new Error("Unable to refresh Meal Planner. Reopen the planner to try again.");
+        const html = await response.text();
+        if (controller.signal.aborted || document.getElementById("mealPlannerPage") !== page) return false;
+        const next = new DOMParser().parseFromString(html, "text/html").getElementById("mealPlannerPage");
+        if (!next) throw new Error("Unable to refresh Meal Planner. Reopen the planner to try again.");
+        if (page.querySelector("dialog[open]")) return false;
+        const expanded = new Set([...page.querySelectorAll("[data-meal-family-details][open]")].map(item => item.dataset.mealFamilyDetails));
+        // Keep this root node: the integrated preview retains its hidden/inert state.
+        page.innerHTML = next.innerHTML;
+        page.dataset.mealWeek = next.dataset.mealWeek || week;
+        delete page.dataset.mealPendingWeek;
+        delete page.dataset.mealPlannerStale;
+        page.querySelectorAll("[data-meal-family-details]").forEach(item => { item.open = expanded.has(item.dataset.mealFamilyDetails); });
+        initDeferredImages(page);
+        return true;
+    } catch (error) {
+        if (!controller.signal.aborted) {
+            const status = page.querySelector("[data-meal-planner-refresh-status]");
+            if (status) {
+                status.hidden = false;
+                status.textContent = error.message || "Unable to refresh Meal Planner. Reopen the planner to try again.";
+                status.classList.add("error");
+            }
+        }
+        return false;
+    } finally {
+        if (mealPlannerRefreshController === controller) {
+            mealPlannerRefreshController = null;
+            page.removeAttribute("aria-busy");
+        }
+    }
 }
 
 function openMealPlannerPageAndDialog() {

@@ -102,7 +102,7 @@ def test_invalid_allocation_never_saves_partial_batch(isolated_plan, candidate):
     with pytest.raises(ValueError):
         service.add_meal_prep_batch(batch_input(), candidate)
     assert not isolated_plan.exists()
-    assert service.load_meal_plan() == {"meals": [], "batches": []}
+    assert service.load_meal_plan() == {"meals": [], "batches": [], "members": []}
 
 
 def test_existing_slot_conflict_is_atomic_but_other_recipes_can_share_slot(isolated_plan):
@@ -226,3 +226,144 @@ def test_batch_routes_auth_collection_checks_and_workspace_isolation(scoped_clie
     assert read["batches"][0]["remaining_servings"] == 5
     assert client.delete(f"/api/meal-plan/batches/{batch_id}").status_code == 200
     assert client.get("/api/meal-plan?recipe_url=recipe://soup").json == {"ok": True, "meals": [], "batches": []}
+
+
+def family_allocations(members):
+    result = []
+    for day in ("2026-09-28", "2026-09-30", "2026-10-02"):
+        for meal_type in ("breakfast", "dinner"):
+            participating = [(members[0], 1), (members[2], 0.5)]
+            if meal_type == "breakfast":
+                participating.insert(1, (members[1], 1))
+            result.append({
+                "date": day, "meal_type": meal_type,
+                "member_portions": [{"member_id": member["id"], "servings": servings} for member, servings in participating],
+            })
+    return result
+
+
+def test_family_example_totals_persist_and_rename_keeps_stable_identity(isolated_plan, monkeypatch):
+    members = [service.add_meal_plan_member(name) for name in ("You", "Partner", "Child")]
+    request = {key: value for key, value in batch_input().items() if key != "batch_servings"}
+    request["portion_mode"] = "family"
+    batch, meals = service.add_meal_prep_batch(request, family_allocations(members))
+    assert len({meal["date"] for meal in meals}) == 3
+    assert len(meals) == 6
+    assert batch["batch_servings"] == batch["allocated_servings"] == 12
+    assert batch["remaining_servings"] == 0
+    assert {row["name"]: row["servings"] for row in batch["member_totals"]} == {"You": 6, "Partner": 3, "Child": 3}
+    assert [meal["planned_servings"] for meal in meals] == [2.5, 1.5] * 3
+    assert all(meal["portion_mode"] == "family" for meal in meals)
+    assert all(len(meal["member_portions"]) == 2 for meal in meals if meal["meal_type"] == "dinner")
+    step_id = batch["prep_steps"][0]["id"]
+    service.update_meal_prep_step(batch["id"], step_id, True)
+    service.update_meal_plan_member(members[2]["id"], "Alex")
+    service.update_meal_ingredient_option_selections(meals[0]["id"], {})
+    monkeypatch.setattr(service, "recipe_data_with_sql_requirements", lambda url, data: data)
+    service.sync_meal_recipe_ingredients("recipe://soup", {"ingredients": [{"name": "onion"}]})
+    saved = service.load_meal_plan()
+    renamed = saved["meals"][0]["member_portions"][-1]
+    assert renamed == {"member_id": members[2]["id"], "name": "Alex", "name_snapshot": "Child", "servings": 0.5}
+    assert saved["batches"][0]["prep_steps"][0]["completed"] is True
+    assert saved["batches"][0]["prep_notes"] == batch_input()["prep_notes"]
+    assert len(service.meal_plan_for_week("2026-09-28")["meals"]) == 6
+    assert service.meal_plan_for_week("2026-09-28")["meals"][0]["member_portions"][-1]["name"] == "Alex"
+    service.delete_meal(meals[0]["id"])
+    assert service.load_meal_plan()["members"][2]["id"] == members[2]["id"]
+    service.delete_meal_prep_batch(batch["id"])
+    assert len(service.load_meal_plan()["members"]) == 3
+
+
+def test_derived_household_totals_support_half_servings_and_day_overrides(isolated_plan):
+    request = {key: value for key, value in batch_input().items() if key != "batch_servings"}
+    rows = [
+        {"date": "2026-09-30", "meal_type": "breakfast", "planned_servings": 0.5},
+        {"date": "2026-09-30", "meal_type": "dinner", "planned_servings": 2.5},
+        {"date": "2026-10-01", "meal_type": "dinner", "planned_servings": 1},
+    ]
+    batch, meals = service.add_meal_prep_batch(request, rows)
+    assert batch["batch_servings"] == 4
+    assert [meal["planned_servings"] for meal in service.load_meal_plan()["meals"]] == [0.5, 2.5, 1]
+    assert len(service.meal_plan_for_week("2026-09-30")["meals"]) == 3
+    assert all(meal["member_portions"] == [] for meal in meals)
+
+
+def test_family_fractional_decimal_totals_and_small_meals(isolated_plan):
+    members = [service.add_meal_plan_member(name) for name in ("A", "B", "C")]
+    request = {key: value for key, value in batch_input().items() if key != "batch_servings"}
+    batch, meals = service.add_meal_prep_batch({**request, "portion_mode": "family"}, [{
+        "date": "2026-09-28", "meal_type": "breakfast", "planned_servings": 0.3,
+        "member_portions": [{"member_id": member["id"], "servings": 0.1} for member in members],
+    }])
+    assert batch["batch_servings"] == meals[0]["planned_servings"] == 0.3
+    assert service.load_meal_plan()["batches"][0]["batch_servings"] == 0.3
+
+
+@pytest.mark.parametrize("invalid", [0, -1, "", "many", True, float("nan"), float("inf"), 10 ** 400])
+def test_invalid_member_portions_fail_without_writing(isolated_plan, invalid):
+    member = service.add_meal_plan_member("A")
+    before = isolated_plan.read_bytes()
+    with pytest.raises(ValueError, match="finite number greater than zero"):
+        service.add_meal_prep_batch({**batch_input(), "portion_mode": "family"}, [{
+            "date": "2026-09-28", "meal_type": "breakfast", "member_portions": [{"member_id": member["id"], "servings": invalid}],
+        }])
+    assert isolated_plan.read_bytes() == before
+
+
+@pytest.mark.parametrize("scenario", ["missing", "unknown", "duplicate", "mismatch", "invalid_mode", "household_with_members"])
+def test_member_validation_rejects_entire_plan_atomically(isolated_plan, scenario):
+    member = service.add_meal_plan_member("A")
+    row = {"date": "2026-09-28", "meal_type": "breakfast", "member_portions": [{"member_id": member["id"], "servings": 1}]}
+    request = {**batch_input(), "portion_mode": "family"}
+    if scenario == "missing":
+        row["member_portions"] = []
+    elif scenario == "unknown":
+        row["member_portions"][0]["member_id"] = "other-workspace-member"
+    elif scenario == "duplicate":
+        row["member_portions"] *= 2
+    elif scenario == "mismatch":
+        row["planned_servings"] = 2
+    elif scenario == "invalid_mode":
+        request["portion_mode"] = "unknown"
+    elif scenario == "household_with_members":
+        request["portion_mode"] = "household"
+        row["planned_servings"] = 1
+    before = isolated_plan.read_bytes()
+    with pytest.raises(ValueError):
+        service.add_meal_prep_batch(request, [row])
+    assert isolated_plan.read_bytes() == before
+
+
+def test_family_member_routes_isolate_names_and_allocations(scoped_client):
+    client = scoped_client
+    assert client.get("/api/meal-plan/members").status_code == 403
+    assert client.post("/api/meal-plan/members", json={"name": "Alice"}).status_code == 403
+    assert client.patch("/api/meal-plan/members/missing", json={"name": "Alice"}).status_code == 403
+    sign_in(client, "alice")
+    for invalid in (None, "", " ", "x" * 101, []):
+        assert client.post("/api/meal-plan/members", json={"name": invalid}).status_code == 400
+    members = [client.post("/api/meal-plan/members", json={"name": name}).json["member"] for name in ("You", "Partner", "Child")]
+    assert client.post("/api/meal-plan/members", json={"name": " child "}).status_code == 400
+    payload = {"recipe_url": "recipe://soup", "portion_mode": "family", "allocations": family_allocations(members)}
+    response = client.post("/api/meal-plan/batches", json=payload)
+    assert response.status_code == 201
+    assert response.json["batch"]["batch_servings"] == 12
+    assert client.post("/api/meal-plan/batches", json=payload).status_code == 400
+    assert len(client.get("/api/meal-plan?recipe_url=recipe://soup").json["meals"]) == 6
+    member_id = members[2]["id"]
+    assert client.patch(f"/api/meal-plan/members/{member_id}", json={"name": "Alex"}).status_code == 200
+    assert client.patch(f"/api/meal-plan/members/{member_id}", json={"name": "You"}).status_code == 400
+    read = client.get("/api/meal-plan?recipe_url=recipe://soup").json
+    assert read["meals"][0]["member_portions"][-1]["name"] == "Alex"
+    assert read["meals"][0]["member_portions"][-1]["name_snapshot"] == "Child"
+    assert read["batches"][0]["member_totals"][-1]["name"] == "Alex"
+    for name, guest in (("bob", False), ("guest-family", True)):
+        sign_in(client, name, guest)
+        assert client.get("/api/meal-plan/members").json["members"] == []
+        assert client.patch(f"/api/meal-plan/members/{member_id}", json={"name": "Unrelated"}).status_code == 404
+        assert client.post("/api/meal-plan/batches", json=payload).status_code == 400
+        assert client.get("/api/meal-plan?recipe_url=recipe://soup").json["batches"] == []
+        own = client.post("/api/meal-plan/members", json={"name": "Child"}).json["member"]
+        assert own["id"] != member_id
+    sign_in(client, "alice")
+    assert [member["name"] for member in client.get("/api/meal-plan/members").json["members"]] == ["You", "Partner", "Alex"]

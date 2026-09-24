@@ -76,6 +76,95 @@ def normalize_planned_servings(value):
     return planned_servings
 
 
+def normalize_positive_servings(value, label="Servings"):
+    message = f"{label} must be a finite number greater than zero."
+    if isinstance(value, bool) or value is None or clean_text(value) == "":
+        raise ValueError(message)
+    try:
+        servings = float(value)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError(message) from exc
+    if not math.isfinite(servings) or servings <= 0:
+        raise ValueError(message)
+    return int(servings) if servings.is_integer() else servings
+
+
+def servings_number(value):
+    return int(value) if value == value.to_integral_value() else float(value)
+
+
+def normalize_member(value):
+    if not isinstance(value, dict):
+        return None
+    member_id = clean_text(value.get("id"))
+    name = clean_text(value.get("name"))
+    return {"id": member_id, "name": name} if member_id and name else None
+
+
+def normalize_member_name(value):
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("Enter a family member name.")
+    name = value.strip()
+    if len(name) > 100:
+        raise ValueError("Family member names must be 100 characters or fewer.")
+    return name
+
+
+def normalize_member_portions(value, members=None):
+    """Read snapshots tolerantly; with a member map, validate a new allocation."""
+    strict = members is not None
+    if not isinstance(value, list) or (strict and not value):
+        if strict:
+            raise ValueError("Choose at least one family member for every meal.")
+        return []
+    portions = []
+    seen = set()
+    for item in value:
+        member_id = clean_text(item.get("member_id")) if isinstance(item, dict) else ""
+        if not member_id or member_id in seen:
+            if strict:
+                raise ValueError("Each family member can appear only once per meal.")
+            continue
+        if strict and member_id not in members:
+            raise ValueError("Choose family members from your current workspace.")
+        try:
+            servings = normalize_positive_servings(item.get("servings"), "Family member portions")
+        except ValueError:
+            if strict:
+                raise
+            continue
+        snapshot = members[member_id]["name"] if strict else clean_text(item.get("name_snapshot") or item.get("name"))
+        portions.append({"member_id": member_id, "name_snapshot": snapshot, "name": snapshot, "servings": servings})
+        seen.add(member_id)
+    return portions
+
+
+def add_meal_plan_member(name):
+    name = normalize_member_name(name)
+    with MEAL_PLAN_LOCK:
+        payload = load_meal_plan()
+        if any(member["name"].casefold() == name.casefold() for member in payload["members"]):
+            raise ValueError("A family member with that name already exists.")
+        member = {"id": uuid.uuid4().hex, "name": name}
+        payload["members"].append(member)
+        save_meal_plan(payload)
+        return member
+
+
+def update_meal_plan_member(member_id, name):
+    name = normalize_member_name(name)
+    with MEAL_PLAN_LOCK:
+        payload = load_meal_plan()
+        member = next((item for item in payload["members"] if item["id"] == clean_text(member_id)), None)
+        if not member:
+            return None
+        if any(item["id"] != member["id"] and item["name"].casefold() == name.casefold() for item in payload["members"]):
+            raise ValueError("A family member with that name already exists.")
+        member["name"] = name
+        save_meal_plan(payload)
+        return member
+
+
 def planned_servings_from_yield(value):
     if isinstance(value, bool) or value is None:
         return None
@@ -150,7 +239,7 @@ def normalize_meal(meal):
     }
     if meal.get("planned_servings") not in (None, ""):
         try:
-            normalized["planned_servings"] = normalize_planned_servings(meal.get("planned_servings"))
+            normalized["planned_servings"] = normalize_positive_servings(meal.get("planned_servings"))
         except ValueError:
             # Keep legacy/core meal data readable even if an optional serving
             # value in an older file is malformed.
@@ -176,6 +265,10 @@ def normalize_meal(meal):
         normalized["ingredients"] = normalize_meal_ingredients(meal.get("ingredients"))
     if clean_text(meal.get("batch_id")):
         normalized["batch_id"] = clean_text(meal.get("batch_id"))
+    if meal.get("portion_mode") in ("household", "family"):
+        normalized["portion_mode"] = meal["portion_mode"]
+    if "member_portions" in meal:
+        normalized["member_portions"] = normalize_member_portions(meal["member_portions"])
     return normalized
 
 
@@ -200,7 +293,7 @@ def normalize_meal_prep_batch(value):
     recipe_url = clean_text(value.get("recipe_url"))
     recipe_name = clean_text(value.get("recipe_name"))
     try:
-        servings = normalize_planned_servings(value.get("batch_servings"))
+        servings = normalize_positive_servings(value.get("batch_servings"))
     except ValueError:
         return None
     if not recipe_url or not recipe_name:
@@ -210,6 +303,7 @@ def normalize_meal_prep_batch(value):
         "recipe_url": recipe_url,
         "recipe_name": recipe_name,
         "batch_servings": servings,
+        "portion_mode": "family" if value.get("portion_mode") == "family" else "household",
         "prep_notes": clean_text(value.get("prep_notes")),
         "prep_steps": [
             step
@@ -229,11 +323,17 @@ def meal_prep_batch_summary(batch, meals):
     )
     allocated = allocated_batch_servings(allocations)
     remaining = max(Decimal(0), Decimal(str(batch["batch_servings"])) - allocated)
+    member_totals = {}
+    for meal in allocations:
+        for portion in meal.get("member_portions") or []:
+            total = member_totals.setdefault(portion["member_id"], {**portion, "servings": Decimal(0)})
+            total["servings"] += Decimal(str(portion["servings"]))
     return {
         **batch,
         "allocations": allocations,
-        "allocated_servings": int(allocated) if allocated == allocated.to_integral_value() else float(allocated),
-        "remaining_servings": int(remaining) if remaining == remaining.to_integral_value() else float(remaining),
+        "allocated_servings": servings_number(allocated),
+        "remaining_servings": servings_number(remaining),
+        "member_totals": [{**member, "servings": servings_number(member["servings"])} for member in member_totals.values()],
     }
 
 
@@ -272,7 +372,15 @@ def load_meal_plan():
             for batch in [normalize_meal_prep_batch(value)]
             if batch
         ]
-        return {"meals": meals, "batches": batches}
+        members = [
+            member for value in (payload.get("members", []) if isinstance(payload, dict) else [])
+            for member in [normalize_member(value)] if member
+        ]
+        members_by_id = {member["id"]: member for member in members}
+        for meal in meals:
+            for portion in meal.get("member_portions") or []:
+                portion["name"] = members_by_id.get(portion["member_id"], {}).get("name") or portion["name_snapshot"]
+        return {"meals": meals, "batches": batches, "members": members}
 
 
 def save_meal_plan(payload):
@@ -290,6 +398,7 @@ def save_meal_plan(payload):
             for batch in [normalize_meal_prep_batch(value)]
             if batch
         ],
+        "members": [member for value in payload.get("members", []) for member in [normalize_member(value)] if member],
     }
     with MEAL_PLAN_LOCK:
         return durable_runtime.save_json_document(
@@ -350,10 +459,12 @@ def add_meal_prep_batch(batch, allocations, ingredient_data=None):
     if not isinstance(batch, dict):
         raise ValueError("Choose a recipe and total batch servings.")
     batch = dict(batch)
-    try:
-        batch["batch_servings"] = normalize_planned_servings(batch.get("batch_servings"))
-    except ValueError as exc:
-        raise ValueError("Batch servings must be a number of 1 or more.") from exc
+    portion_mode = batch.get("portion_mode", "household")
+    if portion_mode not in ("household", "family"):
+        raise ValueError("Choose household totals or family member portions.")
+    explicit_batch_servings = "batch_servings" in batch
+    if explicit_batch_servings:
+        batch["batch_servings"] = normalize_positive_servings(batch.get("batch_servings"), "Batch servings")
     steps = batch.get("prep_steps", [])
     if not isinstance(steps, list):
         raise ValueError("Preparation steps must be a list of dated instructions.")
@@ -364,41 +475,57 @@ def add_meal_prep_batch(batch, allocations, ingredient_data=None):
     batch["prep_steps"] = [
         {**step, "id": uuid.uuid4().hex, "completed": False} for step in steps
     ]
-    normalized = normalize_meal_prep_batch(batch)
-    if not normalized:
-        raise ValueError("Choose a valid recipe for the batch.")
     if not isinstance(allocations, list) or not allocations:
         raise ValueError("Add at least one meal date for this batch.")
-    meals = []
-    slots = set()
-    for allocation in allocations:
-        if not isinstance(allocation, dict):
-            raise ValueError("Choose a valid date, meal type, and servings for every meal.")
-        servings = normalize_planned_servings(allocation.get("planned_servings"))
-        meal = normalize_meal({
-            **(ingredient_data or {}),
-            "id": uuid.uuid4().hex,
-            "date": allocation.get("date"),
-            "meal_type": allocation.get("meal_type"),
-            "planned_servings": servings,
-            "prep_notes": allocation.get("prep_notes"),
-            "recipe_url": normalized["recipe_url"],
-            "recipe_name": normalized["recipe_name"],
-            "batch_id": normalized["id"],
-            "created_at": normalized["created_at"],
-        })
-        if not meal:
-            raise ValueError("Choose a valid date, meal type, and servings for every meal.")
-        slot = (meal["date"], meal["meal_type"])
-        if slot in slots:
-            raise ValueError("Each meal date and meal type can appear only once in a batch.")
-        slots.add(slot)
-        meals.append(meal)
-    if allocated_batch_servings(meals) > Decimal(str(normalized["batch_servings"])):
-        raise ValueError("Planned meal servings cannot exceed total batch servings.")
-
     with MEAL_PLAN_LOCK:
         payload = load_meal_plan()
+        members = {member["id"]: member for member in payload["members"]}
+        meals = []
+        slots = set()
+        for allocation in allocations:
+            if not isinstance(allocation, dict):
+                raise ValueError("Choose a valid date, meal type, and servings for every meal.")
+            portions = []
+            if portion_mode == "family":
+                portions = normalize_member_portions(allocation.get("member_portions"), members)
+                portion_total = sum((Decimal(str(portion["servings"])) for portion in portions), Decimal(0))
+                servings = normalize_positive_servings(servings_number(portion_total), "Meal servings")
+                if "planned_servings" in allocation:
+                    supplied = normalize_positive_servings(allocation["planned_servings"], "Meal servings")
+                    if Decimal(str(supplied)) != portion_total:
+                        raise ValueError("Meal servings must match the assigned family member portions.")
+            else:
+                if allocation.get("member_portions"):
+                    raise ValueError("Choose family member portions to assign servings to members.")
+                servings = normalize_positive_servings(allocation.get("planned_servings"), "Meal servings")
+            meal = normalize_meal({
+                **(ingredient_data or {}),
+                "id": uuid.uuid4().hex,
+                "date": allocation.get("date"),
+                "meal_type": allocation.get("meal_type"),
+                "planned_servings": servings,
+                "prep_notes": allocation.get("prep_notes"),
+                "recipe_url": batch.get("recipe_url"),
+                "recipe_name": batch.get("recipe_name"),
+                "batch_id": batch["id"],
+                "portion_mode": portion_mode,
+                "member_portions": portions,
+            })
+            if not meal:
+                raise ValueError("Choose a valid date, meal type, and servings for every meal.")
+            slot = (meal["date"], meal["meal_type"])
+            if slot in slots:
+                raise ValueError("Each meal date and meal type can appear only once in a batch.")
+            slots.add(slot)
+            meals.append(meal)
+        allocated = allocated_batch_servings(meals)
+        if not explicit_batch_servings:
+            batch["batch_servings"] = normalize_positive_servings(servings_number(allocated), "Batch servings")
+        normalized = normalize_meal_prep_batch(batch)
+        if not normalized:
+            raise ValueError("Choose a valid recipe for the batch.")
+        if allocated > Decimal(str(normalized["batch_servings"])):
+            raise ValueError("Planned meal servings cannot exceed total batch servings.")
         recipe_key = normalize_recipe_url_key(normalized["recipe_url"])
         if any(
             (meal["date"], meal["meal_type"]) in slots

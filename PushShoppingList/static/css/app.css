@@ -33607,6 +33607,39 @@ img[data-deferred-src] {
     color: var(--app-primary);
 }
 
+.app-meal-planner-cell .app-meal-family-portions {
+    grid-column: 1 / -1;
+    min-width: 0;
+    font-size: 11px;
+    line-height: 1.4;
+}
+
+.app-meal-family-portions summary {
+    cursor: pointer;
+    color: var(--app-primary);
+    overflow-wrap: anywhere;
+}
+
+.app-meal-family-portions ul {
+    display: grid;
+    gap: 6px;
+    margin: 8px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.app-meal-family-portions li {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 2px 6px;
+    overflow-wrap: anywhere;
+}
+
+.app-meal-family-portions li > :last-child {
+    color: var(--app-muted);
+}
+
 .app-meal-prep-cell .app-meal-prep-step {
     display: grid;
     gap: 8px;

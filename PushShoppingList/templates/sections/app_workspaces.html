@@ -640,6 +640,7 @@
 <section id="mealPlannerPage"
          class="app-page-workspace app-page-workspace-meal-planner"
          data-app-page-workspace
+         data-meal-week="{{ meal_plan.week_start }}"
          {% if initial_app_page|default("") != "mealPlannerPage" %}hidden{% endif %}>
     <div class="app-page-heading-row">
         <div>
@@ -664,6 +665,7 @@
         <a class="app-page-secondary-action" href="?meal_week={{ meal_plan.today_week }}#mealPlannerPage">Today</a>
     </div>
 
+    <p class="app-dialog-status" data-meal-planner-refresh-status role="status" aria-live="polite" hidden></p>
     <div class="app-page-layout">
         <div class="app-page-main-column">
             <section class="app-meal-planner-grid" aria-label="Weekly meal plan">
@@ -713,6 +715,16 @@
                                             {% if meal.planned_servings %}<span>{{ '%g' | format(meal.planned_servings | float) }} {{ 'serving' if meal.planned_servings == 1 else 'servings' }}</span>{% endif %}
                                             {% if meal.batch_id %}<span class="app-meal-batch-label">From prep batch</span>{% endif %}
                                         </p>{% endif %}
+                                        {% if meal.member_portions %}
+                                            <details class="app-meal-family-portions" data-meal-family-details="{{ meal.id }}">
+                                                <summary>Family portions ({{ meal.member_portions | length }})</summary>
+                                                <ul>
+                                                    {% for portion in meal.member_portions %}
+                                                        <li><span>{{ portion.name or portion.name_snapshot or 'Family member' }}</span><span>{{ '%g' | format(portion.servings | float) }} {{ 'serving' if portion.servings == 1 else 'servings' }}</span></li>
+                                                    {% endfor %}
+                                                </ul>
+                                            </details>
+                                        {% endif %}
                                         {% if meal.prep_notes %}<p class="app-meal-prep-notes" style="white-space: pre-wrap; overflow-wrap: anywhere;">{{ meal.prep_notes }}</p>{% endif %}
                                         {% if meal.ingredient_selection_needed %}
                                             <span class="app-meal-selection-needed">Selection needed.</span>

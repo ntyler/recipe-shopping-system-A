@@ -169,6 +169,7 @@ from PushShoppingList.services.menu_store_service import menu_pdf_logs_by_cookbo
 from PushShoppingList.services.menu_store_service import menus_by_cookbook
 from PushShoppingList.services.meal_plan_service import add_meal
 from PushShoppingList.services.meal_plan_service import add_meal_prep_batch
+from PushShoppingList.services.meal_plan_service import add_meal_plan_member
 from PushShoppingList.services.meal_plan_service import delete_meal
 from PushShoppingList.services.meal_plan_service import delete_meal_prep_batch
 from PushShoppingList.services.meal_plan_service import load_meal_plan
@@ -180,6 +181,7 @@ from PushShoppingList.services.meal_plan_service import normalize_planned_servin
 from PushShoppingList.services.meal_plan_service import planned_servings_from_yield
 from PushShoppingList.services.meal_plan_service import update_meal_ingredient_option_selections
 from PushShoppingList.services.meal_plan_service import update_meal_prep_step
+from PushShoppingList.services.meal_plan_service import update_meal_plan_member
 from PushShoppingList.services.global_search_service import global_search
 from PushShoppingList.services.global_search_service import ACTUAL_RECORD_GROUPS
 from PushShoppingList.services.global_search_service import DEFAULT_RESULT_LIMIT
@@ -5969,7 +5971,7 @@ def recipe_meal_plan_entries_route():
     # load_meal_plan already resolves the active user's or guest's workspace.
     plan = load_meal_plan()
     meals = [
-        {key: meal.get(key) for key in ("id", "date", "meal_type", "planned_servings", "prep_notes", "batch_id")}
+        {key: meal.get(key) for key in ("id", "date", "meal_type", "planned_servings", "prep_notes", "batch_id", "portion_mode", "member_portions")}
         for meal in plan["meals"]
         if normalize_recipe_url_key(meal.get("recipe_url")) == recipe_key
     ]
@@ -5981,6 +5983,34 @@ def recipe_meal_plan_entries_route():
         if normalize_recipe_url_key(batch.get("recipe_url")) == recipe_key
     ]
     return jsonify({"ok": True, "meals": meals, "batches": batches})
+
+
+@main_bp.route("/api/meal-plan/members", methods=["GET", "POST"])
+def meal_plan_members_route():
+    if not current_public_user() and not is_guest_session():
+        return jsonify({"ok": False, "error": "Sign in or start a guest workspace to manage family members."}), 403
+    if request.method == "GET":
+        return jsonify({"ok": True, "members": load_meal_plan()["members"]})
+    payload = request.get_json(silent=True)
+    try:
+        member = add_meal_plan_member(payload.get("name") if isinstance(payload, dict) else None)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    return jsonify({"ok": True, "member": member}), 201
+
+
+@main_bp.route("/api/meal-plan/members/<member_id>", methods=["PATCH"])
+def update_meal_plan_member_route(member_id):
+    if not current_public_user() and not is_guest_session():
+        return jsonify({"ok": False, "error": "Sign in or start a guest workspace to manage family members."}), 403
+    payload = request.get_json(silent=True)
+    try:
+        member = update_meal_plan_member(member_id, payload.get("name") if isinstance(payload, dict) else None)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    if not member:
+        return jsonify({"ok": False, "error": "That family member was not found."}), 404
+    return jsonify({"ok": True, "member": member})
 
 
 @main_bp.route("/api/meal-plan/batches", methods=["POST"])
@@ -6005,7 +6035,8 @@ def add_meal_prep_batch_route():
         batch, meals = add_meal_prep_batch({
             "recipe_url": recipe_url,
             "recipe_name": available_recipes[recipe_url]["name"],
-            "batch_servings": payload.get("batch_servings"),
+            **({"batch_servings": payload["batch_servings"]} if "batch_servings" in payload else {}),
+            "portion_mode": payload.get("portion_mode", "household"),
             "prep_notes": payload.get("prep_notes"),
             "prep_steps": payload.get("prep_steps", []),
         }, payload.get("allocations"), {

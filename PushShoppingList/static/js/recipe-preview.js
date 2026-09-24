@@ -100,36 +100,14 @@ async function openIntegratedRecipePreview({history = true} = {}) {
             <div class="recipe-preview-control"><span>Scale</span><div class="recipe-preview-segment" role="group" aria-label="Recipe scale">${[1,2,3].map(scale => `<button type="button" data-preview-scale="${scale}" aria-pressed="false">${scale}x</button>`).join('')}</div></div>
             <div class="recipe-preview-control"><span>Text size</span><div class="recipe-preview-segment" role="group" aria-label="Recipe text size">${['smaller','normal','larger'].map((size,index) => `<button type="button" data-preview-size="${size}" aria-label="${size[0].toUpperCase()+size.slice(1)} text" aria-pressed="${size === 'normal'}">${['A−','A','A+'][index]}</button>`).join('')}</div></div>
         </div>
-        <form id="recipePreviewMealPanel" class="recipe-preview-meal-panel" aria-label="Add to Meal Plan" hidden>
-            <h2>Add to Meal Plan</h2><fieldset><div class="recipe-preview-meal-fields">
-            <label>Date<input type="date" name="date" required></label>
-            <label>Meal<select name="meal_type" aria-label="Meal">${['breakfast','lunch','dinner','snack'].map(meal => `<option value="${meal}" ${meal === 'dinner' ? 'selected' : ''}>${meal[0].toUpperCase()+meal.slice(1)}</option>`).join('')}</select></label>
-            <label>Planned servings<input type="number" name="planned_servings" min="1" step="any" required></label></div>
-            <label>Meal-prep notes<textarea name="prep_notes" rows="2" placeholder="Notes for this scheduled meal only"></textarea></label>
-            <p>Uses the saved recipe and your selected ingredient bundles.</p>
-            <div class="recipe-preview-note-actions"><button type="submit">Add Meal</button><button type="button" data-preview-action="cancel-meal">Cancel</button></div>
-            </fieldset><p data-preview-meal-status role="status" aria-live="polite"></p>
-        </form>
+        <form id="recipePreviewMealPanel" class="recipe-preview-meal-panel" aria-label="Add to Meal Plan" hidden></form>
         <p id="recipePreviewStatus" class="recipe-preview-status" role="status" aria-live="polite">Loading recipe preview…</p>
         <article class="recipe-preview-card" aria-label="Recipe" aria-busy="true"></article>
         <section class="recipe-preview-meal-planning" aria-labelledby="recipePreviewMealHeading">
             <div class="recipe-preview-section-heading"><h2 id="recipePreviewMealHeading">Meal Planning</h2>
-                <button type="button" data-preview-action="meal-prep" aria-controls="recipePreviewBatchPanel">Plan Meal Prep</button>
                 <button type="button" data-preview-action="meal-plan" aria-controls="recipePreviewMealPanel">Add to Meal Plan</button>
                 <button type="button" data-preview-action="refresh-meals">Refresh</button>
                 <a href="/#mealPlannerPage">View Meal Planner</a></div>
-            <form id="recipePreviewBatchPanel" class="recipe-preview-meal-panel" aria-label="Plan Meal Prep" hidden>
-                <h3>Plan Meal Prep</h3><p>Divide one batch across eating dates and schedule the preparation steps.</p>
-                <fieldset><label>Batch servings<input name="batch_servings" type="number" min="1" step="any" required></label>
-                <label>Batch prep notes<textarea name="prep_notes" rows="2" placeholder="Notes shared by this batch"></textarea></label>
-                <div class="recipe-preview-section-heading"><h4>Eating dates</h4><button type="button" data-preview-action="add-allocation">Add eating date</button></div>
-                <div data-preview-allocations></div><p data-preview-portion-balance aria-live="polite"></p>
-                <div class="recipe-preview-section-heading"><h4>Prep timeline</h4><button type="button" data-preview-action="add-prep-step">Add prep step</button></div>
-                <p>Schedule tasks such as chopping, marinating, cooking, or portioning. Each task can have its own date.</p>
-                <div data-preview-prep-steps></div>
-                <div class="recipe-preview-note-actions"><button type="submit">Save Meal Prep Plan</button><button type="button" data-preview-action="cancel-prep">Cancel</button></div></fieldset>
-                <p data-preview-batch-status role="status" aria-live="polite"></p>
-            </form>
             <p class="recipe-preview-status" data-preview-plans-status role="status" aria-live="polite"></p>
             <div data-preview-planned-meals></div>
         </section>`;
@@ -139,10 +117,7 @@ async function openIntegratedRecipePreview({history = true} = {}) {
     page.addEventListener('change', handleRecipePreviewChange);
     page.addEventListener('input', event => {
         if (event.target.matches('[data-preview-note-field]')) syncRecipePreviewNotesDraft();
-        if (event.target.closest('#recipePreviewBatchPanel')) updateRecipePreviewPortionBalance();
     });
-    page.querySelector('#recipePreviewMealPanel').addEventListener('submit', submitRecipePreviewMeal);
-    page.querySelector('#recipePreviewBatchPanel').addEventListener('submit', submitRecipePreviewBatch);
     page.addEventListener('keydown', event => {
         const rating = event.target.closest('[data-preview-rating]');
         if (rating && ['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) {
@@ -352,14 +327,20 @@ function recipePreviewPlannedMealHtml(meal) {
     return `<li><div class="recipe-preview-planned-meal-summary"><strong><time datetime="${escapeAttribute(meal.date)}">${esc(recipePreviewPlanDate(meal.date))}</time> · ${esc(mealName)}</strong>
         <span>${meal.planned_servings ? `${esc(String(meal.planned_servings))} servings` : 'Servings not set'}</span>
         <a href="/?meal_week=${encodeURIComponent(meal.date)}#mealPlannerPage">View in Meal Planner</a></div>
+        ${recipePreviewFamilyPortionsHtml(meal)}
         ${meal.prep_notes ? `<p class="recipe-preview-prep-notes"><strong>Meal-prep notes</strong>${esc(meal.prep_notes)}</p>` : ''}</li>`;
+}
+
+function recipePreviewFamilyPortionsHtml(meal) {
+    if (!meal.member_portions?.length) return '';
+    return `<details class="recipe-preview-family-portions"><summary>Family portions (${meal.member_portions.length})</summary><ul>${meal.member_portions.map(member => `<li><span>${escapeHtml(member.name || member.name_snapshot || 'Family member')}</span><span>${escapeHtml(String(member.servings))} ${Number(member.servings) === 1 ? 'serving' : 'servings'}</span></li>`).join('')}</ul></details>`;
 }
 
 function recipePreviewMealPlansHtml(result) {
     const esc = escapeHtml, batches = result.batches || [], meals = result.meals || [];
     const grouped = new Set(batches.map(batch => batch.id));
     const singleMeals = meals.filter(meal => !grouped.has(meal.batch_id));
-    if (!batches.length && !meals.length) return '<p class="recipe-preview-empty">This recipe has no planned meals yet. Plan meal prep across several days or add a single meal.</p>';
+    if (!batches.length && !meals.length) return '<p class="recipe-preview-empty">This recipe has no planned meals yet. Use Add to Meal Plan to choose dates, meals, and portions.</p>';
     const plans = batches.map(batch => {
         const allocations = batch.allocations || meals.filter(meal => meal.batch_id === batch.id);
         const steps = [...(batch.prep_steps || [])].sort((a, b) => a.date.localeCompare(b.date));
@@ -367,6 +348,7 @@ function recipePreviewMealPlansHtml(result) {
             <div class="recipe-preview-section-heading"><h3>Meal prep · ${esc(String(batch.batch_servings))} servings</h3>
                 <button type="button" data-preview-action="remove-batch" data-batch-id="${escapeAttribute(batch.id)}">Remove plan</button></div>
             <p class="recipe-preview-batch-balance">${esc(String(batch.allocated_servings))} servings planned · ${esc(String(batch.remaining_servings))} unassigned</p>
+            ${batch.member_totals?.length ? `<p class="recipe-preview-batch-balance">${batch.member_totals.map(member => `${esc(member.name || member.name_snapshot || 'Family member')}: ${esc(String(member.servings))} servings`).join(' · ')}</p>` : ''}
             ${batch.prep_notes ? `<p class="recipe-preview-prep-notes"><strong>Batch prep notes</strong>${esc(batch.prep_notes)}</p>` : ''}
             <div class="recipe-preview-batch-columns"><div><h4>Prep timeline</h4>
                 ${steps.length ? `<ul class="recipe-preview-prep-timeline">${steps.map(step => `<li class="${step.completed ? 'is-complete' : ''}">
@@ -376,88 +358,6 @@ function recipePreviewMealPlansHtml(result) {
                 <div><h4>Eating dates</h4>${allocations.length ? `<ul class="recipe-preview-planned-meals">${allocations.map(recipePreviewPlannedMealHtml).join('')}</ul>` : '<p class="recipe-preview-empty">No eating dates remain in this plan.</p>'}</div></div></section>`;
     }).join('');
     return plans + (singleMeals.length ? `${batches.length ? '<h3>Other scheduled meals</h3>' : ''}<ul class="recipe-preview-planned-meals">${singleMeals.map(recipePreviewPlannedMealHtml).join('')}</ul>` : '');
-}
-
-function recipePreviewAllocationRow(date = recipePreviewToday(), servings = '') {
-    return `<div class="recipe-preview-allocation" data-preview-allocation>
-        <label>Eating date<input data-allocation-field="date" type="date" value="${escapeAttribute(date)}" required></label>
-        <label>Meal<select data-allocation-field="meal_type">${['breakfast','lunch','dinner','snack'].map(meal => `<option value="${meal}" ${meal === 'dinner' ? 'selected' : ''}>${meal[0].toUpperCase()+meal.slice(1)}</option>`).join('')}</select></label>
-        <label>Servings<input data-allocation-field="planned_servings" type="number" min="1" step="any" value="${escapeAttribute(String(servings))}" required></label>
-        <button type="button" data-preview-action="remove-allocation" aria-label="Remove eating date">Remove</button>
-        <label class="recipe-preview-allocation-notes">Meal notes (optional)<input data-allocation-field="prep_notes" placeholder="Notes for this eating date"></label></div>`;
-}
-
-function recipePreviewPrepRow() {
-    return `<div class="recipe-preview-prep-row" data-preview-prep-row>
-        <label>Prep date<input data-prep-field="date" type="date" value="${recipePreviewToday()}" required></label>
-        <label>Prep task<input data-prep-field="instruction" placeholder="e.g. Chop vegetables" maxlength="2000" required></label>
-        <button type="button" data-preview-action="remove-prep-step" aria-label="Remove prep step">Remove</button></div>`;
-}
-
-function openRecipePreviewBatchPanel() {
-    const state = integratedRecipePreview;
-    if (!state?.projectionReady) return;
-    const form = state.page.querySelector('#recipePreviewBatchPanel');
-    if (!state.batchDraftInitialized) {
-        const servings = Math.max(1, recipeEditServingsParts(state.model.servings).number || 1);
-        form.elements.batch_servings.value = servings;
-        form.querySelector('[data-preview-allocations]').innerHTML = recipePreviewAllocationRow(recipePreviewToday(), servings);
-        state.batchDraftInitialized = true;
-    }
-    form.hidden = false;
-    updateRecipePreviewPortionBalance();
-    form.scrollIntoView({block: 'start'});
-    form.elements.batch_servings.focus({preventScroll: true});
-}
-
-function recipePreviewBatchPayload(form, state) {
-    return {recipe_url:state.url, batch_servings:Number(form.elements.batch_servings.value), prep_notes:form.elements.prep_notes.value,
-        ingredient_option_selections:state.selections,
-        allocations:[...form.querySelectorAll('[data-preview-allocation]')].map(row => Object.fromEntries(
-            [...row.querySelectorAll('[data-allocation-field]')].map(input => [input.dataset.allocationField, input.dataset.allocationField === 'planned_servings' ? Number(input.value) : input.value]))),
-        prep_steps:[...form.querySelectorAll('[data-preview-prep-row]')].map(row => Object.fromEntries(
-            [...row.querySelectorAll('[data-prep-field]')].map(input => [input.dataset.prepField, input.value])))};
-}
-
-function updateRecipePreviewPortionBalance() {
-    const form = integratedRecipePreview?.page.querySelector('#recipePreviewBatchPanel');
-    if (!form) return;
-    const total = Number(form.elements.batch_servings.value);
-    const used = [...form.querySelectorAll('[data-allocation-field="planned_servings"]')].reduce((sum, input) => sum + (Number(input.value) || 0), 0);
-    const remaining = Math.round((total - used) * 10000) / 10000;
-    form.querySelector('[data-preview-portion-balance]').textContent = remaining < 0
-        ? `${used} of ${total || 0} servings planned — reduce the portions or increase the batch by ${-remaining}.`
-        : `${used} of ${total || 0} servings planned · ${remaining} unassigned`;
-    form.elements.batch_servings.setCustomValidity(remaining < 0 ? 'Planned portions exceed the batch servings.' : '');
-}
-
-async function submitRecipePreviewBatch(event) {
-    event.preventDefault();
-    const state = integratedRecipePreview, form = event.currentTarget;
-    if (!state?.projectionReady || state.batchBusy) return;
-    updateRecipePreviewPortionBalance();
-    if (!form.reportValidity()) return;
-    const payload = recipePreviewBatchPayload(form, state), status = form.querySelector('[data-preview-batch-status]');
-    if (!payload.allocations.length) { status.textContent = 'Add at least one eating date.'; return; }
-    state.batchBusy = true;
-    form.querySelector('fieldset').disabled = true;
-    status.textContent = 'Saving meal prep plan…';
-    try {
-        const response = await fetch('/api/meal-plan/batches', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
-        const result = await response.json();
-        if (!response.ok || !result.ok) throw new Error(result.error || 'Unable to save this meal prep plan.');
-        form.reset();
-        state.batchDraftInitialized = false;
-        form.querySelector('[data-preview-allocations]').replaceChildren();
-        form.querySelector('[data-preview-prep-steps]').replaceChildren();
-        status.textContent = '';
-        if (integratedRecipePreview === state) {
-            form.hidden = true;
-            await refreshRecipePreviewMeals(state);
-            state.page.querySelector('[data-preview-action="meal-prep"]').focus();
-        }
-    } catch (error) { status.textContent = error.message; }
-    finally { state.batchBusy = false; form.querySelector('fieldset').disabled = false; }
 }
 
 async function toggleRecipePreviewPrepStep(input) {
@@ -470,7 +370,10 @@ async function toggleRecipePreviewPrepStep(input) {
             method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({completed})});
         const result = await response.json();
         if (!response.ok || !result.ok) throw new Error(result.error || 'Unable to save this prep step.');
-        if (integratedRecipePreview !== state) return;
+        if (integratedRecipePreview !== state) {
+            if (typeof refreshMealPlannerWorkspace === 'function') await refreshMealPlannerWorkspace();
+            return;
+        }
         // A Refresh may have replaced the clicked row while its save was pending.
         // Cancel any older read and update the currently mounted checkbox.
         state.mealsAbort?.abort();
@@ -481,6 +384,7 @@ async function toggleRecipePreviewPrepStep(input) {
             }
         });
         status.textContent = completed ? 'Prep step completed.' : 'Prep step reopened.';
+        if (typeof refreshMealPlannerWorkspace === 'function') await refreshMealPlannerWorkspace();
     } catch (error) { input.checked = !completed; status.textContent = error.message; }
     finally { input.disabled = false; }
 }
@@ -494,6 +398,7 @@ async function removeRecipePreviewBatch(button) {
         const result = await response.json();
         if (!response.ok || !result.ok) throw new Error(result.error || 'Unable to remove this plan.');
         if (integratedRecipePreview === state) await refreshRecipePreviewMeals(state);
+        if (typeof refreshMealPlannerWorkspace === 'function') await refreshMealPlannerWorkspace();
     } catch (error) { state.page.querySelector('[data-preview-plans-status]').textContent = error.message; }
     finally { button.disabled = false; }
 }
@@ -501,15 +406,30 @@ async function removeRecipePreviewBatch(button) {
 function openRecipePreviewMealPanel() {
     const state = integratedRecipePreview;
     if (!state?.projectionReady) return;
-    const form = state.page.querySelector('#recipePreviewMealPanel');
-    if (!form.elements.date.value) {
-        const today = new Date();
-        form.elements.date.value = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+    if (!state.mealPanel) {
+        state.mealPanel = new MealPlanPanel(state.page.querySelector('#recipePreviewMealPanel'), {
+            today: recipePreviewToday(),
+            servings: recipeEditServingsParts(state.model.servings).number || 1,
+            title: state.model.title,
+            getContext: () => integratedRecipePreview === state && state.projectionReady
+                ? {recipe_url:state.url, ingredient_option_selections:state.selections} : null,
+            onCancel: () => state.page.querySelector('[data-preview-action="meal-plan"]')?.focus(),
+            onMembersChanged: async () => {
+                if (integratedRecipePreview === state) await refreshRecipePreviewMeals(state);
+                if (typeof refreshMealPlannerWorkspace === 'function') await refreshMealPlannerWorkspace();
+            },
+            onSaved: async (_result, date) => {
+                if (integratedRecipePreview === state) {
+                    await refreshRecipePreviewMeals(state);
+                    const section = state.page.querySelector('.recipe-preview-meal-planning');
+                    section.scrollIntoView({block:'start'});
+                    section.querySelector('[data-preview-action="meal-plan"]').focus({preventScroll:true});
+                }
+                if (typeof refreshMealPlannerWorkspace === 'function') await refreshMealPlannerWorkspace({date});
+            },
+        });
     }
-    form.elements.planned_servings.value = Math.max(1, recipeEditServingsParts(state.model.servings).number || 1);
-    form.hidden = false;
-    form.scrollIntoView({block:'nearest'});
-    form.elements.date.focus();
+    return state.mealPanel.open();
 }
 
 async function refreshRecipePreviewMeals(state = integratedRecipePreview) {
@@ -528,37 +448,6 @@ async function refreshRecipePreviewMeals(state = integratedRecipePreview) {
     } catch (error) {
         if (integratedRecipePreview === state && !abort.signal.aborted) status.textContent = error.message;
     }
-}
-
-async function submitRecipePreviewMeal(event) {
-    event.preventDefault();
-    const state = integratedRecipePreview, form = event.currentTarget;
-    if (!state?.projectionReady || state.mealBusy || !form.reportValidity()) return;
-    const data = new FormData(form), status = form.querySelector('[data-preview-meal-status]');
-    state.mealBusy = true;
-    form.querySelector('fieldset').disabled = true;
-    status.textContent = 'Adding meal…';
-    try {
-        const response = await fetch('/api/meal-plan', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
-            recipe_url:state.url, date:data.get('date'), meal_type:data.get('meal_type'), planned_servings:Number(data.get('planned_servings')),
-            prep_notes:data.get('prep_notes'), ingredient_option_selections:state.selections,
-        })});
-        const result = await response.json();
-        if (!response.ok || !result.ok) throw new Error(result.error || 'Unable to add this meal.');
-        status.textContent = 'Meal added. ';
-        const link = document.createElement('a');
-        link.href = `/?meal_week=${encodeURIComponent(data.get('date'))}#mealPlannerPage`;
-        link.textContent = 'View Meal Planner';
-        status.append(link);
-        if (integratedRecipePreview === state) {
-            await refreshRecipePreviewMeals(state);
-            form.hidden = true;
-            const section = state.page.querySelector('.recipe-preview-meal-planning');
-            section.scrollIntoView({block: 'start'});
-            section.querySelector('[data-preview-action="meal-plan"]').focus({preventScroll: true});
-        }
-    } catch (error) { status.textContent = error.message; }
-    finally { state.mealBusy = false; form.querySelector('fieldset').disabled = false; }
 }
 
 function recipePreviewIngredientsHtml(recipe, url, expandedChoices = new Set()) {
@@ -720,39 +609,8 @@ async function handleRecipePreviewClick(event) {
     switch (button.dataset.previewAction) {
         case 'back': return closeIntegratedRecipePreview();
         case 'meal-plan': return openRecipePreviewMealPanel();
-        case 'meal-prep': return openRecipePreviewBatchPanel();
         case 'remove-batch': return removeRecipePreviewBatch(button);
-        case 'cancel-prep':
-            state.page.querySelector('#recipePreviewBatchPanel').hidden = true;
-            state.page.querySelector('[data-preview-action="meal-prep"]').focus();
-            break;
-        case 'add-allocation': {
-            const rows = state.page.querySelector('[data-preview-allocations]');
-            rows.insertAdjacentHTML('beforeend', recipePreviewAllocationRow());
-            rows.lastElementChild.querySelector('input').focus();
-            updateRecipePreviewPortionBalance();
-            break;
-        }
-        case 'remove-allocation':
-            button.closest('[data-preview-allocation]').remove();
-            updateRecipePreviewPortionBalance();
-            state.page.querySelector('[data-preview-action="add-allocation"]').focus();
-            break;
-        case 'add-prep-step': {
-            const rows = state.page.querySelector('[data-preview-prep-steps]');
-            rows.insertAdjacentHTML('beforeend', recipePreviewPrepRow());
-            rows.lastElementChild.querySelector('input').focus();
-            break;
-        }
-        case 'remove-prep-step':
-            button.closest('[data-preview-prep-row]').remove();
-            state.page.querySelector('[data-preview-action="add-prep-step"]').focus();
-            break;
         case 'refresh-meals': return refreshRecipePreviewMeals();
-        case 'cancel-meal':
-            state.page.querySelector('#recipePreviewMealPanel').hidden = true;
-            state.page.querySelector('[data-preview-action="meal-plan"]').focus();
-            break;
         case 'add-note':
             state.page.querySelector('[data-preview-note-rows]').insertAdjacentHTML('beforeend', recipePreviewNoteEditorHtml({heading: '', items: []}));
             state.page.querySelector('[data-preview-note-rows]').lastElementChild.querySelector('input').focus();
