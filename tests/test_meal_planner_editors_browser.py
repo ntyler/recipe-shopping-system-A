@@ -17,7 +17,8 @@ from test_meal_prep_batches import scoped_client, sign_in
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_simultaneous_meal_editors_in_chromium(scoped_client, monkeypatch):
+@pytest.mark.parametrize('script', ['meal_planner_editors.cjs', 'meal_calendar_drag.cjs'])
+def test_simultaneous_meal_editors_in_chromium(scoped_client, monkeypatch, script):
     node = shutil.which('node')
     module = os.environ.get('AI_PANTRY_PLAYWRIGHT_MODULE', 'playwright')
     if not node or subprocess.run([node, '-e', 'require.resolve(process.argv[1])', module], capture_output=True).returncode:
@@ -64,7 +65,7 @@ def test_simultaneous_meal_editors_in_chromium(scoped_client, monkeypatch):
     thread.start()
     try:
         result = subprocess.run(
-            [node, str(ROOT / 'tests/browser/meal_planner_editors.cjs'), module, f'http://127.0.0.1:{server.server_port}'],
+            [node, str(ROOT / 'tests/browser' / script), module, f'http://127.0.0.1:{server.server_port}'],
             input=json.dumps({'name': cookie.key, 'value': cookie.value, 'domain': '127.0.0.1', 'path': '/'}),
             capture_output=True, text=True, timeout=180,
         )

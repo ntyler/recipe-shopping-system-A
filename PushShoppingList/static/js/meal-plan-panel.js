@@ -25,6 +25,16 @@
             form.addEventListener('click', event => this.click(event));
             form.addEventListener('change', event => this.change(event));
             form.addEventListener('input', event => this.input(event));
+            form.addEventListener('pointerdown', event => this.startCalendarDrag(event));
+            form.addEventListener('pointermove', event => this.moveCalendarDrag(event));
+            form.addEventListener('pointerup', event => {
+                if (event.pointerId !== this.calendarDrag?.pointerId) return;
+                this.moveCalendarDrag(event, true);
+                this.endCalendarDrag();
+            });
+            ['pointercancel', 'lostpointercapture'].forEach(type => form.addEventListener(type, event => {
+                if (event.pointerId === this.calendarDrag?.pointerId) this.endCalendarDrag();
+            }));
             this.render();
         }
 
@@ -113,6 +123,7 @@
         }
 
         render() {
+            if (this.calendarDrag && !this.calendarDragIsCurrent()) this.endCalendarDrag();
             this.captureOpen();
             const active = this.form.contains(document.activeElement) ? document.activeElement : null;
             const key = active?.dataset.focusKey;
@@ -213,7 +224,7 @@
                 const calendar = model.calendarMonth(draft.calendarMonth);
                 dates = `<div class="meal-schedule-calendar"><div class="meal-schedule-calendar-heading"><button type="button" data-schedule-action="month" data-direction="-1" data-focus-key="previous-month" aria-label="Previous month">‹</button><strong>${esc(calendar.label)}</strong><button type="button" data-schedule-action="month" data-direction="1" data-focus-key="next-month" aria-label="Next month">›</button></div>
                     <div class="meal-schedule-calendar-grid">${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(day => `<span aria-hidden="true">${day}</span>`).join('')}${calendar.days.map(day => `<button type="button" data-schedule-action="date" data-date="${day.date}" data-focus-key="calendar-${day.date}" aria-label="${esc(dateLabel(day.date))}" aria-pressed="${draft.selectedDates.includes(day.date)}" class="${day.inMonth ? '' : 'is-other-month'}">${day.day}</button>`).join('')}</div>
-                    <p>Select any dates, including dates in other months.</p></div>`;
+                    <p>Click or drag across dates, including other months. Drag from a selected day to clear dates.</p></div>`;
             }
             const dayCards = totals.days.map(day => {
                 const data = draft.days[day.date], meals = model.MEAL_TYPES.filter(meal => data.mealEnabled[meal]);
@@ -357,7 +368,74 @@
             this.render();
         }
 
+        calendarDragIsCurrent() {
+            const drag = this.calendarDrag;
+            return drag && drag.draft === this.draft && drag.generation === this.generation
+                && this.draft.dateMode === 'days' && this.edit?.scope !== 'meal'
+                && !this.form.hidden && !this.ui.busy && !this.ui.memberBusy && !this.ui.saved;
+        }
+
+        startCalendarDrag(event) {
+            this.calendarClickPointer = null;
+            const button = event.target.closest('[data-schedule-action="date"]');
+            // Touch retains native scrolling and tap selection; only a primary
+            // mouse press starts a range. Capture the form, which survives render().
+            if (event.pointerType !== 'mouse' || event.button !== 0 || event.isPrimary === false
+                || !button || button.disabled || !this.form.contains(button)
+                || this.draft.dateMode !== 'days' || this.edit?.scope === 'meal'
+                || this.form.hidden || this.ui.busy || this.ui.memberBusy || this.ui.saved) return;
+            this.endCalendarDrag();
+            this.calendarDrag = {pointerId:event.pointerId, anchor:button.dataset.date,
+                before:[...this.draft.selectedDays], selecting:!this.draft.selectedDays.includes(button.dataset.date),
+                draft:this.draft, generation:this.generation};
+            this.calendarClickPointer = event.pointerId;
+            event.preventDefault();
+            button.focus({preventScroll:true});
+            this.form.setPointerCapture(event.pointerId);
+            this.selectCalendarDragDate(button.dataset.date);
+        }
+
+        moveCalendarDrag(event, releasing = false) {
+            if (event.pointerId !== this.calendarDrag?.pointerId) return;
+            if (!this.calendarDragIsCurrent() || (!releasing && !(event.buttons & 1))) {
+                this.endCalendarDrag();
+                return;
+            }
+            // Captured events target the form. Hit-test only this editor's dates
+            // so dragging outside it cannot change a neighboring meal's calendar.
+            const button = document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-schedule-action="date"]');
+            if (button && this.form.contains(button) && !button.disabled) this.selectCalendarDragDate(button.dataset.date);
+        }
+
+        selectCalendarDragDate(date) {
+            const drag = this.calendarDrag;
+            if (!drag || drag.lastDate === date) return;
+            drag.lastDate = date;
+            const dates = new Set(drag.before);
+            const [start, end] = [drag.anchor, date].sort();
+            root.MealPlanSchedule.dateRange(start, end).forEach(day => {
+                if (drag.selecting) dates.add(day);
+                else dates.delete(day);
+            });
+            root.MealPlanSchedule.setDates(this.draft, [...dates]);
+            this.render();
+            // Notify the containing editor even when capture consumes the click
+            // (a changed recipe-less form must no longer count as an empty draft).
+            this.form.dispatchEvent(new Event('change', {bubbles:true}));
+        }
+
+        endCalendarDrag() {
+            const drag = this.calendarDrag;
+            this.calendarDrag = null;
+            if (drag && this.form.hasPointerCapture(drag.pointerId)) this.form.releasePointerCapture(drag.pointerId);
+        }
+
         async click(event) {
+            if (event.detail > 0 && event.pointerId === this.calendarClickPointer) {
+                this.calendarClickPointer = null;
+                event.preventDefault();
+                return; // Pointer selection already handled this click exactly once.
+            }
             const button = event.target.closest('button');
             if (!button || button.disabled || this.ui.busy || this.ui.memberBusy) return;
             if (this.ui.saved && button.dataset.scheduleAction !== 'cancel') return;

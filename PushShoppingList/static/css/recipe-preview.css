@@ -186,7 +186,7 @@ body.recipe-preview-active { overflow: auto; }
 .meal-schedule-dates { max-width: 640px; margin-bottom: 20px; }
 .meal-schedule-date-range { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
 .meal-schedule-calendar-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.meal-schedule-calendar-grid { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap: 5px; }
+.meal-schedule-calendar-grid { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap: 5px; user-select: none; }
 .meal-schedule-calendar-grid > span { text-align: center; color: var(--app-muted); font-size: 12px; padding: 6px 0; }
 .meal-schedule-calendar-grid button { min-height: 42px; padding: 7px 3px; }
 .meal-schedule-calendar-grid .is-other-month { color: var(--app-muted); background: transparent; }

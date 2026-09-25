@@ -349,3 +349,52 @@ assert.equal(panel.draft.days['2026-10-05'].overrides.family,true);
 assert.equal(form.portionCells[1].textContent,'2¾ servings');
 assert.equal(form.nodes['[data-day-default-status="2026-10-05"]'].textContent,'Adjusted for this day.');
 """)
+
+
+def test_calendar_drag_selects_ranges_reverses_and_preserves_customized_days():
+    run_panel(r"""
+form.hidden=false;let captured=null,changes=0,hit=null;
+form.setPointerCapture=id=>captured=id;form.hasPointerCapture=id=>captured===id;
+form.releasePointerCapture=()=>{captured=null;};form.contains=button=>button?.own===true;
+form.dispatchEvent=()=>changes++;ctx.Event=class {constructor(type){this.type=type;}};
+ctx.document.elementFromPoint=()=>hit;
+const day=date=>({own:true,dataset:{date,scheduleAction:'date'},focus(){},closest(){return this;}});
+const press=(date,extra={})=>panel.startCalendarDrag({target:day(date),pointerId:7,pointerType:'mouse',button:0,preventDefault(){},...extra});
+const move=date=>{hit=day(date);panel.moveCalendarDrag({pointerId:7,buttons:1});};
+M.setDates(panel.draft,['2026-10-05']);
+M.setDayHousehold(panel.draft,'2026-10-05','dinner',3.5);
+press('2026-10-07');move('2026-10-12');
+assert.deepEqual(plain(panel.draft.selectedDates),['2026-10-05',...M.dateRange('2026-10-07','2026-10-12')]);
+move('2026-10-09');
+assert.deepEqual(plain(panel.draft.selectedDates),['2026-10-05','2026-10-07','2026-10-08','2026-10-09']);
+assert.equal(panel.draft.days['2026-10-05'].household.dinner,3.5);
+assert.equal(captured,7);assert.equal(changes,3);
+form.handlers.pointerup({pointerId:7,buttons:0});assert.equal(panel.calendarDrag,null);assert.equal(captured,null);
+await panel.click({target:day('2026-10-09'),detail:1,pointerId:7,preventDefault(){}});
+assert(panel.draft.selectedDates.includes('2026-10-09'),'Release click cannot toggle the endpoint back off');
+press('2026-10-09');move('2026-10-07');panel.endCalendarDrag();
+assert.deepEqual(plain(panel.draft.selectedDates),['2026-10-05'],'Starting on a selected day removes the inclusive range');
+await panel.click({target:day('2026-10-09'),detail:0});
+assert(panel.draft.selectedDates.includes('2026-10-09'),'Keyboard clicks remain available');
+""")
+
+
+def test_calendar_drag_ignores_other_editors_touch_locked_forms_and_stale_drafts():
+    run_panel(r"""
+form.hidden=false;let captured=null,hit=null;
+form.setPointerCapture=id=>captured=id;form.hasPointerCapture=id=>captured===id;
+form.releasePointerCapture=()=>captured=null;form.contains=button=>button?.own===true;
+form.dispatchEvent=()=>{};ctx.Event=class {};ctx.document.elementFromPoint=()=>hit;
+const button={own:true,dataset:{date:'2026-10-06',scheduleAction:'date'},focus(){},closest(){return this;}};
+const press=extra=>panel.startCalendarDrag({target:button,pointerId:1,pointerType:'mouse',button:0,preventDefault(){},...extra});
+M.setDates(panel.draft,['2026-10-05']);
+for(const extra of [{pointerType:'touch'},{pointerType:'pen'},{button:2},{isPrimary:false}])press(extra);
+assert.deepEqual(plain(panel.draft.selectedDates),['2026-10-05']);
+for(const key of ['busy','memberBusy','saved']){panel.ui[key]=true;press();assert(!panel.calendarDrag);panel.ui[key]=false;}
+panel.edit={scope:'meal'};press();assert(!panel.calendarDrag);panel.edit=null;
+press();hit={own:false,dataset:{date:'2026-10-20'},closest(){return this;}};
+panel.moveCalendarDrag({pointerId:1,buttons:1});assert.deepEqual(plain(panel.draft.selectedDates),['2026-10-05','2026-10-06']);
+form.handlers.pointercancel({pointerId:1});assert.equal(panel.calendarDrag,null);assert.equal(captured,null);
+press();panel.generation++;panel.moveCalendarDrag({pointerId:1,buttons:1});assert.equal(panel.calendarDrag,null);
+press();panel.moveCalendarDrag({pointerId:1,buttons:0});assert.equal(panel.calendarDrag,null,'A missed release must not leave selection active');
+""")
