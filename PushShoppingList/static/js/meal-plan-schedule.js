@@ -253,11 +253,22 @@
         return draft;
     }
 
-    function setMembers(draft, members, {newMembersEnabled = true} = {}) {
+    function setMembers(draft, members, {newMembersEnabled = true, refreshDefaults = false} = {}) {
+        const previous = new Map(draft.members.map(member => [member.id, member]));
         draft.members = normalizedMembers(members);
         const defaults = newFamilyDefaults(draft.members);
         for (const member of draft.members) {
-            if (Object.hasOwn(draft.familyDefaults, member.id)) defaults[member.id] = draft.familyDefaults[member.id];
+            if (Object.hasOwn(draft.familyDefaults, member.id)) {
+                const existing = draft.familyDefaults[member.id];
+                MEAL_TYPES.forEach(meal => {
+                    const cell = existing[meal];
+                    // Update untouched defaults on a fresh plan, preserving
+                    // edits made while the member request was in flight.
+                    if (!refreshDefaults || !cell.enabled || Number(cell.servings) !== previous.get(member.id)?.default_portion) {
+                        defaults[member.id][meal] = cell;
+                    }
+                });
+            }
             else if (!newMembersEnabled) MEAL_TYPES.forEach(meal => { defaults[member.id][meal].enabled = false; });
         }
         draft.familyDefaults = defaults;

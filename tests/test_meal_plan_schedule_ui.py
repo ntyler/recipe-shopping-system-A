@@ -170,3 +170,49 @@ assert.throws(()=>M.setPortionMode(draft,'whatever'),/valid portions mode/);
 M.setHouseholdDefault(draft,'dinner',1e308);M.setDates(draft,['2026-10-05','2026-10-06']);
 assert.equal(M.summary(draft).valid,false);assert.throws(()=>M.payload(draft),/too large/);
 """)
+
+
+def test_fresh_member_refresh_updates_only_untouched_enabled_defaults_and_preserves_day_overrides():
+    run_model(r"""
+M.setMembers(draft,[{id:'you',name:'You',default_portion:1},{id:'partner',name:'Partner',default_portion:1},{id:'child',name:'Child',default_portion:0.5}],{refreshDefaults:true});
+M.setDates(draft,['2026-10-05','2026-10-07']);M.setMeals(draft,['breakfast','dinner']);M.setPortionMode(draft,'family');
+M.setFamilyDefault(draft,'you','dinner',{servings:'2.5'});
+M.setFamilyDefault(draft,'partner','dinner',{enabled:false});
+M.setFamilyDefault(draft,'child','dinner',{servings:''});
+M.setDayFamily(draft,'2026-10-07','you','breakfast',{servings:0.25});
+M.setDayNotes(draft,'2026-10-07','Pack separately');draft.notes='Keep batch notes';
+draft.prepSteps=[{date:'2026-10-04',instruction:'Prepare ahead'}];
+const changedDay=JSON.stringify(draft.days['2026-10-07'].family);
+M.setMembers(draft,[
+ {id:'you',name:'New name',default_portion:2},{id:'partner',name:'Partner',default_portion:3},
+ {id:'child',name:'Child',default_portion:0.75},{id:'new',name:'New member',default_portion:0.5}
+],{refreshDefaults:true,newMembersEnabled:false});
+assert.equal(draft.familyDefaults.you.breakfast.servings,2,'Untouched enabled defaults use fresh Settings portions');
+assert.equal(draft.familyDefaults.you.dinner.servings,'2.5','Typed portions survive refresh');
+assert.equal(draft.familyDefaults.partner.dinner.enabled,false);
+assert.equal(draft.familyDefaults.partner.dinner.servings,1,'Unchecked portions are deliberate selections, not untouched defaults');
+assert.equal(draft.familyDefaults.child.breakfast.servings,0.75);
+assert.equal(draft.familyDefaults.child.dinner.servings,'','Incomplete numeric edits remain available to fix');
+assert.equal(draft.familyDefaults.new.breakfast.enabled,false);assert.equal(draft.familyDefaults.new.breakfast.servings,0.5);
+assert.equal(draft.days['2026-10-05'].family.you.breakfast.servings,2,'Dates using defaults receive current values');
+const changedDayAfter=plain(draft.days['2026-10-07'].family);delete changedDayAfter.new;
+assert.equal(JSON.stringify(changedDayAfter),changedDay,'Explicit date allocations stay unchanged');
+assert.equal(draft.days['2026-10-07'].family.new.breakfast.enabled,false);
+assert.equal(draft.days['2026-10-07'].notes,'Pack separately');assert.equal(draft.notes,'Keep batch notes');
+assert.equal(draft.prepSteps[0].instruction,'Prepare ahead');assert.deepEqual(plain(draft.selectedDates),['2026-10-05','2026-10-07']);
+""")
+
+
+def test_ordinary_member_refresh_never_reinterprets_existing_allocations_as_fresh_defaults():
+    run_model(r"""
+M.setPortionMode(draft,'family');M.setDates(draft,['2026-10-05','2026-10-07']);
+M.setDayFamily(draft,'2026-10-07','child','dinner',{servings:0.5});
+const before=JSON.stringify(M.payload(draft));
+M.setMembers(draft,[
+ {id:'you',name:'You',default_portion:3},{id:'partner',name:'Partner',default_portion:2},
+ {id:'child',name:'Child',default_portion:0.25},{id:'new',name:'New member',default_portion:0.5}
+],{newMembersEnabled:false});
+assert.equal(draft.members[0].default_portion,3,'New metadata is retained for a future plan');
+assert.equal(draft.familyDefaults.you.dinner.servings,1,'An ordinary refresh preserves portions even when equal to the old Settings default');
+assert.equal(JSON.stringify(M.payload(draft)),before,'Refreshing settings does not change scheduled allocations');
+""")

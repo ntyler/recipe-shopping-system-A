@@ -131,7 +131,7 @@ ctx.fetch=async()=>({ok:true,json:async()=>({ok:true,members:people,groups})});a
 assert.equal(panel.draft.familyDefaults.nate.dinner.servings,1.5);assert.equal(panel.draft.familyDefaults.kid.dinner.servings,0.5);
 assert.equal(panel.draft.members[0].first_name,'Nate');assert.equal(panel.draft.members[0].last_name,'Tyler');
 assert.deepEqual(plain(panel.draft.members[0].group_ids),['family','adults']);
-assert(!form.innerHTML.includes('Select people by group'),'Group controls appear only in family mode');
+assert(!form.innerHTML.includes('Select a family or group'),'Group controls appear only in family mode');
 await click({schedulePortionMode:'family'});
 assert(form.innerHTML.includes('Family &lt;group&gt;'));assert(!form.innerHTML.includes('Old group'));assert(!form.innerHTML.includes('Archived person'));
 const before=M.summary(panel.draft).totalServings;
@@ -163,7 +163,7 @@ assert.equal(panel.draft.familyDefaults.guest.dinner.enabled,false);
 assert.equal(panel.draft.days['2026-10-05'].family.guest.dinner.enabled,false);
 assert.equal(panel.draft.days['2026-10-07'].family.guest.dinner.enabled,true);
 assert.equal(panel.draft.days['2026-10-07'].family.guest.dinner.servings,0.75);
-assert.match(panel.ui.message,/Adjusted days are unchanged/);
+assert.match(panel.ui.message,/Individually adjusted days stay unchanged/);
 await click({scheduleAction:'apply'});
 assert.equal(panel.draft.days['2026-10-07'].family.guest.dinner.enabled,false);
 assert.equal(panel.draft.days['2026-10-07'].notes,'Guest portions');assert.equal(panel.draft.notes,'Preserve batch note');
@@ -246,10 +246,13 @@ ctx.fetch=async(url,options)=>({ok:true,json:async()=>options?.method==='POST'
 await panel.open();M.setPortionMode(panel.draft,'family');
 assert.equal(panel.draft.familyDefaults.adult.dinner.servings,1);
 await submit();assert.equal(form.hidden,true);assert.equal(panel.ui.membersLoaded,false);
+assert.equal(panel.draft.members.length,1,'Successful save retains cached people for the next open');
+assert.equal(panel.ui.refreshMemberDefaults,true);
 defaultPortion=2;await panel.open();M.setPortionMode(panel.draft,'family');
 assert.equal(panel.draft.familyDefaults.adult.dinner.servings,2,'A fresh preview plan uses current saved defaults');
 assert.equal(M.payload(panel.draft).allocations[0].member_portions[0].servings,2);
 assert.equal(panel.draft.groups[0].id,'family');
+assert.equal(panel.ui.refreshMemberDefaults,false,'Fresh defaults are reconciled once the member request succeeds');
 M.setFamilyDefault(panel.draft,'adult','dinner',{servings:0.75});panel.draft.notes='Keep this unsaved plan';
 await click({scheduleAction:'cancel'});defaultPortion=3;await panel.open();
 assert.equal(panel.draft.members[0].default_portion,3);
@@ -257,4 +260,116 @@ assert.equal(panel.draft.familyDefaults.adult.dinner.servings,0.75,'Cancel and r
 assert.equal(panel.draft.notes,'Keep this unsaved plan');
 defaultPortion=4;await panel.loadMembers();
 assert.equal(panel.draft.familyDefaults.adult.dinner.servings,0.75,'Ordinary refresh preserves custom portions');
+""")
+
+
+def test_people_and_portions_precede_collapsed_group_and_management_disclosures():
+    run_panel(r"""
+ctx.fetch=async()=>({ok:true,json:async()=>({ok:true,members:[
+ {id:'nate',name:'Nate',default_portion:1,group_ids:['family']},
+ {id:'gary',name:'Gary Tyler',default_portion:0.5,group_ids:['family']}
+],groups:[{id:'family',name:'Tyler family'}]})});
+await panel.open();await click({schedulePortionMode:'family'});
+const people=form.innerHTML.indexOf('People &amp; portions (2)'),name=form.innerHTML.indexOf('<th scope="row">Nate</th>');
+const group=form.innerHTML.indexOf('data-schedule-section="groups"'),edit=form.innerHTML.indexOf('data-schedule-section="members"');
+assert(people>=0 && name>people && group>name && edit>group,'People and their portions are the first family controls');
+assert.match(form.innerHTML,/data-schedule-section="groups"\s*>/,'Group shortcut starts collapsed');
+assert.match(form.innerHTML,/data-schedule-section="members"\s*>/,'Name management starts collapsed');
+assert.match(form.innerHTML,/data-schedule-section="notes"\s*>/,'Optional blank prep notes start collapsed');
+assert.match(form.innerHTML,/<th scope="row">Gary Tyler<\/th>/);
+assert.match(form.innerHTML,/data-schedule-field="family"[^>]+data-member="gary"[^>]+value="0.5"/);
+assert.match(form.innerHTML,/<div data-schedule-apply hidden>/,'Unmodified days inherit portions without an extra action');
+assert(!form.innerHTML.includes('Select people by group'));
+panel.ui.openSections.add('groups');panel.render();assert.match(form.innerHTML,/data-schedule-section="groups" open/);
+""")
+
+
+def test_group_choices_show_counts_and_disable_groups_with_no_active_people():
+    run_panel(r"""
+ctx.fetch=async()=>({ok:true,json:async()=>({ok:true,members:[
+ {id:'nate',name:'Nate',group_ids:['family','adults']},
+ {id:'old',name:'Archived',group_ids:['empty'],archived:true}
+],groups:[{id:'family',name:'Family'},{id:'adults',name:'Adults'},{id:'empty',name:'Empty'}]})});
+await panel.open();await click({schedulePortionMode:'family'});
+assert(form.innerHTML.includes('Family (1)'));assert(form.innerHTML.includes('Adults (1)'));
+assert(form.innerHTML.includes('Empty (0) — no active people assigned'));
+assert.match(form.innerHTML,/data-schedule-field="group"[^>]+data-group="empty"[^>]*disabled/);
+assert(!/data-schedule-field="group"[^>]+data-group="family"[^>]*disabled/.test(form.innerHTML));
+panel.ui.groupIds=['empty'];panel.render();assert.match(form.innerHTML,/data-schedule-action="select-group-members"[^>]*disabled/);
+panel.ui.groupIds=['family','adults'];panel.render();assert(!/data-schedule-action="select-group-members"[^>]*disabled/.test(form.innerHTML));
+await click({scheduleAction:'select-group-members'});assert.equal(M.summary(panel.draft).totalServings,1,'Overlapping groups retain one allocation per person');
+M.setGroups(panel.draft,[]);panel.render();assert(!form.innerHTML.includes('Select a family or group'),'No empty group chooser when no groups exist');
+""")
+
+
+def test_initial_people_loading_failure_empty_and_archived_states_are_distinct_and_scoped():
+    run_panel(r"""
+ctx.withCanonicalViewerUserId=url=>url+(url.includes('?')?'&':'?')+'viewer_user_id=owner';
+await click({schedulePortionMode:'family'});
+let release;ctx.fetch=()=>new Promise(resolve=>release=resolve);const pending=panel.open();
+assert(form.innerHTML.includes('Loading saved people…'));assert(!form.innerHTML.includes('No active people are saved'));
+assert(!form.innerHTML.includes('Add at least one family member.'),'Unresolved member lists must not suggest duplicate creation');
+assert.match(form.innerHTML,/data-schedule-action="retry-members"[^>]*disabled/);
+release({ok:false,json:async()=>({ok:false,error:'Offline'})});await pending;
+assert(form.innerHTML.includes('Your people could not be loaded. Retry before adding them again.'));
+assert(!form.innerHTML.includes('Add at least one family member.'));
+assert(!form.innerHTML.includes('No active people are saved'));
+ctx.fetch=async()=>({ok:true,json:async()=>({ok:true,members:[],groups:[],archived_members:[]})});await panel.loadMembers();
+assert(form.innerHTML.includes('No active people are saved in this workspace.'));assert(form.innerHTML.includes('to add people.'));
+assert(!form.innerHTML.includes('View archived people'));
+ctx.fetch=async()=>({ok:true,json:async()=>({ok:true,members:[],groups:[],archived_members:[{id:'nate',name:'Nate'},{id:'gary',name:'Gary Tyler'}]})});await panel.loadMembers();
+assert(form.innerHTML.includes('Archived: Nate, Gary Tyler.'));assert(form.innerHTML.includes('to restore them.'));
+assert.match(form.innerHTML,/href="\/settings\/family-members\?status=archived&amp;viewer_user_id=owner" target="_blank" rel="noopener"/);
+assert(!form.innerHTML.includes('Your people could not be loaded'));
+""")
+
+
+def test_active_archived_and_group_names_are_escaped_in_people_section():
+    run_panel(r"""
+ctx.fetch=async()=>({ok:true,json:async()=>({ok:true,members:[{id:'person',name:'Nate <img src=x onerror=bad()> & "Jr"',group_ids:['group']}],groups:[{id:'group',name:'Family <script>bad()</script>'}]})});
+await panel.open();await click({schedulePortionMode:'family'});
+const people=Panel.peopleSection(panel.draft,panel.ui,'/settings/family-members');
+assert(people.includes('Nate &lt;img src=x onerror=bad()&gt; &amp; &quot;Jr&quot;'));
+assert(people.includes('Family &lt;script&gt;bad()&lt;/script&gt;'));assert(!people.includes('<script>'));assert(!people.includes('<img'));
+ctx.fetch=async()=>({ok:true,json:async()=>({ok:true,members:[],groups:[],archived_members:[{id:'old',name:'</p><script>bad()</script>'}]})});await panel.loadMembers();
+const archived=Panel.peopleSection(panel.draft,panel.ui,'/settings/family-members');
+assert(archived.includes('&lt;/p&gt;&lt;script&gt;bad()&lt;/script&gt;'));assert(!archived.includes('<script>'));
+""")
+
+
+def test_cached_people_and_allocations_survive_refresh_failure_and_malformed_archived_metadata():
+    run_panel(r"""
+ctx.fetch=async()=>({ok:true,json:async()=>({ok:true,members,groups:[{id:'group',name:'Family'}],archived_members:[{id:'old',name:'Old person'}]})});
+await panel.open();await click({schedulePortionMode:'family'});M.setFamilyDefault(panel.draft,'child','dinner',{servings:0.5});
+panel.draft.notes='Keep these notes';const payload=JSON.stringify(M.payload(panel.draft));
+let release;ctx.fetch=()=>new Promise(resolve=>release=resolve);const refresh=panel.loadMembers();
+assert(form.innerHTML.includes('Refreshing saved people…'));assert.match(form.innerHTML,/<th scope="row">Child<\/th>/);
+release({ok:false,json:async()=>({ok:false,error:'Offline'})});await refresh;
+assert(form.innerHTML.includes('Could not refresh people. The previously loaded people are still shown.'));
+assert.equal(panel.draft.members.length,3);assert.equal(JSON.stringify(M.payload(panel.draft)),payload);
+ctx.fetch=async()=>({ok:true,json:async()=>({ok:true,members:[],groups:[],archived_members:{invalid:true}})});await panel.loadMembers();
+assert.equal(panel.draft.members.length,3);assert.equal(panel.draft.groups.length,1);assert.equal(panel.ui.archivedMembers[0].name,'Old person');
+assert.equal(JSON.stringify(M.payload(panel.draft)),payload);assert.equal(panel.ui.memberLoadError,true);
+""")
+
+
+def test_fresh_plan_keeps_cached_people_on_reopen_failure_and_reconciles_only_untouched_defaults():
+    run_panel(r"""
+let people=[{id:'nate',name:'Nate',default_portion:1},{id:'gary',name:'Gary Tyler',default_portion:0.5}];
+ctx.fetch=async(url,options)=>({ok:true,json:async()=>options?.method==='POST'?{ok:true,batch:{id:'saved'}}:{ok:true,members:people}});
+await panel.open();await click({schedulePortionMode:'family'});await submit();
+assert.equal(panel.draft.members.length,2);assert.equal(panel.ui.refreshMemberDefaults,true);assert.equal(panel.ui.membersLoaded,false);
+ctx.fetch=async()=>{throw new Error('Offline');};await panel.open();await click({schedulePortionMode:'family'});
+assert.match(form.innerHTML,/<th scope="row">Nate<\/th>/);assert.match(form.innerHTML,/<th scope="row">Gary Tyler<\/th>/);
+assert(form.innerHTML.includes('previously loaded people are still shown'));assert.equal(panel.ui.refreshMemberDefaults,true);
+let release;ctx.fetch=()=>new Promise(resolve=>release=resolve);const refresh=panel.loadMembers();
+M.setFamilyDefault(panel.draft,'nate','dinner',{servings:1.25});
+M.setFamilyDefault(panel.draft,'gary','breakfast',{enabled:false});
+M.setDayFamily(panel.draft,'2026-10-05','nate','dinner',{servings:2.25});
+people=[{id:'nate',name:'Nate',default_portion:3},{id:'gary',name:'Gary Tyler',default_portion:0.75}];
+release({ok:true,json:async()=>({ok:true,members:people})});await refresh;
+assert.equal(panel.ui.refreshMemberDefaults,false);assert.equal(panel.draft.familyDefaults.nate.dinner.servings,1.25,'Edits while loading survive');
+assert.equal(panel.draft.familyDefaults.nate.lunch.servings,3,'Untouched defaults use newly saved personal portions');
+assert.equal(panel.draft.familyDefaults.gary.dinner.servings,0.75);assert.equal(panel.draft.familyDefaults.gary.breakfast.enabled,false);
+assert.equal(panel.draft.days['2026-10-05'].family.nate.dinner.servings,2.25,'Per-day edits while loading survive');
 """)

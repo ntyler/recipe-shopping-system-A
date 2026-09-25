@@ -198,7 +198,10 @@ body.recipe-preview-active { overflow: auto; }
 .meal-schedule-columns > section { min-width: 0; }
 .meal-schedule-columns > section + section { padding-left: 24px; border-left: 1px solid var(--app-border-strong); }
 .meal-schedule-household { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; }
-.meal-schedule-panel .meal-schedule-groups { margin-bottom: 20px; padding: 14px; border: 1px solid var(--app-border-strong); border-radius: 8px; }
+.meal-schedule-people-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; margin-bottom: 12px; }
+.meal-schedule-panel .meal-schedule-people-heading h3 { margin: 0; }
+.meal-schedule-people-empty { padding: 12px; border: 1px dashed var(--app-border-strong); border-radius: 8px; }
+.meal-schedule-panel .meal-schedule-groups { margin-top: 8px; border-top: 1px solid var(--app-border); }
 .meal-schedule-panel .meal-schedule-group-choices { display: flex; flex-wrap: wrap; gap: 12px 18px; margin-bottom: 14px; }
 .meal-schedule-panel .meal-schedule-group-choices label { min-width: 0; max-width: 100%; }
 .meal-schedule-panel .meal-schedule-group-choices span { overflow-wrap: anywhere; }
@@ -214,15 +217,19 @@ body.recipe-preview-active { overflow: auto; }
 .meal-schedule-table th, .meal-schedule-table td { padding: 8px; border-bottom: 1px solid var(--app-border); text-align: left; }
 .meal-schedule-table th { font-weight: 500; }
 .meal-schedule-table thead th { color: var(--app-muted); background: var(--app-surface-soft); }
-.meal-schedule-table tbody th { min-width: 100px; max-width: 180px; overflow-wrap: anywhere; }
+.meal-schedule-table th:first-child { position: sticky; left: 0; z-index: 1; background: var(--app-surface); }
+.meal-schedule-table thead th:first-child { background: var(--app-surface-soft); }
+.meal-schedule-table tbody th { min-width: 100px; max-width: 180px; overflow-wrap: anywhere; font-weight: 700; color: var(--app-text-strong); }
 .meal-schedule-table td { min-width: 140px; }
 .meal-schedule-table tfoot { color: var(--app-muted); font-size: 12px; }
 .meal-schedule-table tfoot td { white-space: nowrap; }
-.meal-schedule-members, .meal-schedule-prep { margin-top: 20px; }
-.meal-schedule-members > summary, .meal-schedule-prep > summary { cursor: pointer; padding: 8px 0; }
+.meal-schedule-members, .meal-schedule-prep { margin-top: 12px; }
+.meal-schedule-panel :is(.meal-schedule-members, .meal-schedule-prep, .meal-schedule-groups, .meal-schedule-notes) > summary { cursor: pointer; padding: 10px 0; }
+.meal-schedule-panel summary:focus-visible { outline: 2px solid var(--app-primary-hover); outline-offset: 3px; }
 .meal-schedule-member-row { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 12px; align-items: end; margin: 12px 0; }
 .meal-schedule-panel .meal-schedule-member-row label { margin-bottom: 0; }
-.meal-schedule-notes { margin-top: 20px; }
+.meal-schedule-notes { margin-top: 12px; }
+.meal-schedule-panel [data-schedule-apply][hidden] { display: none !important; }
 .meal-schedule-days { display: grid; gap: 10px; }
 .meal-schedule-day { border: 1px solid var(--app-border-strong); background: var(--app-surface-soft); border-radius: 8px; min-width: 0; }
 .meal-schedule-day > summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; padding: 12px; }

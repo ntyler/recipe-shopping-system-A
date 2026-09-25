@@ -177,6 +177,7 @@ from PushShoppingList.services.meal_plan_service import delete_meal_prep_batch
 from PushShoppingList.services.meal_plan_service import load_meal_plan
 from PushShoppingList.services.meal_plan_service import list_meal_plan_members
 from PushShoppingList.services.meal_plan_service import list_meal_plan_groups
+from PushShoppingList.services.meal_plan_service import meal_plan_member_summary
 from PushShoppingList.services.meal_plan_service import meal_prep_batch_summary
 from PushShoppingList.services.meal_plan_service import meal_plan_yield_label
 from PushShoppingList.services.meal_plan_service import meal_plan_home_preview
@@ -6022,8 +6023,15 @@ def meal_plan_members_route():
     validate_master_data_viewer_scope()
     if request.method == "GET":
         include_archived = request.args.get("include_archived", "false").strip().lower() == "true"
-        return jsonify({"ok": True, "members": list_meal_plan_members(include_archived=include_archived),
-                        "groups": list_meal_plan_groups(include_archived=include_archived)})
+        plan = load_meal_plan()
+        return jsonify({
+            "ok": True,
+            "members": [meal_plan_member_summary(member, plan["meals"]) for member in plan["members"]
+                        if include_archived or not member["archived"]],
+            "groups": [group for group in plan["groups"] if include_archived or not group["archived"]],
+            "archived_members": [{"id": member["id"], "name": member["name"]} for member in plan["members"]
+                                 if member["archived"]],
+        })
     payload = request.get_json(silent=True)
     try:
         if not isinstance(payload, dict) or "name" not in payload or set(payload) - {"name", "first_name", "last_name", "default_portion", "group_ids"}:

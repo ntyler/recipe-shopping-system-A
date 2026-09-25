@@ -243,3 +243,46 @@ assert.equal(page.dataset.mealPlannerStale,'1');assert.equal(previewRefreshes,1)
 assert.equal(refreshes.length,0,'Member edits must not replace an open planning form');
 ctx.closeMealPlannerDialog();await flush();assert.equal(activeDialog.open,false);assert.equal(refreshes.length,1);
 """)
+
+
+def test_reopen_keeps_known_people_while_refresh_is_pending_or_fails():
+    run_dialog(r"""
+responseFactory=async()=>({ok:true,json:async()=>({ok:true,
+ members:[{id:'nate',name:'Nate',default_portion:1,group_ids:['tyler']},{id:'gary',name:'Gary',default_portion:0.5,group_ids:['tyler']}],
+ groups:[{id:'tyler',name:'Tyler'}]
+})});
+await open();const panel=await choose('recipe://bread');
+ctx.closeMealPlannerDialog();
+let release;responseFactory=()=>new Promise(resolve=>release=resolve);
+await open('2026-10-09','lunch');
+assert.equal(panel.ui.loading,true);
+assert.deepEqual(plain(panel.draft.members.map(member=>member.name)),['Nate','Gary'],'Known people must not disappear before the refresh completes');
+assert.equal(panel.draft.groups[0].name,'Tyler');
+release({ok:false,json:async()=>({ok:false,error:'Member refresh unavailable'})});await flush();
+assert.equal(panel.ui.loading,false);assert.equal(panel.ui.error,true);
+assert.deepEqual(plain(panel.draft.members.map(member=>member.name)),['Nate','Gary'],'A failed refresh must retain the last loaded people');
+assert.equal(panel.draft.singleDate,'2026-10-09');assert.deepEqual(plain(panel.draft.mealTypes),['lunch']);
+""")
+
+
+def test_fresh_dialog_refresh_updates_saved_defaults_without_overwriting_edits_made_while_loading():
+    run_dialog(r"""
+responseFactory=async()=>({ok:true,json:async()=>({ok:true,
+ members:[{id:'nate',name:'Nate',default_portion:1,group_ids:['tyler']},{id:'gary',name:'Gary',default_portion:0.5,group_ids:['tyler']}],
+ groups:[{id:'tyler',name:'Tyler'}]
+})});
+await open();const panel=await choose('recipe://bread');ctx.closeMealPlannerDialog();
+let release;responseFactory=()=>new Promise(resolve=>release=resolve);
+await open('2026-10-09','lunch');M.setPortionMode(panel.draft,'family');
+M.setFamilyDefault(panel.draft,'nate','lunch',{servings:2.5});
+M.setDayFamily(panel.draft,'2026-10-09','gary','lunch',{servings:0.25});
+panel.draft.notes='Keep changes during refresh';
+release({ok:true,json:async()=>({ok:true,
+ members:[{id:'nate',name:'Nate',default_portion:3,group_ids:['tyler']},{id:'gary',name:'Gary',default_portion:0.75,group_ids:['tyler']}],
+ groups:[{id:'tyler',name:'Tyler'}]
+})});await flush();
+assert.equal(panel.draft.familyDefaults.nate.lunch.servings,2.5,'A typed default must survive refresh');
+assert.equal(panel.draft.familyDefaults.gary.lunch.servings,0.75,'An untouched new-plan default uses its latest saved value');
+assert.equal(panel.draft.days['2026-10-09'].family.gary.lunch.servings,0.25,'An edited date retains its own override');
+assert.equal(panel.draft.notes,'Keep changes during refresh');assert.equal(panel.ui.loading,false);
+""")

@@ -33,7 +33,9 @@
             this.loading = false;
             this.creating = false;
             this.search = '';
-            this.filter = 'active';
+            const initialStatus = new URLSearchParams(root.location?.search || '').get('status');
+            this.filter = ['active', 'all', 'archived'].includes(initialStatus) ? initialStatus : 'active';
+            page.querySelector('[data-family-filter]').value = this.filter;
             page.addEventListener('click', event => this.click(event));
             page.addEventListener('input', event => this.input(event));
             page.addEventListener('change', event => this.change(event));

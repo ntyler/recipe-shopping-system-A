@@ -1965,10 +1965,11 @@ function openMealPlannerDialog(dateValue = "", mealType = "") {
     state.meal = MealPlanSchedule.MEAL_TYPES.includes(mealType) ? mealType : "dinner";
     if (state.panel) {
         state.panel.options.today = state.date;
-        // This is a new plan, so initialize people from the fresh response and
-        // their latest saved default portions instead of cached allocations.
-        state.panel.draft = MealPlanSchedule.create({today: state.date, servings: state.defaultServings, members: [], groups: state.panel.draft.groups});
+        // Keep known people visible during refresh. The panel updates untouched
+        // fresh-plan defaults after a successful response, preserving any edits.
+        state.panel.draft = MealPlanSchedule.create({today: state.date, servings: state.defaultServings, members: state.panel.draft.members, groups: state.panel.draft.groups});
         state.panel.ui.membersLoaded = false;
+        state.panel.ui.refreshMemberDefaults = true;
         MealPlanSchedule.setMeals(state.panel.draft, [state.meal]);
         state.panel.ui.openDays.clear();
         state.panel.ui.openSections.clear();

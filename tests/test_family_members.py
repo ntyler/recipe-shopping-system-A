@@ -165,14 +165,19 @@ def test_member_management_api_shapes_archiving_and_usage(scoped_client):
     archived = client.patch(endpoint, json={"archived": True})
     assert archived.status_code == 200
     assert archived.json["member"] == {**member, "archived": True, "meal_count": 1}
-    assert client.get("/api/meal-plan/members").json["members"] == []
-    assert client.get("/api/meal-plan/members?include_archived=true").json["members"] == [archived.json["member"]]
+    active_list = client.get("/api/meal-plan/members").json
+    assert active_list["members"] == []
+    assert active_list["archived_members"] == [{"id": member["id"], "name": "Nate"}]
+    full_list = client.get("/api/meal-plan/members?include_archived=true").json
+    assert full_list["members"] == [archived.json["member"]]
+    assert full_list["archived_members"] == active_list["archived_members"]
     meal_data["allocations"][0]["date"] = "2026-09-29"
     rejected = client.post("/api/meal-plan/batches", json=meal_data)
     assert rejected.status_code == 400 and "archived" in rejected.json["error"]
     assert len(client.get("/api/meal-plan?recipe_url=recipe://soup").json["meals"]) == 1
     restored = client.patch(endpoint, json={"name": "Nathan", "archived": False})
     assert restored.json["member"] == {**member, "name": "Nathan", "meal_count": 1}
+    assert client.get("/api/meal-plan/members").json["archived_members"] == []
     assert client.post("/api/meal-plan/batches", json=meal_data).status_code == 201
     assert client.get("/api/meal-plan/members").json["members"][0]["meal_count"] == 2
     assert client.delete(endpoint).status_code == 405
@@ -190,6 +195,7 @@ def test_members_management_is_scoped_to_authenticated_user_or_guest(scoped_clie
     for identity, guest in (("bob", False), ("guest1", True)):
         sign_in(client, identity, guest)
         assert client.get("/api/meal-plan/members?include_archived=true").json["members"] == []
+        assert client.get("/api/meal-plan/members").json["archived_members"] == []
         assert client.patch(endpoint, json={"archived": False}).status_code == 404
         assert client.post("/api/meal-plan/members", json={"name": "Nate"}).status_code == 201
     sign_in(client, "alice")
@@ -460,7 +466,7 @@ def test_groups_and_bulk_routes_share_workspace_and_return_member_metadata(scope
     assert len(members) == 2
     assert members[0]["first_name"] == "Nathaniel" and members[0]["default_portion"] == 0.5
     assert all(member["group_ids"] == [group["id"]] for member in members)
-    assert client.get("/api/meal-plan/members").json == {"ok": True, "members": members, "groups": [group]}
+    assert client.get("/api/meal-plan/members").json == {"ok": True, "members": members, "groups": [group], "archived_members": []}
     assert client.get("/api/meal-plan/groups").json == {"ok": True, "groups": [group]}
     archived = client.patch(f"/api/meal-plan/groups/{group['id']}", json={"archived": True}).json["group"]
     assert client.get("/api/meal-plan/groups").json["groups"] == []

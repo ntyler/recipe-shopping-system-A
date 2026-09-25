@@ -191,7 +191,9 @@ ctx.fetch=async(url,options)=>{
 options.onSaved=async(result,date)=>{
  assert.equal(result.batch.id,'saved');assert.equal(date,'2026-10-05');
  assert.equal(form.hidden,true);assert.equal(panel.ui.busy,false);assert.equal(panel.ui.error,false);
- assert.equal(panel.draft.notes,'');assert.equal(panel.draft.members.length,0);assert.equal(panel.ui.membersLoaded,false);assert.equal(panel.ui.openDays.size,0);
+ assert.equal(panel.draft.notes,'');assert.equal(panel.draft.members.length,3);assert.equal(panel.ui.membersLoaded,false);assert.equal(panel.ui.openDays.size,0);
+ assert.equal(panel.ui.refreshMemberDefaults,true,'Fresh plan refreshes saved defaults while keeping cached people visible');
+ assert.equal(panel.draft.familyDefaults.child.dinner.servings,1,'Saved plan portion overrides do not leak into a new plan');
  saved.push(result);
 };
 await submit();assert.equal(requests.length,1);assert.equal(saved.length,1);assert.equal(panel.ui.message,'Meal plan saved.');
@@ -222,6 +224,21 @@ M.setHouseholdDefault(panel.draft,'dinner',0.25);
 await click({scheduleAction:'step',direction:'-1'},{parentElement:{querySelector:()=>input}});
 assert(Number(input.value)>0);assert(Number(input.value)<=0.25,'Minus must not increase a fractional portion');
 assert.equal(Number(panel.draft.householdDefaults.dinner),Number(input.value));
+""")
+
+
+def test_apply_controls_appear_only_for_customized_days_and_update_without_replacing_inputs():
+    run_panel(r"""
+M.setMembers(panel.draft,members);M.setPortionMode(panel.draft,'family');panel.render();
+assert.match(form.innerHTML,/<div data-schedule-apply hidden>/);
+let renders=0;const realRender=panel.render.bind(panel);panel.render=()=>{renders++;realRender();};
+panel.input({target:field('day-family','0.5',{dataset:{scheduleField:'day-family',member:'child',meal:'dinner',date:'2026-10-05'}})});
+assert.equal(renders,0,'Typing a per-day override should not replace the focused input');
+assert.equal(form.nodes['[data-schedule-apply]'].hidden,false);
+assert.equal(M.summary(panel.draft).days[0].customized,true);
+await click({scheduleAction:'apply'});assert.equal(M.summary(panel.draft).days[0].customized,false);
+assert.match(form.innerHTML,/<div data-schedule-apply hidden>/);
+panel.updateTotals();assert.equal(form.nodes['[data-schedule-apply]'].hidden,true);
 """)
 
 

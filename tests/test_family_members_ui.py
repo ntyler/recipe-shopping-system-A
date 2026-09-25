@@ -17,7 +17,7 @@ def run_page(script):
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const plain=value=>JSON.parse(JSON.stringify(value));
 let requests=[],reply={ok:true,members:[]},httpOK=true;
-const ctx={document:{readyState:'complete',querySelector(){return null;}},
+const ctx={URLSearchParams,document:{readyState:'complete',querySelector(){return null;}},
  withCanonicalViewerUserId:url=>url+(url.includes('?')?'&':'?')+'viewer_user_id=viewer123',
  fetch:async(url,options)=>{requests.push({url,options});return {ok:httpOK,json:async()=>reply};}};
 vm.createContext(ctx);vm.runInContext(fs.readFileSync(process.argv[1],'utf8'),ctx);
@@ -288,4 +288,20 @@ assert.deepEqual(plain(panel.memberProfile(member).group_ids),['group1','group2'
 panel.change({target:checkbox('group1',false)});assert.deepEqual(plain(panel.memberProfile(member).group_ids),['group2']);
 panel.drafts.set('nate','New name');panel.errors.set('nate','failed');panel.cancelRow('nate');
 assert.equal(panel.profiles.size,0);assert.equal(panel.drafts.size,0);assert.equal(panel.errors.size,0);assert.equal(panel.memberProfile(member).first_name,'');
+""")
+
+
+def test_status_deep_link_initializes_filter_and_only_accepts_supported_values():
+    run_page(r"""
+ctx.location={search:'?viewer_user_id=viewer123&status=archived'};
+const archived=new ctx.FamilyMembersPage(page,members);
+assert.equal(archived.filter,'archived');assert.equal(page.querySelector('[data-family-filter]').value,'archived');
+assert(rows().includes('Former member'));assert(!rows().includes('value="Nate"'));
+reply={ok:true,members};await archived.load();assert.equal(archived.filter,'archived');
+ctx.location.search='?status=all';const all=new ctx.FamilyMembersPage(page,members);assert.equal(all.visibleMembers().length,2);
+for(const search of ['', '?status=unknown', '?status=%3Cscript%3E', '?status=ARCHIVED']){
+ ctx.location.search=search;const safe=new ctx.FamilyMembersPage(page,members);
+ assert.equal(safe.filter,'active');assert.equal(page.querySelector('[data-family-filter]').value,'active');assert.equal(safe.visibleMembers()[0].id,'nate');
+}
+ctx.location.search='?status=active';assert.equal(new ctx.FamilyMembersPage(page,members).filter,'active');
 """)
