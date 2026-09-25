@@ -18,6 +18,7 @@ def test_meal_cards_use_compact_actions_with_correct_ids_and_batch_scope_choices
             super().__init__()
             self.buttons = []
             self.menus = []
+            self.cards = []
             self.stack = []
             self.current = None
 
@@ -25,6 +26,8 @@ def test_meal_cards_use_compact_actions_with_correct_ids_and_batch_scope_choices
             attributes = dict(attrs)
             if "data-meal-card-menu" in attributes:
                 self.menus.append(attributes)
+            if "data-meal-plan-id" in attributes:
+                self.cards.append(attributes)
             if tag == "button":
                 parent = next((attrs for _, attrs in reversed(self.stack) if "data-meal-card-menu" in attrs), None)
                 self.current = {"attrs": attributes, "text": "", "menu": parent}
@@ -66,6 +69,8 @@ def test_meal_cards_use_compact_actions_with_correct_ids_and_batch_scope_choices
     assert standalone["recipe_name"] in triggers[0]["attrs"]["aria-label"]
     assert not any(button["attrs"].get("class") in {"app-meal-edit", "app-meal-remove"} for button in parser.buttons)
     assert len(parser.menus) == 2
+    assert [card["data-meal-plan-id"] for card in parser.cards] == [standalone["id"], batched["id"]]
+    assert [card["data-meal-plan-batch-id"] for card in parser.cards] == ["", batched["batch_id"]]
     for trigger, expected_options in zip(triggers, [
         ["Edit meal", "Remove this meal"],
         ["Edit this meal", "Edit entire prep plan", "Shop this prep batch", "Remove this meal", "Remove entire prep batch"],
@@ -76,6 +81,8 @@ def test_meal_cards_use_compact_actions_with_correct_ids_and_batch_scope_choices
         actions = [button for button in parser.buttons if button["menu"] is menu]
         assert [button["text"].strip() for button in actions] == expected_options
         assert all("runMealPlannerCardAction" in button["attrs"]["onclick"] for button in actions)
+        previews = [button["attrs"]["data-meal-delete-preview"] for button in actions if "data-meal-delete-preview" in button["attrs"]]
+        assert previews == (["meal", "batch"] if trigger["attrs"]["data-batch-id"] else ["meal"])
     assert '<meal>' not in html and '<one>' not in html
     assert 'data-meal-prep-date=' not in html
     assert '>Prep</div>' not in html
@@ -109,6 +116,7 @@ def test_weekly_grid_places_prep_steps_on_their_dates_and_labels_batch_meals():
     monday = html.split('data-meal-prep-date="2026-09-28"', 1)[1].split('data-meal-prep-date="2026-09-29"', 1)[0]
     assert 'data-batch-id="batch-1"' in monday
     assert 'data-step-id="step-1"' in monday
+    assert 'data-meal-prep-batch-id="batch-1"' in monday
     assert 'checked' in monday
     assert 'Chop &lt;onions&gt;' in monday
     assert 'data-recipe-url="recipe://bread"' in monday

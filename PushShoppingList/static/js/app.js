@@ -2026,8 +2026,39 @@ function closeMealPlannerDialog() {
     return false;
 }
 
+function clearMealPlannerRemovalPreview(menu) {
+    if (!menu) return;
+    (menu.mealRemovalPreviewCards || []).forEach(card => card.classList.remove("is-removal-preview"));
+    menu.mealRemovalPreviewCards = [];
+}
+
+function updateMealPlannerRemovalPreview(menu) {
+    clearMealPlannerRemovalPreview(menu);
+    if (!menu) return;
+    const open = menu.classList.contains("is-fallback-open") || (typeof menu.showPopover === "function" && menu.matches(":popover-open"));
+    if (!open) return;
+    const action = menu.mealRemovalPointer || menu.mealRemovalFocus;
+    const scope = action?.dataset.mealDeletePreview;
+    if (action?.disabled || !["meal", "batch"].includes(scope)) return;
+    const trigger = document.getElementById(menu.dataset.triggerId || "");
+    const id = scope === "batch" ? trigger?.dataset.batchId : trigger?.dataset.mealId;
+    const panel = document.getElementById("plannerMealsPanel");
+    const page = document.getElementById("mealPlannerPage");
+    if (!id || !panel || panel.hidden || page?.hidden || page?.inert) return;
+    // Compare saved identities directly: a recipe can have several distinct batches.
+    const meals = [...panel.querySelectorAll("[data-meal-plan-id]")].filter(card => (
+        scope === "batch" ? card.dataset.mealPlanBatchId === id : card.dataset.mealPlanId === id
+    ));
+    const tasks = scope === "batch" ? [...panel.querySelectorAll("[data-meal-prep-batch-id]")].filter(card => card.dataset.mealPrepBatchId === id) : [];
+    menu.mealRemovalPreviewCards = [...meals, ...tasks];
+    menu.mealRemovalPreviewCards.forEach(card => card.classList.add("is-removal-preview"));
+}
+
 function closeMealPlannerCardMenu(menu, restoreFocus = false) {
     if (!menu) return;
+    clearMealPlannerRemovalPreview(menu);
+    menu.mealRemovalPointer = null;
+    menu.mealRemovalFocus = null;
     if (typeof menu.hidePopover === "function" && menu.matches(":popover-open")) menu.hidePopover();
     menu.classList.remove("is-fallback-open");
     if (menu.mealActionsDismiss) {
@@ -2055,6 +2086,30 @@ function toggleMealPlannerCardMenu(button) {
     });
     if (!menu.mealActionsBound) {
         menu.mealActionsBound = true;
+        const menuAction = target => {
+            const action = target?.closest?.("button");
+            return action && menu.contains(action) ? action : null;
+        };
+        menu.addEventListener("pointerover", event => {
+            if (event.pointerType === "touch") return;
+            menu.mealRemovalPointer = menuAction(event.target);
+            updateMealPlannerRemovalPreview(menu);
+        });
+        menu.addEventListener("pointerout", event => {
+            if (event.pointerType === "touch") return;
+            menu.mealRemovalPointer = menuAction(event.relatedTarget);
+            updateMealPlannerRemovalPreview(menu);
+        });
+        menu.addEventListener("focusin", event => {
+            menu.mealRemovalPointer = null;
+            menu.mealRemovalFocus = menuAction(event.target);
+            updateMealPlannerRemovalPreview(menu);
+        });
+        menu.addEventListener("focusout", event => {
+            menu.mealRemovalPointer = null;
+            menu.mealRemovalFocus = menuAction(event.relatedTarget);
+            updateMealPlannerRemovalPreview(menu);
+        });
         menu.addEventListener("toggle", event => {
             button.setAttribute("aria-expanded", String(event.newState === "open"));
             if (event.newState === "closed") closeMealPlannerCardMenu(menu);

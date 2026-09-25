@@ -33755,6 +33755,60 @@ img[data-deferred-src] {
     line-height: 1.4;
 }
 
+#mealPlannerPage :is(.app-meal-card, .app-meal-prep-step) {
+    position: relative;
+}
+
+#mealPlannerPage .app-meal-removal-preview-label {
+    display: none;
+}
+
+#mealPlannerPage :is(.app-meal-card, .app-meal-prep-step).is-removal-preview {
+    overflow: visible;
+    border-color: var(--app-danger, #c31524);
+    outline: 2px solid var(--app-danger, #c31524);
+    outline-offset: 1px;
+    background: var(--app-surface-soft, #18242e);
+    background: color-mix(in srgb, var(--app-danger, #c31524) 12%, var(--app-surface-soft, #18242e));
+    transition: none;
+    animation: none;
+}
+
+#mealPlannerPage :is(.app-meal-card, .app-meal-prep-step).is-removal-preview > .app-meal-removal-preview-label {
+    position: absolute;
+    z-index: 2;
+    top: -9px;
+    left: 6px;
+    display: block;
+    box-sizing: border-box;
+    max-width: calc(100% - 12px);
+    margin: 0;
+    padding: 0 4px;
+    border: 1px solid var(--app-danger, #c31524);
+    border-radius: 3px;
+    background: var(--app-surface, #17212b);
+    color: var(--app-danger, #c31524);
+    font-size: 10px;
+    font-weight: 650;
+    line-height: 12px;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+@media (forced-colors: active) {
+    #mealPlannerPage :is(.app-meal-card, .app-meal-prep-step).is-removal-preview {
+        border-color: Highlight;
+        outline-color: Highlight;
+        background: Canvas;
+    }
+
+    #mealPlannerPage :is(.app-meal-card, .app-meal-prep-step).is-removal-preview > .app-meal-removal-preview-label {
+        border-color: Highlight;
+        background: Canvas;
+        color: CanvasText;
+    }
+}
+
 .app-meal-prep-step > a {
     color: var(--app-text-strong);
     font-size: 11px;

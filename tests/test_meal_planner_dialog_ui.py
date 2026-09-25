@@ -31,13 +31,22 @@ function node(extra={}) {
  return {hidden:false,disabled:false,dataset:{},innerHTML:'',textContent:'',value:'',handlers:{},classList:classes(),
   addEventListener(type,handler){(this.handlers[type] ||= []).push(handler);},
   focus(){this.focused=true;},setAttribute(name,value){this[name]=value;},removeAttribute(name){delete this[name];},
-  contains(target){return target===this;},querySelector(){return null;},querySelectorAll(){return [];},...extra};
+  contains(target){return target===this;},closest(){return null;},querySelector(){return null;},querySelectorAll(){return [];},...extra};
 }
 let requests=[],refreshes=[],statuses=[],ingredientRenders=[],previewRefreshes=0;
 let responseFactory=async()=>({ok:true,json:async()=>({ok:true,members:[{id:'adult',name:'Adult'},{id:'child',name:'Child'}]})});
 let activeDialog;
 const extraNodes=new Map();
-const page=node({dataset:{mealWeek:'2026-09-21'}});
+const calendarNodes=[],otherCalendarNodes=[];
+function calendarMatches(item,selector){
+ return selector.split(',').some(part=>{
+  part=part.trim();if(part==='.is-removal-preview')return item.classList.contains('is-removal-preview');
+  assert(/^\[data-meal-(?:plan-id|plan-batch-id|prep-batch-id)\]$/.test(part),'Query raw association attributes, never interpolate record IDs into CSS: '+part);
+  const key=part.slice(6,-1).replace(/-([a-z])/g,(_,letter)=>letter.toUpperCase());return key in item.dataset;
+ });
+}
+const mealsPanel=node({querySelectorAll(selector){return calendarNodes.filter(item=>calendarMatches(item,selector));}});
+const page=node({dataset:{mealWeek:'2026-09-21'},querySelector(selector){return selector==='#plannerMealsPanel'?mealsPanel:null;}});
 function makeDialog() {
  const options=[
   {value:'',textContent:'Choose a recipe',label:'Choose a recipe',dataset:{defaultServings:'1',yieldLabel:''}},
@@ -75,9 +84,9 @@ activeDialog=makeDialog();
 const ctx={console,Date,Set,AbortController,window:{...eventSurface(),innerWidth:800,innerHeight:600},document:{...eventSurface(),activeElement:null,
  getElementById(id){if(extraNodes.has(id))return extraNodes.get(id);return ({mealPlannerDialog:activeDialog,mealPlannerRecipe:activeDialog.recipe,
   mealPlannerRecipeFields:activeDialog.fieldset,mealPlannerScheduleForm:activeDialog.form,
-  mealPlannerServingsHelp:activeDialog.helper,mealPlannerPage:page})[id] || activeDialog.querySelector('#'+id);},
+  mealPlannerServingsHelp:activeDialog.helper,mealPlannerPage:page,plannerMealsPanel:mealsPanel})[id] || activeDialog.querySelector('#'+id);},
  querySelector(selector){return activeDialog.querySelector(selector);},
- querySelectorAll(selector){return selector==='[data-meal-card-menu]'?[...extraNodes.values()].filter(node=>node.dataset.triggerId):[];},
+ querySelectorAll(selector){if(selector==='[data-meal-card-menu]')return [...extraNodes.values()].filter(node=>node.dataset.triggerId);if(selector.includes('data-meal-plan-')||selector.includes('data-meal-prep-batch-id')||selector==='.is-removal-preview')return [...calendarNodes,...otherCalendarNodes].filter(item=>calendarMatches(item,selector));return [];},
 },fetch:async(url,options)=>{requests.push({url,options});return responseFactory(url,options);},
  setMealPlannerStatus(message,error){statuses.push({message,error});},
  refreshMealPlannerWorkspace:async({date}={})=>{assert.equal(activeDialog.open,false,'Close dialog before refreshing its containing page');refreshes.push(date);return true;},
@@ -113,19 +122,34 @@ const card=(overrides={})=>node({dataset:{mealId:'meal-1',mealName:'Corn Spoon B
 function cardMenu(overrides={}) {
  const trigger=card({menuId:'meal-menu',...overrides});trigger.id='trigger-'+trigger.dataset.menuId;
  trigger.getBoundingClientRect=()=>({right:795,top:570,bottom:590});
- const firstAction=node();
- const menu=node({dataset:{triggerId:trigger.id},style:{},popoverOpen:false,
+ const firstAction=node(),actions=[firstAction];
+ const menu=node({dataset:{triggerId:trigger.id},style:{},popoverOpen:false,actions,
   matches(selector){return selector===':popover-open'&&this.popoverOpen;},
   showPopover(options){this.source=options?.source;this.popoverOpen=true;(this.handlers.toggle||[]).forEach(handler=>handler({newState:'open'}));},
   hidePopover(){this.popoverOpen=false;(this.handlers.toggle||[]).forEach(handler=>handler({newState:'closed'}));},
-  contains(target){return target===this||target===firstAction;},
+  contains(target){return target===this||actions.includes(target)||actions.includes(target?.parentAction);},
   getBoundingClientRect(){return {width:210,height:130};},
-  querySelector(selector){return selector==='button'?firstAction:null;}
+  querySelector(selector){return selector==='button'?firstAction:null;},
+  querySelectorAll(selector){return selector==='[data-meal-delete-preview]'?actions.filter(action=>action.dataset.mealDeletePreview):[];}
  });
- firstAction.closest=selector=>selector==='[data-meal-card-menu]'?menu:null;
+ firstAction.closest=selector=>selector==='[data-meal-card-menu]'?menu:selector==='button'?firstAction:null;
  extraNodes.set(trigger.id,trigger);extraNodes.set(trigger.dataset.menuId,menu);
  return {trigger,menu,firstAction};
 }
+function previewAction(card,scope){
+ const action=node({dataset:{mealDeletePreview:scope},closest(selector){return selector==='[data-meal-delete-preview]'||selector==='button'?this:selector==='[data-meal-card-menu]'?card.menu:null;}});
+ card.menu.actions.push(action);return action;
+}
+function menuEvent(menu,type,target,relatedTarget=null,extra={}){for(const handler of menu.handlers[type]||[])handler({target,relatedTarget,...extra});}
+function removalCards(mealId='meal-1',batchId='batch-1'){
+ calendarNodes.length=0;otherCalendarNodes.length=0;
+ const meal=(id,batch)=>node({dataset:{mealPlanId:id,mealPlanBatchId:batch,recipeUrl:'recipe://same-bread'}});
+ const prep=batch=>node({dataset:{mealPrepBatchId:batch}});
+ const items={target:meal(mealId,batchId),sibling:meal('sibling',batchId),otherBatch:meal('different','another-batch'),standalone:meal('standalone',''),prep:prep(batchId),otherPrep:prep('another-batch'),outside:meal('outside',batchId)};
+ calendarNodes.push(items.target,items.sibling,items.otherBatch,items.standalone,items.prep,items.otherPrep);otherCalendarNodes.push(items.outside);
+ return items;
+}
+const highlighted=items=>Object.keys(items).filter(key=>items[key].classList.contains('is-removal-preview'));
 const openEdit=async(button=card(),scope='')=>{ctx.openMealPlannerEditDialog(button,scope);await flush();return activeDialog.mealPlanScheduleState.panel;};
 (async()=>{
 """
@@ -176,6 +200,82 @@ assert.equal(prevented,true);assert.equal(menu.popoverOpen,false);assert.equal(t
 ctx.toggleMealPlannerCardMenu(trigger);menu.hidePopover();
 assert.equal(trigger['aria-expanded'],'false','Native light-dismiss notification synchronizes the trigger state');
 assert.equal(requests.length,0);
+""")
+
+
+def test_removal_pointer_preview_matches_saved_id_and_batch_members_only_in_visible_week():
+    run_dialog(r"""
+const mealId='meal"[raw]:1',batchId='batch"[raw]:1',items=removalCards(mealId,batchId),card=cardMenu({mealId,batchId});
+const single=previewAction(card,'meal'),batch=previewAction(card,'batch');ctx.toggleMealPlannerCardMenu(card.trigger);
+const child=node({parentAction:single,closest:selector=>selector==='button'?single:null});
+menuEvent(card.menu,'pointerover',child);assert.deepEqual(highlighted(items),['target']);
+menuEvent(card.menu,'pointerout',child,batch);assert.deepEqual(highlighted(items),['target','sibling','prep']);
+assert.equal(items.otherBatch.dataset.recipeUrl,items.target.dataset.recipeUrl,'The same recipe may belong to a different batch');
+assert(!items.otherBatch.classList.contains('is-removal-preview'));assert(!items.outside.classList.contains('is-removal-preview'));
+menuEvent(card.menu,'pointerout',batch,card.firstAction);assert.deepEqual(highlighted(items),[],'Moving to a non-removal action clears the preview');
+menuEvent(card.menu,'pointerover',batch);menuEvent(card.menu,'pointerout',batch,node());assert.deepEqual(highlighted(items),[]);
+assert.equal(requests.length,0,'Hovering must not GET details or DELETE any scheduled record');assert.equal(activeDialog.open,false);
+""")
+
+
+def test_removal_keyboard_focus_preview_and_pointer_override_clear_predictably():
+    run_dialog(r"""
+const items=removalCards(),card=cardMenu({batchId:'batch-1'}),single=previewAction(card,'meal'),batch=previewAction(card,'batch');
+ctx.toggleMealPlannerCardMenu(card.trigger);menuEvent(card.menu,'focusin',batch);assert.deepEqual(highlighted(items),['target','sibling','prep']);
+menuEvent(card.menu,'pointerover',single);assert.deepEqual(highlighted(items),['target'],'Pointer choice temporarily overrides focused removal');
+menuEvent(card.menu,'pointerout',single,node());assert.deepEqual(highlighted(items),['target','sibling','prep'],'Leaving with keyboard focus retained restores its preview');
+menuEvent(card.menu,'focusout',batch,single);assert.deepEqual(highlighted(items),['target']);
+menuEvent(card.menu,'focusin',card.firstAction);assert.deepEqual(highlighted(items),[]);
+menuEvent(card.menu,'focusin',batch);menuEvent(card.menu,'focusout',batch,node());assert.deepEqual(highlighted(items),[]);
+menuEvent(card.menu,'pointerover',batch,null,{pointerType:'touch'});assert.deepEqual(highlighted(items),[],'Touch has no hover preview');
+batch.disabled=true;menuEvent(card.menu,'focusin',batch);assert.deepEqual(highlighted(items),[]);
+assert.equal(requests.length,0);
+""")
+
+
+@pytest.mark.parametrize("hidden_state", ["page_hidden", "page_inert", "panel_hidden", "menu_closed"])
+def test_removal_preview_does_not_mark_hidden_or_closed_calendar_context(hidden_state):
+    run_dialog(r"""
+const state=__STATE__,items=removalCards(),card=cardMenu({batchId:'batch-1'}),batch=previewAction(card,'batch');
+ctx.toggleMealPlannerCardMenu(card.trigger);
+if(state==='page_hidden')page.hidden=true;if(state==='page_inert')page.inert=true;if(state==='panel_hidden')mealsPanel.hidden=true;
+if(state==='menu_closed')ctx.closeMealPlannerCardMenu(card.menu);
+menuEvent(card.menu,'pointerover',batch);menuEvent(card.menu,'focusin',batch);
+assert.deepEqual(highlighted(items),[]);assert.equal(requests.length,0);
+""".replace("__STATE__", repr(hidden_state)))
+
+
+@pytest.mark.parametrize("dismissal", ["outside", "escape", "native", "toggle", "switch", "scroll", "resize", "confirmation"])
+def test_every_menu_dismissal_clears_removal_highlights_before_further_actions(dismissal):
+    run_dialog(r"""
+const dismissal=__DISMISSAL__,items=removalCards(),card=cardMenu({batchId:'batch-1'}),batch=previewAction(card,'batch');
+ctx.toggleMealPlannerCardMenu(card.trigger);menuEvent(card.menu,'focusin',batch);menuEvent(card.menu,'pointerover',batch);
+assert.deepEqual(highlighted(items),['target','sibling','prep']);
+let confirmed=false;
+if(dismissal==='outside')ctx.document.dispatch('pointerdown',node());
+if(dismissal==='escape')ctx.document.dispatch('keydown',node(),{key:'Escape',preventDefault(){}});
+if(dismissal==='native')card.menu.hidePopover();
+if(dismissal==='toggle')ctx.toggleMealPlannerCardMenu(card.trigger);
+if(dismissal==='switch'){const other=cardMenu({menuId:'second-menu',mealId:'other',batchId:'another-batch'});ctx.toggleMealPlannerCardMenu(other.trigger);}
+if(dismissal==='scroll')ctx.document.dispatch('scroll',page);
+if(dismissal==='resize')ctx.window.dispatch('resize',ctx.window);
+if(dismissal==='confirmation'){
+ ctx.openMealPlannerDeleteDialog=(trigger,scope)=>{assert.deepEqual(highlighted(items),[],'Clear the calendar highlight before opening confirmation');assert.equal(trigger,card.trigger);assert.equal(scope,'batch');confirmed=true;return false;};
+ ctx.runMealPlannerCardAction(batch,'remove-batch');assert.equal(confirmed,true);
+}
+assert.deepEqual(highlighted(items),[]);assert.equal(card.menu.mealRemovalPointer,null);assert.equal(card.menu.mealRemovalFocus,null);assert.equal(card.menu.popoverOpen,false);
+assert.equal(requests.length,0);
+""".replace("__DISMISSAL__", repr(dismissal)))
+
+
+def test_fallback_menu_preview_clears_on_escape_and_reopening_binds_handlers_once():
+    run_dialog(r"""
+const items=removalCards(),card=cardMenu({batchId:'batch-1'}),batch=previewAction(card,'batch');delete card.menu.showPopover;delete card.menu.hidePopover;
+ctx.toggleMealPlannerCardMenu(card.trigger);menuEvent(card.menu,'focusin',batch);assert.deepEqual(highlighted(items),['target','sibling','prep']);
+ctx.document.dispatch('keydown',node(),{key:'Escape',preventDefault(){}});assert.deepEqual(highlighted(items),[]);assert.equal(card.menu.classList.contains('is-fallback-open'),false);
+ctx.toggleMealPlannerCardMenu(card.trigger);menuEvent(card.menu,'pointerover',batch);assert.deepEqual(highlighted(items),['target','sibling','prep']);
+for(const event of ['pointerover','pointerout','focusin','focusout'])assert.equal(card.menu.handlers[event].length,1,'Reopening does not bind duplicate preview listeners');
+ctx.document.dispatch('pointerdown',node());assert.deepEqual(highlighted(items),[]);assert.equal(requests.length,0);
 """)
 
 
