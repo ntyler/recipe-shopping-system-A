@@ -81,8 +81,8 @@ def test_meal_cards_use_compact_actions_with_correct_ids_and_batch_scope_choices
         actions = [button for button in parser.buttons if button["menu"] is menu]
         assert [button["text"].strip() for button in actions] == expected_options
         assert all("runMealPlannerCardAction" in button["attrs"]["onclick"] for button in actions)
-        previews = [button["attrs"]["data-meal-delete-preview"] for button in actions if "data-meal-delete-preview" in button["attrs"]]
-        assert previews == (["meal", "batch"] if trigger["attrs"]["data-batch-id"] else ["meal"])
+        previews = [button["attrs"]["data-meal-action-preview"] for button in actions if "data-meal-action-preview" in button["attrs"]]
+        assert previews == (["meal", "batch", "shop", "remove", "remove-batch"] if trigger["attrs"]["data-batch-id"] else ["meal", "remove"])
     assert '<meal>' not in html and '<one>' not in html
     assert 'data-meal-prep-date=' not in html
     assert '>Prep</div>' not in html

@@ -40,7 +40,7 @@ const extraNodes=new Map();
 const calendarNodes=[],otherCalendarNodes=[];
 function calendarMatches(item,selector){
  return selector.split(',').some(part=>{
-  part=part.trim();if(part==='.is-removal-preview')return item.classList.contains('is-removal-preview');
+  part=part.trim();if(['.is-action-preview','.is-removal-preview','.is-edit-preview','.is-shopping-preview'].includes(part))return item.classList.contains(part.slice(1));
   assert(/^\[data-meal-(?:plan-id|plan-batch-id|prep-batch-id)\]$/.test(part),'Query raw association attributes, never interpolate record IDs into CSS: '+part);
   const key=part.slice(6,-1).replace(/-([a-z])/g,(_,letter)=>letter.toUpperCase());return key in item.dataset;
  });
@@ -86,7 +86,7 @@ const ctx={console,Date,Set,AbortController,window:{...eventSurface(),innerWidth
   mealPlannerRecipeFields:activeDialog.fieldset,mealPlannerScheduleForm:activeDialog.form,
   mealPlannerServingsHelp:activeDialog.helper,mealPlannerPage:page,plannerMealsPanel:mealsPanel})[id] || activeDialog.querySelector('#'+id);},
  querySelector(selector){return activeDialog.querySelector(selector);},
- querySelectorAll(selector){if(selector==='[data-meal-card-menu]')return [...extraNodes.values()].filter(node=>node.dataset.triggerId);if(selector.includes('data-meal-plan-')||selector.includes('data-meal-prep-batch-id')||selector==='.is-removal-preview')return [...calendarNodes,...otherCalendarNodes].filter(item=>calendarMatches(item,selector));return [];},
+ querySelectorAll(selector){if(selector==='[data-meal-card-menu]')return [...extraNodes.values()].filter(node=>node.dataset.triggerId);if(selector.includes('data-meal-plan-')||selector.includes('data-meal-prep-batch-id')||selector.endsWith('-preview'))return [...calendarNodes,...otherCalendarNodes].filter(item=>calendarMatches(item,selector));return [];},
 },fetch:async(url,options)=>{requests.push({url,options});return responseFactory(url,options);},
  setMealPlannerStatus(message,error){statuses.push({message,error});},
  refreshMealPlannerWorkspace:async({date}={})=>{assert.equal(activeDialog.open,false,'Close dialog before refreshing its containing page');refreshes.push(date);return true;},
@@ -130,26 +130,32 @@ function cardMenu(overrides={}) {
   contains(target){return target===this||actions.includes(target)||actions.includes(target?.parentAction);},
   getBoundingClientRect(){return {width:210,height:130};},
   querySelector(selector){return selector==='button'?firstAction:null;},
-  querySelectorAll(selector){return selector==='[data-meal-delete-preview]'?actions.filter(action=>action.dataset.mealDeletePreview):[];}
+  querySelectorAll(selector){return selector==='[data-meal-action-preview]'?actions.filter(action=>action.dataset.mealActionPreview):[];}
  });
  firstAction.closest=selector=>selector==='[data-meal-card-menu]'?menu:selector==='button'?firstAction:null;
  extraNodes.set(trigger.id,trigger);extraNodes.set(trigger.dataset.menuId,menu);
  return {trigger,menu,firstAction};
 }
 function previewAction(card,scope){
- const action=node({dataset:{mealDeletePreview:scope},closest(selector){return selector==='[data-meal-delete-preview]'||selector==='button'?this:selector==='[data-meal-card-menu]'?card.menu:null;}});
+ const action=node({dataset:{mealActionPreview:scope},closest(selector){return selector==='[data-meal-action-preview]'||selector==='button'?this:selector==='[data-meal-card-menu]'?card.menu:null;}});
  card.menu.actions.push(action);return action;
 }
 function menuEvent(menu,type,target,relatedTarget=null,extra={}){for(const handler of menu.handlers[type]||[])handler({target,relatedTarget,...extra});}
 function removalCards(mealId='meal-1',batchId='batch-1'){
  calendarNodes.length=0;otherCalendarNodes.length=0;
- const meal=(id,batch)=>node({dataset:{mealPlanId:id,mealPlanBatchId:batch,recipeUrl:'recipe://same-bread'}});
- const prep=batch=>node({dataset:{mealPrepBatchId:batch}});
+ const withLabel=dataset=>{const label=node();return node({dataset,label,querySelector:selector=>selector==='.app-meal-action-preview-label'?label:null});};
+ const meal=(id,batch)=>withLabel({mealPlanId:id,mealPlanBatchId:batch,recipeUrl:'recipe://same-bread'});
+ const prep=batch=>withLabel({mealPrepBatchId:batch});
  const items={target:meal(mealId,batchId),sibling:meal('sibling',batchId),otherBatch:meal('different','another-batch'),standalone:meal('standalone',''),prep:prep(batchId),otherPrep:prep('another-batch'),outside:meal('outside',batchId)};
  calendarNodes.push(items.target,items.sibling,items.otherBatch,items.standalone,items.prep,items.otherPrep);otherCalendarNodes.push(items.outside);
  return items;
 }
-const highlighted=items=>Object.keys(items).filter(key=>items[key].classList.contains('is-removal-preview'));
+const highlighted=(items,style='is-removal-preview')=>Object.keys(items).filter(key=>items[key].classList.contains(style));
+const assertPreview=(items,expected,style,label,message)=>{
+ assert.deepEqual(highlighted(items,'is-action-preview'),expected,message);
+ for(const kind of ['is-edit-preview','is-shopping-preview','is-removal-preview'])assert.deepEqual(highlighted(items,kind),kind===style?expected:[]);
+ for(const [key,item] of Object.entries(items))assert.equal(item.label.textContent,expected.includes(key)?label:'');
+};
 const openEdit=async(button=card(),scope='')=>{ctx.openMealPlannerEditDialog(button,scope);await flush();return activeDialog.mealPlanScheduleState.panel;};
 (async()=>{
 """
@@ -206,7 +212,7 @@ assert.equal(requests.length,0);
 def test_removal_pointer_preview_matches_saved_id_and_batch_members_only_in_visible_week():
     run_dialog(r"""
 const mealId='meal"[raw]:1',batchId='batch"[raw]:1',items=removalCards(mealId,batchId),card=cardMenu({mealId,batchId});
-const single=previewAction(card,'meal'),batch=previewAction(card,'batch');ctx.toggleMealPlannerCardMenu(card.trigger);
+const single=previewAction(card,'remove'),batch=previewAction(card,'remove-batch');ctx.toggleMealPlannerCardMenu(card.trigger);
 const child=node({parentAction:single,closest:selector=>selector==='button'?single:null});
 menuEvent(card.menu,'pointerover',child);assert.deepEqual(highlighted(items),['target']);
 menuEvent(card.menu,'pointerout',child,batch);assert.deepEqual(highlighted(items),['target','sibling','prep']);
@@ -220,7 +226,7 @@ assert.equal(requests.length,0,'Hovering must not GET details or DELETE any sche
 
 def test_removal_keyboard_focus_preview_and_pointer_override_clear_predictably():
     run_dialog(r"""
-const items=removalCards(),card=cardMenu({batchId:'batch-1'}),single=previewAction(card,'meal'),batch=previewAction(card,'batch');
+const items=removalCards(),card=cardMenu({batchId:'batch-1'}),single=previewAction(card,'remove'),batch=previewAction(card,'remove-batch');
 ctx.toggleMealPlannerCardMenu(card.trigger);menuEvent(card.menu,'focusin',batch);assert.deepEqual(highlighted(items),['target','sibling','prep']);
 menuEvent(card.menu,'pointerover',single);assert.deepEqual(highlighted(items),['target'],'Pointer choice temporarily overrides focused removal');
 menuEvent(card.menu,'pointerout',single,node());assert.deepEqual(highlighted(items),['target','sibling','prep'],'Leaving with keyboard focus retained restores its preview');
@@ -233,10 +239,83 @@ assert.equal(requests.length,0);
 """)
 
 
+def test_edit_shopping_and_removal_actions_switch_scope_style_and_label_without_requests():
+    run_dialog(r"""
+const items=removalCards('meal"[raw]:1','batch"[raw]:1'),card=cardMenu({mealId:'meal"[raw]:1',batchId:'batch"[raw]:1'});
+const single=previewAction(card,'meal'),batch=previewAction(card,'batch'),shop=previewAction(card,'shop'),remove=previewAction(card,'remove-batch');
+ctx.toggleMealPlannerCardMenu(card.trigger);
+menuEvent(card.menu,'focusin',single);assertPreview(items,['target'],'is-edit-preview','Editing meal');
+menuEvent(card.menu,'focusout',single,batch);assertPreview(items,['target','sibling','prep'],'is-edit-preview','Editing prep plan');
+menuEvent(card.menu,'pointerover',shop);assertPreview(items,['target','sibling'],'is-shopping-preview','Shopping batch');
+assert.equal(items.target.dataset.recipeUrl,items.otherBatch.dataset.recipeUrl,'Same recipe in another batch is not selected');
+menuEvent(card.menu,'pointerout',shop,remove);assertPreview(items,['target','sibling','prep'],'is-removal-preview','Removal preview');
+menuEvent(card.menu,'pointerout',remove,node());assertPreview(items,['target','sibling','prep'],'is-edit-preview','Editing prep plan');
+menuEvent(card.menu,'focusin',shop);assertPreview(items,['target','sibling'],'is-shopping-preview','Shopping batch');
+menuEvent(card.menu,'focusout',shop,node());assertPreview(items,[]);
+menuEvent(card.menu,'pointerover',single,null,{pointerType:'touch'});assertPreview(items,[]);
+batch.disabled=true;menuEvent(card.menu,'focusin',batch);assertPreview(items,[]);
+assert.equal(requests.length,0,'Previewing actions does not fetch or change saved data');
+assert.equal(activeDialog.open,false);
+""")
+
+
+@pytest.mark.parametrize("scope", ["meal", "batch"])
+@pytest.mark.parametrize("dismissal", ["cancel", "native"])
+def test_edit_dialog_owns_clicked_preview_during_loading_until_cancel_or_native_close(scope, dismissal):
+    run_dialog(r"""
+const scope=__SCOPE__,dismissal=__DISMISSAL__,items=removalCards(),card=cardMenu({batchId:'batch-1'}),action=previewAction(card,scope);
+const expected=scope==='meal'?['target']:['target','sibling','prep'],label=scope==='meal'?'Editing meal':'Editing prep plan';
+let release;responseFactory=()=>new Promise(resolve=>release=resolve);
+ctx.toggleMealPlannerCardMenu(card.trigger);menuEvent(card.menu,'pointerover',action);ctx.runMealPlannerCardAction(action,scope);
+assert.equal(card.menu.popoverOpen,false);assert.equal(activeDialog.open,true);
+assert.equal(card.menu.mealActionPreviewCards.length,0,'Preview ownership transfers away from the closed menu');
+assert.equal(activeDialog.mealActionPreviewCards.length,expected.length);assertPreview(items,expected,'is-edit-preview',label);
+menuEvent(card.menu,'pointerover',action);menuEvent(card.menu,'focusin',action);
+assertPreview(items,expected,'is-edit-preview',label,'Late events from the closed menu cannot remove the dialog preview');
+const signal=requests[0].options.signal;
+if(dismissal==='native')activeDialog.close();else ctx.closeMealPlannerDialog();
+assert.equal(activeDialog.open,false);assertPreview(items,[]);assert.equal(activeDialog.mealActionPreviewCards.length,0);
+if(dismissal==='cancel'){assert.equal(signal.aborted,true);assert.equal(card.trigger.focused,true);}
+release(ok(scope==='meal'?{meal:savedMeal()}:{batch:savedBatch(),meals:savedAllocations()}));await flush();
+assertPreview(items,[]);assert.equal(activeDialog.mealPlanScheduleState.panel,null,'A response after closing cannot restore form or highlight');
+assert.equal(requests.length,1);assert.equal(refreshes.length,0);
+""".replace("__SCOPE__", repr(scope)).replace("__DISMISSAL__", repr(dismissal)))
+
+
+def test_failed_edit_load_keeps_scope_visible_for_retry_then_cancel_clears_it():
+    run_dialog(r"""
+const items=removalCards(),card=cardMenu({batchId:'batch-1'}),action=previewAction(card,'batch');
+responseFactory=async()=>({ok:false,json:async()=>({ok:false,error:'Unable to load this plan.'})});
+ctx.toggleMealPlannerCardMenu(card.trigger);ctx.runMealPlannerCardAction(action,'batch');await flush();
+assert.equal(activeDialog.open,true);assert.equal(activeDialog.querySelector('[data-meal-edit-retry]').hidden,false);
+assertPreview(items,['target','sibling','prep'],'is-edit-preview','Editing prep plan');
+assert.equal(requests.length,1);assert.equal(refreshes.length,0);
+ctx.closeMealPlannerDialog();assertPreview(items,[]);
+""")
+
+
+def test_edit_preview_survives_pending_or_failed_save_and_clears_only_on_success():
+    run_dialog(r"""
+const items=removalCards(),button=card({batchId:'batch-1'});
+responseFactory=async(url)=>url.endsWith('/members')?ok({members:[]}):ok({meal:savedMeal()});
+const panel=await openEdit(button,'meal');assertPreview(items,['target'],'is-edit-preview','Editing meal');
+panel.draft.notes='New instructions';let release;requests=[];responseFactory=()=>new Promise(resolve=>release=resolve);
+const pending=submit(panel);await submit(panel);ctx.closeMealPlannerDialog();
+for(const handler of activeDialog.handlers.cancel || [])handler({preventDefault(){}});
+assert.equal(requests.length,1);assert.equal(activeDialog.open,true);assertPreview(items,['target'],'is-edit-preview','Editing meal');
+release({ok:false,json:async()=>({ok:false,error:'Save failed.'})});await pending;
+assert.equal(activeDialog.open,true);assert.equal(panel.draft.notes,'New instructions');assert.match(panel.ui.message,/Save failed/);
+assertPreview(items,['target'],'is-edit-preview','Editing meal');assert.equal(refreshes.length,0);
+responseFactory=async()=>ok({meal:savedMeal({prep_notes:'New instructions'})});await submit(panel);
+assert.equal(activeDialog.open,false);assertPreview(items,[]);assert.deepEqual(refreshes,['2026-10-07']);
+assert.equal(requests.length,2);assert.equal(previewRefreshes,1);
+""")
+
+
 @pytest.mark.parametrize("hidden_state", ["page_hidden", "page_inert", "panel_hidden", "menu_closed"])
 def test_removal_preview_does_not_mark_hidden_or_closed_calendar_context(hidden_state):
     run_dialog(r"""
-const state=__STATE__,items=removalCards(),card=cardMenu({batchId:'batch-1'}),batch=previewAction(card,'batch');
+const state=__STATE__,items=removalCards(),card=cardMenu({batchId:'batch-1'}),batch=previewAction(card,'remove-batch');
 ctx.toggleMealPlannerCardMenu(card.trigger);
 if(state==='page_hidden')page.hidden=true;if(state==='page_inert')page.inert=true;if(state==='panel_hidden')mealsPanel.hidden=true;
 if(state==='menu_closed')ctx.closeMealPlannerCardMenu(card.menu);
@@ -248,7 +327,7 @@ assert.deepEqual(highlighted(items),[]);assert.equal(requests.length,0);
 @pytest.mark.parametrize("dismissal", ["outside", "escape", "native", "toggle", "switch", "scroll", "resize", "confirmation"])
 def test_every_menu_dismissal_clears_removal_highlights_before_further_actions(dismissal):
     run_dialog(r"""
-const dismissal=__DISMISSAL__,items=removalCards(),card=cardMenu({batchId:'batch-1'}),batch=previewAction(card,'batch');
+const dismissal=__DISMISSAL__,items=removalCards(),card=cardMenu({batchId:'batch-1'}),batch=previewAction(card,'remove-batch');
 ctx.toggleMealPlannerCardMenu(card.trigger);menuEvent(card.menu,'focusin',batch);menuEvent(card.menu,'pointerover',batch);
 assert.deepEqual(highlighted(items),['target','sibling','prep']);
 let confirmed=false;
@@ -263,14 +342,14 @@ if(dismissal==='confirmation'){
  ctx.openMealPlannerDeleteDialog=(trigger,scope)=>{assert.deepEqual(highlighted(items),[],'Clear the calendar highlight before opening confirmation');assert.equal(trigger,card.trigger);assert.equal(scope,'batch');confirmed=true;return false;};
  ctx.runMealPlannerCardAction(batch,'remove-batch');assert.equal(confirmed,true);
 }
-assert.deepEqual(highlighted(items),[]);assert.equal(card.menu.mealRemovalPointer,null);assert.equal(card.menu.mealRemovalFocus,null);assert.equal(card.menu.popoverOpen,false);
+assert.deepEqual(highlighted(items),[]);assert.equal(card.menu.mealPreviewPointer,null);assert.equal(card.menu.mealPreviewFocus,null);assert.equal(card.menu.popoverOpen,false);
 assert.equal(requests.length,0);
 """.replace("__DISMISSAL__", repr(dismissal)))
 
 
 def test_fallback_menu_preview_clears_on_escape_and_reopening_binds_handlers_once():
     run_dialog(r"""
-const items=removalCards(),card=cardMenu({batchId:'batch-1'}),batch=previewAction(card,'batch');delete card.menu.showPopover;delete card.menu.hidePopover;
+const items=removalCards(),card=cardMenu({batchId:'batch-1'}),batch=previewAction(card,'remove-batch');delete card.menu.showPopover;delete card.menu.hidePopover;
 ctx.toggleMealPlannerCardMenu(card.trigger);menuEvent(card.menu,'focusin',batch);assert.deepEqual(highlighted(items),['target','sibling','prep']);
 ctx.document.dispatch('keydown',node(),{key:'Escape',preventDefault(){}});assert.deepEqual(highlighted(items),[]);assert.equal(card.menu.classList.contains('is-fallback-open'),false);
 ctx.toggleMealPlannerCardMenu(card.trigger);menuEvent(card.menu,'pointerover',batch);assert.deepEqual(highlighted(items),['target','sibling','prep']);

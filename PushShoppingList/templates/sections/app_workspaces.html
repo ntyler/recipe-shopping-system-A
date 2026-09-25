@@ -706,7 +706,7 @@
                     <div class="app-meal-planner-cell app-meal-prep-cell{% if day.is_past %} is-past{% endif %}{% if day.is_today %} is-today{% endif %}" data-meal-prep-date="{{ day.date }}">
                         {% for step in meal_plan.get('prep_steps_by_day', {}).get(day.date, []) %}
                             <article class="app-meal-prep-step{% if step.completed %} is-complete{% endif %}" data-meal-prep-step data-meal-prep-batch-id="{{ step.batch_id }}">
-                                <span class="app-meal-removal-preview-label" aria-hidden="true">Removal preview</span>
+                                <span class="app-meal-action-preview-label" aria-hidden="true"></span>
                                 <a href="#recipeView" data-recipe-url="{{ step.recipe_url }}" onclick="return jumpToRecipeViewRecipe(this, event)">{{ step.recipe_name }}</a>
                                 <label>
                                     <input type="checkbox"
@@ -733,7 +733,7 @@
                             <div class="app-meal-slot-recipes">
                                 {% for meal in planned_meals %}
                                     <article class="app-meal-card{% if meal.cover_image and meal.cover_image.src %} has-image{% endif %}" data-meal-plan-id="{{ meal.id }}" data-meal-plan-batch-id="{{ meal.batch_id or '' }}">
-                                        <span class="app-meal-removal-preview-label" aria-hidden="true">Removal preview</span>
+                                        <span class="app-meal-action-preview-label" aria-hidden="true"></span>
                                         {% if meal.cover_image and meal.cover_image.src %}
                                             <img src="{{ meal.cover_image.thumb_url or meal.cover_image.card_url or meal.cover_image.src }}" alt="">
                                         {% endif %}
@@ -747,11 +747,11 @@
                                         <div id="mealActions{{ meal.id }}" class="app-meal-card-menu" popover="auto"
                                              data-meal-card-menu data-trigger-id="mealActionsTrigger{{ meal.id }}"
                                              role="group" aria-label="Actions for {{ meal.recipe_name }}">
-                                            <button type="button" onclick="return runMealPlannerCardAction(this, 'meal')">{{ 'Edit this meal' if meal.batch_id else 'Edit meal' }}</button>
-                                            {% if meal.batch_id %}<button type="button" onclick="return runMealPlannerCardAction(this, 'batch')">Edit entire prep plan</button>{% endif %}
-                                            {% if meal.batch_id %}<button type="button" onclick="return runMealPlannerCardAction(this, 'shop')">Shop this prep batch</button>{% endif %}
-                                            <button type="button" class="is-danger" data-meal-delete-preview="meal" onclick="return runMealPlannerCardAction(this, 'remove')">Remove this meal</button>
-                                            {% if meal.batch_id %}<button type="button" class="is-danger" data-meal-delete-preview="batch" onclick="return runMealPlannerCardAction(this, 'remove-batch')">Remove entire prep batch</button>{% endif %}
+                                            <button type="button" data-meal-action-preview="meal" onclick="return runMealPlannerCardAction(this, 'meal')">{{ 'Edit this meal' if meal.batch_id else 'Edit meal' }}</button>
+                                            {% if meal.batch_id %}<button type="button" data-meal-action-preview="batch" onclick="return runMealPlannerCardAction(this, 'batch')">Edit entire prep plan</button>{% endif %}
+                                            {% if meal.batch_id %}<button type="button" data-meal-action-preview="shop" onclick="return runMealPlannerCardAction(this, 'shop')">Shop this prep batch</button>{% endif %}
+                                            <button type="button" class="is-danger" data-meal-action-preview="remove" onclick="return runMealPlannerCardAction(this, 'remove')">Remove this meal</button>
+                                            {% if meal.batch_id %}<button type="button" class="is-danger" data-meal-action-preview="remove-batch" onclick="return runMealPlannerCardAction(this, 'remove-batch')">Remove entire prep batch</button>{% endif %}
                                         </div>
                                         {% if meal.planned_servings or meal.batch_id %}<p class="app-meal-plan-details">
                                             {% if meal.planned_servings %}<span>{{ '%g' | format(meal.planned_servings | float) }} {{ 'serving' if meal.planned_servings == 1 else 'servings' }}</span>{% endif %}

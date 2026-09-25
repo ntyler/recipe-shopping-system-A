@@ -33759,22 +33759,35 @@ img[data-deferred-src] {
     position: relative;
 }
 
-#mealPlannerPage .app-meal-removal-preview-label {
+#mealPlannerPage :is(.app-meal-action-preview-label, .app-meal-removal-preview-label) {
     display: none;
 }
 
-#mealPlannerPage :is(.app-meal-card, .app-meal-prep-step).is-removal-preview {
+#mealPlannerPage :is(.app-meal-card, .app-meal-prep-step):is(.is-action-preview, .is-removal-preview) {
+    --app-meal-preview-color: var(--app-primary, #078a2f);
     overflow: visible;
-    border-color: var(--app-danger, #c31524);
-    outline: 2px solid var(--app-danger, #c31524);
+    border-color: var(--app-meal-preview-color);
+    outline: 2px solid var(--app-meal-preview-color);
     outline-offset: 1px;
     background: var(--app-surface-soft, #18242e);
-    background: color-mix(in srgb, var(--app-danger, #c31524) 12%, var(--app-surface-soft, #18242e));
+    background: color-mix(in srgb, var(--app-meal-preview-color) 12%, var(--app-surface-soft, #18242e));
     transition: none;
     animation: none;
 }
 
-#mealPlannerPage :is(.app-meal-card, .app-meal-prep-step).is-removal-preview > .app-meal-removal-preview-label {
+#mealPlannerPage :is(.app-meal-card, .app-meal-prep-step).is-edit-preview {
+    --app-meal-preview-color: var(--app-focus, #2563eb);
+}
+
+#mealPlannerPage :is(.app-meal-card, .app-meal-prep-step).is-shopping-preview {
+    --app-meal-preview-color: var(--app-primary, #078a2f);
+}
+
+#mealPlannerPage :is(.app-meal-card, .app-meal-prep-step).is-removal-preview {
+    --app-meal-preview-color: var(--app-danger, #c31524);
+}
+
+#mealPlannerPage :is(.app-meal-card, .app-meal-prep-step):is(.is-action-preview, .is-removal-preview) > :is(.app-meal-action-preview-label, .app-meal-removal-preview-label) {
     position: absolute;
     z-index: 2;
     top: -9px;
@@ -33784,10 +33797,10 @@ img[data-deferred-src] {
     max-width: calc(100% - 12px);
     margin: 0;
     padding: 0 4px;
-    border: 1px solid var(--app-danger, #c31524);
+    border: 1px solid var(--app-meal-preview-color);
     border-radius: 3px;
     background: var(--app-surface, #17212b);
-    color: var(--app-danger, #c31524);
+    color: var(--app-meal-preview-color);
     font-size: 10px;
     font-weight: 650;
     line-height: 12px;
@@ -33796,13 +33809,13 @@ img[data-deferred-src] {
 }
 
 @media (forced-colors: active) {
-    #mealPlannerPage :is(.app-meal-card, .app-meal-prep-step).is-removal-preview {
+    #mealPlannerPage :is(.app-meal-card, .app-meal-prep-step):is(.is-action-preview, .is-removal-preview) {
         border-color: Highlight;
         outline-color: Highlight;
         background: Canvas;
     }
 
-    #mealPlannerPage :is(.app-meal-card, .app-meal-prep-step).is-removal-preview > .app-meal-removal-preview-label {
+    #mealPlannerPage :is(.app-meal-card, .app-meal-prep-step):is(.is-action-preview, .is-removal-preview) > :is(.app-meal-action-preview-label, .app-meal-removal-preview-label) {
         border-color: Highlight;
         background: Canvas;
         color: CanvasText;

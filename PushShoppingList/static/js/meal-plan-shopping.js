@@ -49,6 +49,16 @@
     function sourceLabel(source) {
         return `${source.servings} servings · ${source.kind === 'batch' ? 'Prep batch' : 'Meal'} · ${source.date_from}${source.date_to && source.date_to !== source.date_from ? ' – ' + source.date_to : ''}`;
     }
+    function syncPlannerPreview(s) {
+        if (!s.previewTrigger) return;
+        const batchId = s.previewTrigger.dataset.batchId;
+        const sources = s.step === 'choose' && s.initial
+            ? [...s.dialog.querySelectorAll('[data-shopping-source]')].filter(input => input.checked).map(input => s.initial.sources[Number(input.dataset.shoppingSource)])
+            : s.review?.sources;
+        const included = !sources || sources.some(source => source.kind === 'batch' && (source.record_id || source.id) === batchId);
+        if (included) global.setMealPlannerActionPreview?.(s.dialog, s.previewTrigger, 'shop');
+        else global.clearMealPlannerActionPreview?.(s.dialog);
+    }
     function choose(s) {
         s.step = 'choose';
         status(s.dialog, '[data-meal-shopping-status]');
@@ -57,6 +67,7 @@
             <p class="meal-shopping-help">Each prep batch is included once, for all its prepared servings—even when it spans more than one week.</p>
             <div class="meal-shopping-sources">${s.initial.sources.map((source,index) => `<label class="meal-shopping-source"><input type="checkbox" data-shopping-source="${index}" ${selected.has(`${source.kind}:${source.id}`) ? 'checked' : ''}><span><strong>${escape(source.recipe_name)}</strong><small>${escape(sourceLabel(source))}</small>${source.error ? `<small class="error">${escape(source.error)}</small>` : ''}</span></label>`).join('') || '<p class="meal-shopping-empty">No planned meals in this selection.</p>'}</div>
             <div class="meal-shopping-actions"><button type="button" data-shopping-action="cancel">Cancel</button><button type="button" class="app-page-primary-action" data-shopping-action="review" ${s.initial.sources.length ? '' : 'disabled'}>Review ingredients</button></div>`);
+        syncPlannerPreview(s);
     }
     function review(s) {
         s.step = 'review';
@@ -95,7 +106,7 @@
             s.review = data;
             s.selection = data.selection || selection;
             status(s.dialog, '[data-meal-shopping-status]');
-            if (initial) {s.initial = data; choose(s);} else review(s);
+            if (initial) {s.initial = data; choose(s);} else {review(s); syncPlannerPreview(s);}
         } catch (error) {
             if (!controller.signal.aborted && state === s) {
                 status(s.dialog, '[data-meal-shopping-status]', error.message, true);
@@ -124,6 +135,8 @@
             const data = await request('/add', payload);
             if (state !== s) return;
             s.step = 'done'; s.savedList = data.list;
+            global.clearMealPlannerActionPreview?.(s.dialog);
+            s.previewTrigger = null;
             content(s, `<p class="meal-shopping-summary">Added to ${escape(data.list.name)}.</p><p class="meal-shopping-help">Your other shopping items have been kept.</p><div class="meal-shopping-actions"><button type="button" data-shopping-action="cancel">Done</button><button type="button" data-shopping-action="schedule">Schedule shopping trip</button><button type="button" class="app-page-primary-action" data-shopping-action="view">Open shopping list</button></div>`);
             status(s.dialog, '[data-meal-shopping-status]', 'Shopping list saved.');
         } catch (error) {
@@ -164,23 +177,34 @@
             }
         };
         s.dialog.onchange = event => {
+            if (event.target.matches('[data-shopping-source]')) syncPlannerPreview(s);
             if (event.target.matches('[data-shopping-item]')) syncIncluded(s);
             if (event.target.matches('[data-shopping-destination]')) node(s.dialog, '[data-shopping-name-field]').hidden = event.target.value !== '__new__';
         };
         s.dialog.oncancel = event => {event.preventDefault(); close();};
+        s.dialog.onclose = () => {
+            if (s.dialog.open) return;
+            global.clearMealPlannerActionPreview?.(s.dialog);
+            if (state === s) {s.controller?.abort(); state = null;}
+        };
     }
     function open(selection, opener = document.activeElement) {
         const dialog = document.getElementById('mealPlanShoppingDialog');
         if (!dialog || state?.saving) return;
         state?.controller?.abort();
-        const s = state = {dialog,opener,initialSelection:selection,busy:false,step:'choose'};
+        global.clearMealPlannerActionPreview?.(dialog);
+        const previewTrigger = opener?.dataset?.batchId && selection.batch_ids?.includes(opener.dataset.batchId) ? opener : null;
+        const s = state = {dialog,opener,previewTrigger,initialSelection:selection,busy:false,step:'choose'};
         bind(s); content(s, '');
         if (!dialog.open) dialog.showModal();
+        syncPlannerPreview(s);
         void load(s, selection, true);
     }
     function close() {
         if (!state || state.saving) return false;
-        const s = state; state = null; s.controller?.abort(); s.dialog.close(); s.opener?.focus({preventScroll:true});
+        const s = state; state = null; s.controller?.abort();
+        global.clearMealPlannerActionPreview?.(s.dialog);
+        s.dialog.close(); s.opener?.focus({preventScroll:true});
         return false;
     }
     async function loadLists(s, id = '') {

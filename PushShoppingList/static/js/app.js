@@ -1879,6 +1879,9 @@ function mealPlannerScheduleState(dialog) {
             event.preventDefault();
             closeMealPlannerDialog();
         });
+        dialog.addEventListener("close", () => {
+            if (!dialog.open) clearMealPlannerActionPreview(dialog);
+        });
     }
     return dialog.mealPlanScheduleState;
 }
@@ -1912,6 +1915,7 @@ function ensureMealPlannerSchedulePanel(dialog, recipeTitle, defaultServings) {
         },
         onSaved: async (_result, date) => {
             // Close before refresh: refreshing must never replace an open dialog.
+            clearMealPlannerActionPreview(dialog);
             dialog.close();
             await refreshMealPlannerWorkspace({date});
             if (typeof refreshRecipePreviewMeals === "function") await refreshRecipePreviewMeals();
@@ -2018,6 +2022,7 @@ function closeMealPlannerDialog() {
     state?.editRequest?.abort();
     if (state) { state.editRequest = null; state.editLoading = false; }
     if (dialog?.open) {
+        clearMealPlannerActionPreview(dialog);
         dialog.close();
         state?.editOpener?.focus({preventScroll:true});
         // Member edits may have changed names on existing meal cards.
@@ -2026,21 +2031,28 @@ function closeMealPlannerDialog() {
     return false;
 }
 
-function clearMealPlannerRemovalPreview(menu) {
-    if (!menu) return;
-    (menu.mealRemovalPreviewCards || []).forEach(card => card.classList.remove("is-removal-preview"));
-    menu.mealRemovalPreviewCards = [];
+function clearMealPlannerActionPreview(owner) {
+    if (!owner) return;
+    (owner.mealActionPreviewCards || []).forEach(card => {
+        ["is-action-preview", "is-removal-preview", "is-edit-preview", "is-shopping-preview"].forEach(name => card.classList.remove(name));
+        const label = card.querySelector(".app-meal-action-preview-label");
+        if (label) label.textContent = "";
+    });
+    owner.mealActionPreviewCards = [];
 }
 
-function updateMealPlannerRemovalPreview(menu) {
-    clearMealPlannerRemovalPreview(menu);
-    if (!menu) return;
-    const open = menu.classList.contains("is-fallback-open") || (typeof menu.showPopover === "function" && menu.matches(":popover-open"));
-    if (!open) return;
-    const action = menu.mealRemovalPointer || menu.mealRemovalFocus;
-    const scope = action?.dataset.mealDeletePreview;
-    if (action?.disabled || !["meal", "batch"].includes(scope)) return;
-    const trigger = document.getElementById(menu.dataset.triggerId || "");
+function setMealPlannerActionPreview(owner, trigger, action) {
+    clearMealPlannerActionPreview(owner);
+    const previews = {
+        meal: {scope:"meal", style:"is-edit-preview", label:"Editing meal"},
+        batch: {scope:"batch", style:"is-edit-preview", label:"Editing prep plan", tasks:true},
+        shop: {scope:"batch", style:"is-shopping-preview", label:"Shopping batch"},
+        remove: {scope:"meal", style:"is-removal-preview", label:"Removal preview"},
+        "remove-batch": {scope:"batch", style:"is-removal-preview", label:"Removal preview", tasks:true},
+    };
+    const preview = Object.hasOwn(previews, action) ? previews[action] : null;
+    if (!owner || !preview) return;
+    const {scope} = preview;
     const id = scope === "batch" ? trigger?.dataset.batchId : trigger?.dataset.mealId;
     const panel = document.getElementById("plannerMealsPanel");
     const page = document.getElementById("mealPlannerPage");
@@ -2049,16 +2061,31 @@ function updateMealPlannerRemovalPreview(menu) {
     const meals = [...panel.querySelectorAll("[data-meal-plan-id]")].filter(card => (
         scope === "batch" ? card.dataset.mealPlanBatchId === id : card.dataset.mealPlanId === id
     ));
-    const tasks = scope === "batch" ? [...panel.querySelectorAll("[data-meal-prep-batch-id]")].filter(card => card.dataset.mealPrepBatchId === id) : [];
-    menu.mealRemovalPreviewCards = [...meals, ...tasks];
-    menu.mealRemovalPreviewCards.forEach(card => card.classList.add("is-removal-preview"));
+    const tasks = preview.tasks ? [...panel.querySelectorAll("[data-meal-prep-batch-id]")].filter(card => card.dataset.mealPrepBatchId === id) : [];
+    owner.mealActionPreviewCards = [...meals, ...tasks];
+    owner.mealActionPreviewCards.forEach(card => {
+        card.classList.add("is-action-preview");
+        card.classList.add(preview.style);
+        const label = card.querySelector(".app-meal-action-preview-label");
+        if (label) label.textContent = preview.label;
+    });
+}
+
+function updateMealPlannerActionPreview(menu) {
+    clearMealPlannerActionPreview(menu);
+    if (!menu) return;
+    const open = menu.classList.contains("is-fallback-open") || (typeof menu.showPopover === "function" && menu.matches(":popover-open"));
+    if (!open) return;
+    const action = menu.mealPreviewPointer || menu.mealPreviewFocus;
+    if (action?.disabled) return;
+    setMealPlannerActionPreview(menu, document.getElementById(menu.dataset.triggerId || ""), action?.dataset.mealActionPreview);
 }
 
 function closeMealPlannerCardMenu(menu, restoreFocus = false) {
     if (!menu) return;
-    clearMealPlannerRemovalPreview(menu);
-    menu.mealRemovalPointer = null;
-    menu.mealRemovalFocus = null;
+    clearMealPlannerActionPreview(menu);
+    menu.mealPreviewPointer = null;
+    menu.mealPreviewFocus = null;
     if (typeof menu.hidePopover === "function" && menu.matches(":popover-open")) menu.hidePopover();
     menu.classList.remove("is-fallback-open");
     if (menu.mealActionsDismiss) {
@@ -2092,23 +2119,23 @@ function toggleMealPlannerCardMenu(button) {
         };
         menu.addEventListener("pointerover", event => {
             if (event.pointerType === "touch") return;
-            menu.mealRemovalPointer = menuAction(event.target);
-            updateMealPlannerRemovalPreview(menu);
+            menu.mealPreviewPointer = menuAction(event.target);
+            updateMealPlannerActionPreview(menu);
         });
         menu.addEventListener("pointerout", event => {
             if (event.pointerType === "touch") return;
-            menu.mealRemovalPointer = menuAction(event.relatedTarget);
-            updateMealPlannerRemovalPreview(menu);
+            menu.mealPreviewPointer = menuAction(event.relatedTarget);
+            updateMealPlannerActionPreview(menu);
         });
         menu.addEventListener("focusin", event => {
-            menu.mealRemovalPointer = null;
-            menu.mealRemovalFocus = menuAction(event.target);
-            updateMealPlannerRemovalPreview(menu);
+            menu.mealPreviewPointer = null;
+            menu.mealPreviewFocus = menuAction(event.target);
+            updateMealPlannerActionPreview(menu);
         });
         menu.addEventListener("focusout", event => {
-            menu.mealRemovalPointer = null;
-            menu.mealRemovalFocus = menuAction(event.relatedTarget);
-            updateMealPlannerRemovalPreview(menu);
+            menu.mealPreviewPointer = null;
+            menu.mealPreviewFocus = menuAction(event.relatedTarget);
+            updateMealPlannerActionPreview(menu);
         });
         menu.addEventListener("toggle", event => {
             button.setAttribute("aria-expanded", String(event.newState === "open"));
@@ -2155,7 +2182,7 @@ function runMealPlannerCardAction(button, action) {
     const menu = button?.closest("[data-meal-card-menu]");
     const trigger = document.getElementById(menu?.dataset.triggerId || "");
     if (!menu || !trigger || !['meal', 'batch', 'remove', 'remove-batch', 'shop'].includes(action)) return false;
-    if (action === "remove-batch" && !trigger.dataset.batchId) return false;
+    if (["batch", "shop", "remove-batch"].includes(action) && !trigger.dataset.batchId) return false;
     closeMealPlannerCardMenu(menu, true);
     if (action === "shop") return openMealPlanShopping(trigger.dataset.batchId, trigger);
     if (action === "remove-batch") return openMealPlannerDeleteDialog(trigger, "batch");
@@ -2206,6 +2233,7 @@ async function loadMealPlannerEdit(scope) {
     const controller = state.editRequest = new AbortController();
     const edit = state.edit;
     edit.scope = scope;
+    setMealPlannerActionPreview(dialog, state.editOpener, scope);
     state.editLoading = true;
     const choices = dialog.querySelector("[data-meal-edit-scope]");
     choices.querySelectorAll("button").forEach(button => { button.disabled = true; });

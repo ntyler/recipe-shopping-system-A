@@ -26,7 +26,7 @@ function element(tag='button',attrs={}) {
  const classes=new Set();
  return {tag,attrs,dataset:Object.fromEntries(Object.entries(attrs).filter(([key])=>key.startsWith('data-')).map(([key,value])=>[camel(key.slice(5)),value])),
   checked:'checked' in attrs,disabled:'disabled' in attrs,hidden:'hidden' in attrs,value:attrs.value||'',textContent:'',focused:false,
-  classList:{toggle(value,on){if(on)classes.add(value);else classes.delete(value);},contains(value){return classes.has(value);}},
+  classList:{add(value){classes.add(value);},remove(value){classes.delete(value);},toggle(value,on){if(on)classes.add(value);else classes.delete(value);},contains(value){return classes.has(value);}},
   setAttribute(key,value){this.attrs[key]=value;},focus(){this.focused=true;document.activeElement=this;},
   matches(selector){return selector.split(',').some(part=>{part=part.trim();if(part.endsWith(':not(:disabled)')){if(this.disabled)return false;part=part.replace(/:not\(:disabled\)$/,'');}if(part===tag)return true;const match=part.match(/^\[([^=\]]+)(?:="([^"]*)")?\]$/);return !!match&&match[1] in attrs&&(match[2]===undefined||attrs[match[1]]===match[2]);});},
   closest(selector){return this.matches(selector)?this:null;},
@@ -49,18 +49,41 @@ function dialog(prefix){
  return {...element('dialog'),open:false,content,status,closeButton:close,
   querySelector(selector){if(selector==='['+prefix+'-content]')return content;if(selector==='['+prefix+'-status]')return status;return this.querySelectorAll(selector)[0]||null;},
   querySelectorAll(selector){return [close,...content.elements].filter(el=>el.matches(selector));},
-  showModal(){this.open=true;},close(){this.open=false;},
+  showModal(){this.open=true;},close(){this.open=false;this.onclose?.();},
  };
 }
 const shopping=dialog('data-meal-shopping'),lists=dialog('data-meal-shopping-lists');
-const document={activeElement:null,getElementById(id){return {mealPlanShoppingDialog:shopping,mealPlanShoppingListsDialog:lists}[id]||null;}};
+const calendar=[],page={hidden:false,inert:false,dataset:{mealWeek:'2026-09-21'}},mealsPanel={hidden:false,querySelectorAll(selector){
+ assert(['[data-meal-plan-id]','[data-meal-prep-batch-id]'].includes(selector),'Record IDs must not be interpolated into selectors');
+ return calendar.filter(item=>item.matches(selector));
+}};
+const document={activeElement:null,getElementById(id){return {mealPlanShoppingDialog:shopping,mealPlanShoppingListsDialog:lists,mealPlannerPage:page,plannerMealsPanel:mealsPanel}[id]||null;}};
 const calls=[],navigations=[];let respond=async()=>{throw new Error('Unexpected request');};
 const window={withCanonicalViewerUserId:url=>{const parsed=new URL(url,'https://example.test');parsed.searchParams.set('viewer_user_id','account-1');return parsed.pathname+parsed.search+parsed.hash;},location:{assign:url=>navigations.push(url)}};
 const ctx={window,document,console,AbortController,fetch:async(url,options)=>{
  const call={url,path:url.split('?')[0],options,body:options.body?JSON.parse(options.body):undefined};calls.push(call);return respond(call);
 }};
 vm.createContext(ctx);vm.runInContext(fs.readFileSync(process.argv[1],'utf8'),ctx);
+const appCode=fs.readFileSync(require('node:path').join(require('node:path').dirname(process.argv[1]),'app.js'),'utf8');
+vm.runInContext(appCode.slice(appCode.indexOf('function clearMealPlannerActionPreview('),appCode.indexOf('function updateMealPlannerActionPreview(')),ctx);
+vm.runInContext(appCode.slice(appCode.indexOf('function openMealPlanShopping('),appCode.indexOf('function openMealPlannerEditDialog(')),ctx);
+window.setMealPlannerActionPreview=ctx.setMealPlannerActionPreview;window.clearMealPlannerActionPreview=ctx.clearMealPlannerActionPreview;
 const UI=window.MealPlanShopping;
+function previewCards(batch='batch-1'){
+ calendar.length=0;
+ const meal=(id,batchId)=>{const item=element('article',{'data-meal-plan-id':id,'data-meal-plan-batch-id':batchId});item.recipeUrl='recipe://bread';return item;};
+ const items={target:meal('scheduled-1',batch),sibling:meal('scheduled-2',batch),otherBatch:meal('same-recipe-other','other-batch'),standalone:meal('single',''),prep:element('article',{'data-meal-prep-batch-id':batch})};
+ for(const item of Object.values(items)){item.label=element('span');item.querySelector=selector=>selector==='.app-meal-action-preview-label'?item.label:null;calendar.push(item);}
+ return items;
+}
+function assertShoppingPreview(items,expected){
+ for(const [name,item] of Object.entries(items)){
+  assert.equal(item.classList.contains('is-action-preview'),expected.includes(name),name+' action marker');
+  assert.equal(item.classList.contains('is-shopping-preview'),expected.includes(name),name+' shopping marker');
+  assert.equal(item.classList.contains('is-edit-preview'),false);assert.equal(item.classList.contains('is-removal-preview'),false);
+  assert.equal(item.label.textContent,expected.includes(name)?'Shopping batch':'');
+ }
+}
 const flush=async()=>{await new Promise(resolve=>setImmediate(resolve));await new Promise(resolve=>setImmediate(resolve));};
 const ok=data=>({ok:true,status:200,json:async()=>({ok:true,...data})});
 const fail=(error,status=500)=>({ok:false,status,json:async()=>({ok:false,error})});
@@ -113,6 +136,79 @@ def test_shopping_dialogs_have_accessible_scoped_controls_and_workspace_entry_po
     assert 'onclick="return openMealPlanShopping()"' in source
     assert 'onclick="return MealPlanShopping.openLists()"' in source
     assert 'data-meal-shopping-saved-lists' in source
+
+
+@requires_node
+def test_shop_batch_preview_persists_through_loading_review_and_source_selection_changes():
+    run_shopping(r"""
+const batch='batch"[raw]:1',items=previewCards(batch),opener=element('button',{'data-batch-id':batch});
+const first=deferred();respond=()=>first.promise;
+ctx.openMealPlanShopping(batch,opener);
+assert.equal(shopping.open,true);assertShoppingPreview(items,['target','sibling']);
+assert.equal(items.target.recipeUrl,items.otherBatch.recipeUrl,'Other batches of the same recipe stay unmarked');
+assert.deepEqual(calls[0].body,{selection:{batch_ids:[batch]}});assert.equal(calls.length,1);
+const data=review({sources:[source('batch',batch),source('meal','meal-1')],selection:{batch_ids:[batch],meal_ids:['meal-1']}});
+first.resolve(ok(data));await flush();assertShoppingPreview(items,['target','sibling']);
+let inputs=shopping.querySelectorAll('[data-shopping-source]');inputs[0].checked=false;change(inputs[0]);assertShoppingPreview(items,[]);
+inputs[0].checked=true;change(inputs[0]);assertShoppingPreview(items,['target','sibling']);
+const next=deferred();respond=()=>next.promise;click('review');assertShoppingPreview(items,['target','sibling']);
+assert.deepEqual(calls.at(-1).body,{selection:{batch_ids:[batch],meal_ids:['meal-1']}});
+next.resolve(ok(data));await flush();assertShoppingPreview(items,['target','sibling']);
+click('back');inputs=shopping.querySelectorAll('[data-shopping-source]');inputs[0].checked=false;change(inputs[0]);assertShoppingPreview(items,[]);
+await reviewStep(review({sources:[source('meal','meal-1')],selection:{batch_ids:[],meal_ids:['meal-1']}}));assertShoppingPreview(items,[]);
+assert.equal(calls.filter(call=>call.path.endsWith('/add')).length,0);
+UI.close();assertShoppingPreview(items,[]);assert.equal(opener.focused,true);
+""")
+
+
+@requires_node
+@pytest.mark.parametrize("dismissal", ["cancel", "native", "reopen"])
+def test_shop_batch_loading_preview_clears_and_late_response_cannot_restore_it(dismissal):
+    run_shopping(r"""
+const dismissal=__DISMISSAL__,items=previewCards(),opener=element('button',{'data-batch-id':'batch-1'}),pending=deferred();
+respond=()=>pending.promise;ctx.openMealPlanShopping('batch-1',opener);assertShoppingPreview(items,['target','sibling']);
+const signal=calls[0].options.signal;
+if(dismissal==='cancel')shopping.oncancel({preventDefault(){}});
+if(dismissal==='native')shopping.close();
+if(dismissal==='reopen'){
+ respond=async()=>ok(review({sources:[]}));ctx.openMealPlanShopping('',element());await flush();assert.equal(shopping.open,true);
+}else assert.equal(shopping.open,false);
+assert.equal(signal.aborted,true);assertShoppingPreview(items,[]);
+pending.resolve(ok(review()));await flush();assertShoppingPreview(items,[]);
+assert.equal(calls.filter(call=>call.path.endsWith('/add')).length,0);
+if(dismissal==='reopen')assert.equal(shopping.querySelectorAll('[data-shopping-source]').length,0,'A stale response must not restore the previous batch selection');
+""".replace("__DISMISSAL__", repr(dismissal)))
+
+
+@requires_node
+def test_shop_preview_survives_save_failure_and_busy_guards_then_clears_after_success():
+    run_shopping(r"""
+const items=previewCards(),opener=element('button',{'data-batch-id':'batch-1'});
+respond=async()=>ok(review());ctx.openMealPlanShopping('batch-1',opener);await flush();await reviewStep();
+assertShoppingPreview(items,['target','sibling']);
+const pending=deferred();respond=()=>pending.promise;click('save');click('save');UI.close();
+UI.open({week_start:'2026-10-05'},element());shopping.oncancel({preventDefault(){}});
+assert.equal(shopping.open,true);assertShoppingPreview(items,['target','sibling']);
+assert.equal(calls.filter(call=>call.path.endsWith('/add')).length,1);
+pending.resolve(fail('Could not save shopping list.'));await flush();assertShoppingPreview(items,['target','sibling']);
+assert.match(shopping.status.textContent,/Could not save/);assert.equal(shopping.open,true);
+respond=async()=>ok({list:{id:'saved-list',name:'Weekly prep'}});click('save');await flush();
+assertShoppingPreview(items,[]);assert.equal(shopping.open,true,'The success panel may remain open without marking an active shopping operation');
+assert.equal(calls.filter(call=>call.path.endsWith('/add')).length,2);assert.equal(shopping.querySelector('[data-shopping-action="save"]'),null);
+UI.close();assertShoppingPreview(items,[]);assert.equal(shopping.open,false);
+""")
+
+
+@requires_node
+def test_shop_preview_reconciles_missing_review_source_and_does_not_infer_batch_from_unrelated_opener():
+    run_shopping(r"""
+const items=previewCards(),opener=element('button',{'data-batch-id':'batch-1'});
+respond=async()=>ok(review({sources:[]}));ctx.openMealPlanShopping('batch-1',opener);await flush();assertShoppingPreview(items,[]);
+UI.close();respond=async()=>ok(review());UI.open({batch_ids:['other-batch']},opener);await flush();assertShoppingPreview(items,[]);
+UI.close();respond=async()=>fail('Review unavailable.');ctx.openMealPlanShopping('batch-1',opener);await flush();
+assert.match(shopping.status.textContent,/Review unavailable/);assertShoppingPreview(items,['target','sibling']);
+UI.close();assertShoppingPreview(items,[]);
+""")
 
 
 @requires_node
