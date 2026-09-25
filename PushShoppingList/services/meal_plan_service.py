@@ -24,6 +24,7 @@ from PushShoppingList.services import durable_document_runtime_service as durabl
 MEAL_PLAN_FILE = scoped_package_path("meal_plan.json")
 MEAL_PLAN_LOCK = threading.RLock()
 MEAL_TYPES = ("breakfast", "lunch", "dinner", "snack")
+_UNSET = object()
 
 
 def clean_text(value):
@@ -98,7 +99,11 @@ def normalize_member(value):
         return None
     member_id = clean_text(value.get("id"))
     name = clean_text(value.get("name"))
-    return {"id": member_id, "name": name} if member_id and name else None
+    return {
+        "id": member_id,
+        "name": name,
+        "archived": value.get("archived") is True,
+    } if member_id and name else None
 
 
 def normalize_member_name(value):
@@ -127,6 +132,8 @@ def normalize_member_portions(value, members=None):
             continue
         if strict and member_id not in members:
             raise ValueError("Choose family members from your current workspace.")
+        if strict and members[member_id].get("archived"):
+            raise ValueError("That family member is archived. Restore them in Family Members before assigning new meals.")
         try:
             servings = normalize_positive_servings(item.get("servings"), "Family member portions")
         except ValueError:
@@ -139,30 +146,65 @@ def normalize_member_portions(value, members=None):
     return portions
 
 
+def meal_plan_member_summary(member, meals):
+    """Count scheduled meals once each, regardless of portions or batch size."""
+    meal_ids = {
+        meal["id"] for meal in meals
+        if any(portion["member_id"] == member["id"] for portion in meal.get("member_portions") or [])
+    }
+    return {**member, "meal_count": len(meal_ids)}
+
+
+def list_meal_plan_members(include_archived=False):
+    payload = load_meal_plan()
+    return [
+        meal_plan_member_summary(member, payload["meals"])
+        for member in payload["members"]
+        if include_archived or not member["archived"]
+    ]
+
+
+def validate_unique_member_name(name, members, member_id=None):
+    existing = next((
+        member for member in members
+        if member["id"] != member_id and member["name"].casefold() == name.casefold()
+    ), None)
+    if existing:
+        if existing["archived"]:
+            raise ValueError("An archived family member with that name already exists. Restore them in Family Members.")
+        raise ValueError("A family member with that name already exists.")
+
+
 def add_meal_plan_member(name):
     name = normalize_member_name(name)
     with MEAL_PLAN_LOCK:
         payload = load_meal_plan()
-        if any(member["name"].casefold() == name.casefold() for member in payload["members"]):
-            raise ValueError("A family member with that name already exists.")
-        member = {"id": uuid.uuid4().hex, "name": name}
+        validate_unique_member_name(name, payload["members"])
+        member = {"id": uuid.uuid4().hex, "name": name, "archived": False}
         payload["members"].append(member)
         save_meal_plan(payload)
-        return member
+        return meal_plan_member_summary(member, payload["meals"])
 
 
-def update_meal_plan_member(member_id, name):
-    name = normalize_member_name(name)
+def update_meal_plan_member(member_id, name=_UNSET, *, archived=_UNSET):
+    if name is _UNSET and archived is _UNSET:
+        raise ValueError("Provide a name or archived status to update.")
+    if name is not _UNSET:
+        name = normalize_member_name(name)
+    if archived is not _UNSET and not isinstance(archived, bool):
+        raise ValueError("Archived must be true or false.")
     with MEAL_PLAN_LOCK:
         payload = load_meal_plan()
         member = next((item for item in payload["members"] if item["id"] == clean_text(member_id)), None)
         if not member:
             return None
-        if any(item["id"] != member["id"] and item["name"].casefold() == name.casefold() for item in payload["members"]):
-            raise ValueError("A family member with that name already exists.")
-        member["name"] = name
+        if name is not _UNSET:
+            validate_unique_member_name(name, payload["members"], member["id"])
+            member["name"] = name
+        if archived is not _UNSET:
+            member["archived"] = archived
         save_meal_plan(payload)
-        return member
+        return meal_plan_member_summary(member, payload["meals"])
 
 
 def planned_servings_from_yield(value):

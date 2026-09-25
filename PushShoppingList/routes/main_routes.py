@@ -173,6 +173,7 @@ from PushShoppingList.services.meal_plan_service import add_meal_plan_member
 from PushShoppingList.services.meal_plan_service import delete_meal
 from PushShoppingList.services.meal_plan_service import delete_meal_prep_batch
 from PushShoppingList.services.meal_plan_service import load_meal_plan
+from PushShoppingList.services.meal_plan_service import list_meal_plan_members
 from PushShoppingList.services.meal_plan_service import meal_prep_batch_summary
 from PushShoppingList.services.meal_plan_service import meal_plan_yield_label
 from PushShoppingList.services.meal_plan_service import meal_plan_home_preview
@@ -5961,6 +5962,29 @@ def global_search_results_route():
     )
 
 
+@main_bp.route("/settings/family-members")
+def family_members_route():
+    if not current_public_user() and not is_guest_session():
+        return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+    viewer_user_id = validate_master_data_viewer_scope()
+    return render_template(
+        "family_members.html",
+        family_members={
+            "members": list_meal_plan_members(include_archived=True),
+            "viewer_user_id": "" if is_guest_session() else viewer_user_id,
+            "settings_url": url_for("main_bp.index", _anchor="settingsProfilePanel"),
+            "meal_planner_url": url_for("main_bp.index", _anchor="mealPlannerPage"),
+            "api_url": url_for("main_bp.meal_plan_members_route"),
+        },
+        current_user=current_public_user(),
+        is_guest_demo=is_guest_session(),
+        app_css_version=static_asset_version("css/app.css"),
+        app_js_version=static_asset_version("js/app.js"),
+        family_members_css_version=static_asset_version("css/family-members.css"),
+        family_members_js_version=static_asset_version("js/family-members.js"),
+    )
+
+
 @main_bp.route("/api/meal-plan", methods=["GET"])
 def recipe_meal_plan_entries_route():
     if not current_public_user() and not is_guest_session():
@@ -5989,8 +6013,10 @@ def recipe_meal_plan_entries_route():
 def meal_plan_members_route():
     if not current_public_user() and not is_guest_session():
         return jsonify({"ok": False, "error": "Sign in or start a guest workspace to manage family members."}), 403
+    validate_master_data_viewer_scope()
     if request.method == "GET":
-        return jsonify({"ok": True, "members": load_meal_plan()["members"]})
+        include_archived = request.args.get("include_archived", "false").strip().lower() == "true"
+        return jsonify({"ok": True, "members": list_meal_plan_members(include_archived=include_archived)})
     payload = request.get_json(silent=True)
     try:
         member = add_meal_plan_member(payload.get("name") if isinstance(payload, dict) else None)
@@ -6003,9 +6029,12 @@ def meal_plan_members_route():
 def update_meal_plan_member_route(member_id):
     if not current_public_user() and not is_guest_session():
         return jsonify({"ok": False, "error": "Sign in or start a guest workspace to manage family members."}), 403
+    validate_master_data_viewer_scope()
     payload = request.get_json(silent=True)
     try:
-        member = update_meal_plan_member(member_id, payload.get("name") if isinstance(payload, dict) else None)
+        if not isinstance(payload, dict) or not payload or set(payload) - {"name", "archived"}:
+            raise ValueError("Provide a name or archived status to update.")
+        member = update_meal_plan_member(member_id, **payload)
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
     if not member:

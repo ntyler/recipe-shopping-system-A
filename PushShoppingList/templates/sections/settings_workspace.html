@@ -59,6 +59,11 @@
                 </button>
 
                 <div class="settings-category-group-label">Preferences</div>
+                <a class="settings-category-button"
+                   href="{{ url_for('main_bp.family_members_route') }}">
+                    {{ shell.svg_icon("user") }}
+                    <span>Family Members</span>
+                </a>
                 <button type="button"
                         class="settings-category-button"
                         data-settings-nav-button

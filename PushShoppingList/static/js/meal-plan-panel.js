@@ -16,7 +16,7 @@
         constructor(form, options) {
             this.form = form;
             this.options = options;
-            this.ui = {openDays:new Set(), openSections:new Set(), names:{}, newName:'', busy:false, memberBusy:false, loading:false, membersLoaded:false, message:'', error:false};
+            this.ui = {openDays:new Set(), openSections:new Set(), names:{}, newName:'', busy:false, memberBusy:false, loading:false, membersLoaded:false, memberReview:[], message:'', error:false};
             this.draft = root.MealPlanSchedule.create({today:options.today, servings:options.servings, members:[]});
             this.form.classList.add('meal-schedule-panel');
             form.addEventListener('submit', event => this.submit(event));
@@ -30,17 +30,22 @@
             this.form.hidden = false;
             this.form.scrollIntoView({block:'start'});
             this.form.querySelector('[data-schedule-mode][aria-pressed="true"]')?.focus({preventScroll:true});
-            if (!this.ui.membersLoaded && !this.ui.loading) await this.loadMembers();
+            await this.loadMembers();
         }
 
         async loadMembers() {
+            // List refreshes and member mutations must not overwrite one another.
+            if (this.ui.loading || this.ui.busy || this.ui.memberBusy) return;
             this.ui.loading = true;
             this.render();
             try {
                 const response = await fetch('/api/meal-plan/members');
                 const data = await response.json();
                 if (!response.ok || !data.ok) throw new Error(data.error || 'Unable to load family members.');
-                root.MealPlanSchedule.setMembers(this.draft, data.members);
+                if (!Array.isArray(data.members)) throw new Error('Unable to load family members.');
+                // A member added elsewhere becomes an available choice without
+                // silently increasing portions in an already configured draft.
+                this.syncMembers(data.members, {newMembersEnabled:!this.ui.membersLoaded});
                 this.ui.membersLoaded = true;
                 this.ui.message = '';
                 this.ui.error = false;
@@ -49,6 +54,17 @@
         }
 
         setMessage(message, error = false) { this.ui.message = message; this.ui.error = error; }
+
+        syncMembers(members, options) {
+            const previousMembers = this.draft.members;
+            root.MealPlanSchedule.setMembers(this.draft, members, options);
+            const removed = previousMembers.filter(member => !this.draft.members.some(active => active.id === member.id));
+            if (removed.length) {
+                this.ui.memberReview = [...new Set([...this.ui.memberReview, ...removed.map(member => member.name)])];
+                this.ui.openSections.add('members');
+                removed.forEach(member => { delete this.ui.names[member.id]; });
+            }
+        }
 
         captureOpen() {
             this.form.querySelectorAll('details[data-schedule-day]').forEach(item => {
@@ -107,6 +123,9 @@
         static html(draft, ui, recipeTitle = '') {
             const model = root.MealPlanSchedule, totals = model.summary(draft);
             const disabled = ui.busy || ui.memberBusy;
+            const reviewRequired = draft.portionMode === 'family' && ui.memberReview.length > 0;
+            const manageMembersUrl = typeof root.withCanonicalViewerUserId === 'function'
+                ? root.withCanonicalViewerUserId('/settings/family-members') : '/settings/family-members';
             const dateModes = [['single','One day'],['range','Date range'],['days','Select days']];
             let dates = draft.dateMode === 'single'
                 ? `<label>Date<input type="date" data-schedule-field="single-date" data-focus-key="single-date" value="${esc(draft.singleDate)}" required></label>`
@@ -135,16 +154,18 @@
                 ${draft.portionMode === 'family' ? '<p>Unchecked means not eating this meal.</p>' : ''}
                 <button type="button" data-schedule-action="apply" data-focus-key="apply">Apply to selected days</button>
                 <details class="meal-schedule-members" data-schedule-section="members" ${ui.openSections.has('members') || (draft.portionMode === 'family' && !draft.members.length) ? 'open' : ''}><summary>Family members</summary>
+                    <p><a href="${esc(manageMembersUrl)}" target="_blank" rel="noopener">Manage Family Members</a> (opens in a new tab). Refresh members here after making changes.</p>
                     ${ui.loading ? '<p>Loading family members…</p>' : ''}
-                    ${!ui.membersLoaded && !ui.loading ? '<button type="button" data-schedule-action="retry-members">Retry loading members</button>' : ''}
-                    ${draft.members.map(member => `<div class="meal-schedule-member-row"><label>Name<input type="text" maxlength="100" data-member-name="${esc(member.id)}" data-focus-key="member-${esc(member.id)}" value="${esc(ui.names[member.id] ?? member.name)}"></label><button type="button" data-schedule-action="save-member" data-member="${esc(member.id)}">Save name</button></div>`).join('')}
-                    <div class="meal-schedule-member-row"><label>New family member<input type="text" maxlength="100" data-new-member data-focus-key="new-member" value="${esc(ui.newName)}" placeholder="Name"></label><button type="button" data-schedule-action="add-member" ${!ui.membersLoaded ? 'disabled' : ''}>Add member</button></div>
+                    <button type="button" data-schedule-action="retry-members" data-focus-key="refresh-members" ${ui.loading ? 'disabled' : ''}>${ui.membersLoaded ? 'Refresh members' : 'Retry loading members'}</button>
+                    ${draft.members.map(member => `<div class="meal-schedule-member-row"><label>Name<input type="text" maxlength="100" data-member-name="${esc(member.id)}" data-focus-key="member-${esc(member.id)}" value="${esc(ui.names[member.id] ?? member.name)}"></label><button type="button" data-schedule-action="save-member" data-member="${esc(member.id)}" ${ui.loading ? 'disabled' : ''}>Save name</button></div>`).join('')}
+                    <div class="meal-schedule-member-row"><label>New family member<input type="text" maxlength="100" data-new-member data-focus-key="new-member" value="${esc(ui.newName)}" placeholder="Name"></label><button type="button" data-schedule-action="add-member" ${!ui.membersLoaded || ui.loading ? 'disabled' : ''}>Add member</button></div>
                 </details><label class="meal-schedule-notes">Meal-prep notes (optional)<textarea rows="2" data-schedule-field="notes" data-focus-key="notes" placeholder="Notes shared by this meal plan">${esc(draft.notes)}</textarea></label></section>
                 <section><h3>Scheduled meals</h3><p>Expand a day to adjust meals, people, and portions.</p><div class="meal-schedule-days">${dayCards || '<p>Select dates to build your schedule.</p>'}</div>
                 <details class="meal-schedule-prep" data-schedule-section="prep" ${ui.openSections.has('prep') ? 'open' : ''}><summary>Prep tasks (optional)</summary><p>Schedule preparation on its own dates.</p>${draft.prepSteps.map((step,index) => `<div class="meal-schedule-prep-row"><label>Prep date<input type="date" data-schedule-field="prep-date" data-step="${index}" data-focus-key="prep-date-${index}" value="${esc(step.date)}" required></label><label>Task<input type="text" maxlength="2000" data-schedule-field="prep-instruction" data-step="${index}" data-focus-key="prep-instruction-${index}" value="${esc(step.instruction)}" placeholder="e.g. Chop vegetables" required></label><button type="button" data-schedule-action="remove-prep" data-step="${index}" aria-label="Remove prep task ${index+1}">Remove</button></div>`).join('')}<button type="button" data-schedule-action="add-prep">Add prep task</button></details></section></div>
                 <div class="meal-schedule-summary" data-schedule-summary aria-live="polite">${MealPlanPanel.summaryHtml(draft, totals)}</div>
+                ${ui.memberReview.length ? `<p role="alert">No longer active: ${esc(ui.memberReview.join(', '))}. Their portions were removed from this draft. Review the updated family portions and totals before saving.</p><button type="button" data-schedule-action="review-members">Use updated family list</button>` : ''}
                 <p class="meal-schedule-errors" data-schedule-errors role="status">${esc(totals.errors.join(' '))}</p>
-                <div class="meal-schedule-footer"><button type="button" data-schedule-action="cancel">Cancel</button><button type="submit" class="is-primary" data-schedule-submit ${!totals.valid ? 'disabled' : ''}>${ui.busy ? 'Saving…' : `Add ${totals.mealCount} ${totals.mealCount === 1 ? 'meal' : 'meals'}`}</button></div></fieldset>
+                <div class="meal-schedule-footer"><button type="button" data-schedule-action="cancel">Cancel</button><button type="submit" class="is-primary" data-schedule-submit ${!totals.valid || ui.loading || reviewRequired ? 'disabled' : ''}>${ui.busy ? 'Saving…' : `Add ${totals.mealCount} ${totals.mealCount === 1 ? 'meal' : 'meals'}`}</button></div></fieldset>
                 <p class="recipe-preview-status ${ui.error ? 'is-error' : ''}" data-schedule-status role="${ui.error ? 'alert' : 'status'}">${esc(ui.message)}</p>`;
         }
 
@@ -157,7 +178,7 @@
             this.form.querySelector('[data-schedule-summary]').innerHTML = MealPlanPanel.summaryHtml(this.draft, totals);
             this.form.querySelector('[data-schedule-errors]').textContent = totals.errors.join(' ');
             const button = this.form.querySelector('[data-schedule-submit]');
-            button.disabled = !totals.valid || this.ui.busy;
+            button.disabled = !totals.valid || this.ui.busy || this.ui.loading || (this.draft.portionMode === 'family' && this.ui.memberReview.length > 0);
             button.textContent = `Add ${totals.mealCount} ${totals.mealCount === 1 ? 'meal' : 'meals'}`;
             totals.days.forEach(day => {
                 const total = this.form.querySelector(`[data-day-total="${day.date}"]`);
@@ -264,6 +285,7 @@
                     break;
                 case 'remove-prep': draft.prepSteps.splice(Number(button.dataset.step), 1); break;
                 case 'retry-members': await this.loadMembers(); return;
+                case 'review-members': this.ui.memberReview = []; this.setMessage('Updated family list accepted.'); break;
                 case 'add-member': await this.saveMember(); return;
                 case 'save-member': await this.saveMember(button.dataset.member); return;
                 default: return;
@@ -272,6 +294,7 @@
         }
 
         async saveMember(id) {
+            if (this.ui.loading || this.ui.busy || this.ui.memberBusy) return;
             const name = String(id ? this.ui.names[id] ?? this.draft.members.find(member => member.id === id)?.name : this.ui.newName).trim();
             if (!name) { this.setMessage('Enter a family member’s name.', true); this.render(); return; }
             this.ui.memberBusy = true;
@@ -282,7 +305,7 @@
                 const data = await response.json();
                 if (!response.ok || !data.ok) throw new Error(data.error || 'Unable to save this family member.');
                 const members = id ? this.draft.members.map(member => member.id === id ? data.member : member) : [...this.draft.members, data.member];
-                root.MealPlanSchedule.setMembers(this.draft, members);
+                this.syncMembers(members);
                 if (id) delete this.ui.names[id]; else this.ui.newName = '';
                 this.setMessage('Family member saved.');
                 this.options.onMembersChanged?.();
@@ -293,6 +316,11 @@
         async submit(event) {
             event.preventDefault();
             if (this.ui.busy || this.ui.memberBusy) return;
+            if (this.ui.loading) { this.setMessage('Wait for family members to finish loading.', true); this.render(); return; }
+            if (this.draft.portionMode === 'family' && this.ui.memberReview.length) {
+                this.setMessage('Review the updated portions, then choose “Use updated family list” before saving.', true);
+                this.render(); return;
+            }
             let payload;
             try { payload = root.MealPlanSchedule.payload(this.draft); }
             catch (error) { this.setMessage(error.message, true); this.render(); return; }
@@ -319,6 +347,7 @@
             this.draft = root.MealPlanSchedule.create({today:this.options.today, servings:this.options.servings, members});
             this.ui.busy = false;
             this.ui.openDays.clear();
+            this.ui.memberReview = [];
             this.setMessage('Meal plan saved.');
             this.render();
             this.form.hidden = true;

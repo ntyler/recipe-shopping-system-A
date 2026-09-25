@@ -1969,11 +1969,15 @@ function openMealPlannerDialog(dateValue = "", mealType = "") {
         MealPlanSchedule.setMeals(state.panel.draft, [state.meal]);
         state.panel.ui.openDays.clear();
         state.panel.ui.openSections.clear();
+        state.panel.ui.memberReview = [];
         state.panel.setMessage("");
     }
     setMealPlannerStatus("");
     syncMealPlannerServingsFromRecipe();
     dialog.showModal();
+    // Reusing the controller must still pick up archived, restored, or renamed
+    // members from Settings. Recipe changes alone do not trigger extra refreshes.
+    if (state.panel) void state.panel.loadMembers();
     dialog.querySelector("#mealPlannerRecipe")?.focus();
     return false;
 }

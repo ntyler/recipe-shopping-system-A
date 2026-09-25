@@ -80,7 +80,7 @@
     function normalizedMembers(members) {
         const seen = new Set();
         return (Array.isArray(members) ? members : []).filter(member => {
-            if (!member || typeof member.id !== 'string' || !member.id || seen.has(member.id)) return false;
+            if (!member || member.archived === true || typeof member.id !== 'string' || !member.id || seen.has(member.id)) return false;
             seen.add(member.id);
             return true;
         }).map(member => ({id: member.id, name: String(member.name || '')}));
@@ -239,11 +239,12 @@
         return draft;
     }
 
-    function setMembers(draft, members) {
+    function setMembers(draft, members, {newMembersEnabled = true} = {}) {
         draft.members = normalizedMembers(members);
         const defaults = newFamilyDefaults(draft.members);
         for (const member of draft.members) {
             if (Object.hasOwn(draft.familyDefaults, member.id)) defaults[member.id] = draft.familyDefaults[member.id];
+            else if (!newMembersEnabled) MEAL_TYPES.forEach(meal => { defaults[member.id][meal].enabled = false; });
         }
         draft.familyDefaults = defaults;
         Object.values(draft.days).forEach(day => {

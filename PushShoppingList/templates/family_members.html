@@ -1,0 +1,74 @@
+{% extends "layouts/app_layout.html" %}
+{% set app_page_title = "Family Members · AI Pantry" %}
+{% set app_shell_mode = "route" %}
+{% set app_active_nav_item = "settings" %}
+{% set app_search_id = "familyMembersGlobalSearch" %}
+{% set app_content_class = "master-data-app-content family-members-app-content" %}
+
+{% block app_body_attributes %}
+data-user-id="{{ family_members.viewer_user_id }}"
+data-viewer-user-id="{{ family_members.viewer_user_id }}"
+{% endblock %}
+
+{% block app_styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/family-members.css', v=family_members_css_version) }}">
+{% endblock %}
+
+{% block app_content %}
+<section class="master-data-page family-members-page" aria-labelledby="familyMembersTitle"
+         data-family-members-page data-api-url="{{ family_members.api_url }}">
+    <script id="familyMembersData" type="application/json">{{ family_members.members | tojson }}</script>
+    <header class="master-data-header">
+        <div>
+            <a class="master-data-home-link" href="{{ family_members.settings_url }}">Settings</a>
+            <h1 id="familyMembersTitle">Family Members (<span data-family-total>{{ family_members.members | length }}</span>)</h1>
+            <p>Manage the people available when planning meals for your household.</p>
+            <div class="family-members-summary" aria-label="Family member summary">
+                <span><strong data-family-active>{{ family_members.members | rejectattr('archived') | list | length }}</strong> active</span>
+                <span><strong data-family-archived>{{ family_members.members | selectattr('archived') | list | length }}</strong> archived</span>
+                <span><strong data-family-used>{{ family_members.members | selectattr('meal_count') | list | length }}</strong> in use</span>
+            </div>
+        </div>
+        <div class="family-members-header-actions">
+            <a href="{{ family_members.meal_planner_url }}" class="family-members-link">Meal Planner</a>
+            <button type="button" class="family-members-primary" data-family-add
+                    aria-controls="familyMemberCreate" aria-expanded="false">{{ shell.svg_icon('plus') }} Add member</button>
+        </div>
+    </header>
+
+    <div class="family-members-status" role="status" aria-live="polite" data-family-status hidden></div>
+    <section class="unit-master-panel family-members-panel" aria-labelledby="familyMemberRegistryTitle">
+        <h2 id="familyMemberRegistryTitle" class="sr-only">Saved family members</h2>
+        <div class="family-members-toolbar">
+            <strong data-family-visible-count aria-live="polite"></strong>
+            <button type="button" data-family-refresh>Refresh</button>
+        </div>
+        <div class="family-members-filters">
+            <label>Search<input type="search" placeholder="Member name" autocomplete="off" data-family-search></label>
+            <label>Status<select data-family-filter><option value="active">Active</option><option value="all">All</option><option value="archived">Archived</option></select></label>
+        </div>
+        <form id="familyMemberCreate" class="family-members-create" data-family-create hidden>
+            <label for="familyMemberNewName">New family member
+                <input id="familyMemberNewName" type="text" name="name" maxlength="100" required autocomplete="off" placeholder="Name" aria-describedby="familyMemberCreateError">
+            </label>
+            <button type="submit" class="family-members-primary">Add member</button>
+            <button type="button" data-family-cancel-create>Cancel</button>
+            <p id="familyMemberCreateError" class="family-members-error" role="alert" data-family-create-error hidden></p>
+        </form>
+        <div class="master-data-table-wrap family-members-table-wrap">
+            <table class="master-data-table family-members-table">
+                <caption class="sr-only">Saved family members, status, scheduled meal usage, and actions</caption>
+                <thead><tr><th scope="col">Name</th><th scope="col">Status</th><th scope="col">Used in meal plans</th><th scope="col">Actions</th></tr></thead>
+                <tbody data-family-rows></tbody>
+            </table>
+        </div>
+        <p class="family-members-empty" data-family-empty hidden></p>
+        <p class="family-members-help">Usage counts include scheduled meals assigned to each member. Archived members stay in existing meal plans. Restore them to include them in new meals.</p>
+        <noscript><p>Enable JavaScript to manage family members.</p></noscript>
+    </section>
+</section>
+{% endblock %}
+
+{% block app_scripts %}
+<script src="{{ url_for('static', filename='js/family-members.js', v=family_members_js_version) }}" defer></script>
+{% endblock %}
