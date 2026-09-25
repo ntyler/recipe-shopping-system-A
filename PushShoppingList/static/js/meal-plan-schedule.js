@@ -129,6 +129,20 @@
         });
     }
 
+    // Recipe-specific portions follow the shared schedule, including individual
+    // day meal choices and notes. Neither source draft is changed.
+    function withPortions(shared, portions) {
+        const draft = clone(shared);
+        for (const key of ['portionMode', 'householdDefaults', 'familyDefaults']) draft[key] = clone(portions[key]);
+        setMembers(draft, shared.members, {newMembersEnabled: false});
+        Object.values(draft.days).forEach(day => {
+            day.overrides.household = false;
+            day.overrides.family = false;
+        });
+        syncDefaults(draft);
+        return draft;
+    }
+
     function refreshDates(draft) {
         if (draft.dateMode === 'single') draft.selectedDates = parseDate(draft.singleDate) ? [draft.singleDate] : [];
         else if (draft.dateMode === 'range') draft.selectedDates = dateRange(draft.startDate, draft.endDate);
@@ -512,6 +526,6 @@
         setDateMode, setSingleDate, setRange, setDates, toggleDate, setPortionMode, setMeals,
         setHouseholdDefault, setFamilyDefault, setDayMeal, setDayHousehold, setDayFamily,
         setDayNotes, setMealNotes, mealPortionMode, canAssignMember, fromSaved,
-        applyDefaults, setMembers, setGroups, selectGroupMembers, summary, payload
+        applyDefaults, setMembers, setGroups, selectGroupMembers, withPortions, summary, payload
     });
 })(globalThis);

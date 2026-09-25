@@ -72,6 +72,7 @@
         }
 
         async loadMembers() {
+            if (this.options.loadMembers) return this.options.loadMembers();
             // List refreshes and member mutations must not overwrite one another.
             if (this.ui.loading || this.ui.busy || this.ui.memberBusy) return;
             const generation = this.generation;
@@ -128,7 +129,7 @@
             const active = this.form.contains(document.activeElement) ? document.activeElement : null;
             const key = active?.dataset.focusKey;
             const position = active && ['text','search'].includes(active.type) ? active.selectionStart : null;
-            this.form.innerHTML = MealPlanPanel.html(this.draft, this.ui, this.edit?.title || this.options.title);
+            this.form.innerHTML = MealPlanPanel.html(this.draft, this.ui, this.edit?.title || this.options.title, this.options);
             const footer = this.form.querySelector('.meal-schedule-footer');
             if (footer) footer.hidden = Boolean(this.options.onSubmit && !this.edit);
             if (key) {
@@ -209,13 +210,28 @@
                 ${MealPlanPanel.groupChooser(draft, ui, manageMembersUrl)}</section>`;
         }
 
-        static html(draft, ui, recipeTitle = '') {
+        static portionModes(draft) {
+            return `<h3>Who is eating?</h3><div class="recipe-preview-segment meal-schedule-modes" role="group" aria-label="Portion allocation">${[['household','Household total'],['family','By family member']].map(([mode,label]) => `<button type="button" data-schedule-portion-mode="${mode}" data-focus-key="portion-mode-${mode}" aria-pressed="${draft.portionMode === mode}">${label}</button>`).join('')}</div>`;
+        }
+
+        static memberReviewHtml(ui) {
+            return ui.memberReview.length ? `<p role="alert">No longer active: ${esc(ui.memberReview.join(', '))}. Their portions were removed from this draft. Review the updated family portions and totals before saving.</p><button type="button" data-schedule-action="review-members">Use updated family list</button>` : '';
+        }
+
+        static html(draft, ui, recipeTitle = '', options = {}) {
             const model = root.MealPlanSchedule, totals = model.summary(draft);
             const singleEdit = draft.edit?.scope === 'meal';
             const disabled = ui.busy || ui.memberBusy || ui.saved;
             const reviewRequired = draft.portionMode === 'family' && ui.memberReview.length > 0;
             const manageMembersUrl = typeof root.withCanonicalViewerUserId === 'function'
                 ? root.withCanonicalViewerUserId('/settings/family-members') : '/settings/family-members';
+            if (options.portionsOnly) return `<fieldset ${disabled ? 'disabled' : ''}>
+                <p>People and portions for this recipe. Dates, meal types, notes, and prep tasks follow the shared plan.</p>
+                ${MealPlanPanel.portionModes(draft)}${MealPlanPanel.peopleSection(draft, ui, manageMembersUrl)}
+                <div class="meal-schedule-summary" data-schedule-summary aria-live="polite">${MealPlanPanel.summaryHtml(draft, totals)}</div>
+                ${MealPlanPanel.memberReviewHtml(ui)}
+                <p class="meal-schedule-errors" data-schedule-errors role="status">${esc(MealPlanPanel.validationMessage(draft, ui, totals))}</p></fieldset>
+                <p class="recipe-preview-status ${ui.error ? 'is-error' : ''}" data-schedule-status role="${ui.error ? 'alert' : 'status'}">${esc(ui.message)}</p>`;
             const dateModes = [['single','One day'],['range','Date range'],['days','Select days']];
             let dates = draft.dateMode === 'single'
                 ? `<label>Date<input type="date" data-schedule-field="single-date" data-focus-key="single-date" value="${esc(draft.singleDate)}" required></label>`
@@ -237,7 +253,7 @@
                 <fieldset ${disabled ? 'disabled' : ''}>${singleEdit ? '<p>Changes apply only to this scheduled meal.</p>' : `<div class="recipe-preview-segment meal-schedule-modes" role="group" aria-label="Date selection">${dateModes.map(([mode,label]) => `<button type="button" data-schedule-mode="${mode}" data-focus-key="mode-${mode}" aria-pressed="${draft.dateMode === mode}">${label}</button>`).join('')}</div>`}
                 <div class="meal-schedule-dates">${dates}</div>
                 <div class="meal-schedule-meals">${singleEdit ? `<label>Meal<select data-schedule-field="single-meal" data-focus-key="single-meal">${model.MEAL_TYPES.map(meal => `<option value="${meal}" ${draft.mealTypes[0] === meal ? 'selected' : ''}>${title(meal)}</option>`).join('')}</select></label>` : `<strong>Meals on selected days</strong>${model.MEAL_TYPES.map(meal => MealPlanPanel.check(meal, draft.mealTypes.includes(meal), 'meal', `data-focus-key="meal-${meal}"`)).join('')}`}</div>
-                <div class="meal-schedule-columns"><section><h3>Who is eating?</h3><div class="recipe-preview-segment meal-schedule-modes" role="group" aria-label="Portion allocation">${[['household','Household total'],['family','By family member']].map(([mode,label]) => `<button type="button" data-schedule-portion-mode="${mode}" data-focus-key="portion-mode-${mode}" aria-pressed="${draft.portionMode === mode}">${label}</button>`).join('')}</div>
+                <div class="meal-schedule-columns"><section>${MealPlanPanel.portionModes(draft)}
                 ${MealPlanPanel.peopleSection(draft, ui, manageMembersUrl)}
                 <div data-schedule-apply ${totals.days.some(day => day.customized) ? '' : 'hidden'}><p class="meal-schedule-apply-help">Some days have individual changes. Apply these portions to replace those changes.</p><button type="button" data-schedule-action="apply" data-focus-key="apply">Apply to selected days</button></div>
                 <details class="meal-schedule-members" data-schedule-section="members" ${ui.openSections.has('members') ? 'open' : ''}><summary>Add or edit people</summary>
@@ -249,7 +265,7 @@
                 ${singleEdit ? '' : `<section><h3>Scheduled meals</h3><p>Expand a day to adjust meals, people, and portions.</p><div class="meal-schedule-days">${dayCards || '<p>Select dates to build your schedule.</p>'}</div>
                 <details class="meal-schedule-prep" data-schedule-section="prep" ${ui.openSections.has('prep') ? 'open' : ''}><summary>Prep tasks (optional)</summary><p>Schedule preparation on its own dates.</p>${draft.prepSteps.map((step,index) => `<div class="meal-schedule-prep-row"><label>Prep date<input type="date" data-schedule-field="prep-date" data-step="${index}" data-focus-key="prep-date-${index}" value="${esc(step.date)}" required></label><label>Task<input type="text" maxlength="2000" data-schedule-field="prep-instruction" data-step="${index}" data-focus-key="prep-instruction-${index}" value="${esc(step.instruction)}" placeholder="e.g. Chop vegetables" required></label><button type="button" data-schedule-action="remove-prep" data-step="${index}" aria-label="Remove prep task ${index+1}">Remove</button></div>`).join('')}<button type="button" data-schedule-action="add-prep">Add prep task</button></details></section>`}</div>
                 <div class="meal-schedule-summary" data-schedule-summary aria-live="polite">${MealPlanPanel.summaryHtml(draft, totals)}</div>
-                ${ui.memberReview.length ? `<p role="alert">No longer active: ${esc(ui.memberReview.join(', '))}. Their portions were removed from this draft. Review the updated family portions and totals before saving.</p><button type="button" data-schedule-action="review-members">Use updated family list</button>` : ''}
+                ${MealPlanPanel.memberReviewHtml(ui)}
                 <p class="meal-schedule-errors" data-schedule-errors role="status">${esc(MealPlanPanel.validationMessage(draft, ui, totals))}</p>
                 <div class="meal-schedule-footer"><button type="button" data-schedule-action="cancel">Cancel</button><button type="submit" class="is-primary" data-schedule-submit ${!totals.valid || ui.loading || reviewRequired || ui.saved ? 'disabled' : ''}>${ui.busy ? 'Saving…' : draft.edit ? 'Save changes' : `Add ${totals.mealCount} ${totals.mealCount === 1 ? 'meal' : 'meals'}`}</button></div></fieldset>
                 <p class="recipe-preview-status ${ui.error ? 'is-error' : ''}" data-schedule-status role="${ui.error ? 'alert' : 'status'}">${esc(ui.message)}</p>`;
@@ -275,8 +291,10 @@
             const apply = this.form.querySelector('[data-schedule-apply]');
             if (apply) apply.hidden = !totals.days.some(day => day.customized);
             const button = this.form.querySelector('[data-schedule-submit]');
-            button.disabled = !totals.valid || this.ui.busy || this.ui.loading || this.ui.saved || (this.draft.portionMode === 'family' && this.ui.memberReview.length > 0);
-            button.textContent = this.edit ? 'Save changes' : `Add ${totals.mealCount} ${totals.mealCount === 1 ? 'meal' : 'meals'}`;
+            if (button) {
+                button.disabled = !totals.valid || this.ui.busy || this.ui.loading || this.ui.saved || (this.draft.portionMode === 'family' && this.ui.memberReview.length > 0);
+                button.textContent = this.edit ? 'Save changes' : `Add ${totals.mealCount} ${totals.mealCount === 1 ? 'meal' : 'meals'}`;
+            }
             totals.days.forEach(day => {
                 const total = this.form.querySelector(`[data-day-total="${day.date}"]`);
                 if (total) total.textContent = `${number(day.totalServings)} servings`;
