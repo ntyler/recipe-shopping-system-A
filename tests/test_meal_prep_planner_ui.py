@@ -1,6 +1,7 @@
 """Weekly planner rendering and prep-task completion behavior."""
 
 from pathlib import Path
+from html.parser import HTMLParser
 import shutil
 import subprocess
 
@@ -9,6 +10,58 @@ import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_meal_cards_offer_edit_with_correct_ids_and_batch_scope_choices():
+    class Buttons(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.buttons = []
+            self.current = None
+
+        def handle_starttag(self, tag, attrs):
+            if tag == "button":
+                self.current = {"attrs": dict(attrs), "text": ""}
+                self.buttons.append(self.current)
+
+        def handle_data(self, data):
+            if self.current is not None:
+                self.current["text"] += data
+
+        def handle_endtag(self, tag):
+            if tag == "button":
+                self.current = None
+
+    source = (ROOT / "PushShoppingList/templates/sections/app_workspaces.html").read_text(encoding="utf-8")
+    start = source.index('<section class="app-meal-planner-grid"')
+    template = Environment(autoescape=True).from_string(source[start:source.index("</section>", start)])
+    standalone = {"id": 'meal"<one>', "recipe_url": "recipe://bread", "recipe_name": 'Bread " & <meal>', "planned_servings": 1}
+    batched = {**standalone, "id": "meal-2", "batch_id": 'batch"<one>'}
+    html = template.render(meal_plan={
+        "days": [{"date": "2026-10-05", "weekday": "Mon", "day_label": "10/5"}],
+        "meal_types": ["dinner"], "meals_by_day": {"2026-10-05": {"dinner": [standalone, batched]}},
+        "prep_steps_by_day": {},
+    }, meal_plan_recipe_options=[standalone])
+    parser = Buttons()
+    parser.feed(html)
+    edits = [button for button in parser.buttons if button["attrs"].get("class") == "app-meal-edit"]
+    assert len(edits) == 2
+    assert [button["text"].strip() for button in edits] == ["Edit", "Edit"]
+    assert [button["attrs"]["data-meal-id"] for button in edits] == [standalone["id"], "meal-2"]
+    assert [button["attrs"]["data-batch-id"] for button in edits] == ["", batched["batch_id"]]
+    assert all(button["attrs"]["onclick"] == "return openMealPlannerEditDialog(this)" for button in edits)
+    assert edits[0]["attrs"]["data-meal-name"] == standalone["recipe_name"]
+    assert "Mon 10/5 dinner" in edits[0]["attrs"]["aria-label"]
+    assert '<meal>' not in html and '<one>' not in html
+
+    scope_start = source.index('<section class="app-meal-edit-scope"')
+    scope = Buttons()
+    scope.feed(source[scope_start:source.index("</section>", scope_start)])
+    assert len(scope.buttons) == 2
+    assert scope.buttons[0]["text"].startswith("Edit this meal")
+    assert scope.buttons[0]["attrs"]["onclick"] == "return loadMealPlannerEdit('meal')"
+    assert scope.buttons[1]["text"].startswith("Edit entire prep plan")
+    assert scope.buttons[1]["attrs"]["onclick"] == "return loadMealPlannerEdit('batch')"
 
 
 def test_weekly_grid_places_prep_steps_on_their_dates_and_labels_batch_meals():

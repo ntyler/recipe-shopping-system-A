@@ -82,6 +82,84 @@ assert.match(form.innerHTML,/data-schedule-field="family"[^>]+data-member="partn
 """)
 
 
+def test_edit_single_meal_locks_scope_and_patches_changed_date_people_portions_and_notes():
+    run_panel(r"""
+const meal={id:'meal1',date:'2026-10-05',meal_type:'dinner',recipe_url:'recipe://saved',recipe_name:'Saved bread',portion_mode:'family',planned_servings:1.5,
+ prep_notes:'Old note',ingredient_option_selections:{butter:'saved-bundle'},member_portions:[{member_id:'former',name_snapshot:'Former eater',servings:0.5},{member_id:'you',name:'You',servings:1}]};
+panel.loadEdit({meal},'meal');
+ctx.fetch=async(url,request)=>{requests.push({url,options:request});return {ok:true,json:async()=>request?{ok:true,meal:{...meal,date:'2026-11-02',meal_type:'breakfast'}}:{ok:true,members}};};
+await panel.open();requests=[];
+assert(form.innerHTML.includes('Edit scheduled meal'));assert(form.innerHTML.includes('Saved bread'));assert(form.innerHTML.includes('Save changes'));
+assert(!form.innerHTML.includes('Date range'));assert(!form.innerHTML.includes('Select days'));assert(!form.innerHTML.includes('Prep tasks'));
+assert(!form.innerHTML.includes('data-schedule-field="day-meal"'));assert(form.innerHTML.includes('Former eater (Archived)'));
+await click({scheduleMode:'range'});await click({scheduleAction:'add-prep'});
+assert.equal(panel.draft.dateMode,'single');assert.equal(panel.draft.prepSteps.length,0);
+panel.change({target:field('single-date','')});panel.change({target:field('single-date','2026-11-02')});
+panel.change({target:field('single-meal','breakfast',{type:'select-one'})});
+panel.input({target:field('family','1.25',{dataset:{scheduleField:'family',member:'you',meal:'breakfast'}})});
+panel.input({target:field('notes','New meal note',{type:'textarea'})});
+await submit();assert.equal(requests.length,1);assert.equal(requests[0].url,'/api/meal-plan/meal1');assert.equal(requests[0].options.method,'PATCH');
+assert.deepEqual(JSON.parse(requests[0].options.body),{date:'2026-11-02',meal_type:'breakfast',portion_mode:'family',prep_notes:'New meal note',
+ member_portions:[{member_id:'you',servings:1.25},{member_id:'former',servings:0.5}]});
+assert.equal(saved[0][1],'2026-11-02');assert.deepEqual(plain(saved[0][2]),{scope:'meal',id:'meal1'});
+assert.equal(form.hidden,true);assert.equal(panel.edit,null);await submit();assert.equal(requests.length,1,'A completed save cannot be submitted twice');
+""")
+
+
+def test_edit_batch_preserves_notes_per_meal_task_identity_mixed_modes_and_spare_servings():
+    run_panel(r"""
+const meals=[{id:'a',date:'2026-10-05',meal_type:'breakfast',portion_mode:'family',planned_servings:0.5,prep_notes:'Pack breakfast',member_portions:[{member_id:'child',name:'Child',servings:0.5}]},
+ {id:'b',date:'2026-11-07',meal_type:'dinner',portion_mode:'household',planned_servings:3,prep_notes:'Share dinner',member_portions:[]}];
+const batch={id:'batch1',recipe_url:'recipe://saved',recipe_name:'Saved bread',portion_mode:'family',batch_servings:5,prep_notes:'Cook once',prep_steps:[{id:'prep1',date:'2026-10-04',instruction:'Bake',completed:true}]};
+panel.loadEdit({batch,meals},'batch');
+assert(form.innerHTML.includes('Edit prep plan'));assert(form.innerHTML.includes('Pack breakfast'));assert(form.innerHTML.includes('Share dinner'));
+assert(form.innerHTML.includes('data-schedule-field="day-household"'));assert(form.innerHTML.includes('value="3"'));
+panel.input({target:field('notes','Batch note changed',{type:'textarea'})});
+panel.input({target:field('meal-notes','',{type:'text',dataset:{scheduleField:'meal-notes',date:'2026-10-05',meal:'breakfast'}})});
+panel.input({target:field('day-household','4',{dataset:{scheduleField:'day-household',date:'2026-11-07',meal:'dinner'}})});
+ctx.fetch=async(url,options)=>{requests.push({url,options});return {ok:true,json:async()=>({ok:true,batch:{...batch,prep_notes:'Batch note changed'},meals})};};
+await submit();assert.equal(requests[0].url,'/api/meal-plan/batches/batch1');assert.equal(requests[0].options.method,'PATCH');
+const body=JSON.parse(requests[0].options.body);
+assert.equal(body.batch_servings,6);assert.equal(body.prep_notes,'Batch note changed');
+assert.deepEqual(body.prep_steps,[{id:'prep1',date:'2026-10-04',instruction:'Bake'}]);
+assert.deepEqual(body.allocations.map(item=>[item.id,item.portion_mode,item.prep_notes]),[['a','family',''],['b','household','Share dinner']]);
+assert.equal(body.allocations[1].planned_servings,4);assert(!('recipe_url' in body));assert(!('ingredient_option_selections' in body));
+assert.deepEqual(plain(saved[0][2]),{scope:'batch',id:'batch1'});
+""")
+
+
+def test_edit_save_failure_keeps_draft_and_successful_save_callback_failure_cannot_retry_patch():
+    run_panel(r"""
+panel.loadEdit({meal:{id:'meal1',date:'2026-10-05',meal_type:'dinner',recipe_url:'recipe://saved',recipe_name:'Bread',planned_servings:2,prep_notes:'Keep this'}},'meal');
+form.hidden=false;
+ctx.fetch=async(url,options)=>{requests.push({url,options});return {ok:false,json:async()=>({ok:false,error:'This meal could not be changed.'})};};
+await submit();assert.equal(panel.edit.id,'meal1');assert.equal(panel.draft.notes,'Keep this');assert.equal(form.hidden,false);assert.equal(saved.length,0);
+ctx.fetch=async(url,options)=>{requests.push({url,options});return {ok:true,json:async()=>({ok:true,meal:{id:'meal1'}})};};
+options.onSaved=async()=>{throw new Error('Refresh unavailable');};
+await submit();assert.equal(panel.ui.saved,true);assert.match(panel.ui.message,/saved\. Reload/);await submit();assert.equal(requests.length,2);
+assert.match(form.innerHTML,/<fieldset disabled>/);
+panel.clearEdit();assert.equal(panel.edit,null);assert.equal(panel.ui.saved,false);assert(!panel.draft.edit);
+assert(form.innerHTML.includes('Add to Meal Plan'));assert.equal(panel.draft.notes,'');
+""")
+
+
+def test_edit_loading_ignores_previous_member_response_and_retains_saved_people_on_refresh():
+    run_panel(r"""
+let resolveOld,resolveNew;ctx.fetch=()=>new Promise(resolve=>{if(!resolveOld)resolveOld=resolve;else resolveNew=resolve;});
+const old=panel.open();
+panel.loadEdit({meal:{id:'meal1',date:'2026-10-05',meal_type:'dinner',recipe_url:'recipe://saved',planned_servings:0.5,portion_mode:'family',
+ member_portions:[{member_id:'former',name_snapshot:'Former person',servings:0.5}],prep_notes:'Keep notes'}},'meal');
+const current=panel.open();
+resolveNew({ok:true,json:async()=>({ok:true,members:[{id:'new',name:'New person'}]})});await current;
+resolveOld({ok:true,json:async()=>({ok:true,members:[{id:'old-response',name:'Old response'}]})});await old;
+assert(!panel.draft.members.some(member=>member.id==='old-response'));
+assert(panel.draft.members.some(member=>member.id==='former'));assert.equal(panel.ui.memberReview.length,0);
+assert.equal(panel.draft.familyDefaults.new.dinner.enabled,false);assert.equal(M.summary(panel.draft).totalServings,0.5);
+assert.equal(panel.draft.notes,'Keep notes');assert.equal(panel.ui.loading,false);
+await click({scheduleAction:'cancel'});assert.equal(form.hidden,true);assert.equal(canceled,1);assert.equal(requests.length,0);
+""")
+
+
 def test_controller_dates_multiple_meals_portions_and_override_reapplication():
     run_panel(r"""
 await click({scheduleMode:'range'});

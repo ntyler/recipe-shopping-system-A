@@ -77,16 +77,16 @@
         return Number(scale ? `${text.slice(0, -scale)}.${text.slice(-scale)}` : text);
     }
 
-    function normalizedMembers(members) {
+    function normalizedMembers(members, retained = new Set()) {
         const seen = new Set();
         return (Array.isArray(members) ? members : []).filter(member => {
-            if (!member || member.archived === true || typeof member.id !== 'string' || !member.id || seen.has(member.id)) return false;
+            if (!member || (member.archived === true && !retained.has(member.id)) || typeof member.id !== 'string' || !member.id || seen.has(member.id)) return false;
             seen.add(member.id);
             return true;
         }).map(member => ({
             id: member.id, name: String(member.name || [member.first_name, member.last_name].filter(Boolean).join(' ')),
             first_name: String(member.first_name || ''), last_name: String(member.last_name || ''),
-            default_portion: portion(member.default_portion) || 1,
+            default_portion: portion(member.default_portion) || 1, ...(member.archived ? {archived:true} : {}),
             group_ids: [...new Set((Array.isArray(member.group_ids) ? member.group_ids : []).filter(id => typeof id === 'string' && id))]
         }));
     }
@@ -111,7 +111,7 @@
             household: clone(draft.householdDefaults),
             family: clone(draft.familyDefaults),
             overrides: {meals: false, household: false, family: false},
-            notes: ''
+            notes: '', mealNotes: {}, allocationIds: {}, mealPortionModes: {}
         };
     }
 
@@ -157,6 +157,13 @@
     }
 
     function setSingleDate(draft, date) {
+        if (draft.edit?.scope === 'meal' && parseDate(date) && date !== draft.singleDate) {
+            const previous = Object.keys(draft.days).find(key => draft.days[key]?.allocationIds?.[draft.mealTypes[0]] === draft.edit.id);
+            if (previous && previous !== date) {
+                draft.days[date] = draft.days[previous];
+                delete draft.days[previous];
+            }
+        }
         draft.singleDate = date;
         return refreshDates(draft);
     }
@@ -183,11 +190,31 @@
 
     function setPortionMode(draft, mode) {
         if (!['household', 'family'].includes(mode)) throw new Error('Choose a valid portions mode.');
+        if (draft.portionMode === mode) return draft;
         draft.portionMode = mode;
+        if (draft.edit) Object.values(draft.days).forEach(day => { day.mealPortionModes = {}; });
         return draft;
     }
 
     function setMeals(draft, types) {
+        if (draft.edit?.scope === 'meal') {
+            const next = MEAL_TYPES.find(meal => types.includes(meal));
+            if (!next) return draft;
+            const previous = draft.mealTypes[0];
+            if (next !== previous) {
+                draft.householdDefaults[next] = draft.householdDefaults[previous];
+                Object.values(draft.familyDefaults).forEach(cells => { cells[next] = clone(cells[previous]); });
+                Object.values(draft.days).forEach(day => {
+                    day.household[next] = day.household[previous];
+                    Object.values(day.family).forEach(cells => { cells[next] = clone(cells[previous]); });
+                    for (const key of ['mealNotes','allocationIds','mealPortionModes']) {
+                        day[key][next] = day[key][previous]; delete day[key][previous];
+                    }
+                    day.mealEnabled = Object.fromEntries(MEAL_TYPES.map(meal => [meal, meal === next]));
+                });
+            }
+            types = [next];
+        }
         draft.mealTypes = MEAL_TYPES.filter(meal => types.includes(meal));
         syncDefaults(draft);
         return draft;
@@ -240,6 +267,43 @@
         return draft;
     }
 
+    function setMealNotes(draft, date, meal, notes) {
+        const day = ensureDay(draft, date);
+        if (day && validMeal(meal)) day.mealNotes[meal] = String(notes);
+        return draft;
+    }
+
+    function mealPortionMode(draft, date, meal) {
+        return draft.days[date]?.mealPortionModes?.[meal] || draft.portionMode;
+    }
+
+    function canAssignMember(draft, member, date, meal) {
+        if (!member.archived) return true;
+        const id = date ? draft.days[date]?.allocationIds?.[meal] : draft.edit?.scope === 'meal' ? draft.edit.id : null;
+        return !!id && !!draft.edit?.assignments?.[id]?.includes(member.id);
+    }
+
+    function seedSavedFamilyDefaults(draft, initialize = false) {
+        if (draft.edit?.scope !== 'batch' || !draft.edit.defaultSeeds) return;
+        const baseline = draft.edit.seedCells || {}, next = {};
+        for (const member of draft.members) {
+            next[member.id] = {};
+            for (const meal of MEAL_TYPES) {
+                const saved = draft.edit.defaultSeeds[meal]?.member_portions?.find(part => part.member_id === member.id);
+                const desired = {enabled:!member.archived && !!saved, servings:saved?.servings ?? member.default_portion};
+                const current = draft.familyDefaults[member.id][meal], previous = baseline[member.id]?.[meal];
+                // A later active-member lookup can identify a saved assignee.
+                // Seed only untouched defaults; keep edits typed during loading.
+                if (initialize || (previous && current.enabled === previous.enabled && Number(current.servings) === Number(previous.servings))) {
+                    draft.familyDefaults[member.id][meal] = clone(desired);
+                }
+                if (member.archived) draft.familyDefaults[member.id][meal].enabled = false;
+                next[member.id][meal] = desired;
+            }
+        }
+        draft.edit.seedCells = next;
+    }
+
     function applyDefaults(draft) {
         draft.selectedDates.forEach(date => {
             const day = ensureDay(draft, date);
@@ -248,6 +312,7 @@
             day.overrides.meals = false;
             // Applying family defaults does not destroy the household draft, or vice versa.
             day[draft.portionMode] = defaults[draft.portionMode];
+            if (draft.edit) day.mealPortionModes = {};
             day.overrides[draft.portionMode] = false;
         });
         return draft;
@@ -255,7 +320,12 @@
 
     function setMembers(draft, members, {newMembersEnabled = true, refreshDefaults = false} = {}) {
         const previous = new Map(draft.members.map(member => [member.id, member]));
-        draft.members = normalizedMembers(members);
+        const retained = new Set(Object.keys(draft.edit?.savedMembers || {}));
+        const list = Array.isArray(members) ? [...members] : [];
+        for (const [id, member] of Object.entries(draft.edit?.savedMembers || {})) {
+            if (!list.some(item => item.id === id)) list.push({...member, archived:true});
+        }
+        draft.members = normalizedMembers(list, retained);
         const defaults = newFamilyDefaults(draft.members);
         for (const member of draft.members) {
             if (Object.hasOwn(draft.familyDefaults, member.id)) {
@@ -269,9 +339,10 @@
                     }
                 });
             }
-            else if (!newMembersEnabled) MEAL_TYPES.forEach(meal => { defaults[member.id][meal].enabled = false; });
+            else if (!newMembersEnabled || draft.edit) MEAL_TYPES.forEach(meal => { defaults[member.id][meal].enabled = false; });
         }
         draft.familyDefaults = defaults;
+        seedSavedFamilyDefaults(draft);
         Object.values(draft.days).forEach(day => {
             day.family = Object.fromEntries(draft.members.map(member => [member.id,
                 Object.hasOwn(day.family, member.id) ? day.family[member.id] : clone(defaults[member.id])]));
@@ -290,7 +361,7 @@
         const selected = new Set((Array.isArray(groupIds) ? groupIds : []).filter(id => activeGroups.has(id)));
         if (!selected.size) throw new Error('Choose at least one active group.');
         for (const member of draft.members) {
-            const enabled = member.group_ids.some(id => selected.has(id));
+            const enabled = !member.archived && member.group_ids.some(id => selected.has(id));
             MEAL_TYPES.forEach(meal => { draft.familyDefaults[member.id][meal].enabled = enabled; });
         }
         // Group membership is resolved now, never bound to future group edits.
@@ -314,13 +385,18 @@
                 if (!day.mealEnabled[meal]) continue;
                 let servings;
                 const memberPortions = [];
-                if (draft.portionMode === 'household') {
+                const mode = mealPortionMode(draft, date, meal);
+                if (mode === 'household') {
                     servings = portion(day.household[meal]);
                     if (servings === null) errors.push(`${date} ${meal}: enter a finite number of servings greater than zero.`);
                 } else {
                     for (const member of draft.members) {
                         const cell = day.family[member.id][meal];
                         if (!cell.enabled) continue;
+                        if (!canAssignMember(draft, member, date, meal)) {
+                            errors.push(`${date} ${meal}: ${member.name} is archived and cannot be assigned to another meal.`);
+                            continue;
+                        }
                         const value = portion(cell.servings);
                         if (value === null) errors.push(`${date} ${meal}: enter positive, finite portions for ${member.name || 'this family member'}.`);
                         else {
@@ -332,7 +408,7 @@
                     // A meal with nobody eating is skipped, rather than persisted as zero servings.
                     if (!servings) continue;
                 }
-                if (servings !== null) meals.push({meal_type: meal, planned_servings: servings, member_portions: memberPortions});
+                if (servings !== null) meals.push({meal_type: meal, planned_servings: servings, member_portions: memberPortions, ...(draft.edit ? {portion_mode:mode} : {})});
             }
             const customized = day.overrides.meals || day.overrides[draft.portionMode];
             return {date, meals, totalServings: sum(meals.map(meal => meal.planned_servings)), customized};
@@ -348,7 +424,10 @@
     function payload(draft) {
         const totals = summary(draft);
         if (!totals.valid) throw new Error(totals.errors[0]);
-        const steps = draft.prepSteps.map(step => ({date: step.date, instruction: String(step.instruction || '').trim()}));
+        const steps = draft.prepSteps.map(step => ({date: step.date, instruction: String(step.instruction || '').trim(),
+            // Completion is edited in the planner, not this form. Omitting it
+            // preserves a completion change made while this editor was open.
+            ...(draft.edit && step.id ? {id:step.id} : {})}));
         for (const step of steps) {
             if (!parseDate(step.date) || !step.instruction) throw new Error('Every preparation task needs a valid date and an instruction.');
         }
@@ -357,16 +436,82 @@
             prep_notes: String(draft.notes || ''),
             prep_steps: steps,
             allocations: totals.days.flatMap(day => day.meals.map(meal => ({
-                date: day.date, meal_type: meal.meal_type, prep_notes: draft.days[day.date].notes,
-                ...(draft.portionMode === 'family' ? {member_portions: meal.member_portions} : {planned_servings: meal.planned_servings})
+                date: day.date, meal_type: meal.meal_type,
+                prep_notes: draft.days[day.date].mealNotes[meal.meal_type] ?? draft.days[day.date].notes,
+                ...(draft.edit && draft.days[day.date].allocationIds[meal.meal_type] ? {id:draft.days[day.date].allocationIds[meal.meal_type]} : {}),
+                ...(draft.edit ? {portion_mode:meal.portion_mode} : {}),
+                ...(mealPortionMode(draft, day.date, meal.meal_type) === 'family' ? {member_portions: meal.member_portions} : {planned_servings: meal.planned_servings})
             })))
         };
+    }
+
+    function fromSaved({meal, batch, meals}, scope = 'meal', options = {}) {
+        if (!['meal','batch'].includes(scope)) throw new Error('Choose a valid edit scope.');
+        const allocations = scope === 'meal' ? [meal] : meals || batch?.allocations;
+        if (!Array.isArray(allocations) || !allocations.length || allocations.some(item => !item?.id || !parseDate(item.date) || !validMeal(item.meal_type))) {
+            throw new Error('The saved schedule could not be loaded.');
+        }
+        const source = scope === 'meal' ? meal : batch;
+        if (!source?.id) throw new Error('The saved schedule has no identifier.');
+        const draft = create({...options, today:allocations[0].date, servings:allocations[0].planned_servings});
+        const savedMembers = {}, assignments = {};
+        allocations.forEach(item => {
+            assignments[item.id] = (item.member_portions || []).map(part => part.member_id);
+            (item.member_portions || []).forEach(part => {
+                savedMembers[part.member_id] = {id:part.member_id, name:part.name || part.name_snapshot || 'Saved family member', default_portion:part.servings, archived:true};
+            });
+        });
+        draft.edit = {scope, id:source.id, savedMembers, assignments};
+        setMembers(draft, options.members || [], {newMembersEnabled:false});
+        Object.values(draft.familyDefaults).forEach(cells => MEAL_TYPES.forEach(type => { cells[type].enabled = false; }));
+        draft.portionMode = source.portion_mode === 'family' ? 'family' : 'household';
+        draft.mealTypes = MEAL_TYPES.filter(type => allocations.some(item => item.meal_type === type));
+        draft.days = {};
+        const dates = [...new Set(allocations.map(item => item.date))].sort();
+        setDates(draft, dates);
+        if (scope === 'meal') { draft.singleDate = meal.date; setDateMode(draft, 'single'); }
+        for (const date of dates) {
+            const day = draft.days[date];
+            day.mealEnabled = Object.fromEntries(MEAL_TYPES.map(type => [type,false]));
+            day.overrides = {meals:true, household:true, family:true};
+        }
+        for (const item of allocations) {
+            const day = draft.days[item.date], type = item.meal_type;
+            if (day.allocationIds[type]) throw new Error('This plan has multiple meals in the same slot and cannot be edited together. Edit each meal separately.');
+            day.mealEnabled[type] = true;
+            day.allocationIds[type] = item.id;
+            day.mealNotes[type] = String(item.prep_notes || '');
+            day.mealPortionModes[type] = item.portion_mode || ((item.member_portions || []).length ? 'family' : 'household');
+            day.household[type] = item.planned_servings;
+            (item.member_portions || []).forEach(part => { day.family[part.member_id][type] = {enabled:true,servings:part.servings}; });
+        }
+        if (scope === 'meal') {
+            const day = draft.days[meal.date];
+            draft.portionMode = day.mealPortionModes[meal.meal_type];
+            draft.householdDefaults = clone(day.household);
+            draft.familyDefaults = clone(day.family);
+            day.overrides = {meals:false,household:false,family:false};
+        }
+        draft.notes = String(source.prep_notes || '');
+        draft.prepSteps = scope === 'batch' ? clone(batch.prep_steps || []) : [];
+        if (scope === 'batch') {
+            draft.edit.defaultSeeds = {};
+            [...allocations].sort((a,b) => a.date.localeCompare(b.date)).forEach(item => {
+                if (!draft.edit.defaultSeeds[item.meal_type]) {
+                    draft.edit.defaultSeeds[item.meal_type] = clone(item);
+                    draft.householdDefaults[item.meal_type] = item.planned_servings;
+                }
+            });
+            seedSavedFamilyDefaults(draft, true);
+        }
+        return draft;
     }
 
     root.MealPlanSchedule = Object.freeze({
         MEAL_TYPES, parseDate, formatDate, dateRange, shiftMonth, calendarMonth, create,
         setDateMode, setSingleDate, setRange, setDates, toggleDate, setPortionMode, setMeals,
         setHouseholdDefault, setFamilyDefault, setDayMeal, setDayHousehold, setDayFamily,
-        setDayNotes, applyDefaults, setMembers, setGroups, selectGroupMembers, summary, payload
+        setDayNotes, setMealNotes, mealPortionMode, canAssignMember, fromSaved,
+        applyDefaults, setMembers, setGroups, selectGroupMembers, summary, payload
     });
 })(globalThis);

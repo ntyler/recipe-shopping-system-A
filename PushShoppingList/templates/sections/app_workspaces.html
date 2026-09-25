@@ -729,6 +729,13 @@
                                         {% if meal.ingredient_selection_needed %}
                                             <span class="app-meal-selection-needed">Selection needed.</span>
                                         {% endif %}
+                                        <div class="app-meal-card-actions">
+                                        <button type="button" class="app-meal-edit"
+                                                aria-label="Edit {{ meal.recipe_name }} for {{ day.weekday }} {{ day.day_label }} {{ meal_type }}"
+                                                data-meal-id="{{ meal.id }}"
+                                                data-batch-id="{{ meal.batch_id or '' }}"
+                                                data-meal-name="{{ meal.recipe_name }}"
+                                                onclick="return openMealPlannerEditDialog(this)">Edit</button>
                                         <button type="button"
                                                 class="app-meal-remove"
                                                 aria-label="Remove {{ meal.recipe_name }} from {{ meal_type }}"
@@ -736,6 +743,7 @@
                                                 data-meal-id="{{ meal.id }}"
                                                 data-meal-name="{{ meal.recipe_name }}"
                                                 onclick="return openMealPlannerDeleteDialog(this)">&times;</button>
+                                        </div>
                                     </article>
                                 {% endfor %}
                             </div>
@@ -787,9 +795,14 @@
     <dialog id="mealPlannerDialog" class="app-dialog" aria-labelledby="mealPlannerDialogTitle">
         <div class="app-dialog-card app-meal-schedule-dialog-card">
             <div class="app-dialog-header">
-                <div><h3 id="mealPlannerDialogTitle">Add Meal</h3><p>Choose a recipe, then plan dates, meals, and portions for your household.</p></div>
-                <button type="button" class="app-dialog-close" data-meal-schedule-close aria-label="Close add meal dialog" onclick="return closeMealPlannerDialog()">&times;</button>
+                <div><h3 id="mealPlannerDialogTitle">Add Meal</h3><p data-meal-schedule-description>Choose a recipe, then plan dates, meals, and portions for your household.</p></div>
+                <button type="button" class="app-dialog-close" data-meal-schedule-close aria-label="Close meal planning dialog" onclick="return closeMealPlannerDialog()">&times;</button>
             </div>
+            <section class="app-meal-edit-scope" data-meal-edit-scope hidden aria-label="Choose what to edit">
+                <p>This meal belongs to a prep plan. Choose which entries to update.</p>
+                <button type="button" onclick="return loadMealPlannerEdit('meal')"><strong>Edit this meal</strong><span>Change just this date, meal, people, portions, and notes.</span></button>
+                <button type="button" onclick="return loadMealPlannerEdit('batch')"><strong>Edit entire prep plan</strong><span>Change the plan’s days, meals, people, portions, and prep tasks together.</span></button>
+            </section>
             <fieldset id="mealPlannerRecipeFields">
                 <label for="mealPlannerRecipe">Recipe
                     <select id="mealPlannerRecipe" name="recipe_url" required aria-describedby="mealPlannerServingsHelp" onchange="return syncMealPlannerServingsFromRecipe()">
@@ -816,6 +829,7 @@
             </fieldset>
             <p class="app-meal-schedule-empty" data-meal-schedule-empty>Select a recipe to choose one day, a date range, or individual days and assign meal portions.</p>
             <div class="app-dialog-status" data-meal-plan-status aria-live="polite"></div>
+            <button type="button" class="app-page-secondary-action" data-meal-edit-retry hidden onclick="return loadMealPlannerEdit(document.getElementById('mealPlannerDialog').mealPlanScheduleState.edit.scope)">Retry loading meal</button>
             <form id="mealPlannerScheduleForm" class="recipe-preview-meal-panel" hidden></form>
         </div>
     </dialog>

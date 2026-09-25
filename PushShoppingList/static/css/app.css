@@ -33549,7 +33549,7 @@ img[data-deferred-src] {
 
 .app-meal-planner-cell .app-meal-card {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 26px;
+    grid-template-columns: minmax(0, 1fr);
     gap: 6px;
     align-items: center;
     min-width: 0;
@@ -33562,7 +33562,7 @@ img[data-deferred-src] {
 }
 
 .app-meal-planner-cell .app-meal-card.has-image {
-    grid-template-columns: 38px minmax(0, 1fr) 26px;
+    grid-template-columns: 38px minmax(0, 1fr);
 }
 
 .app-meal-planner-cell .app-meal-card img {
@@ -33586,6 +33586,47 @@ img[data-deferred-src] {
     align-items: center;
     justify-content: center;
     background: var(--app-surface);
+}
+
+.app-meal-planner-cell .app-meal-card-actions {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding-top: 4px;
+}
+
+.app-meal-planner-cell .app-meal-card-actions .app-meal-remove {
+    position: static;
+    width: 32px;
+    height: 32px;
+    min-height: 32px;
+    flex: 0 0 32px;
+}
+
+.app-meal-planner-cell .app-meal-edit {
+    min-height: 32px;
+    padding: 4px 9px;
+    border: 1px solid var(--app-border);
+    border-radius: 6px;
+    background: var(--app-surface);
+    color: var(--app-primary);
+    font: inherit;
+    cursor: pointer;
+}
+
+.app-meal-card-actions button:focus-visible {
+    outline: 2px solid var(--app-primary);
+    outline-offset: 2px;
+}
+
+@media (max-width: 760px) {
+    .app-meal-planner-cell .app-meal-card-actions :is(.app-meal-edit, .app-meal-remove) {
+        min-width: 44px;
+        min-height: 44px;
+    }
 }
 
 .app-meal-planner-cell .app-meal-plan-details,
@@ -45799,7 +45840,7 @@ body.recipe-edit-standalone-page .recipe-edit-ingredient-column-view-empty > but
     }
 
     .app-meal-planner-cell .app-meal-card.has-image {
-        grid-template-columns: 34px minmax(0, 1fr) 26px;
+        grid-template-columns: 34px minmax(0, 1fr);
     }
 
     .app-meal-planner-cell .app-meal-card img {

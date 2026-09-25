@@ -265,6 +265,14 @@ body.recipe-preview-active { overflow: auto; }
 #mealPlannerRecipe { width: 100%; min-width: 0; min-height: 42px; padding: 9px 11px; border: 1px solid var(--app-border-strong); border-radius: 6px; background: var(--app-surface); color: var(--app-text); font: inherit; }
 #mealPlannerDialog :is(button, input, select, textarea, summary, [tabindex]):focus-visible { outline: 2px solid var(--app-primary-hover, #31dfa0); outline-offset: 3px; }
 #mealPlannerDialog .app-dialog-status:empty { display: none; }
+#mealPlannerDialog .app-meal-edit-scope { display: grid; gap: 12px; }
+#mealPlannerDialog .app-meal-edit-scope > p { margin: 0; color: var(--app-muted); }
+#mealPlannerDialog .app-meal-edit-scope > button { display: grid; gap: 6px; width: 100%; min-height: 68px; padding: 14px; text-align: left; white-space: normal; border: 1px solid var(--app-border-strong); border-radius: 8px; background: var(--app-surface); color: var(--app-text-strong); }
+#mealPlannerDialog .app-meal-edit-scope > button:hover { border-color: var(--app-primary); }
+#mealPlannerDialog .app-meal-edit-scope > button span { font-size: 13px; font-weight: 400; color: var(--app-muted); }
+#mealPlannerDialog:has([data-schedule-field="single-meal"]) { width: min(720px, calc(100vw - 32px)); }
+#mealPlannerScheduleForm:has([data-schedule-field="single-meal"]) .meal-schedule-columns { grid-template-columns: minmax(0,1fr); }
+#mealPlannerScheduleForm [data-schedule-field="single-meal"] { min-width: 160px; min-height: 42px; padding: 8px 10px; border: 1px solid var(--app-border-strong); border-radius: 6px; background: var(--app-surface); color: var(--app-text); font: inherit; }
 #mealPlannerDialog .app-meal-schedule-empty { margin: 0; padding: 16px; border: 1px dashed var(--app-border-strong); border-radius: 8px; font-size: 13px; line-height: 1.6; color: var(--app-muted); }
 #mealPlannerScheduleForm { min-width: 0; margin: 0; padding: 20px 0 0; border: 0; border-top: 1px solid var(--app-border-strong); border-radius: 0; }
 #mealPlannerScheduleForm .meal-schedule-heading { display: none; }

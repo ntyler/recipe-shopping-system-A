@@ -630,6 +630,203 @@ def delete_meal(meal_id):
     return True
 
 
+def meal_plan_entry_detail(meal_id, payload=None):
+    payload = load_meal_plan() if payload is None else payload
+    meal = next((item for item in payload["meals"] if item["id"] == clean_text(meal_id)), None)
+    if not meal:
+        return None
+    batch = next((item for item in payload["batches"] if item["id"] == meal.get("batch_id")), None)
+    return {"meal": meal, **({"batch": meal_prep_batch_summary(batch, payload["meals"])} if batch else {})}
+
+
+def meal_prep_batch_detail(batch_id, payload=None):
+    payload = load_meal_plan() if payload is None else payload
+    batch = next((item for item in payload["batches"] if item["id"] == clean_text(batch_id)), None)
+    if not batch:
+        return None
+    summary = meal_prep_batch_summary(batch, payload["meals"])
+    return {"batch": summary, "meals": summary["allocations"]}
+
+
+def validate_meal_edit_fields(value, allowed, label):
+    if not isinstance(value, dict) or not value or set(value) - allowed:
+        raise ValueError(f"Provide supported {label} details to update.")
+    if "prep_notes" in value and not isinstance(value["prep_notes"], str):
+        raise ValueError("Meal-prep notes must be text.")
+
+
+def edited_member_portions(value, members, previous):
+    """Keep historical assignments, without allowing archived people on new meals."""
+    prior = {item["member_id"]: item for item in previous or []}
+    permitted = {key: dict(member) for key, member in members.items()}
+    for member_id, portion in prior.items():
+        permitted[member_id] = {**permitted.get(member_id, {"name": portion["name_snapshot"]}), "archived": False}
+    if isinstance(value, list) and any(
+        not isinstance(item, dict) or not isinstance(item.get("member_id"), str)
+        or set(item) - {"member_id", "servings", "name", "name_snapshot"} for item in value
+    ):
+        raise ValueError("Provide a saved member ID and portions for each family member.")
+    portions = normalize_member_portions(value, permitted)
+    for portion in portions:
+        if portion["member_id"] in prior:
+            portion["name_snapshot"] = prior[portion["member_id"]]["name_snapshot"]
+    return portions
+
+
+def edited_meal(existing, patch, members, portion_mode=None):
+    if "member_portions" in patch and not isinstance(patch["member_portions"], list):
+        raise ValueError("Family member portions must be a list.")
+    if "date" in patch and not isinstance(patch["date"], str):
+        raise ValueError("Choose a valid meal date.")
+    mode = portion_mode or patch.get("portion_mode") or (
+        "family" if patch.get("member_portions") else existing.get("portion_mode", "household")
+    )
+    if mode not in ("household", "family"):
+        raise ValueError("Choose household totals or family member portions.")
+    if "portion_mode" in patch and patch["portion_mode"] not in ("household", "family"):
+        raise ValueError("Choose household totals or family member portions.")
+    if mode == "family":
+        portions = edited_member_portions(patch.get("member_portions", existing.get("member_portions")), members, existing.get("member_portions"))
+        total = sum((Decimal(str(item["servings"])) for item in portions), Decimal(0))
+        servings = normalize_positive_servings(servings_number(total), "Meal servings")
+        if "planned_servings" in patch and Decimal(str(normalize_positive_servings(patch["planned_servings"], "Meal servings"))) != total:
+            raise ValueError("Meal servings must match the assigned family member portions.")
+    else:
+        if patch.get("member_portions"):
+            raise ValueError("Choose family member portions to assign servings to members.")
+        portions = []
+        servings = (normalize_positive_servings(patch.get("planned_servings", existing.get("planned_servings")), "Meal servings")
+                    if "planned_servings" in patch or "planned_servings" in existing else None)
+    candidate = normalize_meal({**existing, **{key: patch[key] for key in ("date", "meal_type", "prep_notes") if key in patch},
+                               "portion_mode": mode, "member_portions": portions, "planned_servings": servings})
+    if not candidate:
+        raise ValueError("Choose a valid date, meal type, and servings for every meal.")
+    for portion in candidate.get("member_portions") or []:
+        portion["name"] = members.get(portion["member_id"], {}).get("name") or portion["name_snapshot"]
+    return candidate
+
+
+def validate_edited_slots(meals, remaining):
+    slots = set()
+    for meal in meals:
+        slot = (meal["date"], meal["meal_type"], normalize_recipe_url_key(meal["recipe_url"]))
+        if slot in slots:
+            raise ValueError("Each meal date and meal type can appear only once in a batch.")
+        slots.add(slot)
+    if any((meal["date"], meal["meal_type"], normalize_recipe_url_key(meal["recipe_url"])) in slots for meal in remaining):
+        raise ValueError("That recipe is already planned for one of these meals.")
+
+
+def update_meal(meal_id, patch):
+    validate_meal_edit_fields(patch, {"date", "meal_type", "planned_servings", "member_portions", "portion_mode", "prep_notes"}, "meal")
+    with MEAL_PLAN_LOCK:
+        payload = load_meal_plan()
+        existing = next((item for item in payload["meals"] if item["id"] == clean_text(meal_id)), None)
+        if not existing:
+            return None
+        members = {member["id"]: member for member in payload["members"]}
+        meal = edited_meal(existing, patch, members)
+        validate_edited_slots([meal], [item for item in payload["meals"] if item["id"] != existing["id"]])
+        batch = next((item for item in payload["batches"] if item["id"] == existing.get("batch_id")), None)
+        if batch:
+            # Preserve spare portions while adjusting the amount to prepare.
+            total = Decimal(str(batch["batch_servings"])) + Decimal(str(meal.get("planned_servings") or 0)) - Decimal(str(existing.get("planned_servings") or 0))
+            batch["batch_servings"] = normalize_positive_servings(servings_number(total), "Batch servings")
+        payload["meals"] = [meal if item["id"] == existing["id"] else item for item in payload["meals"]]
+        save_meal_plan(payload)
+        return meal_plan_entry_detail(meal["id"], payload)
+
+
+def edited_prep_steps(value, previous):
+    if not isinstance(value, list):
+        raise ValueError("Preparation steps must be a list of dated instructions.")
+    by_id = {step["id"]: step for step in previous}
+    explicit_ids = [step["id"] for step in value if isinstance(step, dict) and "id" in step]
+    if any(not isinstance(step_id, str) or step_id not in by_id for step_id in explicit_ids) or len(set(explicit_ids)) != len(explicit_ids):
+        raise ValueError("Choose existing preparation task IDs from this plan, once each.")
+    used = set()
+    steps = []
+    for row in value:
+        if not isinstance(row, dict) or set(row) - {"id", "date", "instruction", "completed"}:
+            raise ValueError("Provide a date and instruction for every preparation step.")
+        prior = by_id.get(row.get("id"))
+        if not prior:
+            prior = next((step for step in previous if step["id"] not in used and step["id"] not in explicit_ids
+                          and step["date"] == row.get("date") and step["instruction"] == clean_text(row.get("instruction"))), None)
+        if "completed" in row and not isinstance(row["completed"], bool):
+            raise ValueError("Completed must be true or false.")
+        if "instruction" in row and not isinstance(row["instruction"], str):
+            raise ValueError("Preparation instructions must be text.")
+        step = normalize_prep_step({**(prior or {}), **row, "id": prior["id"] if prior else uuid.uuid4().hex})
+        if not step:
+            raise ValueError("Each preparation step needs a valid date and instruction.")
+        used.add(step["id"])
+        steps.append(step)
+    return steps
+
+
+def update_meal_prep_batch(batch_id, patch):
+    allowed = {"recipe_url", "recipe_name", "batch_servings", "portion_mode", "prep_notes", "prep_steps", "allocations", "ingredient_option_selections"}
+    validate_meal_edit_fields(patch, allowed, "meal-prep batch")
+    with MEAL_PLAN_LOCK:
+        payload = load_meal_plan()
+        existing = next((item for item in payload["batches"] if item["id"] == clean_text(batch_id)), None)
+        if not existing:
+            return None
+        if "recipe_url" in patch and patch["recipe_url"] != existing["recipe_url"]:
+            raise ValueError("The recipe cannot be changed when editing a meal-prep plan.")
+        if "recipe_name" in patch and patch["recipe_name"] != existing["recipe_name"]:
+            raise ValueError("The recipe cannot be changed when editing a meal-prep plan.")
+        old_meals = [meal for meal in payload["meals"] if meal.get("batch_id") == existing["id"]]
+        by_id = {meal["id"]: meal for meal in old_meals}
+        ingredient_base = old_meals[0] if old_meals else {}
+        if "ingredient_option_selections" in patch and not isinstance(patch["ingredient_option_selections"], dict):
+            raise ValueError("Ingredient selections must be saved ingredient choices.")
+        if "ingredient_option_selections" in patch and normalize_selection_map(patch["ingredient_option_selections"]) != normalize_selection_map(ingredient_base.get("ingredient_option_selections")):
+            raise ValueError("Edit ingredient choices separately from the meal schedule.")
+        mode = patch.get("portion_mode", existing["portion_mode"])
+        if mode not in ("household", "family"):
+            raise ValueError("Choose household totals or family member portions.")
+        allocations = patch.get("allocations") if "allocations" in patch else old_meals
+        if not isinstance(allocations, list) or not 1 <= len(allocations) <= 1000:
+            raise ValueError("Add between 1 and 1000 meals for this batch.")
+        explicit_ids = [row["id"] for row in allocations if isinstance(row, dict) and "id" in row]
+        if any(not isinstance(meal_id, str) or meal_id not in by_id for meal_id in explicit_ids) or len(set(explicit_ids)) != len(explicit_ids):
+            raise ValueError("Choose existing meal IDs from this plan, once each.")
+        members = {member["id"]: member for member in payload["members"]}
+        meals, used = [], set()
+        for allocation in allocations:
+            allocation_fields = {"id", "date", "meal_type", "planned_servings", "member_portions", "portion_mode", "prep_notes"}
+            if "allocations" in patch:
+                validate_meal_edit_fields(allocation, allocation_fields, "meal allocation")
+            prior = by_id.get(allocation.get("id"))
+            if not prior:
+                prior = next((meal for meal in old_meals if meal["id"] not in used and meal["id"] not in explicit_ids
+                              and meal["date"] == allocation.get("date") and meal["meal_type"] == allocation.get("meal_type")), None)
+            base = prior or {**{key: ingredient_base[key] for key in ("ingredients", "ingredient_option_selections", "unresolved_ingredient_requirement_ids", "ingredient_selection_needed") if key in ingredient_base},
+                             "id": uuid.uuid4().hex, "recipe_url": existing["recipe_url"], "recipe_name": existing["recipe_name"], "batch_id": existing["id"]}
+            meal = edited_meal(base, allocation, members, allocation.get("portion_mode", mode))
+            if "planned_servings" not in meal:
+                raise ValueError("Provide servings for every meal in the batch.")
+            used.add(meal["id"])
+            meals.append(meal)
+        remaining = [meal for meal in payload["meals"] if meal.get("batch_id") != existing["id"]]
+        validate_edited_slots(meals, remaining)
+        batch = {**existing, "portion_mode": mode}
+        if "prep_notes" in patch:
+            batch["prep_notes"] = patch["prep_notes"].strip()
+        if "prep_steps" in patch:
+            batch["prep_steps"] = edited_prep_steps(patch["prep_steps"], existing["prep_steps"])
+        allocated = allocated_batch_servings(meals)
+        batch["batch_servings"] = normalize_positive_servings(patch.get("batch_servings", servings_number(allocated) if "allocations" in patch else existing["batch_servings"]), "Batch servings")
+        if allocated > Decimal(str(batch["batch_servings"])):
+            raise ValueError("Planned meal servings cannot exceed total batch servings.")
+        payload["meals"] = remaining + meals
+        payload["batches"] = [batch if item["id"] == existing["id"] else item for item in payload["batches"]]
+        save_meal_plan(payload)
+        return meal_prep_batch_detail(batch["id"], payload)
+
+
 def add_meal_prep_batch(batch, allocations, ingredient_data=None):
     """Validate and persist one batch and all meal allocations in one write."""
     if not isinstance(batch, dict):

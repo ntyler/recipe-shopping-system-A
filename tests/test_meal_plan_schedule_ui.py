@@ -12,6 +12,78 @@ SOURCE = Path(__file__).resolve().parents[1] / "PushShoppingList/static/js/meal-
 pytestmark = pytest.mark.skipif(not shutil.which("node"), reason="Node.js is required for scheduling logic checks")
 
 
+def test_saved_single_meal_keeps_allocations_when_date_is_cleared_then_date_and_meal_change():
+    run_model(r"""
+const meal={id:'meal1',date:'2026-10-05',meal_type:'dinner',portion_mode:'family',planned_servings:1.25,prep_notes:'Pack cold',
+ member_portions:[{member_id:'former',name_snapshot:'Former eater',servings:0.75},{member_id:'you',name:'You',servings:0.5}]};
+const saved=JSON.stringify(meal),edited=M.fromSaved({meal},'meal',{members});
+assert.equal(edited.dateMode,'single');assert.equal(edited.portionMode,'family');assert.equal(edited.notes,'Pack cold');
+assert.equal(M.summary(edited).totalServings,1.25);assert.equal(edited.familyDefaults.partner.dinner.enabled,false);
+M.setMembers(edited,[...members,{id:'new',name:'New person'}]);
+assert.equal(edited.members.find(member=>member.id==='former').archived,true);
+assert.equal(edited.familyDefaults.new.dinner.enabled,false);assert.equal(M.summary(edited).totalServings,1.25);
+M.setSingleDate(edited,'');assert.equal(M.summary(edited).valid,false);
+M.setSingleDate(edited,'2026-11-02');M.setMeals(edited,['breakfast']);
+const allocation=plain(M.payload(edited).allocations[0]);
+assert.deepEqual(allocation,{id:'meal1',date:'2026-11-02',meal_type:'breakfast',portion_mode:'family',prep_notes:'Pack cold',
+ member_portions:[{member_id:'you',servings:0.5},{member_id:'former',servings:0.75}]});
+assert.equal(M.summary(edited).mealCount,1);assert.equal(JSON.stringify(meal),saved);
+""")
+
+
+def test_saved_batch_roundtrip_preserves_mixed_modes_individual_notes_ids_and_completed_prep():
+    run_model(r"""
+const meals=[{id:'breakfast1',date:'2026-10-05',meal_type:'breakfast',portion_mode:'family',planned_servings:0.5,prep_notes:'Pack breakfast',member_portions:[{member_id:'child',name:'Child',servings:0.5}]},
+ {id:'dinner1',date:'2026-10-05',meal_type:'dinner',portion_mode:'household',planned_servings:3,prep_notes:'Share at dinner',member_portions:[]},
+ {id:'later',date:'2026-11-07',meal_type:'lunch',portion_mode:'family',planned_servings:1,prep_notes:'For former member',member_portions:[{member_id:'former',name_snapshot:'Former',servings:1}]}];
+const batch={id:'batch1',portion_mode:'family',prep_notes:'Cook once',batch_servings:6,prep_steps:[{id:'prep1',date:'2026-10-04',instruction:'Bake',completed:true}],allocations:meals};
+const edited=M.fromSaved({batch},'batch',{members});
+M.setMembers(edited,members);M.setGroups(edited,[]);
+M.setPortionMode(edited,'family');
+let payload=plain(M.payload(edited));
+assert.equal(payload.allocations.length,3);assert.equal(M.summary(edited).totalServings,4.5);
+assert.deepEqual(payload.allocations.map(item=>[item.id,item.portion_mode,item.prep_notes]),[
+ ['breakfast1','family','Pack breakfast'],['dinner1','household','Share at dinner'],['later','family','For former member']]);
+assert.equal(payload.allocations[0].member_portions[0].servings,0.5);assert.equal(payload.allocations[1].planned_servings,3);
+assert.equal(edited.prepSteps[0].completed,true);
+assert.deepEqual(payload.prep_steps,[{id:'prep1',date:'2026-10-04',instruction:'Bake'}],'Keep completion server-owned so another screen can finish this task while editing');
+M.setMealNotes(edited,'2026-10-05','dinner','');edited.notes='Updated batch note';
+payload=plain(M.payload(edited));assert.equal(payload.allocations[0].prep_notes,'Pack breakfast');assert.equal(payload.allocations[1].prep_notes,'');
+assert.equal(payload.prep_notes,'Updated batch note');
+M.setDates(edited,['2026-10-05','2026-11-07','2026-11-08']);
+M.setDayFamily(edited,'2026-11-08','former','dinner',{enabled:true,servings:1});
+assert.equal(M.summary(edited).valid,false);assert.match(M.summary(edited).errors.join(' '),/archived/);
+assert.throws(()=>M.payload(edited),/archived/);
+""")
+
+
+def test_invalid_or_duplicate_saved_slots_are_rejected_instead_of_silently_collapsed():
+    run_model(r"""
+assert.throws(()=>M.fromSaved({meal:{id:'meal1',date:'bad',meal_type:'dinner'}},'meal'),/could not be loaded/);
+const meal={id:'meal1',date:'2026-10-05',meal_type:'dinner',planned_servings:2};
+assert.throws(()=>M.fromSaved({batch:{id:'batch1'},meals:[meal,{...meal,id:'meal2'}]},'batch'),/multiple meals in the same slot/);
+""")
+
+
+def test_edit_batch_new_dates_use_earliest_saved_active_portions_and_keep_existing_days_exact():
+    run_model(r"""
+const meals=[{id:'later',date:'2026-10-07',meal_type:'dinner',portion_mode:'family',planned_servings:3.5,member_portions:[{member_id:'you',name:'You',servings:3.5}]},
+ {id:'first',date:'2026-10-05',meal_type:'dinner',portion_mode:'family',planned_servings:1.5,member_portions:[{member_id:'you',name:'You',servings:0.5},{member_id:'former',name:'Former',servings:1}]}];
+const edited=M.fromSaved({batch:{id:'batch1',portion_mode:'family'},meals},'batch');
+M.setMembers(edited,[{id:'you',name:'You',default_portion:1},{id:'new',name:'New person',default_portion:2}]);
+assert.equal(edited.familyDefaults.you.dinner.enabled,true);assert.equal(edited.familyDefaults.you.dinner.servings,0.5);
+assert.equal(edited.familyDefaults.former.dinner.enabled,false);assert.equal(edited.familyDefaults.new.dinner.enabled,false);
+M.setDates(edited,['2026-10-05','2026-10-07','2026-10-09']);
+let payload=plain(M.payload(edited));
+assert.deepEqual(payload.allocations[0].member_portions,[{member_id:'you',servings:0.5},{member_id:'former',servings:1}]);
+assert.deepEqual(payload.allocations[1].member_portions,[{member_id:'you',servings:3.5}]);
+assert.deepEqual(payload.allocations[2].member_portions,[{member_id:'you',servings:0.5}]);
+M.setFamilyDefault(edited,'you','dinner',{servings:0.75});M.setMembers(edited,[{id:'you',name:'Renamed',default_portion:2}]);
+assert.equal(edited.familyDefaults.you.dinner.servings,0.75);assert.equal(edited.days['2026-10-05'].family.you.dinner.servings,0.5);
+assert.equal(edited.days['2026-10-09'].family.you.dinner.servings,0.75);
+""")
+
+
 def run_model(script, timezone="America/Indiana/Indianapolis"):
     bootstrap = r"""
 const assert = require('node:assert/strict'), fs = require('node:fs'), vm = require('node:vm');

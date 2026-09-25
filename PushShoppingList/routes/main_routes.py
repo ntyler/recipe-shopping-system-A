@@ -179,6 +179,10 @@ from PushShoppingList.services.meal_plan_service import list_meal_plan_members
 from PushShoppingList.services.meal_plan_service import list_meal_plan_groups
 from PushShoppingList.services.meal_plan_service import meal_plan_member_summary
 from PushShoppingList.services.meal_plan_service import meal_prep_batch_summary
+from PushShoppingList.services.meal_plan_service import meal_prep_batch_detail
+from PushShoppingList.services.meal_plan_service import meal_plan_entry_detail
+from PushShoppingList.services.meal_plan_service import update_meal
+from PushShoppingList.services.meal_plan_service import update_meal_prep_batch
 from PushShoppingList.services.meal_plan_service import meal_plan_yield_label
 from PushShoppingList.services.meal_plan_service import meal_plan_home_preview
 from PushShoppingList.services.meal_plan_service import meal_plan_for_week
@@ -6146,10 +6150,20 @@ def add_meal_prep_batch_route():
     return jsonify({"ok": True, "batch": batch, "meals": meals}), 201
 
 
-@main_bp.route("/api/meal-plan/batches/<batch_id>", methods=["DELETE"])
+@main_bp.route("/api/meal-plan/batches/<batch_id>", methods=["GET", "PATCH", "DELETE"])
 def delete_meal_prep_batch_route(batch_id):
     if not current_public_user() and not is_guest_session():
         return jsonify({"ok": False, "error": "Sign in or start a guest workspace to update meal plans."}), 403
+    validate_master_data_viewer_scope()
+    if request.method in ("GET", "PATCH"):
+        try:
+            detail = (meal_prep_batch_detail(batch_id) if request.method == "GET"
+                      else update_meal_prep_batch(batch_id, request.get_json(silent=True)))
+        except ValueError as exc:
+            return jsonify({"ok": False, "error": str(exc)}), 400
+        if not detail:
+            return jsonify({"ok": False, "error": "That meal-prep batch was not found."}), 404
+        return jsonify({"ok": True, **detail})
     if not delete_meal_prep_batch(batch_id):
         return jsonify({"ok": False, "error": "That meal-prep batch was not found."}), 404
     return jsonify({"ok": True})
@@ -6219,10 +6233,20 @@ def add_meal_plan_entry_route():
     return jsonify({"ok": True, "meal": meal}), 201
 
 
-@main_bp.route("/api/meal-plan/<meal_id>", methods=["DELETE"])
+@main_bp.route("/api/meal-plan/<meal_id>", methods=["GET", "PATCH", "DELETE"])
 def delete_meal_plan_entry_route(meal_id):
     if not current_public_user() and not is_guest_session():
         return jsonify({"ok": False, "error": "Sign in or start a guest workspace to update meal plans."}), 403
+    validate_master_data_viewer_scope()
+    if request.method in ("GET", "PATCH"):
+        try:
+            detail = (meal_plan_entry_detail(meal_id) if request.method == "GET"
+                      else update_meal(meal_id, request.get_json(silent=True)))
+        except ValueError as exc:
+            return jsonify({"ok": False, "error": str(exc)}), 400
+        if not detail:
+            return jsonify({"ok": False, "error": "That planned meal was not found."}), 404
+        return jsonify({"ok": True, **detail})
     if not delete_meal(meal_id):
         return jsonify({"ok": False, "error": "That planned meal was not found."}), 404
     return jsonify({"ok": True})
