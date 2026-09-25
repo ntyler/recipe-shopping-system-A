@@ -118,6 +118,8 @@
             const key = active?.dataset.focusKey;
             const position = active && ['text','search'].includes(active.type) ? active.selectionStart : null;
             this.form.innerHTML = MealPlanPanel.html(this.draft, this.ui, this.edit?.title || this.options.title);
+            const footer = this.form.querySelector('.meal-schedule-footer');
+            if (footer) footer.hidden = Boolean(this.options.onSubmit && !this.edit);
             if (key) {
                 const replacement = [...this.form.querySelectorAll('[data-focus-key]')].find(node => node.dataset.focusKey === key);
                 replacement?.focus({preventScroll:true});
@@ -415,8 +417,7 @@
             finally { this.ui.memberBusy = false; this.render(); }
         }
 
-        async submit(event) {
-            event.preventDefault();
+        collectPayload() {
             if (this.ui.busy || this.ui.memberBusy || this.ui.saved) return;
             if (this.ui.loading) { this.setMessage('Wait for family members to finish loading.', true); this.render(); return; }
             if (this.draft.portionMode === 'family' && this.ui.memberReview.length) {
@@ -427,10 +428,17 @@
             try { payload = root.MealPlanSchedule.payload(this.draft); }
             catch (error) { this.setMessage(error.message, true); this.render(); return; }
             if (!this.form.reportValidity()) return;
-            const edit = this.edit;
-            const context = edit ? {} : this.options.getContext();
+            const context = this.edit ? {} : this.options.getContext();
             if (!context) return;
-            if (!edit && this.options.onStage) return this.options.onStage({...payload, ...context}, this);
+            return {...payload, ...context};
+        }
+
+        async submit(event) {
+            event.preventDefault();
+            if (!this.edit && this.options.onSubmit) return this.options.onSubmit();
+            let payload = this.collectPayload();
+            if (!payload) return;
+            const edit = this.edit;
             let url = '/api/meal-plan/batches', method = 'POST';
             if (edit) {
                 method = 'PATCH';
@@ -450,7 +458,7 @@
             this.render();
             let result;
             try {
-                const response = await fetch(url, {method, headers:{'Content-Type':'application/json'}, body:JSON.stringify({...payload, ...context})});
+                const response = await fetch(url, {method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
                 result = await response.json();
                 if (!response.ok || !result.ok) throw new Error(result.error || 'Unable to save this meal plan.');
             } catch (error) {

@@ -1,0 +1,177 @@
+const {chromium} = require(process.argv[2]);
+const assert = require('node:assert/strict');
+const fs = require('node:fs'), path = require('node:path');
+const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
+
+(async () => {
+    // Browser plugin not available; use the repository's installed Playwright.
+    // Flow: Add Meals -> three full editors -> independent edits/removal -> atomic save.
+    const browser = await chromium.launch({channel: process.env.AI_PANTRY_BROWSER_CHANNEL || 'chrome', headless: true});
+    try {
+        const context = await browser.newContext({viewport: {width: 1440, height: 1000}});
+        await context.addCookies([cookie]);
+        const page = await context.newPage(), errors = [], posts = [];
+        page.on('pageerror', error => errors.push(error.message));
+        page.on('console', message => { if (['error', 'warning'].includes(message.type())) errors.push(message.text()); });
+        page.on('request', request => { if (request.method() === 'POST' && request.url().endsWith('/batches/bulk')) posts.push(request.postDataJSON()); });
+        await page.goto(base + '/editor-qa');
+        assert.equal(await page.title(), 'AI Pantry — Meal Planner');
+        assert.equal(page.url(), base + '/editor-qa');
+        assert(await page.getByRole('heading', {name: 'Meal Planner', exact: true}).isVisible());
+        const dialog = page.locator('#mealPlannerDialog');
+        const editors = dialog.locator('[data-meal-editor]');
+        const editor = i => editors.nth(i);
+        const recipe = i => editor(i).locator('[name="recipe_url"]');
+        const portions = i => editor(i).locator('[data-schedule-field="household"][data-meal="dinner"]');
+        const note = i => editor(i).locator('[data-schedule-field="notes"]');
+        const save = dialog.locator('[data-meal-batch-save]');
+        const add = async () => { await dialog.locator('[data-meal-editor-add]').click(); await ready(); };
+        const ready = async () => page.waitForFunction(() => document.getElementById('mealPlannerDialog').mealPlanScheduleState.entries.every(e => !e.panel.ui.loading));
+        const open = async () => { await page.getByRole('button', {name: 'Add Meals', exact: true}).click(); await ready(); };
+        const notes = async (i, value) => { await editor(i).locator('[data-schedule-section="notes"] > summary').click(); await note(i).fill(value); };
+        const screenshot = async name => {
+            if (process.env.AI_PANTRY_BROWSER_ARTIFACTS) {
+                fs.mkdirSync(process.env.AI_PANTRY_BROWSER_ARTIFACTS, {recursive: true});
+                await page.screenshot({path: path.join(process.env.AI_PANTRY_BROWSER_ARTIFACTS, name)});
+            }
+        };
+        await open();
+        assert.equal(await editors.count(), 1);
+        assert(await editor(0).getByRole('button', {name: 'Date range', exact: true}).isVisible());
+        assert(await editor(0).getByRole('heading', {name: 'Who is eating?'}).isVisible());
+        assert.equal(await editor(0).locator('[data-meal-editor-remove]').isVisible(), false);
+        await recipe(0).selectOption('recipe://bread');
+        await portions(0).fill('8');
+        await notes(0, 'Bread notes');
+        await add();
+        assert.equal(await editors.count(), 2);
+        assert(await editor(0).locator('[data-meal-editor-form]').isVisible());
+        assert.equal(await note(0).inputValue(), 'Bread notes');
+        assert.equal(await save.textContent(), 'Save 1 Meal');
+        await recipe(1).selectOption('recipe://soup');
+        await editor(1).getByRole('button', {name: 'Date range', exact: true}).click();
+        await editor(1).locator('[data-schedule-field="end-date"]').fill('2026-10-07');
+        await portions(1).fill('3');
+        await notes(1, 'Soup notes');
+        await add();
+        await recipe(2).selectOption('recipe://rice');
+        await portions(2).fill('6');
+        await notes(2, 'Rice notes');
+        assert.equal(await save.textContent(), 'Save 3 Meals');
+        assert.equal(await editors.locator('[data-meal-editor-form]:visible').count(), 3);
+        assert.equal(await dialog.getByText('Meals in this batch', {exact: true}).count(), 0);
+        const ids = await editors.evaluateAll(nodes => nodes.map(n => n.dataset.mealEditor));
+        assert.equal(new Set(ids).size, 3);
+        const before = await editors.evaluateAll(nodes => nodes.map(n => n.getBoundingClientRect().top));
+        assert(before[0] < before[1] && before[1] < before[2]);
+        const allIds = await dialog.locator('[id]').evaluateAll(nodes => nodes.map(n => n.id));
+        assert.equal(new Set(allIds).size, allIds.length, 'All control IDs are unique');
+        await portions(0).fill('9');
+        await note(0).fill('Edited while three meals are open');
+        assert.equal(await portions(1).inputValue(), '3');
+        assert.equal(await portions(2).inputValue(), '6');
+        assert.equal(await note(1).inputValue(), 'Soup notes');
+        assert.equal(await note(2).inputValue(), 'Rice notes');
+        await editor(1).getByRole('radio', {name: 'Sunflower'}).check();
+        assert(await editor(0).getByRole('radio', {name: 'Olive'}).isChecked());
+        assert(await editor(2).getByRole('radio', {name: 'Olive'}).isChecked());
+        await dialog.evaluate(e => { e.scrollTop = 0; });
+        await screenshot('meal-editors-dark.png');
+        await page.evaluate(() => document.documentElement.dataset.publicAuthTheme = 'light');
+        await screenshot('meal-editors-light.png');
+        const light = await dialog.locator('.app-dialog-card').evaluate(e => getComputedStyle(e).backgroundColor);
+        assert.equal(light, 'rgb(255, 255, 255)');
+        await page.evaluate(() => document.documentElement.dataset.publicAuthTheme = 'dark');
+        const dark = await dialog.locator('.app-dialog-card').evaluate(e => getComputedStyle(e).backgroundColor);
+        assert.notEqual(dark, light);
+        await editor(1).locator('[data-meal-editor-heading]').evaluate(e => e.scrollIntoView({block:'center'}));
+        await screenshot('meal-editors-boundary.png');
+        await page.setViewportSize({width: 390, height: 844});
+        await editor(2).locator('[data-meal-editor-heading]').evaluate(e => e.scrollIntoView({block:'start'}));
+        await screenshot('meal-editors-mobile.png');
+        const bounds = await dialog.evaluate(e => ({width:e.clientWidth, scrollWidth:e.scrollWidth, height:e.getBoundingClientRect().height}));
+        assert(bounds.width >= bounds.scrollWidth - 1, 'No horizontal modal overflow on mobile');
+        assert(bounds.height <= 844, 'Modal fits the mobile viewport');
+        await page.setViewportSize({width: 1440, height: 1000});
+
+        // Validate every editor in place and retain its siblings.
+        await recipe(1).selectOption('');
+        await editor(2).getByRole('button', {name:'Select days', exact:true}).click();
+        const dates = editor(2).locator('[data-schedule-action="date"][aria-pressed="true"]');
+        while (await dates.count()) await dates.first().click();
+        await save.click();
+        assert.match(await editor(1).locator('[data-meal-editor-error]').textContent(), /Meal 2: Please select a recipe/);
+        assert.match(await editor(2).locator('[data-meal-editor-error]').textContent(), /Meal 3:.*date/i);
+        assert.equal(posts.length, 0);
+        assert.equal(await note(0).inputValue(), 'Edited while three meals are open');
+        await recipe(1).selectOption('recipe://soup');
+        await editor(2).getByRole('button', {name:'One day', exact:true}).click();
+        await editor(1).locator('[data-meal-editor-remove]').click();
+        assert.equal(await editors.count(), 2);
+        assert.equal(await editor(1).getAttribute('data-meal-editor'), ids[2]);
+        assert.equal(await editor(1).locator('[data-meal-editor-number]').textContent(), 'Meal 2');
+        assert.equal(await portions(0).inputValue(), '9');
+        assert.equal(await note(1).inputValue(), 'Rice notes');
+        assert((await dialog.evaluate(e => e.scrollTop)) > 0, 'Removal must not reset scrolling to the top');
+        await add(); // Untouched blank editor must not produce a meal.
+        assert.equal(await save.textContent(), 'Save 2 Meals');
+        await save.click();
+        await dialog.waitFor({state:'hidden'});
+        assert.equal(posts.length, 1);
+        assert.equal(posts[0].batches.length, 2);
+        const meals = async url => (await (await context.request.get(base + '/api/meal-plan?recipe_url=' + encodeURIComponent(url))).json()).meals;
+        assert.equal((await meals('recipe://bread')).length, 1);
+        assert.equal((await meals('recipe://rice')).length, 1);
+        assert.equal((await meals('recipe://soup')).length, 0);
+
+        await open();
+        assert.equal(await editors.count(), 1);
+        assert.equal(await recipe(0).inputValue(), '');
+        await recipe(0).selectOption('recipe://soup');
+        await add();
+        await dialog.getByRole('button', {name:'Cancel', exact:true}).click();
+        await open();
+        assert.equal(await editors.count(), 1);
+        assert.equal(await recipe(0).inputValue(), '');
+        await recipe(0).selectOption('recipe://soup');
+        let release;
+        const pending = new Promise(resolve => release = resolve);
+        await page.route('**/api/meal-plan/batches/bulk', async route => { await pending; await route.continue(); });
+        await save.click();
+        await page.waitForFunction(() => document.getElementById('mealPlannerDialog').mealPlanScheduleState.saving);
+        assert(await save.isDisabled());
+        assert(await recipe(0).isDisabled());
+        await page.keyboard.press('Escape');
+        assert(await dialog.isVisible());
+        await page.evaluate(() => { void saveMealPlannerBatch(); void saveMealPlannerBatch(); });
+        release();
+        await dialog.waitFor({state:'hidden'});
+        assert.equal(posts.length, 2);
+        assert.equal((await meals('recipe://soup')).length, 1);
+        await page.unroute('**/api/meal-plan/batches/bulk');
+        await open();
+        await recipe(0).selectOption('recipe://soup');
+        await save.click(); // Real backend duplicate rejection preserves the form.
+        await page.waitForFunction(() => !document.getElementById('mealPlannerDialog').mealPlanScheduleState.saving);
+        assert(await dialog.isVisible());
+        assert.match(await editor(0).locator('[data-meal-editor-error]').textContent(), /already planned/i);
+        assert.equal((await meals('recipe://soup')).length, 1);
+        // Removing the first section also retains stable identity and supports reopening.
+        await add();
+        const survivor = await editor(1).getAttribute('data-meal-editor');
+        await recipe(1).selectOption('recipe://rice');
+        await notes(1, 'Survives removing the first meal');
+        await editor(0).locator('[data-meal-editor-remove]').click();
+        assert.equal(await editor(0).getAttribute('data-meal-editor'), survivor);
+        assert.equal(await note(0).inputValue(), 'Survives removing the first meal');
+        await add();
+        assert.notEqual(await editor(1).getAttribute('data-meal-editor'), survivor);
+        await dialog.getByRole('button', {name:'Cancel', exact:true}).click();
+        await open();
+        assert.equal(await editors.count(), 1);
+        assert.equal(await recipe(0).inputValue(), '');
+        // Expected HTTP 400 is the only console error allowed.
+        assert.deepEqual(errors.filter(error => !error.includes('400 (BAD REQUEST)')), []);
+        console.log('PASS: three independent editors, remove, validation, blank placeholders, cancel/reopen, single/bulk atomic save, duplicate protection, dark/light/mobile, console health');
+    } finally { await browser.close(); }
+})().catch(error => {console.error(error); process.exitCode = 1;});

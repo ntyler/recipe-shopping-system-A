@@ -835,13 +835,15 @@
                 <button type="button" onclick="return loadMealPlannerEdit('meal')"><strong>Edit this meal</strong><span>Change just this date, meal, people, portions, and notes.</span></button>
                 <button type="button" onclick="return loadMealPlannerEdit('batch')"><strong>Edit entire prep plan</strong><span>Change the plan’s days, meals, people, portions, and prep tasks together.</span></button>
             </section>
-            <section class="app-meal-batch" data-meal-batch hidden aria-labelledby="mealPlannerBatchTitle">
-                <div class="app-meal-batch-heading"><h4 id="mealPlannerBatchTitle">Meals in this batch</h4><span data-meal-batch-count></span></div>
-                <ol data-meal-batch-list></ol>
-            </section>
-            <fieldset id="mealPlannerRecipeFields">
+            <div data-meal-editors>
+            <section class="app-meal-editor" data-meal-editor>
+            <div class="app-meal-editor-heading" data-meal-editor-heading>
+                <div><h4 data-meal-editor-number>Meal 1</h4><p data-meal-editor-title>Choose a recipe</p></div>
+                <button type="button" class="app-page-secondary-action" data-meal-editor-remove hidden>Remove</button>
+            </div>
+            <fieldset id="mealPlannerRecipeFields" data-meal-recipe-fields>
                 <label for="mealPlannerRecipe">Recipe
-                    <select id="mealPlannerRecipe" name="recipe_url" required aria-describedby="mealPlannerServingsHelp" onchange="return syncMealPlannerServingsFromRecipe()">
+                    <select id="mealPlannerRecipe" name="recipe_url" required aria-describedby="mealPlannerServingsHelp" onchange="return syncMealPlannerServingsFromRecipe(this)">
                         <option value="" data-default-servings="1" data-yield-label="">Choose a recipe</option>
                         {% for recipe in meal_plan_recipe_options %}
                             <option value="{{ recipe.url }}"
@@ -863,13 +865,20 @@
                 </section>
                 <small id="mealPlannerServingsHelp" class="app-dialog-helper" data-meal-servings-help aria-live="polite">Select a recipe to use its default yield.</small>
             </fieldset>
-            <p class="app-meal-schedule-empty" data-meal-schedule-empty>Select a recipe to choose one day, a date range, or individual days and assign meal portions.</p>
+            <p class="app-meal-schedule-empty" data-meal-schedule-empty hidden>Select a recipe to choose one day, a date range, or individual days and assign meal portions.</p>
+            <form id="mealPlannerScheduleForm" class="recipe-preview-meal-panel" data-meal-editor-form novalidate></form>
+            <p class="app-meal-editor-error" data-meal-editor-error role="alert" tabindex="-1" hidden></p>
+            </section>
+            </div>
             <div class="app-dialog-status" data-meal-plan-status aria-live="polite"></div>
             <button type="button" class="app-page-secondary-action" data-meal-edit-retry hidden onclick="return loadMealPlannerEdit(document.getElementById('mealPlannerDialog').mealPlanScheduleState.edit.scope)">Retry loading meal</button>
-            <form id="mealPlannerScheduleForm" class="recipe-preview-meal-panel" hidden></form>
+            <button type="button" class="app-page-secondary-action" data-meal-editor-add onclick="return addMealPlannerEditor()">+ Add another meal</button>
             <div class="app-meal-batch-footer" data-meal-batch-footer>
-                <p data-meal-batch-help aria-live="polite">Meals are saved together when you’re ready.</p>
-                <button type="button" class="app-page-primary-action" data-meal-batch-save disabled onclick="void saveMealPlannerBatch()">Save meals</button>
+                <p data-meal-batch-help aria-live="polite">0 meals being planned</p>
+                <div class="app-meal-batch-footer-actions">
+                    <button type="button" class="app-page-secondary-action" data-meal-schedule-close onclick="return closeMealPlannerDialog()">Cancel</button>
+                    <button type="button" class="app-page-primary-action" data-meal-batch-save disabled onclick="void saveMealPlannerBatch()">Save 0 Meals</button>
+                </div>
             </div>
         </div>
     </dialog>

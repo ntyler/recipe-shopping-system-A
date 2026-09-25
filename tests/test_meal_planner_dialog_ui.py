@@ -31,6 +31,7 @@ function node(extra={}) {
  return {hidden:false,disabled:false,dataset:{},innerHTML:'',textContent:'',value:'',handlers:{},children:[],classList:classes(),
   replaceChildren(...items){this.children=items;},append(...items){this.children.push(...items);},appendChild(item){this.children.push(item);},
   addEventListener(type,handler){(this.handlers[type] ||= []).push(handler);},
+  remove(){this.removed=true;},scrollIntoView(){this.scrolled=true;},cloneNode(){return makeDialog().editor;},
   focus(){this.focused=true;},setAttribute(name,value){this[name]=value;},removeAttribute(name){delete this[name];},
   contains(target){return target===this;},closest(){return null;},querySelector(){return null;},querySelectorAll(){return [];},...extra};
 }
@@ -64,8 +65,8 @@ function makeDialog() {
   dataset:{mealDate:'2026-09-21'},
   showModal(){this.open=true;},close(){this.open=false;for(const handler of this.handlers.close || []) handler({});},
   querySelector(selector){
-   if(selector.includes('mealPlannerScheduleForm'))return form;
-   if(selector.includes('mealPlannerRecipeFields'))return fieldset;
+   if(selector.includes('mealPlannerScheduleForm') || selector==='[data-meal-editor-form]')return form;
+   if(selector.includes('mealPlannerRecipeFields') || selector==='[data-meal-recipe-fields]')return fieldset;
    if(selector==='#mealPlannerRecipe' || selector.includes('recipe_url'))return recipe;
    if(selector.includes('data-meal-schedule-close'))return close;
    if(selector.includes('data-meal-servings-help'))return helper;
@@ -74,11 +75,16 @@ function makeDialog() {
    return this.nodes[selector] ||= node({querySelector:child=>dialog.querySelector(child)});
   },
   querySelectorAll(selector){
+   if(selector==='[data-meal-recipe-fields]')return [fieldset];
    if(selector.includes('ingredient-requirement-id'))return this.radios;
    if(selector.includes('data-meal-schedule-close'))return [close];
    return [];
   },
  });
+ const originalQuery=dialog.querySelector.bind(dialog);
+ const editor=node({querySelector:originalQuery,querySelectorAll:dialog.querySelectorAll.bind(dialog)});
+ dialog.editor=editor;
+ dialog.querySelector=selector=>selector==='[data-meal-editor]'?editor:originalQuery(selector);
  return dialog;
 }
 activeDialog=makeDialog();
@@ -172,7 +178,7 @@ const openEdit=async(button=card(),scope='')=>{ctx.openMealPlannerEditDialog(but
 def test_clicked_slot_and_recipe_yield_initialize_shared_schedule():
     run_dialog(r"""
 await open('2026-10-07','breakfast');
-assert.equal(activeDialog.open,true);assert.equal(activeDialog.form.hidden,true);
+assert.equal(activeDialog.open,true);assert.equal(activeDialog.form.hidden,false);
 const panel=await choose('recipe://bread');
 assert(panel instanceof ctx.MealPlanPanel);
 assert.equal(panel.form,activeDialog.form);assert.equal(panel.form.hidden,false);
@@ -536,57 +542,54 @@ assert.equal(panel.draft.notes,'','Successful save must not leave a resubmittabl
 """)
 
 
-def test_build_edit_remove_and_save_multiple_recipes_without_losing_current_draft():
+def test_three_live_editors_keep_independent_drafts_through_edits_removal_and_save():
     run_dialog(r"""
-await open('2026-10-05','lunch');const panel=await choose('recipe://bread');
-M.setHouseholdDefault(panel.draft,'lunch',2.5);panel.draft.notes='Bread only';
-panel.draft.prepSteps=[{date:'2026-10-04',instruction:'Bake ahead'}];
-activeDialog.radios=[{dataset:{ingredientRequirementId:'butter'},value:'unsalted'}];
-requests=[];await submit(panel);
-const state=activeDialog.mealPlanScheduleState, bread=state.entries[0];
-assert.equal(requests.length,0);assert.equal(activeDialog.open,true);assert.equal(panel.form.hidden,true);
-assert.equal(bread.payload.allocations[0].planned_servings,2.5);
-assert.equal(activeDialog.querySelector('[data-meal-batch-list]').children.length,1);
-await choose('recipe://soup');
-assert.equal(panel.draft.notes,'');assert.equal(panel.draft.prepSteps.length,0);
-assert.equal(Number(panel.draft.householdDefaults.lunch),4);
-M.setDates(panel.draft,['2026-10-06','2026-10-07']);panel.draft.notes='Soup only';
-await ctx.changeMealPlannerBatchEntry(activeDialog,bread,'Edit');
-assert.equal(state.entries.length,1);assert.equal(state.entries[0].payload.recipe_url,'recipe://soup');
-assert.equal(panel.draft.notes,'Bread only');assert.equal(panel.draft.prepSteps[0].instruction,'Bake ahead');
-assert.equal(Number(panel.draft.householdDefaults.lunch),2.5);
-M.setHouseholdDefault(panel.draft,'lunch',3);await submit(panel);
-assert.equal(state.entries.length,2);assert.equal(bread.payload.allocations[0].planned_servings,2.5,'Editing uses an independent copy');
-await ctx.changeMealPlannerBatchEntry(activeDialog,state.entries[0],'Remove');
-assert.equal(state.entries.length,1);
-await choose('recipe://soup');M.setDates(panel.draft,['2026-10-09']);
+await open('2026-10-05','lunch');const first=await choose('recipe://bread');
+const state=activeDialog.mealPlanScheduleState;
+M.setHouseholdDefault(first.draft,'lunch',2.5);first.draft.notes='Bread only';
+first.draft.prepSteps=[{date:'2026-10-04',instruction:'Bake ahead'}];
+ctx.addMealPlannerEditor();await flush();const second=state.entries[1];
+second.root.querySelector('[name="recipe_url"]').value='recipe://soup';
+ctx.syncMealPlannerServingsFromRecipe(second.root.querySelector('[name="recipe_url"]'));
+M.setDates(second.panel.draft,['2026-10-06','2026-10-07']);second.panel.draft.notes='Soup only';
+ctx.addMealPlannerEditor();await flush();const third=state.entries[2],thirdId=third.id;
+third.root.querySelector('[name="recipe_url"]').value='recipe://bread';
+ctx.syncMealPlannerServingsFromRecipe(third.root.querySelector('[name="recipe_url"]'));
+M.setDates(third.panel.draft,['2026-10-09']);third.panel.draft.notes='Third only';
+assert.equal(new Set(state.entries.map(entry=>entry.id)).size,3);
+assert(state.entries.every(entry=>!entry.panel.form.hidden));
+assert.equal(first.draft.notes,'Bread only');assert.equal(first.draft.prepSteps[0].instruction,'Bake ahead');
+M.setHouseholdDefault(first.draft,'lunch',3);first.render();
+assert.equal(second.panel.draft.notes,'Soup only');assert.equal(third.panel.draft.notes,'Third only');
+ctx.removeMealPlannerEditor(activeDialog,second);
+assert.equal(state.entries.length,2);assert.equal(state.entries[1],third);assert.equal(third.id,thirdId);
+assert.equal(third.root.querySelector('[data-meal-editor-number]').textContent,'Meal 2');
+assert.equal(first.draft.notes,'Bread only');assert.equal(third.panel.draft.notes,'Third only');
+assert.equal(activeDialog.querySelector('[data-meal-batch-save]').textContent,'Save 2 Meals');
 requests=[];responseFactory=async()=>ok({batches:[{id:'one'},{id:'two'}],meals:[]});
-await ctx.saveMealPlannerBatch();
-assert.equal(requests.length,1);assert.equal(requests[0].url,'/api/meal-plan/batches/bulk');
-const body=JSON.parse(requests[0].options.body);
+await ctx.saveMealPlannerBatch();await ctx.saveMealPlannerBatch();
+assert.equal(requests.length,1);const body=JSON.parse(requests[0].options.body);
 assert.equal(body.batches.length,2);assert.equal(body.batches[0].allocations[0].planned_servings,3);
-assert.equal(body.batches[1].allocations[0].date,'2026-10-09');
-assert.equal(state.entries.length,0);assert.equal(activeDialog.open,false);
-await ctx.saveMealPlannerBatch();assert.equal(requests.length,1);
+assert.equal(body.batches[1].allocations[0].date,'2026-10-09');assert.equal(activeDialog.open,false);
 """)
 
 
-def test_invalid_current_recipe_and_duplicate_slots_keep_batch_open_without_writes():
+def test_independent_validation_duplicates_and_empty_placeholders_preserve_values():
     run_dialog(r"""
-await open();const panel=await choose('recipe://bread');await submit(panel);
-const state=activeDialog.mealPlanScheduleState;
-await choose('recipe://bread');requests=[];await ctx.saveMealPlannerBatch();
-assert.equal(requests.length,0);assert.equal(state.entries.length,1);
-assert.match(panel.ui.message,/already in your batch/);assert.equal(activeDialog.recipe.value,'recipe://bread');
-await choose('recipe://soup');M.setHouseholdDefault(panel.draft,'dinner',0);
-await ctx.saveMealPlannerBatch();assert.equal(requests.length,0);assert.equal(state.entries.length,1);
-await ctx.changeMealPlannerBatchEntry(activeDialog,state.entries[0],'Edit');
-assert.equal(state.entries.length,1);assert.equal(activeDialog.recipe.value,'recipe://soup');
-M.setHouseholdDefault(panel.draft,'dinner',2);panel.draft.prepSteps=[{date:'bad',instruction:'Prep'}];
-await ctx.saveMealPlannerBatch();assert.equal(requests.length,0);assert.equal(state.entries.length,1);
-ctx.closeMealPlannerDialog();await open();
-assert.equal(state.entries.length,0);assert.equal(activeDialog.recipe.value,'');
-await ctx.saveMealPlannerBatch();assert.equal(requests.filter(r=>r.options?.method==='POST').length,0);
+await open();const first=await choose('recipe://bread');first.draft.notes='Keep first';
+ctx.addMealPlannerEditor();await flush();const state=activeDialog.mealPlanScheduleState,second=state.entries[1];
+assert.equal(activeDialog.querySelector('[data-meal-batch-save]').textContent,'Save 1 Meal');
+second.touched=true;requests=[];await ctx.saveMealPlannerBatch();
+assert.equal(requests.length,0);assert.match(second.root.querySelector('[data-meal-editor-error]').textContent,/Meal 2: Please select a recipe/);
+second.root.querySelector('[name="recipe_url"]').value='recipe://bread';ctx.syncMealPlannerServingsFromRecipe(second.root.querySelector('[name="recipe_url"]'));
+await ctx.saveMealPlannerBatch();assert.equal(requests.length,0);
+assert.match(second.root.querySelector('[data-meal-editor-error]').textContent,/already planned/);
+second.root.querySelector('[name="recipe_url"]').value='recipe://soup';ctx.syncMealPlannerServingsFromRecipe(second.root.querySelector('[name="recipe_url"]'));
+M.setHouseholdDefault(second.panel.draft,'dinner',0);await ctx.saveMealPlannerBatch();
+assert.equal(requests.length,0);assert.equal(first.draft.notes,'Keep first');assert.equal(state.entries.length,2);
+ctx.removeMealPlannerEditor(activeDialog,second);ctx.addMealPlannerEditor();await flush();
+requests=[];responseFactory=async()=>ok({batches:[],meals:[]});await ctx.saveMealPlannerBatch();
+assert.equal(JSON.parse(requests[0].options.body).batches.length,1,'Ignore untouched placeholder');
 """)
 
 
@@ -613,17 +616,17 @@ const pending=ctx.saveMealPlannerBatch();await flush();
 assert.equal(panel.ui.busy,true);assert.equal(activeDialog.fieldset.disabled,true);
 ctx.closeMealPlannerDialog();assert.equal(activeDialog.open,true);
 activeDialog.recipe.value='recipe://soup';ctx.syncMealPlannerServingsFromRecipe();
-assert.equal(activeDialog.recipe.value,'');
+assert.equal(activeDialog.recipe.value,'recipe://bread');
 let prevented=false;
 for(const handler of activeDialog.handlers.cancel || [])handler({preventDefault(){prevented=true;}});
 assert.equal(prevented,true,'Escape cannot dismiss a pending save');
 await ctx.saveMealPlannerBatch();assert.equal(requests.length,1);
 release({ok:false,json:async()=>({ok:false,error:'Please retry later.'})});await pending;
 assert.equal(panel.ui.busy,false);assert.equal(activeDialog.fieldset.disabled,false);
-assert.equal(activeDialog.open,true);assert.equal(panel.form.hidden,true);
+assert.equal(activeDialog.open,true);assert.equal(panel.form.hidden,false);
 const entry=activeDialog.mealPlanScheduleState.entries[0];
-assert.equal(entry.draft.notes,'Keep all my work');assert.equal(entry.draft.selectedDates.length,2);
-assert.equal(entry.payload.ingredient_option_selections.butter,'unsalted');
+assert.equal(entry.panel.draft.notes,'Keep all my work');assert.equal(entry.panel.draft.selectedDates.length,2);
+assert.equal(entry.panel.options.getContext().ingredient_option_selections.butter,'unsalted');
 assert.match(statuses.at(-1).message,/Please retry later/);assert.equal(refreshes.length,0);
 """)
 
@@ -650,7 +653,7 @@ def test_placeholder_and_replaced_dialog_cannot_submit_a_stale_recipe_context():
     run_dialog(r"""
 await open();const panel=await choose('recipe://bread');
 panel.draft.notes='Retain while selecting a recipe';
-await choose('');assert.equal(activeDialog.form.hidden,true);
+await choose('');assert.equal(activeDialog.form.hidden,false);
 assert.equal(panel.draft.notes,'Retain while selecting a recipe');
 requests=[];await submit(panel);assert.equal(requests.length,0);
 await choose('recipe://bread');assert.equal(panel.form.hidden,false);
