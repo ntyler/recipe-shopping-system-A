@@ -2025,6 +2025,84 @@ function closeMealPlannerDialog() {
     return false;
 }
 
+function closeMealPlannerCardMenu(menu, restoreFocus = false) {
+    if (!menu) return;
+    if (typeof menu.hidePopover === "function" && menu.matches(":popover-open")) menu.hidePopover();
+    menu.classList.remove("is-fallback-open");
+    if (menu.mealActionsDismiss) {
+        document.removeEventListener("pointerdown", menu.mealActionsDismiss);
+        document.removeEventListener("keydown", menu.mealActionsEscape);
+        document.removeEventListener("scroll", menu.mealActionsScroll, true);
+        window.removeEventListener("resize", menu.mealActionsScroll);
+        menu.mealActionsDismiss = null;
+    }
+    const trigger = document.getElementById(menu.dataset.triggerId || "");
+    trigger?.setAttribute("aria-expanded", "false");
+    if (restoreFocus) trigger?.focus({preventScroll:true});
+}
+
+function toggleMealPlannerCardMenu(button) {
+    const menu = document.getElementById(button?.dataset.menuId || "");
+    if (!menu) return false;
+    const nativePopover = typeof menu.showPopover === "function";
+    if (nativePopover ? menu.matches(":popover-open") : menu.classList.contains("is-fallback-open")) {
+        closeMealPlannerCardMenu(menu, true);
+        return false;
+    }
+    document.querySelectorAll("[data-meal-card-menu]").forEach(other => {
+        if (other !== menu) closeMealPlannerCardMenu(other);
+    });
+    if (!menu.mealActionsBound) {
+        menu.mealActionsBound = true;
+        menu.addEventListener("toggle", event => {
+            button.setAttribute("aria-expanded", String(event.newState === "open"));
+            if (event.newState === "closed") closeMealPlannerCardMenu(menu);
+        });
+        menu.addEventListener("keydown", event => {
+            if (event.key === "Escape") {
+                event.preventDefault();
+                closeMealPlannerCardMenu(menu, true);
+            }
+        });
+    }
+    if (nativePopover) menu.showPopover({source:button});
+    else menu.classList.add("is-fallback-open");
+    menu.mealActionsDismiss = event => {
+        if (!menu.contains(event.target) && !button.contains(event.target)) closeMealPlannerCardMenu(menu);
+    };
+    menu.mealActionsScroll = event => {
+        if (!menu.contains(event.target)) closeMealPlannerCardMenu(menu);
+    };
+    menu.mealActionsEscape = event => {
+        if (event.key === "Escape") {
+            event.preventDefault();
+            closeMealPlannerCardMenu(menu, true);
+        }
+    };
+    document.addEventListener("pointerdown", menu.mealActionsDismiss);
+    document.addEventListener("keydown", menu.mealActionsEscape);
+    document.addEventListener("scroll", menu.mealActionsScroll, true);
+    window.addEventListener("resize", menu.mealActionsScroll);
+    const anchor = button.getBoundingClientRect(), bounds = menu.getBoundingClientRect();
+    const viewport = window.visualViewport;
+    const left = viewport?.offsetLeft || 0, top = viewport?.offsetTop || 0;
+    const right = left + (viewport?.width || window.innerWidth);
+    const bottom = top + (viewport?.height || window.innerHeight);
+    menu.style.left = `${Math.max(left + 8, Math.min(anchor.right - bounds.width, right - bounds.width - 8))}px`;
+    menu.style.top = `${Math.max(top + 8, Math.min(anchor.bottom + bounds.height + 6 <= bottom - 8 ? anchor.bottom + 6 : anchor.top - bounds.height - 6, bottom - bounds.height - 8))}px`;
+    button.setAttribute("aria-expanded", "true");
+    menu.querySelector("button")?.focus({preventScroll:true});
+    return false;
+}
+
+function runMealPlannerCardAction(button, action) {
+    const menu = button?.closest("[data-meal-card-menu]");
+    const trigger = document.getElementById(menu?.dataset.triggerId || "");
+    if (!menu || !trigger || !['meal', 'batch', 'remove'].includes(action)) return false;
+    closeMealPlannerCardMenu(menu, true);
+    return action === "remove" ? openMealPlannerDeleteDialog(trigger) : openMealPlannerEditDialog(trigger, action);
+}
+
 function openMealPlannerEditDialog(button, scope = "") {
     const dialog = document.getElementById("mealPlannerDialog");
     const mealId = String(button?.dataset.mealId || "");

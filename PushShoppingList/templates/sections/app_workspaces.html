@@ -677,6 +677,7 @@
                     </div>
                 {% endfor %}
 
+                {% if meal_plan.get('prep_steps_by_day', {}).values() | select | list | length %}
                 <div class="app-meal-planner-row-label">Prep</div>
                 {% for day in meal_plan.days %}
                     <div class="app-meal-planner-cell app-meal-prep-cell{% if day.is_past %} is-past{% endif %}{% if day.is_today %} is-today{% endif %}" data-meal-prep-date="{{ day.date }}">
@@ -698,6 +699,7 @@
                         {% endfor %}
                     </div>
                 {% endfor %}
+                {% endif %}
 
                 {% for meal_type in meal_plan.meal_types %}
                     <div class="app-meal-planner-row-label">{{ meal_type | title }}</div>
@@ -711,9 +713,22 @@
                                             <img src="{{ meal.cover_image.thumb_url or meal.cover_image.card_url or meal.cover_image.src }}" alt="">
                                         {% endif %}
                                         <a href="#recipeView" data-recipe-url="{{ meal.recipe_url }}" onclick="return jumpToRecipeViewRecipe(this, event)">{{ meal.recipe_name }}</a>
+                                        <button type="button" id="mealActionsTrigger{{ meal.id }}" class="app-meal-actions-toggle"
+                                                data-meal-card-actions-toggle data-menu-id="mealActions{{ meal.id }}"
+                                                data-meal-id="{{ meal.id }}" data-batch-id="{{ meal.batch_id or '' }}" data-meal-name="{{ meal.recipe_name }}"
+                                                aria-label="Actions for {{ meal.recipe_name }} on {{ day.weekday }} {{ day.day_label }} {{ meal_type }}"
+                                                aria-expanded="false" aria-controls="mealActions{{ meal.id }}"
+                                                title="Meal actions" onclick="return toggleMealPlannerCardMenu(this)"><span aria-hidden="true">&hellip;</span></button>
+                                        <div id="mealActions{{ meal.id }}" class="app-meal-card-menu" popover="auto"
+                                             data-meal-card-menu data-trigger-id="mealActionsTrigger{{ meal.id }}"
+                                             role="group" aria-label="Actions for {{ meal.recipe_name }}">
+                                            <button type="button" onclick="return runMealPlannerCardAction(this, 'meal')">{{ 'Edit this meal' if meal.batch_id else 'Edit meal' }}</button>
+                                            {% if meal.batch_id %}<button type="button" onclick="return runMealPlannerCardAction(this, 'batch')">Edit entire prep plan</button>{% endif %}
+                                            <button type="button" class="is-danger" onclick="return runMealPlannerCardAction(this, 'remove')">Remove meal</button>
+                                        </div>
                                         {% if meal.planned_servings or meal.batch_id %}<p class="app-meal-plan-details">
                                             {% if meal.planned_servings %}<span>{{ '%g' | format(meal.planned_servings | float) }} {{ 'serving' if meal.planned_servings == 1 else 'servings' }}</span>{% endif %}
-                                            {% if meal.batch_id %}<span class="app-meal-batch-label">From prep batch</span>{% endif %}
+                                            {% if meal.batch_id %}<span class="app-meal-batch-label">Prep batch</span>{% endif %}
                                         </p>{% endif %}
                                         {% if meal.member_portions %}
                                             <details class="app-meal-family-portions" data-meal-family-details="{{ meal.id }}">
@@ -729,21 +744,6 @@
                                         {% if meal.ingredient_selection_needed %}
                                             <span class="app-meal-selection-needed">Selection needed.</span>
                                         {% endif %}
-                                        <div class="app-meal-card-actions">
-                                        <button type="button" class="app-meal-edit"
-                                                aria-label="Edit {{ meal.recipe_name }} for {{ day.weekday }} {{ day.day_label }} {{ meal_type }}"
-                                                data-meal-id="{{ meal.id }}"
-                                                data-batch-id="{{ meal.batch_id or '' }}"
-                                                data-meal-name="{{ meal.recipe_name }}"
-                                                onclick="return openMealPlannerEditDialog(this)">Edit</button>
-                                        <button type="button"
-                                                class="app-meal-remove"
-                                                aria-label="Remove {{ meal.recipe_name }} from {{ meal_type }}"
-                                                title="Remove planned meal"
-                                                data-meal-id="{{ meal.id }}"
-                                                data-meal-name="{{ meal.recipe_name }}"
-                                                onclick="return openMealPlannerDeleteDialog(this)">&times;</button>
-                                        </div>
                                     </article>
                                 {% endfor %}
                             </div>

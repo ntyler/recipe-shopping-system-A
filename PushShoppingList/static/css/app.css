@@ -33547,86 +33547,148 @@ img[data-deferred-src] {
     min-width: 0;
 }
 
-.app-meal-planner-cell .app-meal-card {
+.app-page-workspace-meal-planner .app-meal-planner-grid {
+    grid-template-columns: 72px repeat(7, minmax(156px, 1fr));
+}
+
+.app-page-workspace-meal-planner .app-meal-planner-cell {
+    min-width: 0;
+    min-height: 100px;
+    padding: 6px;
+}
+
+.app-page-workspace-meal-planner .app-meal-planner-cell .app-meal-card {
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 6px;
+    grid-template-columns: minmax(0, 1fr) 32px;
+    gap: 4px 6px;
     align-items: center;
     min-width: 0;
-    min-height: 42px;
+    min-height: 0;
     height: auto;
-    padding: 5px;
+    padding: 6px;
     border: 1px solid var(--app-border);
     border-radius: 8px;
     background: var(--app-surface-soft);
 }
 
-.app-meal-planner-cell .app-meal-card.has-image {
-    grid-template-columns: 38px minmax(0, 1fr);
+.app-page-workspace-meal-planner .app-meal-planner-cell .app-meal-card.has-image {
+    grid-template-columns: 34px minmax(0, 1fr) 32px;
 }
 
-.app-meal-planner-cell .app-meal-card img {
-    width: 38px;
-    height: 38px;
-    border-radius: 7px;
+.app-page-workspace-meal-planner .app-meal-planner-cell .app-meal-card img {
+    width: 34px;
+    height: 34px;
+    border-radius: 6px;
     object-fit: cover;
 }
 
-.app-meal-planner-cell .app-meal-card > a {
+.app-page-workspace-meal-planner .app-meal-planner-cell .app-meal-card > a {
     min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow-wrap: anywhere;
 }
 
-.app-meal-planner-cell .app-meal-remove {
+.app-page-workspace-meal-planner .app-meal-planner-cell .app-meal-actions-toggle {
     grid-column: -2 / -1;
     grid-row: 1;
     position: static;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--app-surface);
-}
-
-.app-meal-planner-cell .app-meal-card-actions {
-    grid-column: 1 / -1;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    padding-top: 4px;
-}
-
-.app-meal-planner-cell .app-meal-card-actions .app-meal-remove {
-    position: static;
+    display: grid;
+    place-items: center;
+    align-self: start;
+    justify-self: end;
     width: 32px;
+    min-width: 32px;
+    max-width: 32px;
     height: 32px;
     min-height: 32px;
-    flex: 0 0 32px;
-}
-
-.app-meal-planner-cell .app-meal-edit {
-    min-height: 32px;
-    padding: 4px 9px;
-    border: 1px solid var(--app-border);
-    border-radius: 6px;
-    background: var(--app-surface);
-    color: var(--app-primary);
-    font: inherit;
+    margin: 0;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--app-muted);
+    font-size: 20px;
+    line-height: 1;
     cursor: pointer;
 }
 
-.app-meal-card-actions button:focus-visible {
+.app-page-workspace-meal-planner .app-meal-actions-toggle:hover:not(:disabled),
+.app-page-workspace-meal-planner .app-meal-actions-toggle[aria-expanded="true"] {
+    border-color: var(--app-border);
+    background: var(--app-surface);
+    color: var(--app-text-strong);
+}
+
+.app-page-workspace-meal-planner .app-meal-card-menu {
+    position: fixed;
+    inset: auto;
+    z-index: 1000;
+    display: none;
+    gap: 2px;
+    width: 190px;
+    max-width: calc(100vw - 16px);
+    max-height: calc(100dvh - 16px);
+    margin: 0;
+    padding: 5px;
+    overflow: auto;
+    border: 1px solid var(--app-border);
+    border-radius: 8px;
+    background: var(--app-surface);
+    color: var(--app-text-strong);
+    box-shadow: 0 8px 24px rgb(0 0 0 / 20%);
+}
+
+.app-page-workspace-meal-planner .app-meal-card-menu:popover-open {
+    display: grid;
+}
+
+.app-page-workspace-meal-planner .app-meal-card-menu.is-fallback-open {
+    display: grid;
+}
+
+.app-page-workspace-meal-planner .app-meal-card-menu > button {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    min-height: 36px;
+    margin: 0;
+    padding: 7px 9px;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--app-text-strong);
+    font: inherit;
+    font-size: 12px;
+    line-height: 1.35;
+    text-align: left;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    cursor: pointer;
+}
+
+.app-page-workspace-meal-planner .app-meal-card-menu > button:hover:not(:disabled) {
+    border-color: var(--app-border);
+    background: var(--app-primary-soft);
+}
+
+.app-page-workspace-meal-planner .app-meal-card-menu > button.is-danger {
+    color: var(--app-danger);
+}
+
+.app-page-workspace-meal-planner :is(.app-meal-actions-toggle, .app-meal-card-menu > button, .app-meal-add-slot):focus-visible {
     outline: 2px solid var(--app-primary);
     outline-offset: 2px;
 }
 
-@media (max-width: 760px) {
-    .app-meal-planner-cell .app-meal-card-actions :is(.app-meal-edit, .app-meal-remove) {
-        min-width: 44px;
-        min-height: 44px;
-    }
+.app-page-workspace-meal-planner .app-meal-planner-cell .app-meal-plan-details {
+    margin: 0;
+    gap: 2px 6px;
+    font-size: 11px;
+}
+
+.app-page-workspace-meal-planner .app-meal-selection-needed {
+    grid-column: 1 / -1;
+    overflow-wrap: anywhere;
 }
 
 .app-meal-planner-cell .app-meal-plan-details,
@@ -33738,23 +33800,61 @@ img[data-deferred-src] {
     color: var(--app-danger);
 }
 
-.app-meal-planner-cell .app-meal-add-slot {
+.app-page-workspace-meal-planner .app-meal-planner-cell .app-meal-add-slot {
     gap: 5px;
-    width: 100%;
-    min-height: 34px;
+    justify-self: start;
+    width: auto;
+    max-width: 100%;
+    min-height: 28px;
     height: auto;
-    padding: 6px 8px;
-    border-color: var(--app-border);
-    border-radius: 7px;
+    margin: 0;
+    padding: 4px 6px;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    background: transparent;
     color: var(--app-muted);
     font-size: 11px;
-    font-weight: 650;
+    font-weight: 500;
     line-height: 1.2;
+}
+
+.app-page-workspace-meal-planner .app-meal-planner-cell .app-meal-add-slot:hover:not(:disabled),
+.app-page-workspace-meal-planner .app-meal-planner-cell .app-meal-add-slot:focus-visible:not(:disabled) {
+    border-color: var(--app-border);
+    background: var(--app-primary-soft);
+    color: var(--app-primary);
 }
 
 .app-meal-planner-cell .app-meal-add-slot > span[aria-hidden="true"] {
     font-size: 16px;
     line-height: 1;
+}
+
+@media (max-width: 760px), (pointer: coarse) {
+    .app-page-workspace-meal-planner .app-meal-planner-grid {
+        grid-template-columns: 68px repeat(7, minmax(184px, 1fr));
+    }
+
+    .app-page-workspace-meal-planner .app-meal-planner-cell .app-meal-card {
+        grid-template-columns: minmax(0, 1fr) 44px;
+    }
+
+    .app-page-workspace-meal-planner .app-meal-planner-cell .app-meal-card.has-image {
+        grid-template-columns: 34px minmax(0, 1fr) 44px;
+    }
+
+    .app-page-workspace-meal-planner .app-meal-planner-cell .app-meal-actions-toggle {
+        width: 44px;
+        min-width: 44px;
+        max-width: 44px;
+        height: 44px;
+        min-height: 44px;
+    }
+
+    .app-page-workspace-meal-planner .app-meal-card-menu > button,
+    .app-page-workspace-meal-planner .app-meal-planner-cell .app-meal-add-slot {
+        min-height: 44px;
+    }
 }
 
 .app-home-recent-recipes {

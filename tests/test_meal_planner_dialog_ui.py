@@ -20,16 +20,23 @@ def run_dialog(script):
     bootstrap = r"""
 const assert = require('node:assert/strict'), fs = require('node:fs'), vm = require('node:vm');
 const plain = value => JSON.parse(JSON.stringify(value));
-const classes = () => ({add(){},remove(){},toggle(){}});
+const classes = () => {const values=new Set();return {add(value){values.add(value);},remove(value){values.delete(value);},
+ contains(value){return values.has(value);},toggle(value,present){if(present)values.add(value);else values.delete(value);}};};
+const eventSurface=()=>({listeners:{},
+ addEventListener(type,handler){(this.listeners[type] ||= new Set()).add(handler);},
+ removeEventListener(type,handler){this.listeners[type]?.delete(handler);},
+ dispatch(type,target,event={}){[...(this.listeners[type] || [])].forEach(handler=>handler({...event,target}));}
+});
 function node(extra={}) {
  return {hidden:false,disabled:false,dataset:{},innerHTML:'',textContent:'',value:'',handlers:{},classList:classes(),
   addEventListener(type,handler){(this.handlers[type] ||= []).push(handler);},
   focus(){this.focused=true;},setAttribute(name,value){this[name]=value;},removeAttribute(name){delete this[name];},
-  querySelector(){return null;},querySelectorAll(){return [];},...extra};
+  contains(target){return target===this;},querySelector(){return null;},querySelectorAll(){return [];},...extra};
 }
 let requests=[],refreshes=[],statuses=[],ingredientRenders=[],previewRefreshes=0;
 let responseFactory=async()=>({ok:true,json:async()=>({ok:true,members:[{id:'adult',name:'Adult'},{id:'child',name:'Child'}]})});
 let activeDialog;
+const extraNodes=new Map();
 const page=node({dataset:{mealWeek:'2026-09-21'}});
 function makeDialog() {
  const options=[
@@ -65,11 +72,12 @@ function makeDialog() {
  return dialog;
 }
 activeDialog=makeDialog();
-const ctx={console,Date,Set,AbortController,document:{activeElement:null,
- getElementById(id){return ({mealPlannerDialog:activeDialog,mealPlannerRecipe:activeDialog.recipe,
+const ctx={console,Date,Set,AbortController,window:{...eventSurface(),innerWidth:800,innerHeight:600},document:{...eventSurface(),activeElement:null,
+ getElementById(id){if(extraNodes.has(id))return extraNodes.get(id);return ({mealPlannerDialog:activeDialog,mealPlannerRecipe:activeDialog.recipe,
   mealPlannerRecipeFields:activeDialog.fieldset,mealPlannerScheduleForm:activeDialog.form,
   mealPlannerServingsHelp:activeDialog.helper,mealPlannerPage:page})[id] || activeDialog.querySelector('#'+id);},
  querySelector(selector){return activeDialog.querySelector(selector);},
+ querySelectorAll(selector){return selector==='[data-meal-card-menu]'?[...extraNodes.values()].filter(node=>node.dataset.triggerId):[];},
 },fetch:async(url,options)=>{requests.push({url,options});return responseFactory(url,options);},
  setMealPlannerStatus(message,error){statuses.push({message,error});},
  refreshMealPlannerWorkspace:async({date}={})=>{assert.equal(activeDialog.open,false,'Close dialog before refreshing its containing page');refreshes.push(date);return true;},
@@ -102,6 +110,22 @@ const savedAllocations=()=>[
   member_portions:[{member_id:'adult',name:'Adult',servings:2},{member_id:'child',name:'Child',servings:0.25}]})
 ];
 const card=(overrides={})=>node({dataset:{mealId:'meal-1',mealName:'Corn Spoon Bread',...overrides}});
+function cardMenu(overrides={}) {
+ const trigger=card({menuId:'meal-menu',...overrides});trigger.id='trigger-'+trigger.dataset.menuId;
+ trigger.getBoundingClientRect=()=>({right:795,top:570,bottom:590});
+ const firstAction=node();
+ const menu=node({dataset:{triggerId:trigger.id},style:{},popoverOpen:false,
+  matches(selector){return selector===':popover-open'&&this.popoverOpen;},
+  showPopover(options){this.source=options?.source;this.popoverOpen=true;(this.handlers.toggle||[]).forEach(handler=>handler({newState:'open'}));},
+  hidePopover(){this.popoverOpen=false;(this.handlers.toggle||[]).forEach(handler=>handler({newState:'closed'}));},
+  contains(target){return target===this||target===firstAction;},
+  getBoundingClientRect(){return {width:210,height:130};},
+  querySelector(selector){return selector==='button'?firstAction:null;}
+ });
+ firstAction.closest=selector=>selector==='[data-meal-card-menu]'?menu:null;
+ extraNodes.set(trigger.id,trigger);extraNodes.set(trigger.dataset.menuId,menu);
+ return {trigger,menu,firstAction};
+}
 const openEdit=async(button=card(),scope='')=>{ctx.openMealPlannerEditDialog(button,scope);await flush();return activeDialog.mealPlanScheduleState.panel;};
 (async()=>{
 """
@@ -131,6 +155,126 @@ assert.equal(requests.filter(r=>r.options?.method==='POST').length,0);
 assert(activeDialog.form.innerHTML.includes('Date range'));
 assert(activeDialog.form.innerHTML.includes('Select days'));
 assert(activeDialog.form.innerHTML.includes('By family member'));
+""")
+
+
+def test_card_menu_toggle_positions_within_viewport_and_keyboard_dismissal_returns_focus():
+    run_dialog(r"""
+const {trigger,menu,firstAction}=cardMenu({batchId:'batch-1'});
+assert.equal(ctx.toggleMealPlannerCardMenu(trigger),false);
+assert.equal(menu.popoverOpen,true);assert.equal(menu.source,trigger);assert.equal(trigger['aria-expanded'],'true');
+assert.equal(firstAction.focused,true);assert.equal(activeDialog.open,false);assert.equal(requests.length,0);
+assert(Number.parseFloat(menu.style.left)>=8);assert(Number.parseFloat(menu.style.left)+210<=792);
+assert(Number.parseFloat(menu.style.top)>=8);assert(Number.parseFloat(menu.style.top)+130<=592);
+assert(Number.parseFloat(menu.style.top)<570,'A menu near the viewport bottom opens above its trigger');
+ctx.toggleMealPlannerCardMenu(trigger);
+assert.equal(menu.popoverOpen,false);assert.equal(trigger['aria-expanded'],'false');assert.equal(trigger.focused,true);
+ctx.toggleMealPlannerCardMenu(trigger);let prevented=false;trigger.focused=false;
+assert.equal(menu.handlers.toggle.length,1);assert.equal(menu.handlers.keydown.length,1,'Reopening must not duplicate keyboard handlers');
+menu.handlers.keydown[0]({key:'Escape',preventDefault(){prevented=true;}});
+assert.equal(prevented,true);assert.equal(menu.popoverOpen,false);assert.equal(trigger.focused,true);assert.equal(trigger['aria-expanded'],'false');
+ctx.toggleMealPlannerCardMenu(trigger);menu.hidePopover();
+assert.equal(trigger['aria-expanded'],'false','Native light-dismiss notification synchronizes the trigger state');
+assert.equal(requests.length,0);
+""")
+
+
+@pytest.mark.parametrize("scope", ["meal", "batch"])
+def test_card_menu_edit_actions_close_before_loading_the_correct_saved_scope(scope):
+    run_dialog(r"""
+const scope=__SCOPE__,{trigger,menu,firstAction}=cardMenu({mealId:'meal-2',batchId:'batch-1'});
+responseFactory=async(url)=>{
+ assert.equal(menu.popoverOpen,false);assert.equal(trigger['aria-expanded'],'false');
+ if(url==='/api/meal-plan/meal-2')return ok({meal:savedAllocations()[1],batch:savedBatch()});
+ if(url==='/api/meal-plan/batches/batch-1')return ok({batch:savedBatch(),meals:savedAllocations()});
+ if(url==='/api/meal-plan/members')return ok({members:[{id:'adult',name:'Adult'},{id:'child',name:'Child'}]});
+ throw new Error('Unexpected request '+url);
+};
+ctx.toggleMealPlannerCardMenu(trigger);ctx.runMealPlannerCardAction(firstAction,scope);await flush();
+const panel=activeDialog.mealPlanScheduleState.panel;
+assert.equal(activeDialog.open,true);assert.equal(panel.edit.scope,scope);
+assert.equal(panel.edit.id,scope==='meal'?'meal-2':'batch-1');
+assert.equal(requests[0].url,scope==='meal'?'/api/meal-plan/meal-2':'/api/meal-plan/batches/batch-1');
+assert.equal(activeDialog.querySelector('[data-meal-edit-scope]').hidden,true,'The menu already selected the edit scope');
+assert.equal(activeDialog.mealPlanScheduleState.editOpener,trigger);
+ctx.closeMealPlannerDialog();assert.equal(trigger.focused,true);assert.equal(requests.filter(request=>request.options?.method==='PATCH').length,0);
+""".replace("__SCOPE__", repr(scope)))
+
+
+def test_card_menu_remove_routes_original_meal_identity_without_deleting_until_confirmation():
+    run_dialog(r"""
+const {trigger,menu,firstAction}=cardMenu({mealId:'meal/2',batchId:'batch/1',mealName:'Bread <and soup>'});
+const removals=[];ctx.openMealPlannerDeleteDialog=button=>{
+ assert.equal(menu.popoverOpen,false);assert.equal(button['aria-expanded'],'false');
+ removals.push(button);return false;
+};
+ctx.toggleMealPlannerCardMenu(trigger);
+ctx.runMealPlannerCardAction(firstAction,'unknown');assert.equal(menu.popoverOpen,true);assert.equal(removals.length,0);
+assert.equal(ctx.runMealPlannerCardAction(firstAction,'remove'),false);
+assert.equal(removals.length,1);assert.equal(removals[0],trigger);
+assert.equal(removals[0].dataset.mealId,'meal/2');assert.equal(removals[0].dataset.batchId,'batch/1');
+assert.equal(removals[0].dataset.mealName,'Bread <and soup>');assert.equal(trigger.focused,true);
+assert.equal(requests.length,0,'Opening the remove confirmation does not send a deletion request');
+assert.equal(activeDialog.open,false);
+""")
+
+
+def test_card_menu_fallback_preserves_actions_and_dismisses_without_leaking_listeners():
+    run_dialog(r"""
+const {trigger,menu,firstAction}=cardMenu({batchId:'batch-1'});delete menu.showPopover;delete menu.hidePopover;
+ctx.toggleMealPlannerCardMenu(trigger);
+assert.equal(menu.classList.contains('is-fallback-open'),true);assert.equal(firstAction.focused,true);
+assert.equal(activeDialog.open,false,'Opening the fallback must show the choices, not skip directly to editing');
+assert.equal(ctx.document.listeners.pointerdown.size,1);assert.equal(ctx.document.listeners.scroll.size,1);assert.equal(ctx.window.listeners.resize.size,1);
+ctx.document.dispatch('pointerdown',firstAction);assert.equal(menu.classList.contains('is-fallback-open'),true);
+ctx.document.dispatch('scroll',menu);assert.equal(menu.classList.contains('is-fallback-open'),true,'Scrolling within the menu keeps it open');
+trigger.focused=false;ctx.document.dispatch('pointerdown',node());
+assert.equal(menu.classList.contains('is-fallback-open'),false);assert.equal(trigger['aria-expanded'],'false');
+assert.equal(trigger.focused,false,'Outside dismissal must not steal focus from another control');
+assert.equal(ctx.document.listeners.pointerdown.size,0);assert.equal(ctx.document.listeners.scroll.size,0);assert.equal(ctx.window.listeners.resize.size,0);
+ctx.toggleMealPlannerCardMenu(trigger);ctx.window.dispatch('resize',ctx.window);assert.equal(menu.classList.contains('is-fallback-open'),false);
+ctx.toggleMealPlannerCardMenu(trigger);ctx.document.dispatch('scroll',page);assert.equal(menu.classList.contains('is-fallback-open'),false);
+const removed=[];ctx.openMealPlannerDeleteDialog=button=>{removed.push(button);return false;};
+ctx.toggleMealPlannerCardMenu(trigger);ctx.runMealPlannerCardAction(firstAction,'remove');
+assert.deepEqual(removed,[trigger]);assert.equal(menu.classList.contains('is-fallback-open'),false);assert.equal(requests.length,0);
+assert.equal(ctx.document.listeners.pointerdown.size,0);assert.equal(ctx.window.listeners.resize.size,0);
+""")
+
+
+def test_opening_another_card_menu_closes_previous_menu_and_retains_one_dismissal_listener():
+    run_dialog(r"""
+const first=cardMenu({menuId:'first-menu',mealId:'first'}),second=cardMenu({menuId:'second-menu',mealId:'second'});
+ctx.toggleMealPlannerCardMenu(first.trigger);assert.equal(first.menu.popoverOpen,true);
+ctx.toggleMealPlannerCardMenu(second.trigger);
+assert.equal(first.menu.popoverOpen,false);assert.equal(first.trigger['aria-expanded'],'false');
+assert.equal(second.menu.popoverOpen,true);assert.equal(second.trigger['aria-expanded'],'true');
+assert.equal(ctx.document.listeners.pointerdown.size,1);assert.equal(ctx.document.listeners.scroll.size,1);assert.equal(ctx.window.listeners.resize.size,1);
+ctx.closeMealPlannerCardMenu(second.menu);
+assert.equal(ctx.document.listeners.pointerdown.size,0);assert.equal(ctx.document.listeners.scroll.size,0);assert.equal(ctx.window.listeners.resize.size,0);
+assert.equal(requests.length,0);
+""")
+
+
+def test_fallback_card_menu_escape_after_focus_leaves_menu_closes_and_restores_trigger_focus():
+    run_dialog(r"""
+const {trigger,menu}=cardMenu();delete menu.showPopover;delete menu.hidePopover;
+const outside=node();let prevented=false;
+ctx.toggleMealPlannerCardMenu(trigger);
+ctx.document.activeElement=outside;outside.focus();trigger.focused=false;
+assert.equal(ctx.document.listeners.keydown.size,1);
+ctx.document.dispatch('keydown',outside,{key:'Tab',preventDefault(){throw new Error('Tab remains available outside the menu');}});
+assert.equal(menu.classList.contains('is-fallback-open'),true);
+ctx.document.dispatch('keydown',outside,{key:'Escape',preventDefault(){prevented=true;}});
+assert.equal(prevented,true);assert.equal(menu.classList.contains('is-fallback-open'),false);
+assert.equal(trigger['aria-expanded'],'false');assert.equal(trigger.focused,true);
+assert.equal(ctx.document.listeners.keydown.size,0);assert.equal(ctx.document.listeners.pointerdown.size,0);
+assert.equal(ctx.document.listeners.scroll.size,0);assert.equal(ctx.window.listeners.resize.size,0);
+ctx.toggleMealPlannerCardMenu(trigger);assert.equal(ctx.document.listeners.keydown.size,1,'Reopening installs one Escape listener');
+ctx.document.dispatch('pointerdown',outside);assert.equal(ctx.document.listeners.keydown.size,0,'Outside dismissal also removes Escape handling');
+trigger.focused=false;prevented=false;
+ctx.document.dispatch('keydown',outside,{key:'Escape',preventDefault(){prevented=true;}});
+assert.equal(trigger.focused,false);assert.equal(prevented,false,'A closed menu must not consume Escape elsewhere');
+assert.equal(requests.length,0);
 """)
 
 

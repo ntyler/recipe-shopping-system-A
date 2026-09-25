@@ -12,17 +12,25 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_meal_cards_offer_edit_with_correct_ids_and_batch_scope_choices():
+def test_meal_cards_use_compact_actions_with_correct_ids_and_batch_scope_choices():
     class Buttons(HTMLParser):
         def __init__(self):
             super().__init__()
             self.buttons = []
+            self.menus = []
+            self.stack = []
             self.current = None
 
         def handle_starttag(self, tag, attrs):
+            attributes = dict(attrs)
+            if "data-meal-card-menu" in attributes:
+                self.menus.append(attributes)
             if tag == "button":
-                self.current = {"attrs": dict(attrs), "text": ""}
+                parent = next((attrs for _, attrs in reversed(self.stack) if "data-meal-card-menu" in attrs), None)
+                self.current = {"attrs": attributes, "text": "", "menu": parent}
                 self.buttons.append(self.current)
+            if tag not in {"img", "input", "br", "hr", "meta", "link"}:
+                self.stack.append((tag, attributes))
 
         def handle_data(self, data):
             if self.current is not None:
@@ -31,6 +39,10 @@ def test_meal_cards_offer_edit_with_correct_ids_and_batch_scope_choices():
         def handle_endtag(self, tag):
             if tag == "button":
                 self.current = None
+            for index in range(len(self.stack) - 1, -1, -1):
+                if self.stack[index][0] == tag:
+                    del self.stack[index:]
+                    break
 
     source = (ROOT / "PushShoppingList/templates/sections/app_workspaces.html").read_text(encoding="utf-8")
     start = source.index('<section class="app-meal-planner-grid"')
@@ -44,15 +56,29 @@ def test_meal_cards_offer_edit_with_correct_ids_and_batch_scope_choices():
     }, meal_plan_recipe_options=[standalone])
     parser = Buttons()
     parser.feed(html)
-    edits = [button for button in parser.buttons if button["attrs"].get("class") == "app-meal-edit"]
-    assert len(edits) == 2
-    assert [button["text"].strip() for button in edits] == ["Edit", "Edit"]
-    assert [button["attrs"]["data-meal-id"] for button in edits] == [standalone["id"], "meal-2"]
-    assert [button["attrs"]["data-batch-id"] for button in edits] == ["", batched["batch_id"]]
-    assert all(button["attrs"]["onclick"] == "return openMealPlannerEditDialog(this)" for button in edits)
-    assert edits[0]["attrs"]["data-meal-name"] == standalone["recipe_name"]
-    assert "Mon 10/5 dinner" in edits[0]["attrs"]["aria-label"]
+    triggers = [button for button in parser.buttons if "data-meal-card-actions-toggle" in button["attrs"]]
+    assert len(triggers) == 2
+    assert all("app-meal-actions-toggle" in button["attrs"]["class"].split() for button in triggers)
+    assert [button["attrs"]["data-meal-id"] for button in triggers] == [standalone["id"], "meal-2"]
+    assert [button["attrs"]["data-batch-id"] for button in triggers] == ["", batched["batch_id"]]
+    assert all(button["attrs"]["onclick"] == "return toggleMealPlannerCardMenu(this)" for button in triggers)
+    assert triggers[0]["attrs"]["data-meal-name"] == standalone["recipe_name"]
+    assert standalone["recipe_name"] in triggers[0]["attrs"]["aria-label"]
+    assert not any(button["attrs"].get("class") in {"app-meal-edit", "app-meal-remove"} for button in parser.buttons)
+    assert len(parser.menus) == 2
+    for trigger, expected_options in zip(triggers, [
+        ["Edit meal", "Remove meal"],
+        ["Edit this meal", "Edit entire prep plan", "Remove meal"],
+    ]):
+        menu = next(menu for menu in parser.menus if menu["id"] == trigger["attrs"]["data-menu-id"])
+        assert menu["data-trigger-id"] == trigger["attrs"]["id"]
+        assert menu["popover"] == "auto"
+        actions = [button for button in parser.buttons if button["menu"] is menu]
+        assert [button["text"].strip() for button in actions] == expected_options
+        assert all("runMealPlannerCardAction" in button["attrs"]["onclick"] for button in actions)
     assert '<meal>' not in html and '<one>' not in html
+    assert 'data-meal-prep-date=' not in html
+    assert '>Prep</div>' not in html
 
     scope_start = source.index('<section class="app-meal-edit-scope"')
     scope = Buttons()
@@ -89,7 +115,7 @@ def test_weekly_grid_places_prep_steps_on_their_dates_and_labels_batch_meals():
     assert 'No prep steps for Tue 9/29' in html
     assert html.index('>Prep</div>') < html.index('>Dinner</div>')
     assert '2.5 servings' in html
-    assert 'From prep batch' in html
+    assert 'Prep batch' in html
 
     # Legacy contexts without batches still render the ordinary meal grid.
     context.pop("prep_steps_by_day")
@@ -97,7 +123,9 @@ def test_weekly_grid_places_prep_steps_on_their_dates_and_labels_batch_meals():
     meal["planned_servings"] = 1
     legacy_html = template.render(meal_plan=context, meal_plan_recipe_options=[meal])
     assert '1 serving' in legacy_html
-    assert 'From prep batch' not in legacy_html
+    assert 'Prep batch' not in legacy_html
+    assert 'data-meal-prep-date=' not in legacy_html
+    assert '>Prep</div>' not in legacy_html
 
     meal["member_portions"] = [
         {"member_id": "adult", "name": "Updated <name>", "name_snapshot": "Previous name", "servings": 1},
