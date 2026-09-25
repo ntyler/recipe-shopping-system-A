@@ -280,6 +280,7 @@
                 }, 0);
                 cell.textContent = `${number(total)} servings`;
             });
+            this.options.onRender?.(this);
         }
 
         syncPortionControls(active) {
@@ -429,6 +430,7 @@
             const edit = this.edit;
             const context = edit ? {} : this.options.getContext();
             if (!context) return;
+            if (!edit && this.options.onStage) return this.options.onStage({...payload, ...context}, this);
             let url = '/api/meal-plan/batches', method = 'POST';
             if (edit) {
                 method = 'PATCH';

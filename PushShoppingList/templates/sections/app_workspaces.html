@@ -827,13 +827,17 @@
     <dialog id="mealPlannerDialog" class="app-dialog" aria-labelledby="mealPlannerDialogTitle">
         <div class="app-dialog-card app-meal-schedule-dialog-card">
             <div class="app-dialog-header">
-                <div><h3 id="mealPlannerDialogTitle">Add Meal</h3><p data-meal-schedule-description>Choose a recipe, then plan dates, meals, and portions for your household.</p></div>
+                <div><h3 id="mealPlannerDialogTitle">Add Meals</h3><p data-meal-schedule-description>Plan a recipe, add another, and save all your meals together.</p></div>
                 <button type="button" class="app-dialog-close" data-meal-schedule-close aria-label="Close meal planning dialog" onclick="return closeMealPlannerDialog()">&times;</button>
             </div>
             <section class="app-meal-edit-scope" data-meal-edit-scope hidden aria-label="Choose what to edit">
                 <p>This meal belongs to a prep plan. Choose which entries to update.</p>
                 <button type="button" onclick="return loadMealPlannerEdit('meal')"><strong>Edit this meal</strong><span>Change just this date, meal, people, portions, and notes.</span></button>
                 <button type="button" onclick="return loadMealPlannerEdit('batch')"><strong>Edit entire prep plan</strong><span>Change the plan’s days, meals, people, portions, and prep tasks together.</span></button>
+            </section>
+            <section class="app-meal-batch" data-meal-batch hidden aria-labelledby="mealPlannerBatchTitle">
+                <div class="app-meal-batch-heading"><h4 id="mealPlannerBatchTitle">Meals in this batch</h4><span data-meal-batch-count></span></div>
+                <ol data-meal-batch-list></ol>
             </section>
             <fieldset id="mealPlannerRecipeFields">
                 <label for="mealPlannerRecipe">Recipe
@@ -863,6 +867,10 @@
             <div class="app-dialog-status" data-meal-plan-status aria-live="polite"></div>
             <button type="button" class="app-page-secondary-action" data-meal-edit-retry hidden onclick="return loadMealPlannerEdit(document.getElementById('mealPlannerDialog').mealPlanScheduleState.edit.scope)">Retry loading meal</button>
             <form id="mealPlannerScheduleForm" class="recipe-preview-meal-panel" hidden></form>
+            <div class="app-meal-batch-footer" data-meal-batch-footer>
+                <p data-meal-batch-help aria-live="polite">Meals are saved together when you’re ready.</p>
+                <button type="button" class="app-page-primary-action" data-meal-batch-save disabled onclick="void saveMealPlannerBatch()">Save meals</button>
+            </div>
         </div>
     </dialog>
 

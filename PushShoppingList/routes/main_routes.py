@@ -169,6 +169,7 @@ from PushShoppingList.services.menu_store_service import menu_pdf_logs_by_cookbo
 from PushShoppingList.services.menu_store_service import menus_by_cookbook
 from PushShoppingList.services.meal_plan_service import add_meal
 from PushShoppingList.services.meal_plan_service import add_meal_prep_batch
+from PushShoppingList.services.meal_plan_service import add_meal_prep_batches
 from PushShoppingList.services.meal_plan_service import add_meal_plan_member
 from PushShoppingList.services.meal_plan_service import add_meal_plan_members_bulk
 from PushShoppingList.services.meal_plan_service import add_meal_plan_group
@@ -6304,6 +6305,51 @@ def add_meal_prep_batch_route():
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
     return jsonify({"ok": True, "batch": batch, "meals": meals}), 201
+
+
+@main_bp.route("/api/meal-plan/batches/bulk", methods=["POST"])
+def add_meal_prep_batches_route():
+    if not current_public_user() and not is_guest_session():
+        return jsonify({"ok": False, "error": "Sign in or start a guest workspace to plan meals."}), 403
+    validate_master_data_viewer_scope()
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict) or not isinstance(payload.get("batches"), list) or not 1 <= len(payload["batches"]) <= 100:
+        return jsonify({"ok": False, "error": "Add between 1 and 100 recipe plans to your batch."}), 400
+    available_recipes = {recipe["url"]: recipe for recipe in meal_plan_recipe_option_rows(recipe_url_rows())}
+    entries = []
+    try:
+        for index, entry in enumerate(payload["batches"]):
+            try:
+                if not isinstance(entry, dict):
+                    raise ValueError("Provide a recipe and meal schedule.")
+                recipe_url = str(entry.get("recipe_url") or "").strip()
+                if recipe_url not in available_recipes:
+                    raise ValueError("Choose a recipe from your current recipe collection.")
+                recipe_data = load_recipe_output(recipe_url) or {}
+                resolution = resolve_ingredient_requirements(recipe_data, entry.get("ingredient_option_selections"))
+                entries.append({
+                    "batch": {
+                        "recipe_url": recipe_url,
+                        "recipe_name": available_recipes[recipe_url]["name"],
+                        **({"batch_servings": entry["batch_servings"]} if "batch_servings" in entry else {}),
+                        "portion_mode": entry.get("portion_mode", "household"),
+                        "prep_notes": entry.get("prep_notes"),
+                        "prep_steps": entry.get("prep_steps", []),
+                    },
+                    "allocations": entry.get("allocations"),
+                    "ingredient_data": {
+                        "ingredient_option_selections": resolution["selected_options"],
+                        "unresolved_ingredient_requirement_ids": [item["id"] for item in resolution["unresolved_requirements"]],
+                        "ingredient_selection_needed": resolution["selection_needed"],
+                        **meal_ingredient_snapshot(recipe_data, resolution["items"]),
+                    },
+                })
+            except ValueError as exc:
+                raise ValueError(f"Recipe {index + 1}: {exc}") from exc
+        batches, meals = add_meal_prep_batches(entries)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    return jsonify({"ok": True, "batches": batches, "meals": meals}), 201
 
 
 @main_bp.route("/api/meal-plan/batches/<batch_id>", methods=["GET", "PATCH", "DELETE"])

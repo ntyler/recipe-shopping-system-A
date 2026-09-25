@@ -1872,7 +1872,7 @@ function mealPlannerScheduleState(dialog) {
     if (!dialog.mealPlanScheduleState) {
         dialog.mealPlanScheduleState = {
             panel: null, date: MealPlanSchedule.formatDate(new Date()), meal: "dinner",
-            recipeUrl: "", defaultServings: 1,
+            recipeUrl: "", defaultServings: 1, entries: [], saving: false,
         };
         // Native Escape follows the same pending-save protection as Cancel.
         dialog.addEventListener("cancel", event => {
@@ -1887,11 +1887,191 @@ function mealPlannerScheduleState(dialog) {
 }
 
 function syncMealPlannerScheduleControls(dialog, panel) {
-    const busy = panel.ui.busy || panel.ui.memberBusy;
+    const busy = panel.ui.busy || panel.ui.memberBusy || dialog.mealPlanScheduleState?.saving;
     const fields = dialog.querySelector("#mealPlannerRecipeFields");
     const close = dialog.querySelector("[data-meal-schedule-close]");
     if (fields) fields.disabled = busy || Boolean(dialog.mealPlanScheduleState?.edit);
     if (close) close.disabled = busy;
+    syncMealPlannerBatchControls(dialog);
+}
+
+function syncMealPlannerBatchControls(dialog) {
+    const state = mealPlannerScheduleState(dialog);
+    const footer = dialog.querySelector("[data-meal-batch-footer]");
+    if (!footer) return;
+    footer.hidden = Boolean(state.edit);
+    const panel = state.panel;
+    const busy = state.saving || panel?.ui.busy || panel?.ui.memberBusy;
+    const current = !state.edit && panel && dialog.querySelector("#mealPlannerRecipe")?.value
+        ? MealPlanSchedule.summary(panel.draft).mealCount : 0;
+    const queued = state.entries.reduce((count, entry) => count + entry.payload.allocations.length, 0);
+    const count = queued + current;
+    const save = dialog.querySelector("[data-meal-batch-save]");
+    save.disabled = Boolean(busy || panel?.ui.loading || !count);
+    save.textContent = state.saving ? "Saving meals…" : `Save ${count || ""} ${count === 1 ? "meal" : "meals"}`.replace("  ", " ");
+    dialog.querySelector("[data-meal-batch-help]").textContent = current
+        ? "Save includes the recipe you’re planning. Add another to keep building your batch."
+        : "Meals are saved together when you’re ready.";
+    dialog.querySelectorAll("[data-meal-batch-list] button").forEach(button => { button.disabled = Boolean(busy || panel?.ui.loading); });
+    if (!state.edit && panel) {
+        const add = panel.form.querySelector("[data-schedule-submit]");
+        if (add) add.textContent = "Add another meal";
+    }
+}
+
+function renderMealPlannerBatch(dialog) {
+    const state = mealPlannerScheduleState(dialog);
+    const section = dialog.querySelector("[data-meal-batch]");
+    if (!section) return;
+    section.hidden = Boolean(state.edit) || !state.entries.length;
+    const list = section.querySelector("[data-meal-batch-list]");
+    list.replaceChildren();
+    const mealCount = state.entries.reduce((count, entry) => count + entry.payload.allocations.length, 0);
+    section.querySelector("[data-meal-batch-count]").textContent = `${mealCount} ${mealCount === 1 ? "meal" : "meals"} · Not saved yet`;
+    state.entries.forEach(entry => {
+        const row = document.createElement("li");
+        const copy = document.createElement("div");
+        const name = document.createElement("strong");
+        name.textContent = entry.title;
+        const details = document.createElement("details");
+        const summary = document.createElement("summary");
+        const allocations = entry.payload.allocations;
+        const first = allocations[0];
+        const servings = allocations.reduce((total, meal) => total + (meal.member_portions
+            ? meal.member_portions.reduce((sum, person) => sum + Number(person.servings), 0) : Number(meal.planned_servings)), 0);
+        summary.textContent = allocations.length === 1
+            ? `${first.date} · ${first.meal_type[0].toUpperCase() + first.meal_type.slice(1)} · ${formatMealPlannerServingNumber(servings)} servings`
+            : `${allocations.length} meals · ${first.date} to ${allocations.at(-1).date} · ${formatMealPlannerServingNumber(servings)} servings`;
+        details.appendChild(summary);
+        allocations.forEach(meal => {
+            const line = document.createElement("p");
+            const portions = meal.member_portions
+                ? meal.member_portions.map(person => `${entry.draft.members.find(member => member.id === person.member_id)?.name || "Family member"}: ${formatMealPlannerServingNumber(person.servings)}`).join(", ")
+                : `${formatMealPlannerServingNumber(meal.planned_servings)} servings`;
+            line.textContent = `${meal.date} · ${meal.meal_type} · ${portions}`;
+            details.appendChild(line);
+        });
+        copy.append(name, details);
+        const actions = document.createElement("div");
+        actions.className = "app-meal-batch-actions";
+        ["Edit", "Remove"].forEach(action => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "app-page-secondary-action";
+            button.textContent = action;
+            button.setAttribute("aria-label", `${action} ${entry.title} in batch`);
+            button.addEventListener("click", () => { void changeMealPlannerBatchEntry(dialog, entry, action); });
+            actions.appendChild(button);
+        });
+        row.append(copy, actions);
+        list.appendChild(row);
+    });
+    syncMealPlannerBatchControls(dialog);
+}
+
+function stageMealPlannerRecipe(dialog, payload, panel) {
+    const state = mealPlannerScheduleState(dialog);
+    const duplicate = state.entries.some(entry => entry.payload.recipe_url === payload.recipe_url
+        && entry.payload.allocations.some(saved => payload.allocations.some(meal => meal.date === saved.date && meal.meal_type === saved.meal_type)));
+    if (duplicate) {
+        panel.setMessage("This recipe is already in your batch for one of these meals. Edit its entry or choose another date or meal.", true);
+        panel.render();
+        return false;
+    }
+    if (state.entries.length >= 100) {
+        panel.setMessage("Save this batch before adding more recipes (100 maximum).", true);
+        panel.render();
+        return false;
+    }
+    state.entries.push({payload, title: panel.options.title, draft: JSON.parse(JSON.stringify(panel.draft)),
+        defaultServings: state.defaultServings});
+    // A fresh editor must not inherit another recipe's notes, choices, or portions.
+    panel.generation += 1;
+    panel.draft = MealPlanSchedule.create({today: state.date, servings: 1, members: panel.draft.members, groups: panel.draft.groups});
+    MealPlanSchedule.setMeals(panel.draft, [state.meal]);
+    panel.ui.openDays.clear();
+    panel.ui.openSections.clear();
+    panel.ui.groupIds = [];
+    panel.setMessage("");
+    state.recipeUrl = "";
+    state.defaultServings = 1;
+    dialog.querySelector("#mealPlannerRecipe").value = "";
+    syncMealPlannerServingsFromRecipe();
+    renderMealPlannerBatch(dialog);
+    setMealPlannerStatus("Recipe added to this batch. Choose another recipe or save your meals.");
+    dialog.querySelector("#mealPlannerRecipe").focus();
+    return true;
+}
+
+async function changeMealPlannerBatchEntry(dialog, entry, action) {
+    const state = mealPlannerScheduleState(dialog);
+    const panel = state.panel;
+    if (state.edit || state.saving || panel?.ui.busy || panel?.ui.memberBusy || panel?.ui.loading || !state.entries.includes(entry)) return;
+    if (action === "Edit" && dialog.querySelector("#mealPlannerRecipe").value) {
+        if (!await panel.submit({preventDefault() {}})) return;
+    }
+    state.entries.splice(state.entries.indexOf(entry), 1);
+    if (action === "Edit") {
+        const members = panel.draft.members;
+        dialog.querySelector("#mealPlannerRecipe").value = entry.payload.recipe_url;
+        syncMealPlannerServingsFromRecipe();
+        panel.draft = JSON.parse(JSON.stringify(entry.draft));
+        // Account for member changes made while another recipe was being planned.
+        panel.syncMembers(members, {newMembersEnabled:false});
+        panel.options.title = entry.title;
+        state.defaultServings = entry.defaultServings;
+        dialog.querySelectorAll("[data-ingredient-requirement-id]").forEach(input => {
+            input.checked = entry.payload.ingredient_option_selections?.[input.dataset.ingredientRequirementId] === input.value;
+        });
+        panel.render();
+        dialog.querySelector("#mealPlannerRecipe").focus();
+    }
+    renderMealPlannerBatch(dialog);
+    setMealPlannerStatus(action === "Edit" ? "Editing this recipe. Save includes your changes." : "Recipe removed from this batch.");
+}
+
+async function saveMealPlannerBatch() {
+    const dialog = document.getElementById("mealPlannerDialog");
+    if (!dialog?.open) return;
+    const state = mealPlannerScheduleState(dialog);
+    const panel = state.panel;
+    if (state.edit || state.saving || panel?.ui.busy || panel?.ui.memberBusy || panel?.ui.loading) return;
+    if (dialog.querySelector("#mealPlannerRecipe").value && !await panel.submit({preventDefault() {}})) return;
+    if (state.saving || !state.entries.length) return;
+    state.saving = true;
+    panel.ui.busy = true;
+    panel.render();
+    setMealPlannerStatus("Saving all meals…");
+    let result;
+    try {
+        const response = await fetch("/api/meal-plan/batches/bulk", {
+            method: "POST", headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({batches: state.entries.map(entry => entry.payload)}),
+        });
+        result = await response.json();
+        if (!response.ok || !result.ok) throw new Error(result.error || "Unable to save these meals.");
+    } catch (error) {
+        setMealPlannerStatus(`${error.message} Your batch is still here to review and retry.`, true);
+        state.saving = false;
+        panel.ui.busy = false;
+        panel.render();
+        return;
+    }
+    const date = state.entries.flatMap(entry => entry.payload.allocations.map(meal => meal.date)).sort()[0];
+    state.entries = [];
+    state.saving = false;
+    panel.ui.busy = false;
+    panel.ui.saved = true;
+    // Clear the saved queue before refresh, so a refresh failure cannot resubmit it.
+    renderMealPlannerBatch(dialog);
+    try { await panel.options.onSaved(result, date); }
+    catch (_) {
+        const status = document.querySelector("[data-meal-planner-refresh-status]");
+        if (status) {
+            status.hidden = false;
+            status.textContent = "Meals saved. Reload to see the updated schedule.";
+        }
+    }
 }
 
 function ensureMealPlannerSchedulePanel(dialog, recipeTitle, defaultServings) {
@@ -1907,6 +2087,7 @@ function ensureMealPlannerSchedulePanel(dialog, recipeTitle, defaultServings) {
             return {recipe_url: recipeInput.value, ingredient_option_selections: collectMealPlannerIngredientOptionSelections(dialog)};
         },
         onRender: panel => syncMealPlannerScheduleControls(dialog, panel),
+        onStage: (payload, panel) => stageMealPlannerRecipe(dialog, payload, panel),
         onCancel: () => closeMealPlannerDialog(),
         onMembersChanged: async () => {
             const page = document.getElementById("mealPlannerPage");
@@ -1949,7 +2130,7 @@ function syncMealPlannerServingsFromRecipe() {
     if (empty) empty.hidden = Boolean(selectedRecipe);
     form.hidden = !selectedRecipe;
     renderMealPlannerIngredientOptions(option);
-    if (!selectedRecipe) return false;
+    if (!selectedRecipe) { syncMealPlannerBatchControls(dialog); return false; }
 
     const recipeTitle = option.textContent.trim();
     if (!state.panel) {
@@ -1982,8 +2163,13 @@ function openMealPlannerDialog(dateValue = "", mealType = "") {
     state.edit = null;
     state.editLoading = false;
     state.panel?.clearEdit();
-    dialog.querySelector("#mealPlannerDialogTitle").textContent = "Add Meal";
-    dialog.querySelector("[data-meal-schedule-description]").textContent = "Choose a recipe, then plan dates, meals, and portions for your household.";
+    state.entries = [];
+    state.saving = false;
+    state.recipeUrl = "";
+    state.defaultServings = 1;
+    dialog.querySelector("#mealPlannerRecipe").value = "";
+    dialog.querySelector("#mealPlannerDialogTitle").textContent = "Add Meals";
+    dialog.querySelector("[data-meal-schedule-description]").textContent = "Plan a recipe, add another, and save all your meals together.";
     dialog.querySelector("#mealPlannerRecipeFields").hidden = false;
     dialog.querySelector("#mealPlannerRecipeFields").disabled = false;
     dialog.querySelector("[data-meal-edit-scope]").hidden = true;
@@ -2006,6 +2192,7 @@ function openMealPlannerDialog(dateValue = "", mealType = "") {
     }
     setMealPlannerStatus("");
     syncMealPlannerServingsFromRecipe();
+    renderMealPlannerBatch(dialog);
     dialog.showModal();
     // Reusing the controller must still pick up archived, restored, or renamed
     // members from Settings. Recipe changes alone do not trigger extra refreshes.
@@ -2017,7 +2204,7 @@ function openMealPlannerDialog(dateValue = "", mealType = "") {
 function closeMealPlannerDialog() {
     const dialog = document.getElementById("mealPlannerDialog");
     const panel = dialog?.mealPlanScheduleState?.panel;
-    if (panel?.ui.busy || panel?.ui.memberBusy) return false;
+    if (panel?.ui.busy || panel?.ui.memberBusy || dialog?.mealPlanScheduleState?.saving) return false;
     const state = dialog?.mealPlanScheduleState;
     state?.editRequest?.abort();
     if (state) { state.editRequest = null; state.editLoading = false; }
@@ -2205,6 +2392,7 @@ function openMealPlannerEditDialog(button, scope = "") {
     state.editRequest = null;
     state.editLoading = false;
     state.edit = {mealId, batchId:String(button.dataset.batchId || ""), scope:"", recipeUrl:""};
+    renderMealPlannerBatch(dialog);
     state.editOpener = button;
     dialog.querySelector("#mealPlannerDialogTitle").textContent = "Edit planned meal";
     dialog.querySelector("[data-meal-schedule-description]").textContent = String(button.dataset.mealName || "Scheduled meal");
