@@ -460,9 +460,20 @@
         </div>
     </div>
 
-                <div class="app-page-tabs" aria-label="Shopping list collection">
-                    <span class="app-page-tab-label is-active">Current List <span>{{ items | length }}</span></span>
+    <div class="app-page-tabs" aria-label="Shopping list collection">
+        <span class="app-page-tab-label is-active">Current List <span>{{ items | length }}</span></span>
     </div>
+
+    <section class="meal-shopping-saved-section" aria-labelledby="mealShoppingSavedTitle">
+        <div class="meal-shopping-saved-heading">
+            <div>
+                <h3 id="mealShoppingSavedTitle">Saved meal shopping lists</h3>
+                <p>Reopen ingredient lists created from your meal plans.</p>
+            </div>
+            <button type="button" class="app-page-secondary-action" onclick="return MealPlanShopping.openLists()">Open saved lists</button>
+        </div>
+        <div data-meal-shopping-saved-lists></div>
+    </section>
 
     <div class="app-page-layout">
         <div class="app-page-main-column">
@@ -724,6 +735,7 @@
                                              role="group" aria-label="Actions for {{ meal.recipe_name }}">
                                             <button type="button" onclick="return runMealPlannerCardAction(this, 'meal')">{{ 'Edit this meal' if meal.batch_id else 'Edit meal' }}</button>
                                             {% if meal.batch_id %}<button type="button" onclick="return runMealPlannerCardAction(this, 'batch')">Edit entire prep plan</button>{% endif %}
+                                            {% if meal.batch_id %}<button type="button" onclick="return runMealPlannerCardAction(this, 'shop')">Shop this prep batch</button>{% endif %}
                                             <button type="button" class="is-danger" onclick="return runMealPlannerCardAction(this, 'remove')">Remove meal</button>
                                         </div>
                                         {% if meal.planned_servings or meal.batch_id %}<p class="app-meal-plan-details">
@@ -781,6 +793,7 @@
             <article class="app-page-rail-card">
                 <h3>Plan Actions</h3>
                 <ul class="app-page-link-list">
+                    <li><button type="button" class="meal-shopping-plan-action" onclick="return openMealPlanShopping()">Shop this plan</button></li>
                     <li><a href="#recipesPage" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="recipesPage" data-app-nav-target="recipesPage">Browse Recipes</a></li>
                     <li><a href="#shoppingListsPage" data-app-nav-link data-app-nav-action="app-page" data-app-page-target="shoppingListsPage" data-app-nav-target="shoppingListsPage">Open Shopping List</a></li>
                 </ul>
@@ -849,6 +862,34 @@
         </form>
     </dialog>
 </section>
+
+<dialog id="mealPlanShoppingDialog" class="app-dialog meal-shopping-dialog" aria-labelledby="mealPlanShoppingDialogTitle">
+    <div class="app-dialog-card">
+        <div class="app-dialog-header">
+            <div>
+                <h3 id="mealPlanShoppingDialogTitle">Shop this plan</h3>
+                <p>Choose meals, review ingredients, and create your shopping list.</p>
+            </div>
+            <button type="button" class="app-dialog-close" data-meal-shopping-close aria-label="Close meal shopping" onclick="return MealPlanShopping.close()">&times;</button>
+        </div>
+        <p class="meal-shopping-status" data-meal-shopping-status role="status" aria-live="polite"></p>
+        <div data-meal-shopping-content></div>
+    </div>
+</dialog>
+
+<dialog id="mealPlanShoppingListsDialog" class="app-dialog meal-shopping-dialog" aria-labelledby="mealPlanShoppingListsDialogTitle">
+    <div class="app-dialog-card">
+        <div class="app-dialog-header">
+            <div>
+                <h3 id="mealPlanShoppingListsDialogTitle">Saved meal shopping lists</h3>
+                <p>Review your saved ingredients and check off what you have bought.</p>
+            </div>
+            <button type="button" class="app-dialog-close" data-meal-shopping-lists-close aria-label="Close saved meal shopping lists" onclick="return MealPlanShopping.closeLists()">&times;</button>
+        </div>
+        <p class="meal-shopping-status" data-meal-shopping-lists-status role="status" aria-live="polite"></p>
+        <div data-meal-shopping-lists-content></div>
+    </div>
+</dialog>
 
 <section id="storesPage"
          class="app-page-workspace app-page-workspace-stores"

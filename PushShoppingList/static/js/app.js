@@ -2098,9 +2098,16 @@ function toggleMealPlannerCardMenu(button) {
 function runMealPlannerCardAction(button, action) {
     const menu = button?.closest("[data-meal-card-menu]");
     const trigger = document.getElementById(menu?.dataset.triggerId || "");
-    if (!menu || !trigger || !['meal', 'batch', 'remove'].includes(action)) return false;
+    if (!menu || !trigger || !['meal', 'batch', 'remove', 'shop'].includes(action)) return false;
     closeMealPlannerCardMenu(menu, true);
+    if (action === "shop") return openMealPlanShopping(trigger.dataset.batchId, trigger);
     return action === "remove" ? openMealPlannerDeleteDialog(trigger) : openMealPlannerEditDialog(trigger, action);
+}
+
+function openMealPlanShopping(batchId = "", opener = document.activeElement) {
+    const selection = batchId ? {batch_ids:[batchId]} : {week_start:document.getElementById("mealPlannerPage")?.dataset.mealWeek};
+    window.MealPlanShopping.open(selection, opener);
+    return false;
 }
 
 function openMealPlannerEditDialog(button, scope = "") {
@@ -62843,6 +62850,17 @@ function openItemQtyEditor(button) {
 
     keyInput.value = button.dataset.itemKey || "";
     manualInput.value = manualQty;
+    let hasPlannedQuantity = false;
+    try {hasPlannedQuantity = JSON.parse(button.dataset.recipeQtySources || "[]").some(source => source.meal_plan_source_id);} catch (error) { /* Keep the standard label for invalid metadata. */ }
+    const manualLabel = modal.querySelector('label[for="itemQtyManualInput"]');
+    if (manualLabel) manualLabel.textContent = hasPlannedQuantity ? "Additional / manual qty" : "Manual qty";
+    manualInput.title = hasPlannedQuantity ? "Added to the meal-plan quantity. Edit the plan and shop it again to update planned amounts." : "";
+    const quantityHelp = modal.querySelector(".item-qty-help");
+    if (quantityHelp) quantityHelp.textContent = hasPlannedQuantity
+        ? "Manual quantity is extra to the meal plan. Leave it blank to use planned amounts."
+        : "Leave manual qty blank to go back to the recipe value.";
+    const clearQuantity = modal.querySelector(".item-qty-clear-btn");
+    if (clearQuantity) clearQuantity.textContent = hasPlannedQuantity ? "Use Planned Amount" : "Use Recipe Value";
     if (buyAsInput) {
         buyAsInput.value = buyAs;
     }
@@ -62893,6 +62911,19 @@ function renderItemQtySources(container, sourcesJson, itemKey = "") {
     sources.forEach(source => {
         const row = document.createElement("div");
         row.className = "item-qty-source-row";
+
+        if (source.meal_plan_source_id) {
+            const label = document.createElement("span");
+            label.className = "item-qty-source-label";
+            label.textContent = source.label || "Meal plan";
+            const help = document.createElement("span");
+            help.textContent = "Planned quantity";
+            const amount = document.createElement("span");
+            amount.textContent = source.quantity || "As needed";
+            row.append(label, help, amount);
+            container.appendChild(row);
+            return;
+        }
 
         const label = document.createElement(source.url ? "button" : "span");
         label.className = "item-qty-source-label";

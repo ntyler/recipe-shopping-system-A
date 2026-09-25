@@ -219,6 +219,21 @@ assert.equal(activeDialog.open,false);
 """)
 
 
+def test_card_shop_action_closes_menu_and_reviews_whole_batch_without_writing_items():
+    run_dialog(r"""
+const {trigger,menu,firstAction}=cardMenu({mealId:'meal/2',batchId:'batch/1'}),opened=[];
+ctx.window.MealPlanShopping={open(selection,opener){
+ assert.equal(menu.popoverOpen,false);assert.equal(trigger['aria-expanded'],'false');
+ opened.push({selection:plain(selection),opener});
+}};
+ctx.toggleMealPlannerCardMenu(trigger);assert.equal(ctx.runMealPlannerCardAction(firstAction,'shop'),false);
+assert.deepEqual(opened[0].selection,{batch_ids:['batch/1']});assert.equal(opened[0].opener,trigger);
+assert.equal(activeDialog.open,false);assert.equal(requests.length,0,'Shopping is reviewed separately before items are committed');
+ctx.document.activeElement=page;ctx.openMealPlanShopping();
+assert.deepEqual(opened[1].selection,{week_start:'2026-09-21'});assert.equal(opened[1].opener,page);
+""")
+
+
 def test_card_menu_fallback_preserves_actions_and_dismisses_without_leaking_listeners():
     run_dialog(r"""
 const {trigger,menu,firstAction}=cardMenu({batchId:'batch-1'});delete menu.showPopover;delete menu.hidePopover;

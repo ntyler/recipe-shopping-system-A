@@ -494,6 +494,11 @@ def load_item_quantity_context(items=None):
             "manual": True,
         })
 
+    from PushShoppingList.services.meal_plan_shopping_service import current_shopping_quantity_sources, merge_plan_quantity_sources
+    quantity_sources = merge_plan_quantity_sources(
+        quantity_sources, current_shopping_quantity_sources(items if items is not None else load_items()),
+    )
+
     return {
         item_key: {
             "display": display_quantity_for_purchase_group(summarized, first_purchase_group(sources)),

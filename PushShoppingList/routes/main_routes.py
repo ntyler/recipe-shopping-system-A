@@ -189,6 +189,7 @@ from PushShoppingList.services.meal_plan_service import meal_plan_for_week
 from PushShoppingList.services.meal_plan_service import normalize_planned_servings
 from PushShoppingList.services.meal_plan_service import planned_servings_from_yield
 from PushShoppingList.services.meal_plan_service import update_meal_ingredient_option_selections
+from PushShoppingList.services.meal_plan_service import meal_ingredient_snapshot
 from PushShoppingList.services.meal_plan_service import update_meal_prep_step
 from PushShoppingList.services.meal_plan_service import update_meal_plan_member
 from PushShoppingList.services.meal_plan_service import update_meal_plan_group
@@ -650,10 +651,25 @@ def shopping_views_context(recipe_page=None, recipe_batch_only=False):
     recipe_item_quantity_sources = (
         {} if recipe_batch_only else recipe_quantity_sources_lookup(quantity_rows)
     )
+    if not recipe_batch_only:
+        from PushShoppingList.services.meal_plan_shopping_service import current_shopping_quantity_sources, merge_plan_quantity_sources
+        planner_sources = current_shopping_quantity_sources(shopping_items_only(items))
+        if planner_sources:
+            recipe_item_quantity_sources = merge_plan_quantity_sources(recipe_item_quantity_sources, planner_sources)
+            recipe_item_quantities = {
+                key: summarize_quantity_displays([source.get("quantity", "") for source in sources])
+                for key, sources in recipe_item_quantity_sources.items() if sources
+            }
+    else:
+        planner_sources = {}
     item_quantities = apply_manual_item_quantities(
         recipe_item_quantities,
         item_state,
     )
+    for key, sources in planner_sources.items():
+        manual_qty = str((item_state.get(key) or {}).get("manual_qty") or "").strip()
+        if manual_qty:
+            item_quantities[key] = summarize_quantity_displays([manual_qty] + [source["quantity"] for source in sources])
 
     return {
         **recipe_context,
@@ -5996,6 +6012,71 @@ def family_members_route():
     )
 
 
+@main_bp.route("/api/meal-plan/shopping/review", methods=["POST"])
+def meal_plan_shopping_review_route():
+    from PushShoppingList.services import meal_plan_shopping_service as service
+    if not current_public_user() and not is_guest_session():
+        return jsonify({"ok": False, "error": "Sign in or start a guest workspace to shop your plan."}), 403
+    validate_master_data_viewer_scope()
+    payload = request.get_json(silent=True)
+    try:
+        if not isinstance(payload, dict) or set(payload) != {"selection"}:
+            raise service.ShoppingPlanError("Choose the meals or prep batches to review.")
+        result = service.review_meal_plan_shopping(payload["selection"])
+        result.pop("_contributions", None)
+        return jsonify(result)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), getattr(exc, "status", 400)
+
+
+@main_bp.route("/api/meal-plan/shopping/add", methods=["POST"])
+def meal_plan_shopping_add_route():
+    from PushShoppingList.services import meal_plan_shopping_service as service
+    if not current_public_user() and not is_guest_session():
+        return jsonify({"ok": False, "error": "Sign in or start a guest workspace to shop your plan."}), 403
+    validate_master_data_viewer_scope()
+    try:
+        return jsonify(service.add_meal_plan_shopping(request.get_json(silent=True))), 201
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), getattr(exc, "status", 400)
+
+
+@main_bp.route("/api/meal-plan/shopping/lists", methods=["GET"])
+def meal_plan_shopping_lists_route():
+    from PushShoppingList.services import meal_plan_shopping_service as service
+    if not current_public_user() and not is_guest_session():
+        return jsonify({"ok": False, "error": "Sign in or start a guest workspace to view shopping lists."}), 403
+    validate_master_data_viewer_scope()
+    return jsonify({"ok": True, "lists": service.list_shopping_plans()})
+
+
+@main_bp.route("/api/meal-plan/shopping/lists/<list_id>", methods=["GET"])
+def meal_plan_shopping_list_route(list_id):
+    from PushShoppingList.services import meal_plan_shopping_service as service
+    if not current_public_user() and not is_guest_session():
+        return jsonify({"ok": False, "error": "Sign in or start a guest workspace to view shopping lists."}), 403
+    validate_master_data_viewer_scope()
+    try:
+        return jsonify({"ok": True, "list": service.shopping_plan_detail(list_id)})
+    except service.ShoppingPlanError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), exc.status
+
+
+@main_bp.route("/api/meal-plan/shopping/lists/<list_id>/items/<item_id>", methods=["PATCH"])
+def meal_plan_shopping_list_item_route(list_id, item_id):
+    from PushShoppingList.services import meal_plan_shopping_service as service
+    if not current_public_user() and not is_guest_session():
+        return jsonify({"ok": False, "error": "Sign in or start a guest workspace to update shopping lists."}), 403
+    validate_master_data_viewer_scope()
+    payload = request.get_json(silent=True)
+    try:
+        if not isinstance(payload, dict) or set(payload) != {"checked"}:
+            raise service.ShoppingPlanError("Provide an item's checked state.")
+        return jsonify({"ok": True, "list": service.set_shopping_plan_item_checked(list_id, item_id, payload["checked"])})
+    except service.ShoppingPlanError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), exc.status
+
+
 @main_bp.route("/api/meal-plan", methods=["GET"])
 def recipe_meal_plan_entries_route():
     if not current_public_user() and not is_guest_session():
@@ -6128,8 +6209,9 @@ def add_meal_prep_batch_route():
     if recipe_url not in available_recipes:
         return jsonify({"ok": False, "error": "Choose a recipe from your current recipe collection."}), 400
     try:
+        recipe_data = load_recipe_output(recipe_url) or {}
         resolution = resolve_ingredient_requirements(
-            load_recipe_output(recipe_url) or {},
+            recipe_data,
             payload.get("ingredient_option_selections"),
         )
         batch, meals = add_meal_prep_batch({
@@ -6143,7 +6225,7 @@ def add_meal_prep_batch_route():
             "ingredient_option_selections": resolution["selected_options"],
             "unresolved_ingredient_requirement_ids": [item["id"] for item in resolution["unresolved_requirements"]],
             "ingredient_selection_needed": resolution["selection_needed"],
-            "ingredients": resolution["items"],
+            **meal_ingredient_snapshot(recipe_data, resolution["items"]),
         })
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
@@ -6225,7 +6307,7 @@ def add_meal_plan_entry_route():
                 for requirement in ingredient_resolution["unresolved_requirements"]
             ],
             "ingredient_selection_needed": ingredient_resolution["selection_needed"],
-            "ingredients": ingredient_resolution["items"],
+            **meal_ingredient_snapshot(recipe_data, ingredient_resolution["items"]),
         })
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
@@ -6263,8 +6345,9 @@ def update_meal_plan_ingredient_options_route(meal_id):
     if not meal:
         return jsonify({"ok": False, "error": "That planned meal was not found."}), 404
     payload = request.get_json(silent=True) or {}
+    recipe_data = load_recipe_output(meal["recipe_url"]) or {}
     resolution = resolve_ingredient_requirements(
-        load_recipe_output(meal["recipe_url"]) or {},
+        recipe_data,
         payload.get("ingredient_option_selections"),
     )
     updated = update_meal_ingredient_option_selections(
@@ -6274,7 +6357,7 @@ def update_meal_plan_ingredient_options_route(meal_id):
             requirement["id"]
             for requirement in resolution["unresolved_requirements"]
         ],
-        ingredients=resolution["items"],
+        **meal_ingredient_snapshot(recipe_data, resolution["items"]),
     )
     return jsonify({
         "ok": True,

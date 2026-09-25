@@ -68,7 +68,7 @@ def test_meal_cards_use_compact_actions_with_correct_ids_and_batch_scope_choices
     assert len(parser.menus) == 2
     for trigger, expected_options in zip(triggers, [
         ["Edit meal", "Remove meal"],
-        ["Edit this meal", "Edit entire prep plan", "Remove meal"],
+        ["Edit this meal", "Edit entire prep plan", "Shop this prep batch", "Remove meal"],
     ]):
         menu = next(menu for menu in parser.menus if menu["id"] == trigger["attrs"]["data-menu-id"])
         assert menu["data-trigger-id"] == trigger["attrs"]["id"]

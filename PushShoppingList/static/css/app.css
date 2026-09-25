@@ -33857,6 +33857,201 @@ img[data-deferred-src] {
     }
 }
 
+.app-page-workspace-meal-planner .meal-shopping-plan-action {
+    width: auto;
+    min-height: 32px;
+    margin: 0;
+    padding: 3px 0;
+    border: 0;
+    background: transparent;
+    color: var(--app-primary);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 650;
+    text-align: left;
+}
+
+.meal-shopping-saved-section {
+    margin: 0 0 18px;
+    padding: 14px 16px;
+    border: 1px solid var(--app-border);
+    border-radius: 10px;
+    background: var(--app-surface);
+}
+
+.meal-shopping-saved-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px 16px;
+}
+
+.meal-shopping-saved-heading h3 { margin: 0; font-size: 14px; }
+.meal-shopping-saved-heading p { margin: 3px 0 0; color: var(--app-muted); font-size: 12px; }
+.meal-shopping-saved-section [data-meal-shopping-saved-lists]:empty { display: none; }
+.meal-shopping-saved-section [data-meal-shopping-saved-lists]:not(:empty) { margin-top: 12px; }
+
+.meal-shopping-dialog.app-dialog {
+    width: min(760px, calc(100vw - 32px));
+    max-width: calc(100vw - 32px);
+    max-height: calc(100dvh - 32px);
+    margin: auto;
+    padding: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    color: var(--app-text-strong);
+}
+
+.meal-shopping-dialog .app-dialog-card { min-width: 0; gap: 16px; padding: 20px; }
+.meal-shopping-dialog [hidden] { display: none !important; }
+.meal-shopping-dialog :is(form, fieldset, [data-meal-shopping-content], [data-meal-shopping-lists-content]) { min-width: 0; }
+.meal-shopping-dialog fieldset { margin: 0; padding: 0; border: 0; }
+.meal-shopping-dialog legend { margin-bottom: 10px; padding: 0; font-size: 14px; font-weight: 650; }
+.meal-shopping-dialog h4 { margin: 0 0 8px; font-size: 14px; }
+
+.meal-shopping-dialog button,
+.meal-shopping-saved-section button {
+    width: auto;
+    min-height: 36px;
+    margin: 0;
+    padding: 7px 11px;
+    border: 1px solid var(--app-border);
+    border-radius: 6px;
+    background: var(--app-surface-soft);
+    color: var(--app-text-strong);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.35;
+    cursor: pointer;
+}
+
+.meal-shopping-dialog .app-dialog-close {
+    flex: 0 0 36px;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border-color: transparent;
+    background: transparent;
+    font-size: 22px;
+}
+
+.meal-shopping-dialog button:is(.primary, .app-page-primary-action, [type="submit"]) {
+    border-color: var(--app-primary);
+    background: var(--app-primary);
+    color: var(--app-bg);
+}
+
+.meal-shopping-dialog button.is-danger { color: var(--app-danger); }
+.meal-shopping-dialog button:hover:not(:disabled),
+.meal-shopping-saved-section button:hover:not(:disabled) { border-color: var(--app-primary); }
+.meal-shopping-dialog button:disabled { cursor: wait; opacity: .6; }
+.meal-shopping-dialog :is(button, input, select, textarea, a, summary):focus-visible,
+.meal-shopping-saved-section :is(button, a):focus-visible,
+.app-page-workspace-meal-planner .meal-shopping-plan-action:focus-visible {
+    outline: 2px solid var(--app-primary);
+    outline-offset: 2px;
+}
+
+.meal-shopping-dialog :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    min-height: 38px;
+    margin: 0;
+    padding: 8px 10px;
+    border: 1px solid var(--app-border);
+    border-radius: 6px;
+    background: var(--app-bg-soft);
+    color: var(--app-text-strong);
+    font: inherit;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.meal-shopping-dialog :is(input[type="checkbox"], input[type="radio"]) {
+    appearance: auto;
+    flex: 0 0 18px;
+    width: 18px;
+    min-width: 18px;
+    height: 18px;
+    min-height: 18px;
+    margin: 2px 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    accent-color: var(--app-primary);
+}
+
+.meal-shopping-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; }
+.meal-shopping-field { display: grid; align-content: start; gap: 6px; min-width: 0; font-size: 12px; }
+.meal-shopping-field label { margin: 0; color: var(--app-text-strong); font-weight: 600; }
+.meal-shopping-dialog label.meal-shopping-field { margin: 12px 0 0; color: var(--app-text-strong); font-weight: 600; }
+.meal-shopping-field-wide { grid-column: 1 / -1; }
+.meal-shopping-choice { display: flex; align-items: start; gap: 9px; margin: 0; font-size: 13px; line-height: 1.45; }
+.meal-shopping-steps { display: flex; flex-wrap: wrap; gap: 8px 12px; margin: 0 0 16px; padding: 0; list-style: none; color: var(--app-text-strong); font-size: 12px; font-weight: 600; }
+.meal-shopping-steps > span { color: var(--app-muted); font-weight: 400; }
+.meal-shopping-steps :is(.is-active, [aria-current="step"]) { color: var(--app-primary); font-weight: 700; }
+.meal-shopping-help,
+.meal-shopping-summary { margin: 8px 0; color: var(--app-muted); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.meal-shopping-summary strong { color: var(--app-text-strong); }
+.meal-shopping-status { min-height: 0; margin: 0; color: var(--app-primary); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.meal-shopping-status:empty { display: none; }
+.meal-shopping-status:is(.error, .is-error) { color: var(--app-danger); }
+.meal-shopping-help:is(.error, .is-error) { color: var(--app-danger); font-weight: 600; }
+.meal-shopping-empty { margin: 0; padding: 18px; border: 1px dashed var(--app-border); border-radius: 7px; color: var(--app-muted); font-size: 13px; line-height: 1.5; }
+
+.meal-shopping-sources,
+.meal-shopping-items,
+.meal-shopping-list-editor { display: grid; gap: 8px; min-width: 0; margin: 12px 0; padding: 0; list-style: none; }
+.meal-shopping-source { display: flex; align-items: start; gap: 10px; min-width: 0; margin: 0; padding: 10px 12px; border: 1px solid var(--app-border); border-radius: 7px; font-size: 13px; line-height: 1.45; cursor: pointer; }
+.meal-shopping-source > :not(input) { min-width: 0; overflow-wrap: anywhere; }
+.meal-shopping-source small { display: block; margin-top: 3px; color: var(--app-muted); }
+.meal-shopping-source:has(input:checked) { border-color: var(--app-primary); background: var(--app-primary-soft); }
+.meal-shopping-source:has(input:disabled) { color: var(--app-muted); }
+.meal-shopping-item { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 4px; min-width: 0; padding: 10px 0; border-bottom: 1px solid var(--app-border); font-size: 13px; line-height: 1.45; }
+.meal-shopping-item > label { display: grid; grid-template-columns: 18px minmax(0, 1fr); align-items: start; gap: 10px; min-width: 0; min-height: 36px; margin: 0; cursor: pointer; }
+.meal-shopping-item > label > span { min-width: 0; overflow-wrap: anywhere; }
+.meal-shopping-item > :not(input) { min-width: 0; overflow-wrap: anywhere; }
+.meal-shopping-item small { display: block; color: var(--app-muted); }
+.meal-shopping-item > :is(.meal-shopping-help, details) { margin: 0 0 0 28px; }
+.meal-shopping-item details { color: var(--app-muted); font-size: 12px; }
+.meal-shopping-item summary { width: fit-content; max-width: 100%; cursor: pointer; }
+.meal-shopping-item details ul { display: grid; gap: 4px; margin: 6px 0; padding-left: 18px; }
+.meal-shopping-item:has(input:not(:checked)) > label strong { color: var(--app-muted); font-weight: 400; }
+.meal-shopping-item-quantity { color: var(--app-text-strong); text-align: right; }
+.meal-shopping-item.is-excluded { color: var(--app-muted); }
+.meal-shopping-item.is-checked .meal-shopping-item-name { text-decoration: line-through; color: var(--app-muted); }
+.meal-shopping-item-details { margin-left: 28px; }
+.meal-shopping-saved-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; min-width: 0; padding: 10px 0; border-bottom: 1px solid var(--app-border); }
+.meal-shopping-saved-row > :first-child { min-width: 0; overflow-wrap: anywhere; }
+.meal-shopping-saved-row small { display: block; margin-top: 3px; color: var(--app-muted); }
+.meal-shopping-dialog button.meal-shopping-saved-row { display: flex; width: 100%; padding: 12px; text-align: left; }
+.meal-shopping-dialog .meal-shopping-saved-row + .meal-shopping-saved-row { margin-top: 8px; }
+.meal-shopping-dialog [data-shopping-list-back] { margin-bottom: 16px; }
+.meal-shopping-list-editor .meal-shopping-source:has(input:checked) strong { color: var(--app-muted); text-decoration: line-through; }
+.meal-shopping-actions { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--app-border); }
+
+@media (max-width: 600px) {
+    .meal-shopping-dialog.app-dialog { width: calc(100vw - 16px); max-width: calc(100vw - 16px); max-height: calc(100dvh - 16px); }
+    .meal-shopping-dialog .app-dialog-card { padding: 16px; }
+    .meal-shopping-fields { grid-template-columns: minmax(0, 1fr); }
+    .meal-shopping-item-quantity { text-align: left; }
+    .meal-shopping-dialog :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) { font-size: 16px; }
+}
+
+@media (max-width: 760px), (pointer: coarse) {
+    .meal-shopping-dialog button,
+    .meal-shopping-saved-section button,
+    .meal-shopping-item > label,
+    .meal-shopping-item summary,
+    .app-page-workspace-meal-planner .meal-shopping-plan-action { min-height: 44px; }
+    .meal-shopping-dialog .app-dialog-close { flex-basis: 44px; width: 44px; height: 44px; }
+}
+
 .app-home-recent-recipes {
     grid-column: span 7;
 }

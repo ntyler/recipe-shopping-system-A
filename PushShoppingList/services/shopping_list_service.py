@@ -30,12 +30,23 @@ def load_items():
         ]
 
 
-def save_items(items):
+def save_items(items, *, preserve_plan_contributions=False):
     with SHOPPING_LIST_LOCK:
+        previous = load_items()
+        previous_text = SHOPPING_LIST_FILE.read_text(encoding="utf-8") if SHOPPING_LIST_FILE.exists() else ""
         SHOPPING_LIST_FILE.write_text(
             "\n".join(items) + ("\n" if items else ""),
             encoding="utf-8",
         )
+        if not preserve_plan_contributions and set(previous) - set(items):
+            # Retire amounts belonging to removed planner lines as well. This
+            # covers clear, manual edits, and recipe-driven item removal.
+            from PushShoppingList.services.meal_plan_shopping_service import prune_current_shopping_contributions
+            try:
+                prune_current_shopping_contributions(items)
+            except Exception:
+                SHOPPING_LIST_FILE.write_text(previous_text, encoding="utf-8")
+                raise
 
 
 def load_recipe_selections():

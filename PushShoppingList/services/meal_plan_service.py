@@ -390,6 +390,18 @@ def normalize_meal_ingredients(value):
     ]
 
 
+def meal_ingredient_snapshot(recipe_data, ingredients):
+    """Keep ingredient amounts and their serving basis together for planning."""
+    from PushShoppingList.services.recipe_quantity_service import recipe_base_servings, recipe_base_ingredient_quantity, recipe_base_ingredient_unit
+    items = normalize_meal_ingredients(ingredients)
+    for item in items:
+        quantity = recipe_base_ingredient_quantity(item, recipe_data)
+        unit = recipe_base_ingredient_unit(item, recipe_data)
+        item.update({"quantity": quantity, "base_quantity": quantity, "unit": unit, "base_unit": unit})
+    servings = planned_servings_from_yield(recipe_base_servings(recipe_data))
+    return {"ingredients": items, **({"ingredient_base_servings": servings} if servings else {})}
+
+
 def normalize_meal(meal):
     meal_date = parse_date(meal.get("date"))
     meal_type = clean_text(meal.get("meal_type")).lower()
@@ -434,6 +446,11 @@ def normalize_meal(meal):
     )
     if "ingredients" in meal:
         normalized["ingredients"] = normalize_meal_ingredients(meal.get("ingredients"))
+    if meal.get("ingredient_base_servings") is not None:
+        try:
+            normalized["ingredient_base_servings"] = normalize_positive_servings(meal["ingredient_base_servings"], "Ingredient recipe yield")
+        except ValueError:
+            pass
     if clean_text(meal.get("batch_id")):
         normalized["batch_id"] = clean_text(meal.get("batch_id"))
     if meal.get("portion_mode") in ("household", "family"):
@@ -803,7 +820,7 @@ def update_meal_prep_batch(batch_id, patch):
             if not prior:
                 prior = next((meal for meal in old_meals if meal["id"] not in used and meal["id"] not in explicit_ids
                               and meal["date"] == allocation.get("date") and meal["meal_type"] == allocation.get("meal_type")), None)
-            base = prior or {**{key: ingredient_base[key] for key in ("ingredients", "ingredient_option_selections", "unresolved_ingredient_requirement_ids", "ingredient_selection_needed") if key in ingredient_base},
+            base = prior or {**{key: ingredient_base[key] for key in ("ingredients", "ingredient_base_servings", "ingredient_option_selections", "unresolved_ingredient_requirement_ids", "ingredient_selection_needed") if key in ingredient_base},
                              "id": uuid.uuid4().hex, "recipe_url": existing["recipe_url"], "recipe_name": existing["recipe_name"], "batch_id": existing["id"]}
             meal = edited_meal(base, allocation, members, allocation.get("portion_mode", mode))
             if "planned_servings" not in meal:
@@ -944,6 +961,7 @@ def update_meal_ingredient_option_selections(
     selections,
     unresolved_requirement_ids=None,
     ingredients=None,
+    ingredient_base_servings=None,
 ):
     meal_id = clean_text(meal_id)
     selections = normalize_selection_map(selections)
@@ -969,6 +987,10 @@ def update_meal_ingredient_option_selections(
         target["ingredient_selection_needed"] = bool(unresolved_requirement_ids)
         if ingredients is not None:
             target["ingredients"] = normalize_meal_ingredients(ingredients)
+            if ingredient_base_servings is not None:
+                target["ingredient_base_servings"] = normalize_positive_servings(ingredient_base_servings, "Ingredient recipe yield")
+            else:
+                target.pop("ingredient_base_servings", None)
         save_meal_plan(payload)
         return normalize_meal(target)
 
@@ -995,7 +1017,8 @@ def sync_meal_recipe_ingredients(recipe_url, recipe_data):
                 for requirement in resolution["unresolved_requirements"]
             ]
             meal["ingredient_selection_needed"] = resolution["selection_needed"]
-            meal["ingredients"] = normalize_meal_ingredients(resolution["items"])
+            meal.pop("ingredient_base_servings", None)
+            meal.update(meal_ingredient_snapshot(recipe_data, resolution["items"]))
             updated_count += 1
 
         if updated_count:
