@@ -34052,6 +34052,30 @@ img[data-deferred-src] {
     .meal-shopping-dialog .app-dialog-close { flex-basis: 44px; width: 44px; height: 44px; }
 }
 
+#mealPlannerDeleteDialog [hidden] { display: none !important; }
+#mealPlannerDeleteDialog { width: min(480px, calc(100vw - 32px)); max-width: calc(100vw - 32px); max-height: calc(100dvh - 32px); margin: auto; overflow: auto; overscroll-behavior: contain; }
+#mealPlannerDeleteDialog .app-dialog-card { min-width: 0; }
+#mealPlannerDeleteDialog .app-dialog-header > div { min-width: 0; overflow-wrap: anywhere; }
+#mealPlannerDeleteDialog .app-dialog-close { flex: 0 0 36px; width: 36px; min-height: 36px; margin: 0; }
+#mealPlannerDeleteDialog .app-dialog-actions { flex-wrap: wrap; }
+#mealPlannerDeleteDialog .app-dialog-actions button { flex: 0 1 auto; width: auto; max-width: 100%; min-height: 40px; margin: 0; padding: 8px 12px; font-size: 13px; line-height: 1.35; white-space: normal; overflow-wrap: anywhere; }
+#mealPlannerDeleteDialog :is(button, summary):focus-visible { outline: 2px solid var(--app-primary); outline-offset: 2px; }
+#mealPlannerDeleteDialog [data-meal-delete-summary] { margin: 0; line-height: 1.5; }
+#mealPlannerDeleteDialog .app-meal-delete-help { margin: 0; color: var(--app-muted); font-size: 13px; line-height: 1.5; }
+#mealPlannerDeleteDialog .app-meal-delete-schedule { min-width: 0; font-size: 13px; }
+#mealPlannerDeleteDialog .app-meal-delete-schedule summary { padding: 8px 0; cursor: pointer; }
+#mealPlannerDeleteDialog [data-meal-delete-items] { display: grid; gap: 8px; max-height: 240px; overflow-y: auto; margin: 8px 0 0; padding: 0 8px 0 22px; line-height: 1.5; overflow-wrap: anywhere; }
+
+@media (max-width: 600px) {
+    #mealPlannerDeleteDialog .app-dialog-card { padding: 16px; }
+}
+
+@media (max-width: 760px), (pointer: coarse) {
+    #mealPlannerDeleteDialog .app-dialog-close { flex-basis: 44px; width: 44px; min-height: 44px; }
+    #mealPlannerDeleteDialog .app-dialog-actions button { min-height: 44px; }
+    #mealPlannerDeleteDialog .app-meal-delete-schedule summary { min-height: 44px; padding-block: 12px; box-sizing: border-box; }
+}
+
 /* Shared weekly views retain the meal calendar and add prep and shopping days. */
 #mealPlannerPage [data-planner-panel],
 #mealPlannerPage .planner-week-grid,

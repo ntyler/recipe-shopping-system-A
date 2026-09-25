@@ -748,7 +748,8 @@
                                             <button type="button" onclick="return runMealPlannerCardAction(this, 'meal')">{{ 'Edit this meal' if meal.batch_id else 'Edit meal' }}</button>
                                             {% if meal.batch_id %}<button type="button" onclick="return runMealPlannerCardAction(this, 'batch')">Edit entire prep plan</button>{% endif %}
                                             {% if meal.batch_id %}<button type="button" onclick="return runMealPlannerCardAction(this, 'shop')">Shop this prep batch</button>{% endif %}
-                                            <button type="button" class="is-danger" onclick="return runMealPlannerCardAction(this, 'remove')">Remove meal</button>
+                                            <button type="button" class="is-danger" onclick="return runMealPlannerCardAction(this, 'remove')">Remove this meal</button>
+                                            {% if meal.batch_id %}<button type="button" class="is-danger" onclick="return runMealPlannerCardAction(this, 'remove-batch')">Remove entire prep batch</button>{% endif %}
                                         </div>
                                         {% if meal.planned_servings or meal.batch_id %}<p class="app-meal-plan-details">
                                             {% if meal.planned_servings %}<span>{{ '%g' | format(meal.planned_servings | float) }} {{ 'serving' if meal.planned_servings == 1 else 'servings' }}</span>{% endif %}
@@ -863,17 +864,24 @@
         </div>
     </dialog>
 
-    <dialog id="mealPlannerDeleteDialog" class="app-dialog" aria-labelledby="mealPlannerDeleteTitle">
+    <dialog id="mealPlannerDeleteDialog" class="app-dialog" aria-labelledby="mealPlannerDeleteTitle" aria-describedby="mealPlannerDeleteCopy mealPlannerDeleteSummary mealPlannerDeleteHelp">
         <form method="dialog" class="app-dialog-card app-dialog-card-danger" onsubmit="return confirmMealPlannerDelete(event)">
             <div class="app-dialog-header">
-                <div><h3 id="mealPlannerDeleteTitle">Remove Planned Meal</h3><p data-meal-delete-copy>This removes the meal from this week. The recipe will not be deleted.</p></div>
-                <button type="button" class="app-dialog-close" aria-label="Close remove meal dialog" onclick="return closeMealPlannerDeleteDialog()">&times;</button>
+                <div><h3 id="mealPlannerDeleteTitle">Remove this meal</h3><p id="mealPlannerDeleteCopy" data-meal-delete-copy></p></div>
+                <button type="button" class="app-dialog-close" data-meal-delete-close aria-label="Close removal confirmation" onclick="return closeMealPlannerDeleteDialog()">&times;</button>
             </div>
             <input type="hidden" data-meal-delete-id>
-            <div class="app-dialog-status" data-meal-delete-status aria-live="polite"></div>
+            <p id="mealPlannerDeleteSummary" data-meal-delete-summary aria-live="polite"></p>
+            <details class="app-meal-delete-schedule" data-meal-delete-schedule hidden>
+                <summary>Review affected schedule</summary>
+                <ul data-meal-delete-items></ul>
+            </details>
+            <p id="mealPlannerDeleteHelp" class="app-meal-delete-help">The saved recipe, shopping lists, and shopping trips will be kept. Ingredients already added to a shopping list will stay there.</p>
+            <div class="app-dialog-status" data-meal-delete-status role="status" aria-live="polite"></div>
             <div class="app-dialog-actions">
-                <button type="button" class="app-page-secondary-action" onclick="return closeMealPlannerDeleteDialog()">Cancel</button>
-                <button type="submit" class="app-page-danger-action" data-meal-delete-submit>Remove Meal</button>
+                <button type="button" class="app-page-secondary-action" data-meal-delete-cancel onclick="return closeMealPlannerDeleteDialog()">Cancel</button>
+                <button type="button" class="app-page-secondary-action" data-meal-delete-retry hidden onclick="return loadMealPlannerDeleteDetails()">Retry</button>
+                <button type="submit" class="app-page-danger-action" data-meal-delete-submit disabled>Remove this meal</button>
             </div>
         </form>
     </dialog>

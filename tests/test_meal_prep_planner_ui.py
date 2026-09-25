@@ -67,8 +67,8 @@ def test_meal_cards_use_compact_actions_with_correct_ids_and_batch_scope_choices
     assert not any(button["attrs"].get("class") in {"app-meal-edit", "app-meal-remove"} for button in parser.buttons)
     assert len(parser.menus) == 2
     for trigger, expected_options in zip(triggers, [
-        ["Edit meal", "Remove meal"],
-        ["Edit this meal", "Edit entire prep plan", "Shop this prep batch", "Remove meal"],
+        ["Edit meal", "Remove this meal"],
+        ["Edit this meal", "Edit entire prep plan", "Shop this prep batch", "Remove this meal", "Remove entire prep batch"],
     ]):
         menu = next(menu for menu in parser.menus if menu["id"] == trigger["attrs"]["data-menu-id"])
         assert menu["data-trigger-id"] == trigger["attrs"]["id"]

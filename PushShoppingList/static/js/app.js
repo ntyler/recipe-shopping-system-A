@@ -2099,9 +2099,11 @@ function toggleMealPlannerCardMenu(button) {
 function runMealPlannerCardAction(button, action) {
     const menu = button?.closest("[data-meal-card-menu]");
     const trigger = document.getElementById(menu?.dataset.triggerId || "");
-    if (!menu || !trigger || !['meal', 'batch', 'remove', 'shop'].includes(action)) return false;
+    if (!menu || !trigger || !['meal', 'batch', 'remove', 'remove-batch', 'shop'].includes(action)) return false;
+    if (action === "remove-batch" && !trigger.dataset.batchId) return false;
     closeMealPlannerCardMenu(menu, true);
     if (action === "shop") return openMealPlanShopping(trigger.dataset.batchId, trigger);
+    if (action === "remove-batch") return openMealPlannerDeleteDialog(trigger, "batch");
     return action === "remove" ? openMealPlannerDeleteDialog(trigger) : openMealPlannerEditDialog(trigger, action);
 }
 
@@ -2186,63 +2188,133 @@ async function loadMealPlannerEdit(scope) {
     }
 }
 
-function openMealPlannerDeleteDialog(button) {
+function openMealPlannerDeleteDialog(button, scope = "meal") {
     const dialog = document.getElementById("mealPlannerDeleteDialog");
-    if (!dialog || typeof dialog.showModal !== "function") {
-        return false;
+    if (!dialog || typeof dialog.showModal !== "function" || dialog.mealDeleteState?.saving || !["meal", "batch"].includes(scope)) return false;
+    const id = String(scope === "batch" ? button?.dataset.batchId || "" : button?.dataset.mealId || "");
+    if (!id) return false;
+    dialog.mealDeleteState?.controller?.abort();
+    dialog.mealDeleteState = {scope, id, opener:button, mealName:String(button?.dataset.mealName || "this meal"), loading:false, saving:false, ready:false};
+    dialog.querySelectorAll("button").forEach(control => {control.disabled = false;});
+    dialog.querySelector("[data-meal-delete-id]").value = id;
+    dialog.querySelector("#mealPlannerDeleteTitle").textContent = scope === "batch" ? "Remove entire prep batch" : "Remove this meal";
+    dialog.querySelector("[data-meal-delete-submit]").textContent = scope === "batch" ? "Remove entire prep batch" : "Remove this meal";
+    dialog.oncancel = event => {event.preventDefault(); closeMealPlannerDeleteDialog();};
+    if (!dialog.open) dialog.showModal();
+    void loadMealPlannerDeleteDetails();
+    dialog.querySelector("[data-meal-delete-cancel]")?.focus();
+    return false;
+}
+
+function mealPlannerDeleteEndpoint(state) {
+    const url = state.scope === "batch" ? `/api/meal-plan/batches/${encodeURIComponent(state.id)}` : `/api/meal-plan/${encodeURIComponent(state.id)}`;
+    return typeof withCanonicalViewerUserId === "function" ? withCanonicalViewerUserId(url) : url;
+}
+
+function mealPlannerDeleteDate(value) {
+    const day = new Date(`${value}T12:00:00`);
+    return Number.isNaN(day.getTime()) ? String(value || "Unknown date") : day.toLocaleDateString(undefined, {month:"short",day:"numeric",year:"numeric"});
+}
+
+async function loadMealPlannerDeleteDetails() {
+    const dialog = document.getElementById("mealPlannerDeleteDialog"), state = dialog?.mealDeleteState;
+    if (!dialog?.open || !state || state.saving) return false;
+    state.controller?.abort();
+    const controller = state.controller = new AbortController();
+    const current = () => dialog.open && document.getElementById("mealPlannerDeleteDialog") === dialog && dialog.mealDeleteState === state && state.controller === controller && !controller.signal.aborted;
+    state.loading = true; state.ready = false;
+    dialog.setAttribute("aria-busy", "true");
+    dialog.querySelector("[data-meal-delete-submit]").disabled = true;
+    dialog.querySelector("[data-meal-delete-retry]").hidden = true;
+    dialog.querySelector("[data-meal-delete-copy]").textContent = "";
+    dialog.querySelector("[data-meal-delete-summary]").textContent = "";
+    const schedule = dialog.querySelector("[data-meal-delete-schedule]");
+    schedule.hidden = true; schedule.open = false;
+    const list = dialog.querySelector("[data-meal-delete-items]");
+    list.replaceChildren();
+    setMealPlannerStatus("Loading the affected schedule…", false, "[data-meal-delete-status]");
+    try {
+        const response = await fetch(mealPlannerDeleteEndpoint(state), {cache:"no-store",signal:controller.signal});
+        const payload = await response.json().catch(() => ({}));
+        if (!current()) return false;
+        if (!response.ok || response.redirected || !payload.ok) throw new Error(payload.error || "The affected schedule could not be loaded. Try again.");
+        const batch = state.scope === "batch", record = batch ? payload.batch : payload.meal;
+        if (record?.id !== state.id || (batch && (!Array.isArray(payload.meals) || !Array.isArray(record.prep_steps)))) throw new Error("The saved schedule is incomplete. Refresh it before removing anything.");
+        const meals = batch ? payload.meals : [record], tasks = batch ? record.prep_steps : [];
+        if (meals.some(meal => !meal.id || !meal.date || (batch && meal.batch_id !== state.id)) || tasks.some(task => !task.id || !task.date)) throw new Error("The saved schedule is incomplete. Refresh it before removing anything.");
+        state.mealName = record.recipe_name || state.mealName;
+        dialog.querySelector("[data-meal-delete-copy]").textContent = batch ? `Remove the ${state.mealName} prep batch?` : `Remove ${state.mealName} from this scheduled meal?`;
+        const dates = meals.map(meal => meal.date).sort();
+        const range = dates.length ? (dates[0] === dates[dates.length - 1] ? `on ${mealPlannerDeleteDate(dates[0])}` : `across ${mealPlannerDeleteDate(dates[0])}–${mealPlannerDeleteDate(dates[dates.length - 1])}`) : "";
+        dialog.querySelector("[data-meal-delete-summary]").textContent = batch
+            ? `This removes ${meals.length} scheduled ${meals.length === 1 ? "meal" : "meals"}${range ? " " + range : ""} and ${tasks.length} prep ${tasks.length === 1 ? "task" : "tasks"}. All dates in this batch are included, even in other weeks.`
+            : `This removes only the ${String(record.meal_type || "meal")} ${range}.${record.batch_id ? " Other meals in this batch and its prep tasks will be kept." : ""}`;
+        const entries = [
+            ...meals.map(meal => ({date:meal.date,label:`${mealPlannerDeleteDate(meal.date)} · ${meal.meal_type || "Meal"}${meal.planned_servings != null ? ` · ${meal.planned_servings} servings` : ""}`})),
+            ...tasks.map(task => ({date:task.date,label:`${mealPlannerDeleteDate(task.date)} · Prep: ${task.instruction || "Prep task"}`})),
+        ].sort((left,right) => left.date.localeCompare(right.date));
+        for (const entry of entries) {const item = document.createElement("li"); item.textContent = entry.label; list.appendChild(item);}
+        schedule.hidden = entries.length === 0;
+        state.ready = true;
+        dialog.querySelector("[data-meal-delete-submit]").disabled = false;
+        setMealPlannerStatus("", false, "[data-meal-delete-status]");
+    } catch (error) {
+        if (current()) {
+            setMealPlannerStatus(error.message || "The affected schedule could not be loaded.", true, "[data-meal-delete-status]");
+            dialog.querySelector("[data-meal-delete-retry]").hidden = false;
+        }
+    } finally {
+        if (current()) {state.loading = false; dialog.removeAttribute("aria-busy");}
     }
-    const mealId = String(button?.dataset.mealId || "");
-    const mealName = String(button?.dataset.mealName || "this meal");
-    const idInput = dialog.querySelector("[data-meal-delete-id]");
-    const copy = dialog.querySelector("[data-meal-delete-copy]");
-    if (idInput) {
-        idInput.value = mealId;
-    }
-    if (copy) {
-        copy.textContent = `Remove ${mealName} from this week? The recipe itself will not be deleted, and you can add the meal again later.`;
-    }
-    setMealPlannerStatus("", false, "[data-meal-delete-status]");
-    dialog.showModal();
-    dialog.querySelector("[data-meal-delete-submit]")?.focus();
     return false;
 }
 
 function closeMealPlannerDeleteDialog() {
     const dialog = document.getElementById("mealPlannerDeleteDialog");
+    const state = dialog?.mealDeleteState;
+    if (state?.saving) return false;
+    state?.controller?.abort();
+    if (dialog) {dialog.mealDeleteState = null; dialog.removeAttribute("aria-busy");}
     if (dialog && dialog.open) {
         dialog.close();
     }
+    state?.opener?.focus({preventScroll:true});
     return false;
 }
 
 async function confirmMealPlannerDelete(event) {
     event.preventDefault();
-    const form = event.currentTarget;
-    const mealId = String(form.querySelector("[data-meal-delete-id]")?.value || "");
-    const submitButton = form.querySelector("[data-meal-delete-submit]");
-    const originalLabel = submitButton ? submitButton.textContent : "Remove Meal";
-    if (!mealId) {
-        setMealPlannerStatus("The planned meal could not be identified.", true, "[data-meal-delete-status]");
-        return false;
-    }
-    if (submitButton) {
-        submitButton.disabled = true;
-        submitButton.textContent = "Removing...";
-    }
+    const dialog = document.getElementById("mealPlannerDeleteDialog"), state = dialog?.mealDeleteState;
+    if (!dialog?.open || !state?.ready || state.loading || state.saving) return false;
+    const submitButton = dialog.querySelector("[data-meal-delete-submit]");
+    const originalLabel = submitButton.textContent;
+    state.saving = true;
+    dialog.setAttribute("aria-busy", "true");
+    dialog.querySelectorAll("button").forEach(button => {button.disabled = true;});
+    submitButton.textContent = "Removing…";
+    setMealPlannerStatus("", false, "[data-meal-delete-status]");
     try {
-        const response = await fetch(`/api/meal-plan/${encodeURIComponent(mealId)}`, { method: "DELETE" });
+        const response = await fetch(mealPlannerDeleteEndpoint(state), { method: "DELETE" });
         const payload = await response.json().catch(() => ({}));
-        if (!response.ok || !payload.ok) {
-            throw new Error(payload.error || "The meal could not be removed.");
+        if (!response.ok || response.redirected || !payload.ok) {
+            throw new Error(payload.error || (state.scope === "batch" ? "The prep batch could not be removed." : "The meal could not be removed."));
         }
-        window.location.reload();
     } catch (error) {
         setMealPlannerStatus(error.message || "The meal could not be removed.", true, "[data-meal-delete-status]");
-        if (submitButton) {
-            submitButton.disabled = false;
-            submitButton.textContent = originalLabel;
-        }
+        state.saving = false;
+        dialog.removeAttribute("aria-busy");
+        dialog.querySelectorAll("button").forEach(button => {button.disabled = false;});
+        submitButton.textContent = originalLabel;
+        return false;
     }
+    state.saving = false;
+    closeMealPlannerDeleteDialog();
+    const removed = state.scope === "batch" ? "Prep batch and its scheduled meals removed." : "Scheduled meal removed.";
+    const refreshed = await refreshMealPlannerWorkspace();
+    const status = document.getElementById("mealPlannerPage")?.querySelector("[data-meal-planner-refresh-status]");
+    if (status) {status.hidden = false; status.textContent = refreshed ? removed : `${removed} Reopen the planner to refresh the calendar.`; status.classList.toggle("error", !refreshed);}
+    document.getElementById("mealPlannerPage")?.querySelector('[data-planner-view][aria-selected="true"]')?.focus({preventScroll:true});
+    if (typeof refreshRecipePreviewMeals === "function") await refreshRecipePreviewMeals();
     return false;
 }
 

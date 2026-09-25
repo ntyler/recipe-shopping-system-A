@@ -219,6 +219,19 @@ assert.equal(activeDialog.open,false);
 """)
 
 
+def test_card_menu_remove_entire_batch_routes_explicit_scope_only_for_batched_meals():
+    run_dialog(r"""
+const batched=cardMenu({menuId:'batch-menu',mealId:'meal/2',batchId:'batch/1'}),standalone=cardMenu({menuId:'single-menu',mealId:'single'}),removals=[];
+ctx.openMealPlannerDeleteDialog=(button,scope='meal')=>{assert.equal(batched.menu.popoverOpen,false);removals.push({button,scope});return false;};
+ctx.toggleMealPlannerCardMenu(batched.trigger);ctx.runMealPlannerCardAction(batched.firstAction,'remove-batch');
+assert.equal(removals.length,1);assert.equal(removals[0].button,batched.trigger);assert.equal(removals[0].scope,'batch');
+ctx.toggleMealPlannerCardMenu(standalone.trigger);ctx.runMealPlannerCardAction(standalone.firstAction,'remove-batch');
+assert.equal(removals.length,1,'A standalone meal must never invoke batch removal');assert.equal(standalone.menu.popoverOpen,true);
+ctx.runMealPlannerCardAction(standalone.firstAction,'remove');assert.equal(removals.length,2);assert.equal(removals[1].scope,'meal');
+assert.equal(removals[1].button,standalone.trigger);assert.equal(requests.length,0);
+""")
+
+
 def test_card_shop_action_closes_menu_and_reviews_whole_batch_without_writing_items():
     run_dialog(r"""
 const {trigger,menu,firstAction}=cardMenu({mealId:'meal/2',batchId:'batch/1'}),opened=[];
