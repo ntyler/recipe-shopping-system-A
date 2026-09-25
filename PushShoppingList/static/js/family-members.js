@@ -15,6 +15,9 @@
             this.drafts = new Map();
             this.profiles = new Map();
             this.expanded = new Set();
+            this.groupEditorMemberId = '';
+            this.groupEditor = page.querySelector('[data-family-group-editor]');
+            if (this.groupEditor) this.groupEditor.hidden = true;
             this.groups = Array.isArray(groups) ? groups : [];
             this.groupDrafts = new Map();
             this.groupErrors = new Map();
@@ -40,6 +43,20 @@
             page.addEventListener('input', event => this.input(event));
             page.addEventListener('change', event => this.change(event));
             page.addEventListener('keydown', event => this.keydown(event));
+            document.addEventListener?.('pointerdown', event => {
+                if (!this.groupEditorMemberId || this.groupEditor?.contains(event.target) || event.target.closest?.('[data-family-edit-groups]')) return;
+                this.closeGroupEditor(!event.target.closest?.('button, input, select, textarea, a[href], [tabindex]'));
+            });
+            document.addEventListener?.('focusin', event => {
+                if (!this.groupEditorMemberId || this.groupEditor?.contains(event.target) || event.target.closest?.('[data-family-edit-groups]')) return;
+                this.closeGroupEditor(false);
+            });
+            const positionGroups = () => this.positionGroupEditor();
+            root.addEventListener?.('resize', positionGroups);
+            document.addEventListener?.('scroll', positionGroups, true);
+            root.visualViewport?.addEventListener('resize', positionGroups);
+            root.visualViewport?.addEventListener('scroll', positionGroups);
+            if (this.groupEditor && root.ResizeObserver) new root.ResizeObserver(positionGroups).observe(this.groupEditor);
             page.querySelector('[data-family-create]').addEventListener('submit', event => {
                 event.preventDefault();
                 this.create();
@@ -72,7 +89,7 @@
         groupChoices(selected, attribute, busy = false) {
             const chosen = ids(selected);
             const groups = this.groups.filter(group => !group.archived || chosen.includes(group.id));
-            if (!groups.length) return '<span class="family-members-help">No groups yet. Use Manage groups below to add one.</span>';
+            if (!groups.length) return '<span class="family-members-help">No groups yet. Use Manage groups to add one.</span>';
             return groups.map(group => `<label class="family-members-check"><input type="checkbox" ${attribute} data-family-focus="${esc(attribute + ':' + group.id)}" value="${esc(group.id)}"${chosen.includes(group.id) ? ' checked' : ''}${busy ? ' disabled' : ''}>${esc(group.name)}${group.archived ? ' (Archived)' : ''}</label>`).join('');
         }
 
@@ -85,7 +102,7 @@
 
         focusState() {
             const element = document.activeElement;
-            if (element?.dataset?.familyFocus) return {key:element.dataset.familyFocus, memberId:element.closest('[data-family-detail-id]')?.dataset.familyDetailId, start:element.selectionStart, end:element.selectionEnd};
+            if (element?.dataset?.familyFocus) return {key:element.dataset.familyFocus, memberId:element.closest('[data-family-detail-id]')?.dataset.familyDetailId || (this.groupEditor?.contains(element) ? this.groupEditorMemberId : undefined), start:element.selectionStart, end:element.selectionEnd};
             const row = element?.closest?.('[data-family-member-id]');
             if (!row) return null;
             const control = ['name', 'save', 'cancel', 'archive', 'details', 'edit-groups'].find(key => element.matches(`[data-family-${key}]`));
@@ -107,6 +124,47 @@
             return !active || active === document.body || this.focusState()?.memberId === memberId;
         }
 
+        memberRow(id) {
+            return [...this.page.querySelectorAll('[data-family-member-id]')].find(row => row.dataset.familyMemberId === id);
+        }
+
+        positionGroupEditor() {
+            if (!this.groupEditorMemberId || !this.groupEditor || this.groupEditor.hidden) return;
+            const anchor = this.memberRow(this.groupEditorMemberId)?.querySelector('[data-family-edit-groups]');
+            root.MasterDataAliasEditor?.positionPopover(this.groupEditor, anchor);
+        }
+
+        syncGroupEditor() {
+            if (!this.groupEditorMemberId || !this.groupEditor) return;
+            const member = this.visibleMembers().find(item => item.id === this.groupEditorMemberId);
+            if (!member) { this.closeGroupEditor(false); return; }
+            const busy = this.loading || this.pending.has(member.id);
+            this.page.querySelector('[data-family-group-editor-title]').textContent = `Groups for ${this.drafts.get(member.id) ?? member.name}`;
+            this.page.querySelector('[data-family-group-editor-choices]').innerHTML = this.groupChoices(this.memberProfile(member).group_ids, `data-family-member-group data-family-member="${esc(member.id)}"`, busy);
+            this.groupEditor.hidden = false;
+            if (this.groupEditor.showPopover && !this.groupEditor.matches(':popover-open')) this.groupEditor.showPopover();
+            this.positionGroupEditor();
+        }
+
+        openGroupEditor(member) {
+            if (!this.groupEditor || this.loading || this.pending.has(member.id)) return;
+            this.groupEditorMemberId = member.id;
+            this.render();
+            (this.groupEditor.querySelector('input:not(:disabled)') || this.groupEditor).focus({preventScroll:true});
+        }
+
+        closeGroupEditor(restoreFocus = true) {
+            const id = this.groupEditorMemberId;
+            if (!id) return;
+            this.groupEditorMemberId = '';
+            if (this.groupEditor?.hidePopover && this.groupEditor.matches(':popover-open')) this.groupEditor.hidePopover();
+            if (this.groupEditor) this.groupEditor.hidden = true;
+            const row = this.memberRow(id);
+            row?.classList.remove('is-group-editing');
+            row?.querySelector('[data-family-edit-groups]')?.setAttribute('aria-expanded', 'false');
+            if (restoreFocus) this.restoreFocus({memberId:id, control:'edit-groups'});
+        }
+
         render() {
             const focused = this.focusState();
             const visible = this.visibleMembers();
@@ -120,14 +178,15 @@
                 const error = this.errors.get(member.id) || '';
                 const disabled = busy ? ' disabled' : '';
                 const values = this.memberProfile(member);
-                const groupLabels = ids(member.group_ids).map(id => this.groups.find(group => group.id === id)).filter(Boolean);
+                const groupLabels = ids(values.group_ids).map(id => this.groups.find(group => group.id === id)).filter(Boolean);
                 const detailsOpen = this.expanded.has(member.id);
-                return `<tr data-family-member-id="${esc(member.id)}" aria-busy="${busy}">
+                const groupsOpen = this.groupEditorMemberId === member.id;
+                return `<tr data-family-member-id="${esc(member.id)}" aria-busy="${busy}" class="${this.dirty(member) ? 'is-dirty' : ''}${groupsOpen ? ' is-group-editing' : ''}">
                     <td data-mobile-label="Name"><label class="family-members-name"><span class="sr-only">Name for ${esc(member.name)}</span>
                         <input type="text" value="${esc(this.drafts.get(member.id) ?? member.name)}" maxlength="100" required autocomplete="off" data-family-name aria-describedby="familyMemberError${index}"${error ? ' aria-invalid="true"' : ''}${disabled}>
                     </label><p id="familyMemberError${index}" class="family-members-error" role="alert"${error ? '' : ' hidden'}>${esc(error)}</p></td>
-                    <td data-mobile-label="Groups"><div class="family-members-group-badges">${groupLabels.length ? groupLabels.map(group => `<span class="family-members-badge${group.archived ? ' is-archived' : ''}">${esc(group.name)}${group.archived ? ' (Archived)' : ''}</span>`).join('') : '<span class="family-members-help">Ungrouped</span>'}
-                        <button type="button" class="family-members-edit-groups" data-family-edit-groups aria-expanded="${detailsOpen}" aria-controls="familyMemberGroups${index}" aria-label="Edit groups for ${esc(member.name)}"${disabled}>Edit groups</button></div></td>
+                    <td data-mobile-label="Groups"><div class="family-members-group-badges"><span class="family-members-group-chip-list">${groupLabels.length ? groupLabels.map(group => `<span class="family-members-group-chip${group.archived ? ' is-archived' : ''}">${esc(group.name)}${group.archived ? ' (Archived)' : ''}</span>`).join('') : '<span class="family-members-help">Ungrouped</span>'}</span>
+                        <button type="button" class="family-members-edit-groups" data-family-edit-groups aria-expanded="${groupsOpen}" aria-controls="familyMemberGroupEditor" aria-haspopup="dialog" aria-label="Edit groups for ${esc(member.name)}" title="Edit groups for ${esc(member.name)}"${disabled}>+</button></div></td>
                     <td data-mobile-label="Default portion">${esc(member.default_portion ?? 1)}</td>
                     <td data-mobile-label="Status"><span class="family-members-badge${member.archived ? ' is-archived' : ''}">${member.archived ? 'Archived' : 'Active'}</span></td>
                     <td data-mobile-label="Used in meal plans">${Number(member.meal_count) || 0} scheduled ${(Number(member.meal_count) || 0) === 1 ? 'meal' : 'meals'}</td>
@@ -143,8 +202,6 @@
                             <label>Last name (optional)<input type="text" maxlength="100" value="${esc(values.last_name)}" data-family-profile="last_name" data-family-focus="${esc(member.id)}:last_name"${disabled}></label>
                             <label>Default portion<input type="number" min="0" step="any" required value="${esc(values.default_portion)}" data-family-profile="default_portion" data-family-focus="${esc(member.id)}:default_portion"${disabled}></label>
                         </div>
-                        <fieldset id="familyMemberGroups${index}" class="family-members-group-picker" tabindex="-1"><legend>Groups for ${esc(member.name)}</legend><div>${this.groupChoices(values.group_ids, `data-family-member-group data-family-member="${esc(member.id)}"`, busy)}</div>
-                            <p class="family-members-help">Select one or more groups, or uncheck all to leave this person ungrouped. Click Save to keep your changes.</p></fieldset>
                         <p class="family-members-help">Default portions apply when starting a new meal plan. Existing scheduled portions stay unchanged.</p>
                     </td></tr>`;
             }).join('');
@@ -156,6 +213,7 @@
             this.page.querySelector('[data-family-create]').querySelectorAll('input, button').forEach(node => { node.disabled = this.loading || this.creating; });
             this.page.querySelector('[data-family-rows]').setAttribute('aria-busy', String(this.loading));
             this.renderExtras();
+            this.syncGroupEditor();
             this.restoreFocus(focused);
         }
 
@@ -399,8 +457,7 @@
             const member = this.members.find(item => item.id === row.dataset.familyMemberId);
             if (!member) return;
             this.drafts.set(member.id, target.value);
-            row.querySelector('[data-family-save]').disabled = !this.dirty(member) || !clean(target.value);
-            row.querySelector('[data-family-cancel]').hidden = !this.dirty(member);
+            this.syncMemberActions(member);
         }
 
         syncMemberActions(member) {
@@ -408,6 +465,7 @@
             if (!row) return;
             row.querySelector('[data-family-save]').disabled = !this.dirty(member) || !clean(this.drafts.get(member.id) ?? member.name);
             row.querySelector('[data-family-cancel]').hidden = !this.dirty(member);
+            row.classList.toggle('is-dirty', this.dirty(member));
         }
 
         change(event) {
@@ -419,10 +477,10 @@
             if (target.matches('[data-family-bulk-group]')) this.bulkGroups = toggle(this.bulkGroups);
             if (target.matches('[data-family-member-group]')) {
                 const member = this.members.find(item => item.id === target.dataset.familyMember);
-                if (!member) return;
+                if (!member || this.loading || this.pending.has(member.id)) return;
                 const values = this.memberProfile(member);
                 this.profiles.set(member.id, {...values, group_ids:toggle(values.group_ids)});
-                this.syncMemberActions(member);
+                this.render();
             }
         }
 
@@ -441,6 +499,13 @@
         click(event) {
             const button = event.target.closest('button');
             if (!button || button.disabled) return;
+            if (button.matches('[data-family-close-groups]')) return this.closeGroupEditor();
+            if (button.matches('[data-family-manage-groups]')) {
+                this.closeGroupEditor(false);
+                this.page.querySelector('[data-family-groups-section]').open = true;
+                this.page.querySelector('[data-family-group-create]').querySelector('input').focus();
+                return;
+            }
             if (button.matches('[data-family-add]')) return this.openCreate(true);
             if (button.matches('[data-family-cancel-create]')) return this.openCreate(false);
             if (button.matches('[data-family-refresh]')) return this.load();
@@ -472,13 +537,7 @@
             const member = row && this.members.find(item => item.id === row.dataset.familyMemberId);
             if (!member) return;
             if (button.matches('[data-family-edit-groups]')) {
-                this.expanded.add(member.id);
-                this.render();
-                const detail = [...this.page.querySelectorAll('[data-family-detail-id]')].find(node => node.dataset.familyDetailId === member.id);
-                const picker = detail?.querySelector('.family-members-group-picker');
-                picker?.scrollIntoView({block:'nearest'});
-                (picker?.querySelector('input:not(:disabled)') || picker)?.focus({preventScroll:true});
-                return;
+                return this.openGroupEditor(member);
             }
             if (button.matches('[data-family-details]')) {
                 this.expanded[this.expanded.has(member.id) ? 'delete' : 'add'](member.id);
@@ -501,6 +560,23 @@
         }
 
         keydown(event) {
+            if (this.groupEditorMemberId && event.key === 'Escape') {
+                event.preventDefault(); event.stopPropagation(); this.closeGroupEditor(); return;
+            }
+            if (this.groupEditorMemberId && event.key === 'Tab' && this.groupEditor?.contains(event.target)) {
+                const controls = [...this.groupEditor.querySelectorAll('button:not(:disabled), input:not(:disabled)')];
+                if ((event.shiftKey && event.target === controls[0]) || (!event.shiftKey && event.target === controls.at(-1))) {
+                    event.preventDefault();
+                    const id = this.groupEditorMemberId;
+                    this.closeGroupEditor(event.shiftKey);
+                    if (!event.shiftKey) {
+                        const row = this.memberRow(id);
+                        const save = row?.querySelector('[data-family-save]');
+                        (save && !save.disabled ? save : row?.querySelector('[data-family-details]'))?.focus({preventScroll:true});
+                    }
+                    return;
+                }
+            }
             if (event.target.matches('[data-family-group-name]')) {
                 const id = event.target.closest('[data-family-group-id]').dataset.familyGroupId;
                 const group = this.groups.find(item => item.id === id);

@@ -1,7 +1,10 @@
 .family-members-page { min-width: 0; color: var(--app-text); }
 .family-members-page [hidden] { display: none !important; }
+.family-members-page .master-data-header > :first-child { flex: 1 1 auto; }
+.family-members-page .master-data-header h1 { padding: 0; text-align: left; color: var(--app-text-strong); }
+.family-members-page .master-data-header p { color: var(--app-muted); font-weight: 500; }
 .family-members-summary, .family-members-header-actions, .family-members-toolbar, .family-members-row-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
-.family-members-summary { color: var(--app-muted); font-size: 12px; gap: 16px; margin-top: 10px; }
+.family-members-summary { color: var(--app-muted); font-size: 11px; gap: 6px 12px; margin-top: 8px; }
 .family-members-summary strong { color: var(--app-text-strong); }
 .family-members-header-actions { justify-content: flex-end; }
 .family-members-page button, .family-members-link { display: inline-flex; align-items: center; justify-content: center; gap: 7px; width: auto; margin: 0; padding: 9px 13px; min-height: 36px; border: 1px solid var(--app-border-strong); border-radius: 7px; background: var(--app-surface-soft); color: var(--app-text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: none; box-shadow: none; }
@@ -24,8 +27,8 @@
 .family-members-create .family-members-error { flex-basis: 100%; }
 .family-members-page .family-members-table-wrap { border-color: var(--app-border); background: var(--app-surface); }
 .family-members-page .family-members-table { min-width: 0; table-layout: auto; }
-.family-members-page .family-members-table th { background: var(--app-surface-soft); color: var(--app-muted); }
-.family-members-page .family-members-table th, .family-members-page .family-members-table td { padding: 16px; border-color: var(--app-border); color: var(--app-text); vertical-align: middle; }
+.family-members-page .family-members-table th, .family-members-page .family-members-table td { padding: 10px 12px; border-color: var(--app-border); color: var(--app-text); vertical-align: middle; font-size: 12px; }
+.family-members-page .family-members-table th { background: var(--app-surface-soft); color: var(--app-muted); font-size: 11px; font-weight: 700; }
 .family-members-page .family-members-table th:nth-child(1) { width: 25%; }
 .family-members-page .family-members-table th:nth-child(2) { width: 19%; }
 .family-members-page .family-members-table th:nth-child(3) { width: 10%; }
@@ -33,17 +36,43 @@
 .family-members-page .family-members-table th:nth-child(5) { width: 13%; }
 .family-members-page .family-members-table th:nth-child(6) { width: 23%; }
 .family-members-table .family-members-name { max-width: 460px; }
-.family-members-badge { display: inline-flex; max-width: 100%; box-sizing: border-box; overflow-wrap: anywhere; border: 1px solid var(--app-primary); color: var(--app-primary); padding: 4px 9px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+.family-members-page .family-members-table input[data-family-name] { min-height: 34px; padding: 6px 7px; border-color: transparent; border-radius: 5px; background: transparent; color: var(--app-text-strong); font-size: 13px; font-weight: 650; box-shadow: none; }
+.family-members-page .family-members-table input[data-family-name]:hover:not(:disabled) { border-color: var(--app-border); }
+.family-members-page .family-members-table input[data-family-name]:focus { border-color: var(--app-primary); }
+.family-members-page .family-members-table input[data-family-name][aria-invalid="true"] { border-color: var(--app-danger, #f28f92); }
+.family-members-page .family-members-table tr:is(.is-dirty, .is-group-editing) > td { background: color-mix(in srgb, var(--app-primary) 6%, var(--app-surface)); }
+.family-members-page .family-members-table tr.is-group-editing > td:first-child { box-shadow: inset 3px 0 var(--app-primary); }
+.family-members-badge { display: inline-flex; max-width: 100%; box-sizing: border-box; overflow-wrap: anywhere; border: 1px solid var(--app-border); color: var(--app-primary); padding: 3px 7px; border-radius: 5px; font-size: 11px; font-weight: 600; line-height: 1.3; }
 .family-members-badge.is-archived { border-color: var(--app-border-strong); color: var(--app-muted); }
-.family-members-row-actions { gap: 7px; }
-.family-members-status, .family-members-empty { margin: 0 0 16px; padding: 14px 16px; background: var(--app-surface); border: 1px solid var(--app-border); border-radius: 8px; }
+.family-members-row-actions { gap: 6px; }
+.family-members-page .family-members-table .family-members-row-actions button { min-height: 32px; padding: 5px 7px; border-color: transparent; border-radius: 5px; background: transparent; color: var(--app-muted); font-size: 11px; }
+.family-members-page .family-members-table .family-members-row-actions button:is(:hover, :focus-visible):not(:disabled) { border-color: var(--app-border); color: var(--app-text-strong); }
+.family-members-page .family-members-table [data-family-save]:not(:disabled) { color: var(--app-primary); }
+.family-members-status { margin: 0 0 10px; padding: 0; border: 0; background: transparent; color: var(--app-muted); font-size: 12px; line-height: 1.5; }
+.family-members-empty { margin: 0 0 16px; padding: 14px 16px; background: var(--app-surface); border: 1px solid var(--app-border); border-radius: 8px; }
 .family-members-error, .family-members-status.is-error { color: var(--app-danger, #f28f92); }
 .family-members-error { margin: 7px 0 0; font-size: 13px; }
 .family-members-help { color: var(--app-muted); font-size: 13px; margin: 16px 0 0; }
 .family-members-profile-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: 14px; }
-.family-members-group-badges { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; }
+.family-members-group-badges { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-width: 0; overflow: visible; }
 .family-members-group-badges .family-members-help { margin: 0; }
-.family-members-page button.family-members-edit-groups { padding: 4px 6px; border: 0; background: transparent; color: var(--app-primary); text-decoration: underline; text-underline-offset: 3px; }
+.family-members-group-chip-list { display: contents; }
+.family-members-group-chip { flex: 0 1 auto; min-width: 0; max-width: 100%; box-sizing: border-box; padding: 3px 6px; border: 1px solid var(--app-border); border-radius: 5px; background: var(--app-surface); color: var(--app-text); font-size: 11px; font-weight: 650; line-height: 1.3; overflow-wrap: anywhere; }
+.family-members-group-chip.is-archived { color: var(--app-muted); }
+.family-members-page button.family-members-edit-groups { box-sizing: border-box; flex: 0 0 32px; width: 32px; min-width: 32px; max-width: 32px; height: 32px; min-height: 32px; max-height: 32px; padding: 0; border: 1px solid transparent; border-radius: 5px; background: transparent; color: var(--app-muted); font-size: 15px; font-weight: 600; line-height: 1; text-decoration: none; }
+.family-members-page button.family-members-edit-groups:is(:hover, :focus-visible, [aria-expanded="true"]):not(:disabled) { border-color: var(--app-border); color: var(--app-primary); }
+.family-members-page .family-members-group-popover { display: grid; position: fixed; inset: auto; z-index: 100; box-sizing: border-box; width: min(360px, calc(100vw - 24px)); max-width: none; max-height: calc(100dvh - 24px); margin: 0; padding: 14px; gap: 10px; border: 1px solid var(--app-border); border-radius: 10px; background: var(--app-surface); color: var(--app-text); box-shadow: 0 10px 30px #0005; overflow: auto; overscroll-behavior: contain; }
+.family-members-group-popover > header { display: block; padding: 0; border: 0; background: transparent; }
+.family-members-page .family-members-group-popover h2 { margin: 0; padding: 0; color: var(--app-text-strong); text-align: left; font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; }
+.family-members-group-popover .family-members-help { margin: 5px 0 0; font-size: 11px; line-height: 1.5; }
+.family-members-group-popover [data-family-group-editor-choices] { display: grid; gap: 2px; min-width: 0; }
+.family-members-page .family-members-group-popover .family-members-check { padding: 7px 8px; border-radius: 5px; overflow-wrap: anywhere; }
+.family-members-group-popover .family-members-check:is(:hover, :focus-within) { background: var(--app-surface-soft); }
+.family-members-page .family-members-group-popover .family-members-check input { flex: 0 0 17px; }
+.family-members-group-popover > footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin: 0; padding: 4px 0 0; border: 0; background: transparent; }
+.family-members-page .family-members-group-popover > footer button { min-height: 30px; padding: 5px 9px; font-size: 11px; }
+.family-members-group-popover:focus-visible { outline: 2px solid var(--app-primary); outline-offset: 2px; }
+html[data-app-resolved-theme="light"] .family-members-group-popover { box-shadow: 0 8px 24px color-mix(in srgb, var(--app-text-strong) 10%, transparent); }
 .family-members-group-picker { min-width: 0; margin: 0; padding: 10px 0 0; border: 0; }
 .family-members-group-picker:focus-visible { outline: 2px solid var(--app-primary); outline-offset: 3px; }
 .family-members-group-picker legend { padding: 0; font-size: 12px; font-weight: 600; color: var(--app-muted); }
@@ -80,4 +109,10 @@
     .family-members-table .family-members-detail-row td::before { display: none; }
     .family-members-table .family-members-name { max-width: none; }
     .family-members-filters label:first-child { flex: 1 1 200px; }
+}
+@media (max-width: 760px) {
+    .family-members-page .family-members-table input[data-family-name] { min-height: 44px; font-size: 16px; }
+    .family-members-page .family-members-table .family-members-row-actions button, .family-members-page .family-members-group-popover > footer button { min-height: 44px; }
+    .family-members-page button.family-members-edit-groups { flex-basis: 44px; width: 44px; min-width: 44px; max-width: 44px; height: 44px; min-height: 44px; max-height: 44px; color: var(--app-primary); font-size: 20px; }
+    .family-members-page .family-members-group-popover .family-members-check { min-height: 44px; box-sizing: border-box; }
 }
