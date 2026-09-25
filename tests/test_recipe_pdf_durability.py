@@ -158,6 +158,137 @@ def test_concurrent_pdf_generation_uses_unique_temporary_files(monkeypatch, tmp_
     assert not list(destination.parent.glob(".*.pdf"))
 
 
+@pytest.mark.parametrize("preserve_source_styles", [False, True])
+def test_pdf_document_preparation_runs_before_print_and_preserves_style_mode(monkeypatch, tmp_path, preserve_source_styles):
+    _output_folder, _pdf_folder, temp_folder = configure_pdf_paths(monkeypatch, tmp_path)
+    events = []
+
+    class Driver:
+        page_source = "<html><body>Papa Potato a la Huancaina yellow potatoes</body></html>"
+        title = "Papa Potato a la Huancaina"
+        current_url = ""
+
+        def set_page_load_timeout(self, _timeout):
+            pass
+
+        def get(self, target):
+            self.current_url = target
+            events.append("navigate")
+            source = next(temp_folder.glob("*.html")).read_text(encoding="utf-8")
+            assert ("shopping-app-pdf-print-fix" in source) is not preserve_source_styles
+            assert "keep-me" in source
+
+        def quit(self):
+            events.append("quit")
+
+    driver = Driver()
+    monkeypatch.setattr(recipe_extract_service, "create_headless_chrome_driver", lambda **_kwargs: driver)
+
+    def prepare_document(actual):
+        assert actual is driver
+        events.append("render shared card")
+
+    def prepare_print(actual, **kwargs):
+        assert actual is driver
+        assert events[-1] == "render shared card"
+        assert kwargs == ({"preserve_source_styles": True} if preserve_source_styles else {})
+        events.append("apply print media")
+
+    def print_pdf(actual, path):
+        assert actual is driver
+        assert events[-1] == "apply print media"
+        events.append("print")
+        Path(path).write_bytes(valid_recipe_pdf_bytes())
+
+    monkeypatch.setattr(recipe_extract_service, "prepare_page_for_pdf_print", prepare_print)
+    monkeypatch.setattr(recipe_extract_service, "print_current_browser_page_to_pdf", print_pdf)
+    destination = tmp_path / "pdf" / "prepared.pdf"
+    result = recipe_extract_service.write_recipe_page_pdf(
+        PISCO_URL, '<html><head><style>.keep-me {color: red}</style></head><body>Recipe</body></html>',
+        None, destination, expected_recipe=EXPECTED_RECIPE, prepare_document=prepare_document,
+        preserve_source_styles=preserve_source_styles,
+    )
+    assert result == destination
+    assert events == ["navigate", "render shared card", "apply print media", "print", "quit"]
+    assert destination.read_bytes() == valid_recipe_pdf_bytes()
+    assert not list(temp_folder.glob("*.html"))
+
+
+def test_failed_document_preparation_aborts_export_and_keeps_previous_pdf(monkeypatch, tmp_path):
+    _output_folder, _pdf_folder, temp_folder = configure_pdf_paths(monkeypatch, tmp_path)
+    events = []
+
+    class Driver:
+        page_source = "<html><body>Papa Potato a la Huancaina yellow potatoes</body></html>"
+        title = "Papa Potato a la Huancaina"
+        current_url = ""
+
+        def set_page_load_timeout(self, _timeout):
+            pass
+
+        def get(self, target):
+            self.current_url = target
+
+        def quit(self):
+            events.append("quit")
+
+    def fail_prepare(_driver):
+        raise RuntimeError("shared renderer failed")
+
+    monkeypatch.setattr(recipe_extract_service, "create_headless_chrome_driver", lambda **_kwargs: Driver())
+    monkeypatch.setattr(recipe_extract_service, "prepare_page_for_pdf_print", lambda *_args, **_kwargs: pytest.fail("Must not prepare failed markup"))
+    monkeypatch.setattr(recipe_extract_service, "print_current_browser_page_to_pdf", lambda *_args, **_kwargs: pytest.fail("Must not print failed markup"))
+    destination = tmp_path / "pdf" / "existing.pdf"
+    destination.write_bytes(valid_recipe_pdf_bytes())
+    with pytest.raises(RuntimeError, match="shared renderer failed"):
+        recipe_extract_service.write_recipe_page_pdf(
+            PISCO_URL, "<html><body>Empty shell</body></html>", None, destination,
+            prepare_document=fail_prepare, preserve_source_styles=True,
+        )
+    assert destination.read_bytes() == valid_recipe_pdf_bytes()
+    assert events == ["quit"]
+    assert not list(temp_folder.glob("*.html"))
+    assert not list(destination.parent.glob(".*.pdf"))
+
+
+def test_preserving_source_styles_still_sanitizes_executable_client_markup(monkeypatch, tmp_path):
+    configure_pdf_paths(monkeypatch, tmp_path)
+    source = recipe_extract_service.write_pdf_source_html(
+        PISCO_URL,
+        '<html><head><style>.recipe-preview-card {font-size: 14px}</style><script>untrusted()</script></head>'
+        '<body onload="untrusted()"><img src="missing.png" onerror="untrusted()"><p>Recipe</p></body></html>',
+        preserve_source_styles=True,
+    )
+    try:
+        html = source.read_text(encoding="utf-8")
+        assert ".recipe-preview-card {font-size: 14px}" in html
+        assert "shopping-app-pdf-print-fix" not in html
+        assert "<script" not in html
+        assert "onload" not in html
+        assert "onerror" not in html
+        assert "<p>Recipe</p>" in html
+    finally:
+        recipe_extract_service.remove_temporary_pdf_source(source)
+
+
+def test_preserving_source_styles_skips_webpage_rescue_scripts(monkeypatch):
+    events = []
+
+    class Driver:
+        def execute_cdp_cmd(self, command, arguments):
+            events.append((command, arguments))
+
+        def execute_script(self, *_args):
+            pytest.fail("App print markup must not receive generic rescue scripts")
+
+    driver = Driver()
+    monkeypatch.setattr(recipe_extract_service, "wait_for_browser_document", lambda actual, **_kwargs: events.append("document ready") if actual is driver else pytest.fail("Wrong driver"))
+    monkeypatch.setattr(recipe_extract_service, "wait_for_pdf_page_stability", lambda actual: events.append("stable") if actual is driver else pytest.fail("Wrong driver"))
+    monkeypatch.setattr(recipe_extract_service, "promote_lazy_assets_in_browser", lambda *_args: pytest.fail("Must not apply webpage asset mutations"))
+    recipe_extract_service.prepare_page_for_pdf_print(driver, preserve_source_styles=True)
+    assert events == ["document ready", ("Emulation.setEmulatedMedia", {"media": "print"}), "stable"]
+
+
 def test_large_chrome_err_file_not_found_page_is_rejected_and_cleaned(monkeypatch, tmp_path):
     _output_folder, _pdf_folder, temp_folder = configure_pdf_paths(monkeypatch, tmp_path)
     print_calls = []

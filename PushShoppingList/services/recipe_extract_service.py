@@ -5437,8 +5437,15 @@ def ensure_browser_page_is_printable(driver, target=""):
     )
 
 
-def prepare_page_for_pdf_print(driver):
+def prepare_page_for_pdf_print(driver, *, preserve_source_styles=False):
     wait_for_browser_document(driver, timeout_seconds=20)
+
+    if preserve_source_styles:
+        # App-owned print documents already define their layout. The webpage
+        # rescue stylesheet and position resets would change the live Print UI.
+        driver.execute_cdp_cmd("Emulation.setEmulatedMedia", {"media": "print"})
+        wait_for_pdf_page_stability(driver)
+        return
 
     try:
         driver.execute_cdp_cmd("Emulation.setEmulatedMedia", {"media": "screen"})
@@ -5609,11 +5616,11 @@ def wait_for_pdf_page_stability(driver, timeout_seconds=25):
         print(f"PDF render wait skipped after timeout/error: {exc}")
 
 
-def write_pdf_source_html(recipe_url, html_text):
+def write_pdf_source_html(recipe_url, html_text, *, preserve_source_styles=False):
     base_tag = f'<base href="{html.escape(str(recipe_url or ""), quote=True)}">'
-    print_fix_tag = f'<style id="shopping-app-pdf-print-fix">{PDF_PRINT_FIX_CSS}</style>'
+    print_fix_tag = "" if preserve_source_styles else f'<style id="shopping-app-pdf-print-fix">{PDF_PRINT_FIX_CSS}</style>'
     source_html = sanitize_html_for_pdf_source(html_text)
-    head_inserts = "\n".join([base_tag, print_fix_tag])
+    head_inserts = "\n".join(value for value in (base_tag, print_fix_tag) if value)
 
     if not re.search(r"<base\b", source_html, flags=re.IGNORECASE):
         if re.search(r"<head[^>]*>", source_html, flags=re.IGNORECASE):
@@ -5626,7 +5633,7 @@ def write_pdf_source_html(recipe_url, html_text):
             )
         else:
             source_html = f"{head_inserts}\n{source_html}"
-    elif "shopping-app-pdf-print-fix" not in source_html:
+    elif print_fix_tag and "shopping-app-pdf-print-fix" not in source_html:
         if re.search(r"<head[^>]*>", source_html, flags=re.IGNORECASE):
             source_html = re.sub(
                 r"(<head[^>]*>)",
@@ -6556,7 +6563,15 @@ def write_recipe_page_pdf(
     expected_title="",
     require_recipe_evidence=None,
     print_options=None,
+    prepare_document=None,
+    preserve_source_styles=False,
 ):
+    """Print a page, optionally preparing trusted app-owned content after load.
+
+    ``prepare_document`` is an internal callable supplied by the renderer, never
+    a script or HTML accepted from the export request. External webpage callers
+    keep the existing sanitization and layout-recovery behavior by default.
+    """
     driver = None
     last_error = None
     source_path = None
@@ -6577,7 +6592,10 @@ def write_recipe_page_pdf(
         print_targets = []
 
         if html_text:
-            source_path = write_pdf_source_html(recipe_url, html_text)
+            source_path = (
+                write_pdf_source_html(recipe_url, html_text, preserve_source_styles=True)
+                if preserve_source_styles else write_pdf_source_html(recipe_url, html_text)
+            )
             print_targets.append(source_path.resolve().as_uri())
         elif str(recipe_url or "").lower().startswith(("http://", "https://")):
             print_targets.append(recipe_url)
@@ -6600,7 +6618,12 @@ def write_recipe_page_pdf(
                     ) from exc
 
                 ensure_browser_page_is_printable(driver, target)
-                prepare_page_for_pdf_print(driver)
+                if prepare_document is not None:
+                    prepare_document(driver)
+                if preserve_source_styles:
+                    prepare_page_for_pdf_print(driver, preserve_source_styles=True)
+                else:
+                    prepare_page_for_pdf_print(driver)
                 ensure_browser_page_is_printable(driver, target)
                 if print_options is None:
                     print_current_browser_page_to_pdf(driver, staging_pdf_path)

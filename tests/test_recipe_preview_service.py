@@ -2,10 +2,14 @@
 
 from base64 import b64decode
 from copy import deepcopy
+import json
 from pathlib import Path
 import re
+import shutil
+import subprocess
 from xml.etree import ElementTree
 
+from bs4 import BeautifulSoup
 from flask import Flask
 import pytest
 
@@ -14,6 +18,61 @@ from PushShoppingList.services import recipe_preview_service as preview
 
 
 URL = "https://example.test/preview-fixture"
+STATIC = Path(__file__).resolve().parents[1] / "PushShoppingList" / "static"
+
+
+def shared_preview_card(view):
+    """Exercise the shipped template without starting or automating a browser."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required to exercise the shared recipe renderer")
+    script = """
+        const fs = require('fs');
+        const vm = require('vm');
+        vm.runInThisContext(fs.readFileSync(process.argv[1], 'utf8'));
+        const model = JSON.parse(fs.readFileSync(0, 'utf8'));
+        process.stdout.write(recipePreviewCardHtml(model));
+    """
+    rendered = subprocess.run(
+        [node, "-e", script, str(STATIC / "js" / "recipe-preview-renderer.js")],
+        input=json.dumps(view), text=True, encoding="utf-8", capture_output=True, check=True,
+    ).stdout
+    return BeautifulSoup(rendered, "html.parser")
+
+
+def selected_ingredients(card):
+    return card.select(
+        ".recipe-preview-ingredients > ul > .recipe-task-row, "
+        '.recipe-preview-choice-option[data-selected="true"] .recipe-task-row'
+    )
+
+
+def capture_pdf_export(monkeypatch, payload):
+    """Capture the trusted renderer invocation through the public PDF API."""
+    captured = {}
+
+    class Driver:
+        def execute_script(self, source, *arguments):
+            captured["script"] = source
+            captured["arguments"] = arguments
+            return True
+
+        def execute_async_script(self, source):
+            captured["asset_wait"] = source
+            return True
+
+        def set_script_timeout(self, timeout):
+            captured["script_timeout"] = timeout
+
+    def render(url, html, _source, path, **kwargs):
+        captured.update(url=url, html=html, path=path, **kwargs)
+        kwargs["prepare_document"](Driver())
+        path.write_bytes(b"%PDF-1.4 test attachment")
+        return path
+
+    monkeypatch.setattr(preview.recipe_extract_service, "write_recipe_page_pdf", render)
+    captured["content"], captured["title"] = preview.create_recipe_preview_pdf(payload)
+    return captured
 
 
 @pytest.fixture
@@ -43,6 +102,8 @@ def recipe(monkeypatch):
     monkeypatch.setattr(preview.recipe_edit_service, "save_recipe_output", lambda *_a, **_k: pytest.fail("Preview must not save"))
     monkeypatch.setattr(preview.cuisine_category_service, "cuisine_category_registry_payload",
                         preview.cuisine_category_service.default_cuisine_category_registry_payload)
+    monkeypatch.setattr(preview.ingredient_type_service, "ingredient_type_registry_payload",
+                        preview.ingredient_type_service.default_ingredient_type_registry_payload)
     return value
 
 
@@ -89,10 +150,10 @@ def test_buy_as_label_omits_blank_and_matching_names_without_replacing_ingredien
     assert row["buy_as_label"] == expected
     assert row["quantity"] == "4"
     assert response["recipe"]["ingredient_groups"][0]["items"][0]["buy_as_label"] == expected
-    html = preview.build_recipe_preview_pdf_html(response["recipe"], resolved, response["options"])
-    assert ("(Buy as:" in html) == bool(expected)
+    first = selected_ingredients(shared_preview_card(response["recipe"]))[0]
+    assert bool(first.select_one(".recipe-preview-buy-as")) == bool(expected)
     if expected:
-        assert f"egg (Buy as: {expected})" in html
+        assert first.select_one(".recipe-preview-buy-as").get_text() == f"(Buy as: {expected})"
     assert recipe == original
 
 
@@ -104,10 +165,11 @@ def test_buy_as_labels_follow_selected_bundle_and_escape_pdf_text(recipe):
     group = response["recipe"]["ingredient_groups"][1]
     assert group["items"][0]["buy_as_label"] == 'butter <special> & cream'
     assert group["options"][1]["items"][0]["buy_as_label"] == 'salted butter'
-    html = preview.build_recipe_preview_pdf_html(response["recipe"], resolved, response["options"])
-    assert '(Buy as: butter &lt;special&gt; &amp; cream)' in html
-    assert '<special>' not in html
-    assert '(Buy as: salted butter)' not in html
+    card = shared_preview_card(response["recipe"])
+    selected_rows = selected_ingredients(card)
+    assert selected_rows[1].select_one(".recipe-preview-buy-as").get_text() == '(Buy as: butter <special> & cream)'
+    assert not card.find("special")
+    assert all('(Buy as: salted butter)' not in row.get_text() for row in selected_rows)
     selected = preview.build_recipe_preview({"url": URL, "ingredient_option_selections": {"butter-choice": "simple"}})
     assert selected["recipe"]["ingredients"][1]["buy_as_label"] == 'salted butter'
     assert recipe == original
@@ -124,14 +186,15 @@ def test_equipment_draft_and_pdf_honor_edits_and_explicit_removal(recipe, equipm
         "url": URL, "recipe": {"equipment": equipment}, "options": {"show_image": False},
     })
     assert [row["name"] for row in response["recipe"]["equipment"]] == expected
-    html = preview.build_recipe_preview_pdf_html(response["recipe"], resolved, response["options"])
-    assert html.index("<h2>Ingredients</h2>") < html.index("<h2>Equipment</h2>") < html.index("<h2>Instructions</h2>")
-    assert "Saved mixing bowl" not in html
+    card = shared_preview_card(response["recipe"])
+    assert [heading.get_text() for heading in card.select(".recipe-preview-columns h2")] == ["Ingredients", "Equipment", "Instructions"]
+    section = card.select_one(".recipe-preview-equipment")
+    assert "Saved mixing bowl" not in section.get_text()
     if expected:
-        assert "9-inch pan &lt;oven safe&gt;" in html
-        assert "<oven safe>" not in html
+        assert section.select_one(".recipe-task-text").get_text() == "9-inch pan <oven safe>"
+        assert not section.find("oven")
     else:
-        assert "No equipment specified." in html
+        assert "No equipment specified." in section.get_text()
     assert recipe == original
 
 
@@ -147,10 +210,9 @@ def test_preview_assignment_uses_draft_without_scaling_price_or_restoring_cleare
     view = response["recipe"]
     assert (view["cookbook_name"], view["menu_section"], view["menu_price"]) == (
         "Weeknight & weekend", "Sides", expected)
-    html = preview.build_recipe_preview_pdf_html(view, resolved, response["options"])
-    assert "Cookbook: Weeknight &amp; weekend" in html
-    assert "Section: Sides" in html
-    assert f'Menu Price (optional): {expected or "Not set"}' in html
+    card = shared_preview_card(view)
+    assignment = {row.dt.get_text(): row.dd.get_text() for row in card.select(".recipe-preview-assignment > div")}
+    assert assignment == {"Cookbook": "Weeknight & weekend", "Section": "Sides", "Menu Price (optional)": expected or "Not set"}
     assert recipe == original
 
 
@@ -200,11 +262,13 @@ def test_preview_retains_original_corn_requirement_as_heading_not_duplicate_ingr
     if selected == "bundle":
         assert not group["items"][1].get("quantity")
         assert group["items"][2]["notes"] == "chopped"
-    html = preview.build_recipe_preview_pdf_html(view, resolved, response["options"])
-    assert html.count(f"<h3>{source}</h3>") == 1
-    assert f"<td>{source}</td>" not in html
-    assert ("cumin" in html) == (selected == "bundle")
-    assert ("frozen</td>" in html) == (selected == "simple")
+    card = shared_preview_card(view)
+    assert [node.get_text() for node in card.select(".recipe-preview-choice-title")] == [source]
+    selected_rows = selected_ingredients(card)
+    selected_text = " ".join(row.get_text() for row in selected_rows)
+    assert source not in selected_text
+    assert ("cumin" in selected_text) == (selected == "bundle")
+    assert ("frozen" in selected_text) == (selected == "simple")
     assert recipe == original
 
 
@@ -301,7 +365,7 @@ def test_nutrition_basis_controls_scaling_without_inventing_data(recipe, basis, 
     assert {row["key"]: row["value"] for row in result["nutrition"]}["calories"] == calories
     assert {row["key"]: row["value"] for row in result["nutrition"]}["sugar"] == "0"
     assert ("Total for 12 servings" if mode == "whole_recipe" else "Per serving · Makes 12 servings") == result["nutrition_context"]
-    assert calories in preview.build_recipe_preview_pdf_html(result, resolved, response["options"])
+    assert calories in shared_preview_card(result).select_one(".recipe-preview-print-nutrition").get_text()
     assert recipe == original
     del recipe["nutrition"]["serving_basis"]
     unknown = preview.build_recipe_preview({"url": URL})["recipe"]
@@ -354,12 +418,12 @@ def test_nutrition_groups_keep_zero_unknowns_and_missing_macros_distinct(recipe)
     assert grouped["Carbohydrate details"][0]["value"] == "0"
     assert {row["label"] for row in grouped["Vitamins & minerals"]} == {"Sodium", "Vitamin C"}
     assert grouped["Other nutrients"][0]["value"] == "8 mg"
-    html = preview.build_recipe_preview_pdf_html(response["recipe"], resolved, response["options"])
-    assert "Not provided" in html
-    assert "Fats &amp; cholesterol" in html
-    assert "Vitamin C" in html
-    assert "Custom nutrient" in html
-    assert "Nutrition is not recalculated for ingredient choices." in html
+    card = shared_preview_card(response["recipe"])
+    assert "Not provided" in card.select_one(".recipe-preview-nutrient-grid").get_text()
+    assert "Fats & cholesterol" in card.get_text()
+    assert "Vitamin C" in card.select_one(".recipe-preview-print-nutrition").get_text()
+    assert "Custom nutrient" in card.select_one(".recipe-preview-print-nutrition").get_text()
+    assert "Nutrition is not recalculated for ingredient choices." in card.get_text()
 
 
 @pytest.mark.parametrize("scale", [0, -1, "invalid", float("inf"), 1001])
@@ -369,62 +433,58 @@ def test_invalid_scale_is_rejected(recipe, scale):
 
 
 def test_pdf_visibility_text_size_and_escaping_preserve_projection(recipe, monkeypatch):
-    monkeypatch.setattr(preview.recipe_extract_service, "format_video_recipe_title_image_for_pdf", lambda _recipe: '<figure class="title-image"><img src="data:image/png;base64,AA"></figure>')
-    response, resolved = preview.prepare_recipe_preview({
+    captured = capture_pdf_export(monkeypatch, {
         "url": URL, "recipe": {"recipe_title": "<script>unsafe</script>"},
         "options": {"scale": 2, "show_image": False, "show_nutrition": False, "text_size": "larger"},
     })
-    html = preview.build_recipe_preview_pdf_html(response["recipe"], resolved, response["options"])
-    assert "<script>unsafe</script>" not in html
-    assert "&lt;script&gt;unsafe&lt;/script&gt;" in html
-    assert '<figure class="title-image">' not in html
-    assert "<h2>Nutrition" not in html
-    assert "font: 13pt/1.5" in html
-    assert "<h3>source butter</h3>" in html
-    assert "<td>source butter</td>" not in html
-    assert "whisked" in html
-    assert "room temperature" in html
-    assert "unsalted butter" in html
-    assert response["recipe"]["nutrition"]
-    response["options"].update(show_image=True, show_nutrition=True)
-    visible = preview.build_recipe_preview_pdf_html(response["recipe"], resolved, response["options"])
-    assert '<figure class="title-image">' in visible
-    assert "Nutrition <small>Per serving" in visible
-    assert "200 kcal" in visible
+    model, options = captured["arguments"]
+    assert options["text_size"] == "larger"
+    assert options["show_image"] is options["show_nutrition"] is False
+    card = shared_preview_card(model)
+    assert not card.find("script")
+    assert card.h1.get_text() == "<script>unsafe</script>"
+    assert card.select_one(".recipe-preview-choice-title").get_text() == "source butter"
+    selected_text = " ".join(row.get_text() for row in selected_ingredients(card))
+    assert all(value in selected_text for value in ("whisked", "room temperature", "unsalted butter"))
+    assert model["nutrition"]
+    assert "200 kcal" in card.select_one(".recipe-preview-print-nutrition").get_text()
 
 
 @pytest.mark.parametrize("enabled", [True, False])
-def test_print_bundle_info_controls_export_without_changing_projection(recipe, enabled):
+def test_print_bundle_info_controls_export_without_changing_projection(recipe, monkeypatch, enabled):
     response, resolved = preview.prepare_recipe_preview({
         "url": URL, "options": {"show_image": False, "print_bundle_info": enabled},
     })
     assert response["options"]["print_bundle_info"] is enabled
     assert "unsalted butter" in [row["ingredient"] for row in resolved["ingredients"]]
     assert response["recipe"]["ingredient_groups"][1]["items"]
-    html = preview.build_recipe_preview_pdf_html(response["recipe"], resolved, response["options"])
-    assert "<h3>source butter</h3>" in html
-    assert "room temperature" in html
-    assert ("unsalted butter" in html) is enabled
-    assert ("Selected bundle below" in html) is enabled
+    captured = capture_pdf_export(monkeypatch, {"url": URL, "options": response["options"]})
+    model, options = captured["arguments"]
+    assert options["print_bundle_info"] is enabled
+    card = shared_preview_card(model)
+    assert card.select_one(".recipe-preview-choice-title").get_text() == "source butter"
+    assert "room temperature" in card.get_text()
+    assert "unsalted butter" in card.select_one('.recipe-preview-choice-option[data-selected="true"]').get_text()
 
 
 def test_print_metadata_uses_saved_and_draft_categories(recipe):
     response, resolved = preview.prepare_recipe_preview({"url": URL, "options": {"show_image": False}})
     view = response["recipe"]
     assert (view["course"], view["cuisine"], view["author"]) == ("Side Dish", "American", "Test cook")
-    html = preview.build_recipe_preview_pdf_html(view, resolved, response["options"])
-    assert 'Course</span><span class="metadata-value">Side Dish' in html
-    assert 'Cuisine</span><span class="metadata-value"><span class="cuisine-item">' in html
-    assert 'American</span>' in html
-    assert 'Author</span><span class="metadata-value">Test cook' in html
-    assert html.index('class="metrics"') < html.index('class="recipe-metadata"') < html.index('class="preparation"')
+    card = shared_preview_card(view)
+    assert card.select_one('[data-field="course"] .recipe-preview-metadata-value').get_text() == "Side Dish"
+    assert card.select_one('[data-field="cuisine"] .recipe-preview-cuisine').get_text() == "American"
+    assert card.select_one('[data-field="author"] .recipe-preview-metadata-value').get_text() == "Test cook"
+    children = [node.get("class") for node in card.find_all(recursive=False)]
+    assert children.index(["recipe-preview-metrics"]) < children.index(["recipe-preview-print-metadata"]) < children.index(["recipe-preview-columns"])
     response, resolved = preview.prepare_recipe_preview({"url": URL, "recipe": {
         "course": ["Side <Dish>", "Lunch"], "cuisine": "French & Italian", "author": [{"name": "A & B"}],
     }, "options": {"show_image": False}})
-    html = preview.build_recipe_preview_pdf_html(response["recipe"], resolved, response["options"])
-    assert 'Course</span><span class="metadata-value">Side &lt;Dish&gt;, Lunch' in html
-    assert 'Cuisine</span><span class="metadata-value"><span class="cuisine-item">French &amp; Italian</span>' in html
-    assert 'Author</span><span class="metadata-value">A &amp; B' in html
+    card = shared_preview_card(response["recipe"])
+    assert card.select_one('[data-field="course"] .recipe-preview-metadata-value').get_text() == "Side <Dish>, Lunch"
+    assert card.select_one('[data-field="cuisine"] .recipe-preview-cuisine').get_text() == "French & Italian"
+    assert card.select_one('[data-field="author"] .recipe-preview-metadata-value').get_text() == "A & B"
+    assert not card.find("dish")
 
 
 def test_print_metadata_omits_missing_values(recipe):
@@ -432,7 +492,7 @@ def test_print_metadata_omits_missing_values(recipe):
         recipe.pop(key)
     response, resolved = preview.prepare_recipe_preview({"url": URL, "options": {"show_image": False}})
     assert not any(response["recipe"][key] for key in ("course", "cuisine", "author"))
-    assert 'class="recipe-metadata"' not in preview.build_recipe_preview_pdf_html(response["recipe"], resolved, response["options"])
+    assert not shared_preview_card(response["recipe"]).select_one(".recipe-preview-print-metadata")
 
 
 def test_print_metadata_includes_all_draft_classifications(recipe):
@@ -447,15 +507,16 @@ def test_print_metadata_includes_all_draft_classifications(recipe):
     assert view["cuisine"] == "American, French"
     assert view["dietary_preferences"] == "Dairy Free"
     assert view["custom_tags"] == "Comfort Food, Casserole, Vegetarian Side, Easy & <quick>"
-    html = preview.build_recipe_preview_pdf_html(view, resolved, response["options"])
+    card = shared_preview_card(view)
     for expected in ("Course: Dinner", "Dietary Preferences: Dairy Free",
                      "Main Ingredient: Vegetarian", "Cooking Method: Oven Baked", "Occasion: Family Dinner",
-                     "Custom Tags: Comfort Food, Casserole, Vegetarian Side, Easy &amp; &lt;quick&gt;", "Prep Time Group: Under 1 hour"):
+                     "Custom Tags: Comfort Food, Casserole, Vegetarian Side, Easy & <quick>", "Prep Time Group: Under 1 hour"):
         label, value = expected.split(": ", 1)
-        assert f'{label}</span><span class="metadata-value">{value}</span>' in html
+        row = next(row for row in card.select(".recipe-preview-metadata-field") if row.select_one(".recipe-preview-metadata-label").get_text() == label)
+        assert row.select_one(".recipe-preview-metadata-value").get_text() == value
     assert [item["label"] for item in view["cuisine_items"]] == ["American", "French"]
-    assert 'American</span>, <span class="cuisine-item">' in html
-    assert 'French</span>' in html
+    assert [node.get_text() for node in card.select('[data-field="cuisine"] .recipe-preview-cuisine')] == ["American", "French"]
+    assert not card.find("quick")
 
 
 def test_cuisine_flags_use_bundled_svg_in_projection_and_pdf(recipe):
@@ -469,8 +530,10 @@ def test_cuisine_flags_use_bundled_svg_in_projection_and_pdf(recipe):
     assert svg.tag == "{http://www.w3.org/2000/svg}svg"
     assert svg.get("viewBox") == "0 0 640 480"
     assert len(svg) > 0
-    html = preview.build_recipe_preview_pdf_html(response["recipe"], resolved, response["options"])
-    assert f'<img class="cuisine-flag" src="{item["image_url"]}" alt=""> American' in html
+    card = shared_preview_card(response["recipe"])
+    image = card.select_one('[data-field="cuisine"] .recipe-preview-cuisine img')
+    assert image["src"] == item["image_url"]
+    assert image["alt"] == ""
 
 
 @pytest.mark.parametrize("code", ["US", "GB", "PE"])
@@ -504,10 +567,12 @@ def test_cuisine_icons_honor_workspace_overrides_aliases_and_explicit_clear(reci
     assert custom["label"] == "House & <special>"
     assert custom["icon"] == "flag:ca" and custom["image_url"]
     assert fusion["glyph"] == "\U0001f30d" and not fusion["image_url"]
-    html = preview.build_recipe_preview_pdf_html(response["recipe"], resolved, response["options"])
-    assert 'class="cuisine-item">American</span>' in html
-    assert "House &amp; &lt;special&gt;" in html
-    assert "House & <special>" not in html
+    card = shared_preview_card(response["recipe"])
+    cuisine_nodes = card.select('[data-field="cuisine"] .recipe-preview-cuisine')
+    assert cuisine_nodes[0].get_text() == "American"
+    assert not cuisine_nodes[0].find("img")
+    assert cuisine_nodes[1].get_text() == "House & <special>"
+    assert not card.find("special")
 
 
 def test_cuisine_icons_support_legacy_labels_without_guessing_unknown_regions(recipe):
@@ -531,19 +596,24 @@ def test_print_classifications_support_category_fallback_and_explicit_clear(reci
 
 
 @pytest.mark.parametrize("options, included", [({}, False), ({"print_notes": False}, False), ({"print_notes": True}, True)])
-def test_print_notes_only_exports_saved_notes(recipe, options, included):
+def test_print_notes_only_exports_saved_notes(recipe, monkeypatch, options, included):
     recipe["recipe_notes"] = [{"heading": "Tips <saved>", "items": ["Chill & cover before baking."]}]
     response, resolved = preview.prepare_recipe_preview({"url": URL, "recipe": {
         "recipe_notes": [{"heading": "Draft", "items": ["Unsaved draft note."]}],
     }, "options": {"show_image": False, **options}})
     assert response["recipe"]["recipe_notes"][0]["heading"] == "Draft"
-    html = preview.build_recipe_preview_pdf_html(response["recipe"], resolved, response["options"])
-    assert ('<section class="recipe-notes">' in html) is included
-    assert ("Chill &amp; cover before baking." in html) is included
-    assert ("Tips &lt;saved&gt;" in html) is included
-    assert "Unsaved draft note." not in html
-    if included:
-        assert html.index('<section class="nutrition">') < html.index('<section class="recipe-notes">')
+    captured = capture_pdf_export(monkeypatch, {"url": URL, "recipe": {
+        "recipe_notes": [{"heading": "Draft", "items": ["Unsaved draft note."]}],
+    }, "options": response["options"]})
+    model, print_options = captured["arguments"]
+    assert print_options["print_notes"] is included
+    card = shared_preview_card(model)
+    notes = card.select_one(".recipe-preview-print-notes")
+    assert notes.h3.get_text() == "Tips <saved>"
+    assert notes.li.get_text() == "Chill & cover before baking."
+    assert "Unsaved draft note." not in notes.get_text()
+    assert not notes.find("saved")
+    assert card.select_one(".recipe-preview-nutrition").find_next("section", class_="recipe-preview-print-notes") is notes
 
 
 def test_save_notes_route_preserves_recipe_and_checks_conflicts(recipe, monkeypatch):
@@ -577,20 +647,104 @@ def test_save_notes_route_preserves_recipe_and_checks_conflicts(recipe, monkeypa
 
 
 def test_pdf_export_is_ephemeral_and_does_not_update_persisted_archive(recipe, monkeypatch):
-    seen = {}
-    def render(url, html, _source, path, **kwargs):
-        seen.update(path=path, html=html, expected=kwargs["expected_recipe"], print_options=kwargs["print_options"])
-        path.write_bytes(b"%PDF-1.4 test attachment")
-        return path
-    monkeypatch.setattr(preview.recipe_extract_service, "write_recipe_page_pdf", render)
-    content, title = preview.create_recipe_preview_pdf({"url": URL, "options": {"scale": 2}})
-    assert content.read().startswith(b"%PDF-")
-    assert title == "Preview fixture"
+    seen = capture_pdf_export(monkeypatch, {"url": URL, "options": {"scale": 2}})
+    assert seen["content"].read().startswith(b"%PDF-")
+    assert seen["title"] == "Preview fixture"
     assert not Path(seen["path"]).exists()
-    assert [row["quantity"] for row in seen["expected"]["ingredients"]] == ["4", "1/2", None]
+    assert [row["quantity"] for row in seen["expected_recipe"]["ingredients"]] == ["4", "1/2", None]
     assert "generated_pdf_path" not in recipe
     assert seen["print_options"]["paperHeight"] == 11
     assert seen["print_options"]["scale"] == 1
+    assert seen["print_options"]["preferCSSPageSize"] is True
+    assert seen["print_options"]["displayHeaderFooter"] is False
+    assert all(seen["print_options"][f"margin{edge}"] == 0 for edge in ("Top", "Bottom", "Left", "Right"))
+    assert seen["preserve_source_styles"] is True
+    assert seen["asset_wait"]
+
+
+def test_pdf_shell_embeds_live_styles_with_no_duplicate_recipe_template(recipe):
+    response, resolved = preview.prepare_recipe_preview({"url": URL})
+    shell = BeautifulSoup(preview.build_recipe_preview_pdf_html(response["recipe"], resolved, response["options"]), "html.parser")
+    styles = shell.select("style[data-preview-stylesheet]")
+    assert [style["data-preview-stylesheet"] for style in styles] == ["app.css", "ingredient-choices.css", "recipe-preview.css"]
+    for style in styles:
+        assert style.string == (STATIC / "css" / style["data-preview-stylesheet"]).read_text(encoding="utf-8")
+    assert shell.select_one("body.recipe-preview-active #appContent #recipePreviewPage .recipe-preview-card")
+    assert not shell.select_one(".recipe-preview-card").contents
+    assert not shell.find("script")
+    assert not shell.body.find("style")
+    assert "default-src 'none'" in shell.find("meta", attrs={"http-equiv": "Content-Security-Policy"})["content"]
+
+
+def test_pdf_executes_only_repository_renderer_with_authoritative_projection(recipe, monkeypatch):
+    payload = {"url": URL, "recipe": {"recipe_title": "Draft <title>", "instructions": [{"instruction": "Serve carefully."}]},
+               "options": {"scale": 3, "text_size": "smaller"},
+               "html": '<script>client_injection()</script>', "renderer_source": "client_injection()",
+               "model": {"title": "Client forged projection", "ingredients": []}}
+    original = deepcopy(payload)
+    captured = capture_pdf_export(monkeypatch, payload)
+    model, options = captured["arguments"]
+    assert captured["script"].startswith((STATIC / "js" / "recipe-preview-renderer.js").read_text(encoding="utf-8"))
+    assert "client_injection" not in captured["script"]
+    assert "client_injection" not in captured["html"]
+    assert model["title"] == "Draft <title>"
+    assert [row["quantity"] for row in model["ingredients"]] == ["6", "3/4", None]
+    assert model["instructions"][0]["instruction"] == "Serve carefully."
+    assert options["text_size"] == "smaller"
+    assert not BeautifulSoup(captured["html"], "html.parser").find("script")
+    assert BeautifulSoup(captured["html"], "html.parser").title.get_text() == "Draft <title>"
+    assert payload == original
+
+
+def test_pdf_embeds_saved_cover_and_ignores_client_cover_path(recipe, monkeypatch):
+    recipe["cover_image"] = {"path": "saved-cover.png", "url": "https://example.test/saved-cover.png"}
+    covers = []
+    def embed(cover):
+        covers.append(deepcopy(cover))
+        return "data:image/png;base64,c2F2ZWQ="
+    monkeypatch.setattr(preview.recipe_extract_service, "recipe_pdf_cover_image_src", embed)
+    captured = capture_pdf_export(monkeypatch, {"url": URL, "recipe": {
+        "cover_image": {"path": "C:/private.txt", "url": "file:///C:/private.txt"},
+    }})
+    assert covers == [{"path": "saved-cover.png", "mime_type": None}]
+    model, _options = captured["arguments"]
+    assert model["image_url"] == "data:image/png;base64,c2F2ZWQ="
+    assert shared_preview_card(model).select_one("[data-preview-image] img")["src"] == model["image_url"]
+
+
+def test_pdf_preserves_live_remote_cover_precedence(recipe, monkeypatch):
+    recipe["cover_image"] = {"url": "https://example.test/live.png", "src": "https://example.test/other.png"}
+    monkeypatch.setattr(preview.recipe_extract_service, "recipe_pdf_cover_image_src",
+                        lambda _cover: pytest.fail("URL covers must keep the live preview URL"))
+    captured = capture_pdf_export(monkeypatch, {"url": URL})
+    model, _options = captured["arguments"]
+    assert model["image_url"] == "https://example.test/live.png"
+
+
+def test_pdf_missing_saved_cover_does_not_switch_to_remote_fallback(recipe, monkeypatch):
+    recipe["cover_image"] = {"path": "missing.png", "url": "https://example.test/other.png"}
+    monkeypatch.setattr(preview.recipe_extract_service, "recipe_pdf_cover_image_src", lambda _cover: "")
+    model, _options = capture_pdf_export(monkeypatch, {"url": URL})["arguments"]
+    assert model["image_url"] == ""
+    assert not shared_preview_card(model).select_one("[data-preview-image] img")
+
+
+def test_projection_resolves_workspace_ingredient_type_names_for_all_bundles(recipe, monkeypatch):
+    monkeypatch.setattr(preview.ingredient_type_service, "ingredient_type_registry_payload", lambda: {"types": [
+        {"id": "garnish", "value": "garnish", "name": "Finishing <touch>", "seeded": True},
+        {"id": "house-spice", "value": "house-spice", "name": "House Spice", "seeded": False},
+    ]})
+    recipe["ingredients"][0]["section"] = "Finishing <touch>"
+    recipe["ingredients"][1]["substitutions"][0]["ingredient_type"] = "house-spice"
+    recipe["ingredients"][1]["substitutions"][2]["optional"] = True
+    view = preview.build_recipe_preview({"url": URL})["recipe"]
+    assert (view["ingredients"][0]["ingredient_type_key"], view["ingredients"][0]["ingredient_type_label"]) == ("garnish", "Finishing <touch>")
+    assert (view["ingredients"][1]["ingredient_type_key"], view["ingredients"][1]["ingredient_type_label"]) == ("house spice", "House Spice")
+    assert view["ingredient_groups"][1]["options"][1]["items"][0]["ingredient_type_key"] == "optional"
+    card = shared_preview_card(view)
+    assert card.select_one('[data-preview-ingredient-type="garnish"] .recipe-preview-ingredient-type').get_text() == "Finishing <touch>"
+    assert card.select_one('[data-preview-ingredient-type="house spice"] .recipe-preview-ingredient-type').get_text() == "House Spice"
+    assert not card.find("touch")
 
 
 def test_routes_return_projection_and_pdf_and_validation_errors(recipe, monkeypatch):
@@ -609,4 +763,21 @@ def test_routes_return_projection_and_pdf_and_validation_errors(recipe, monkeypa
     assert exported.status_code == 200
     assert exported.mimetype == "application/pdf"
     assert "attachment" in exported.headers["Content-Disposition"]
+    assert 'filename="Preview fixture - AI Pantry.pdf"' in exported.headers["Content-Disposition"]
     assert exported.data.startswith(b"%PDF-")
+
+
+def test_pdf_route_preserves_recipe_name_spaces_and_removes_filename_path_characters(recipe, monkeypatch):
+    app = Flask(__name__)
+    app.register_blueprint(recipe_bp)
+    def render(_url, _html, _source, path, **_kwargs):
+        path.write_bytes(b"%PDF-1.4 route attachment")
+    monkeypatch.setattr(preview.recipe_extract_service, "write_recipe_page_pdf", render)
+    exported = app.test_client().post("/api/recipe_preview/pdf", json={
+        "url": URL, "recipe": {"recipe_title": 'Sweet / Corn: Bake? <Family> "Favorite"'},
+    })
+    assert exported.status_code == 200
+    filename = exported.headers["Content-Disposition"]
+    assert "Sweet" in filename and "Corn" in filename and "Family" in filename
+    assert " - AI Pantry.pdf" in filename
+    assert not any(char in filename.split("filename=", 1)[1].strip('"') for char in '/\\:*?<>|')

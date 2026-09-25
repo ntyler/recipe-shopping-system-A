@@ -246,6 +246,8 @@ def inject_private_recipe_url_builders():
         "recipe_archive_pdf_url": recipe_archive_pdf_url,
         "recipe_cover_image_url": recipe_cover_image_url,
         "restaurant_source_logo_url": restaurant_source_logo_url,
+        "recipe_preview_js_version": static_asset_version("js/recipe-preview.js"),
+        "recipe_preview_renderer_js_version": static_asset_version("js/recipe-preview-renderer.js"),
     }
 
 
@@ -4740,9 +4742,10 @@ def api_recipe_preview_pdf_route():
             "ok": False,
             "error": "The recipe PDF could not be generated. Try Print to save a PDF from your browser.",
         }), 503
+    filename_title = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "", str(title or "")).strip(" .") or "Recipe"
     return send_file(
         content, mimetype="application/pdf", as_attachment=True,
-        download_name=f"{secure_filename(title) or 'recipe'}-preview.pdf", max_age=0,
+        download_name=f"{filename_title} - AI Pantry.pdf", max_age=0,
     )
 
 

@@ -18,6 +18,7 @@ from tempfile import TemporaryDirectory
 from xml.etree import ElementTree
 
 from PushShoppingList.services import cuisine_category_service
+from PushShoppingList.services import ingredient_type_service
 from PushShoppingList.services import recipe_edit_service
 from PushShoppingList.services import recipe_extract_service
 from PushShoppingList.services.ingredient_option_service import (
@@ -84,9 +85,26 @@ def preview_buy_as_name(item):
     return buy_as
 
 
-def preview_option_items(recipe, requirement_id, option, scale):
+def preview_ingredient_type(item, registry):
+    """Project the workspace type label once for both live and PDF rendering."""
+    value = text(item.get("section") or item.get("ingredient_type")
+                 or item.get("ingredientType") or item.get("type"))
+    optional = item.get("optional") is True or text(item.get("optional")).lower() in {"1", "true", "yes", "on"}
+    value = value or ("optional" if optional else "main")
+    key = ingredient_type_service.type_key(value)
+    definition = next((entry for entry in registry.get("types", [])
+                       if any(ingredient_type_service.type_key(entry.get(field)) == key
+                              for field in ("id", "value", "name"))), None)
+    if definition and definition.get("seeded"):
+        key = ingredient_type_service.type_key(definition.get("value") or definition.get("id"))
+    return key, text(definition.get("name")) if definition else value
+
+
+def preview_option_items(recipe, requirement_id, option, scale, type_registry=None):
     """Scale one bundle for display without borrowing its source requirement's amount."""
     rows = []
+    if type_registry is None:
+        type_registry = ingredient_type_service.ingredient_type_registry_payload()
     for component_index, component in enumerate(option["items"]):
         item = deepcopy(component)
         item["quantity"] = scale_quantity(recipe_base_ingredient_quantity(component, recipe), scale)
@@ -97,11 +115,12 @@ def preview_option_items(recipe, requirement_id, option, scale):
         item["option_id"] = option["id"]
         item["component_index"] = component_index
         item["buy_as_label"] = preview_buy_as_name(item)
+        item["ingredient_type_key"], item["ingredient_type_label"] = preview_ingredient_type(item, type_registry)
         rows.append(item)
     return rows
 
 
-def resolve_preview_recipe(recipe, scale, selections=None):
+def resolve_preview_recipe(recipe, scale, selections=None, type_registry=None):
     """Return resolved/scaled recipe data and the actual selection map, without writes."""
     requirements = ingredient_requirements(recipe)
     requested = normalize_selection_map(selections)
@@ -126,7 +145,7 @@ def resolve_preview_recipe(recipe, scale, selections=None):
     for requirement in requirements:
         option_id = resolution["selected_options"][requirement["id"]]
         option = next(item for item in requirement["options"] if item["id"] == option_id)
-        rows.extend(preview_option_items(recipe, requirement["id"], option, scale))
+        rows.extend(preview_option_items(recipe, requirement["id"], option, scale, type_registry))
     resolved = deepcopy(recipe)
     resolved["ingredients"] = rows
     resolved["servings"] = scale_servings(recipe_base_servings(recipe), scale)
@@ -135,7 +154,7 @@ def resolve_preview_recipe(recipe, scale, selections=None):
     return resolved, resolution["selected_options"]
 
 
-def preview_ingredient_groups(recipe, rows, selected, scale):
+def preview_ingredient_groups(recipe, rows, selected, scale, type_registry=None):
     """Keep authored requirement headings separate from the purchasable bundle."""
     by_requirement = {}
     for row in rows:
@@ -146,7 +165,7 @@ def preview_ingredient_groups(recipe, rows, selected, scale):
              "selected_option_id": selected[requirement["id"]],
              "options": [{"id": option["id"], "label": option["label"],
                           "is_default": option["id"] == requirement["default_option_id"],
-                          "items": preview_option_items(recipe, requirement["id"], option, scale)}
+                          "items": preview_option_items(recipe, requirement["id"], option, scale, type_registry)}
                          for option in requirement["options"]],
              "items": by_requirement.get(requirement["id"], [])}
             for requirement in ingredient_requirements(recipe)]
@@ -305,16 +324,6 @@ def preview_cuisine_items(value):
     return items
 
 
-def preview_cuisine_html(items):
-    result = []
-    for item in items:
-        image_url, glyph = text(item.get("image_url")), text(item.get("glyph"))
-        icon = (f'<img class="cuisine-flag" src="{escape(image_url, quote=True)}" alt=""> '
-                if image_url else f'{escape(glyph)} ' if glyph else "")
-        result.append(f'<span class="cuisine-item">{icon}{escape(text(item.get("label")))}</span>')
-    return ", ".join(result)
-
-
 def preview_instruction_rows(draft, saved):
     """Retain step metadata by identity, never by its old list position."""
     existing = recipe_edit_service.normalize_instruction_records(saved)
@@ -367,7 +376,8 @@ def prepare_recipe_preview(payload):
         if "instructions" in draft:
             recipe["instructions"] = preview_instruction_rows(draft["instructions"], saved.get("instructions", []))
     options = preview_options(payload.get("options"), recipe)
-    resolved, selected = resolve_preview_recipe(recipe, options["scale"], payload.get("ingredient_option_selections"))
+    type_registry = ingredient_type_service.ingredient_type_registry_payload()
+    resolved, selected = resolve_preview_recipe(recipe, options["scale"], payload.get("ingredient_option_selections"), type_registry)
     nutrition, basis, nutrition_mode, nutrition_modes, nutrition_notice = preview_nutrition(recipe, options["scale"], options["nutrition_mode"])
     cover = saved.get("cover_image") if isinstance(saved.get("cover_image"), dict) else {}
     image_url = recipe_cover_image_url(url) if cover.get("path") else text(cover.get("url") or cover.get("src"))
@@ -417,7 +427,7 @@ def prepare_recipe_preview(payload):
         "ingredients": [{**row, "ingredient": text(row.get("ingredient")),
                          "preparation": text(row.get("preparation")), "notes": text(row.get("notes"))}
                         for row in resolved["ingredients"]],
-        "ingredient_groups": preview_ingredient_groups(recipe, resolved["ingredients"], selected, options["scale"]),
+        "ingredient_groups": preview_ingredient_groups(recipe, resolved["ingredients"], selected, options["scale"], type_registry),
         "equipment": [{"id": text(row.get("equipment_row_id") or row.get("row_id") or row.get("id")) or str(index),
                        "name": row["equipment"]}
                       for index, row in enumerate(recipe_edit_service.normalize_equipment_records(recipe.get("equipment", [])), start=1)],
@@ -446,118 +456,90 @@ def build_recipe_preview(payload):
 
 
 def build_recipe_preview_pdf_html(view, resolved, options):
-    """Render the same projected amounts with existing ingredient/step formatters."""
-    title = escape(view["title"])
-    image = recipe_extract_service.format_video_recipe_title_image_for_pdf(resolved) if options["show_image"] else ""
-    description = f'<p class="description">{escape(view["description"])}</p>' if view["description"] else ""
-    attribution = escape(view["source_url"])
-    cuisine_html = preview_cuisine_html(view.get("cuisine_items", [])) or escape(view.get("cuisine", ""))
-    metadata = "".join(f'<div class="metadata-field" data-field="{key}"><span class="metadata-label">{label}</span><span class="metadata-value">{cuisine_html if key == "cuisine" else escape(view[key])}</span></div>'
-                       for key, label in (("course", "Course"), ("cuisine", "Cuisine"), ("dietary_preferences", "Dietary Preferences"),
-                                          ("main_ingredient", "Main Ingredient"), ("cooking_method", "Cooking Method"), ("occasion", "Occasion"),
-                                          ("custom_tags", "Custom Tags"), ("prep_time_group", "Prep Time Group"), ("author", "Author")) if view.get(key))
-    metadata = f'<div class="recipe-metadata">{metadata}</div>' if metadata else ""
-    assignment = " · ".join(f'{label}: {escape(view.get(key) or fallback)}' for key, label, fallback in (
-        ("cookbook_name", "Cookbook", "Unassigned"), ("menu_section", "Section", "Not specified"),
-        ("menu_price", "Menu Price (optional)", "Not set")))
-    metrics = "".join(f'<div><small>{label}</small><strong>{escape(text(view.get(key))) or "Not specified"}</strong></div>'
-                      for key, label in (("prep_time", "Prep Time"), ("cook_time", "Cook Time"),
-                                         ("total_time", "Total Time"), ("servings", "Servings")))
-    def ingredient_table(items):
-        print_ingredients = deepcopy(items)
-        for row in print_ingredients:
-            buy_as = preview_buy_as_name(row)
-            if buy_as:
-                row["ingredient"] = f'{text(row.get("ingredient"))} (Buy as: {buy_as})'
-            row["preparation"] = "; ".join(dict.fromkeys(
-                value for value in (text(row.get("preparation")), text(row.get("notes"))) if value
-            ))
-        return recipe_extract_service.format_video_recipe_ingredients_for_pdf(print_ingredients)
-
-    ingredient_blocks, standard = [], []
-    for group in view["ingredient_groups"]:
-        if not group["is_choice"]:
-            standard.extend(group["items"])
-            continue
-        if standard:
-            ingredient_blocks.append(ingredient_table(standard))
-            standard = []
-        if options.get("print_bundle_info", True):
-            ingredient_blocks.append('<div class="choice-heading"><small>Original recipe requirement · Selected bundle below</small>'
-                                     f'<h3>{escape(group["source_text"])}</h3></div>' + ingredient_table(group["items"]))
-        else:
-            ingredient_blocks.append(f'<div class="choice-heading"><h3>{escape(group["source_text"])}</h3></div>')
-    if standard:
-        ingredient_blocks.append(ingredient_table(standard))
-    ingredients = "".join(ingredient_blocks)
-    equipment = recipe_extract_service.format_video_recipe_equipment_for_pdf(view.get("equipment", [])) or '<p class="source">No equipment specified.</p>'
-    instructions = recipe_extract_service.format_video_recipe_instructions_for_pdf(resolved["instructions"])
-    notes = ""
-    if options.get("print_notes") and view.get("saved_recipe_notes"):
-        sections = "".join((f'<h3>{escape(section["heading"])}</h3>' if section.get("heading") else "") +
-                           '<ul>' + "".join(f'<li>{escape(item)}</li>' for item in section["items"]) + '</ul>'
-                           for section in view["saved_recipe_notes"])
-        notes = f'<section class="recipe-notes"><h2>Recipe Notes</h2>{sections}</section>'
-    nutrition = ""
-    if options["show_nutrition"]:
-        summary = view["nutrition_summary"]
-        rows = "".join(f'<div><span>{escape(row["label"])}</span><strong>{escape(row["value"] or "Not provided")}</strong></div>' for row in summary["primary"])
-        groups = "".join(f'<div class="nutrient-group"><h3>{escape(group["label"])}</h3><dl>' +
-                         "".join(f'<div><dt>{escape(row["label"])}</dt><dd>{escape(row["value"])}</dd></div>' for row in group["rows"]) + '</dl></div>' for group in summary["groups"])
-        nutrition = (f'<section class="nutrition"><h2>Nutrition <small>{escape(view["nutrition_basis"])}</small></h2>'
-                     f'<p class="source">{escape(view["nutrition_context"])}</p>'
-                     + (f'<p class="source">{escape(view["nutrition_notice"])}</p>' if view["nutrition_notice"] else '') +
-                     f'<div class="nutrients">{rows}</div><div class="nutrient-details">{groups}</div><p class="source">{escape(summary["note"])}</p></section>'
-                     if view["nutrition"] else '<section><h2>Nutrition</h2><p>Nutrition information is not available.</p></section>')
-    size = {"smaller": "10pt", "normal": "11.5pt", "larger": "13pt"}[options["text_size"]]
-    return f'''<!doctype html><html lang="en"><head><meta charset="utf-8"><title>{title}</title>
+    """Create only the app Print shell; the trusted shared renderer owns its card."""
+    static = Path(__file__).resolve().parents[1] / "static"
+    styles = "\n".join(
+        f'<style data-preview-stylesheet="{name}">{(static / "css" / name).read_text(encoding="utf-8")}</style>'
+        for name in ("app.css", "ingredient-choices.css", "recipe-preview.css")
+    )
+    return f'''<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: https: http:; style-src 'unsafe-inline'">
-<style>
-@page {{ margin: 14mm; }}
-* {{ box-sizing: border-box; }}
-body {{ font: {size}/1.5 Arial,sans-serif; color: #18252a; background: white; margin: 0; overflow-wrap: anywhere; }}
-h1 {{ font-size: 2em; line-height: 1.15; margin: 0 0 8px; }} h2 {{ font-size: 1.25em; margin: 0 0 14px; break-after: avoid; }}
-h3 {{ font-size: 1em; break-after: avoid; }} p {{ margin: 8px 0; }}
-header {{ min-height: 132px; }} .source {{ color: #52636a; font-size: .8em; }}
-.title-image {{ float: right; margin: 0 0 14px 20px; }} .title-image img {{ width: 140px; height: 140px; object-fit: cover; border-radius: 8px; }}
-.metrics {{ clear: both; display: flex; gap: 12px; border-block: 1px solid #ccd6d3; padding: 12px 0; margin: 18px 0; break-inside: avoid; }}
-.metrics div {{ flex: 1; }} .metrics small,.metrics strong {{ display: block; }} small {{ font-size: .8em; color: #52636a; font-weight: normal; }}
-.recipe-metadata {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2.5mm 5mm; clear: both; margin: -2mm 0 4mm; padding-bottom: 3mm; border-bottom: 1px solid #ddd; font-size: .9em; break-inside: avoid; }}
-.metadata-field {{ min-width: 0; overflow-wrap: anywhere; }} .metadata-field[data-field="custom_tags"] {{ grid-column: span 2; }} .metadata-field[data-field="author"] {{ grid-column: 1 / -1; }}
-.metadata-label {{ display: block; margin-bottom: .6mm; color: #555; font-size: .8em; font-weight: 600; line-height: 1.2; }} .metadata-value {{ display: block; color: #333; line-height: 1.3; }}
-.cuisine-item {{ display: inline-block; }} .cuisine-flag {{ width: 1.33em; height: 1em; object-fit: contain; vertical-align: -.12em; }}
-.ingredients {{ margin-bottom: 22px; }} table {{ width: 100%; border-collapse: collapse; }} thead {{ display: table-header-group; }}
-.preparation {{ display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 24px; }}
-.preparation > section {{ min-width: 0; }} .equipment-list {{ padding-left: 20px; margin-top: 0; }} .equipment-list li {{ margin-bottom: 6px; }}
-.choice-heading {{ margin: 16px 0 8px; break-after: avoid; break-inside: avoid; }} .choice-heading h3 {{ margin: 4px 0; }}
-th,td {{ text-align: left; border-bottom: 1px solid #e3e8e6; padding: 7px; vertical-align: top; }} th {{ font-size: .8em; }}
-tr,li,.title-image {{ break-inside: avoid; }} li {{ padding-left: 6px; margin-bottom: 14px; white-space: pre-line; }} li::marker {{ color: #087958; font-weight: bold; }}
-.step-meta {{ font-size: .8em; color: #52636a; }} ol {{ padding-left: 24px; }}
-.nutrition {{ border-top: 1px solid #ccd6d3; margin-top: 24px; padding-top: 16px; }} .nutrition h2 small {{ margin-left: 8px; }}
-.recipe-notes {{ border-top: 1px solid #ccd6d3; margin-top: 24px; padding-top: 16px; }}
-.nutrients {{ display: flex; flex-wrap: wrap; gap: 12px 24px; }} .nutrients div {{ min-width: 105px; break-inside: avoid; }} .nutrients span,.nutrients strong {{ display: block; }} .nutrients span {{ font-size: .8em; }}
-.nutrient-details {{ display: flex; flex-wrap: wrap; gap: 18px; margin-top: 18px; }} .nutrient-group {{ flex: 1 1 170px; break-inside: avoid; }} .nutrient-group h3 {{ margin-bottom: 8px; }} .nutrient-group dl {{ margin: 0; }} .nutrient-group dl div {{ display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-bottom: 1px solid #e3e8e6; }} .nutrient-group dd {{ margin: 0; white-space: nowrap; }}
-</style></head><body><header>{image}<h1>{title}</h1><div class="source">{attribution}</div>{description}<p class="source">{assignment}</p></header>
-<div class="metrics">{metrics}</div>{metadata}<div class="preparation"><section class="ingredients"><h2>Ingredients</h2>{ingredients}</section>
-<section class="equipment"><h2>Equipment</h2>{equipment}</section></div>
-<section class="instructions"><h2>Instructions</h2>{instructions}</section>{nutrition}{notes}</body></html>'''
+<title>{escape(view["title"])}</title>{styles}</head>
+<body class="app-shell-body recipe-preview-active"><div class="app-shell" data-app-layout>
+<div class="app-main-shell" data-app-main-shell><main id="appContent" class="app-content" data-app-content>
+<section id="recipePreviewPage" class="recipe-preview-page"><article class="recipe-preview-card"></article></section>
+</main></div></div></body></html>'''
+
+
+def prepare_recipe_preview_pdf_document(driver, view, options, renderer_source):
+    """Render server-projected data with a repository-owned script, never client HTML."""
+    driver.execute_script(
+        renderer_source + """
+        const model = arguments[0], options = arguments[1];
+        const page = document.getElementById('recipePreviewPage');
+        page.querySelector('.recipe-preview-card').innerHTML = recipePreviewCardHtml(model);
+        recipePreviewApplyPrintOptions(page, options, model);
+        page.querySelectorAll('details[data-preview-choice]').forEach(details => { details.open = true; });
+        page.querySelectorAll('img').forEach(image => {
+            image.loading = 'eager';
+            image.addEventListener('error', () => { image.hidden = true; }, {once: true});
+            if (image.complete && !image.naturalWidth) image.hidden = true;
+        });
+        """,
+        view, options,
+    )
+    driver.set_script_timeout(20)
+    result = driver.execute_async_script(
+        """
+        const done = arguments[arguments.length - 1];
+        const images = Array.from(document.images);
+        const ready = Promise.all([
+            document.fonts ? document.fonts.ready : Promise.resolve(),
+            ...images.map(image => image.complete ? Promise.resolve() : new Promise(resolve => {
+                image.addEventListener('load', resolve, {once: true});
+                image.addEventListener('error', resolve, {once: true});
+            }))
+        ]);
+        Promise.race([ready, new Promise(resolve => setTimeout(resolve, 10000))]).then(() => {
+            images.forEach(image => {
+                if (!image.complete || !image.naturalWidth) image.hidden = true;
+            });
+            done({ready: true});
+        }).catch(error => done({error: String(error)}));
+        """
+    )
+    if isinstance(result, dict) and result.get("error"):
+        raise RuntimeError(f"Recipe preview assets could not be prepared: {result['error']}")
 
 
 def create_recipe_preview_pdf(payload):
     response, resolved = prepare_recipe_preview(payload)
-    view = response["recipe"]
-    html = build_recipe_preview_pdf_html(view, resolved, response["options"])
+    view = deepcopy(response["recipe"])
+    # Keep the live projection's URL preference. A saved local cover uses an
+    # authenticated route there, so embed only that same file for this renderer.
+    # A missing saved file also has no fallback in the live cover-image route.
+    cover = resolved.get("cover_image", {})
+    if cover.get("path"):
+        view["image_url"] = recipe_extract_service.recipe_pdf_cover_image_src({
+            "path": cover["path"], "mime_type": cover.get("mime_type"),
+        })
+    options = response["options"]
+    html = build_recipe_preview_pdf_html(view, resolved, options)
+    renderer_source = (Path(__file__).resolve().parents[1] / "static/js/recipe-preview-renderer.js").read_text(encoding="utf-8")
     with TemporaryDirectory(prefix="ai-pantry-preview-") as directory:
         path = Path(directory) / "recipe-preview.pdf"
         recipe_extract_service.write_recipe_page_pdf(
             text(payload.get("original_url") or payload.get("url")), html, None, path,
             expected_recipe=resolved, expected_title=view["title"],
+            prepare_document=lambda driver: prepare_recipe_preview_pdf_document(driver, view, options, renderer_source),
+            preserve_source_styles=True,
             print_options={
                 "paperWidth": 8.5, "paperHeight": 11, "scale": 1,
                 "printBackground": True, "displayHeaderFooter": False,
                 "preferCSSPageSize": True,
-                "marginTop": 0.55, "marginBottom": 0.55,
-                "marginLeft": 0.55, "marginRight": 0.55,
+                "marginTop": 0, "marginBottom": 0,
+                "marginLeft": 0, "marginRight": 0,
             },
         )
         content = path.read_bytes()
