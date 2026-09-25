@@ -636,7 +636,8 @@ def test_desktop_workspace_wires_meal_planner_and_sidebar_controls():
     assert 'id="mealPlannerDialog"' in workspaces
     assert 'id="mealPlannerDeleteDialog"' in workspaces
     assert 'onclick="return openMealPlannerDialog()"' in workspaces
-    assert 'onsubmit="return submitMealPlannerForm(event)"' in workspaces
+    assert 'id="mealPlannerScheduleForm"' in workspaces
+    assert 'onsubmit="return submitMealPlannerForm(event)"' not in workspaces
     assert 'onsubmit="return confirmMealPlannerDelete(event)"' in workspaces
     assert 'class="app-meal-slot-recipes"' in workspaces
     assert 'app-meal-planner-day{% if day.is_past %} is-past{% endif %}{% if day.is_today %} is-today{% endif %}' in workspaces
@@ -651,18 +652,15 @@ def test_desktop_workspace_wires_meal_planner_and_sidebar_controls():
     add_action = workspaces.index('class="app-meal-add-slot', card_loop)
     assert workspaces.index("{% endfor %}", card_loop) < add_action
     recipe_field = workspaces.index('<select id="mealPlannerRecipe"')
-    servings_field = workspaces.index("Planned Servings")
-    assert recipe_field < servings_field
+    schedule_form = workspaces.index('id="mealPlannerScheduleForm"')
+    assert recipe_field < schedule_form
     assert 'data-default-servings="{{ recipe.default_servings }}"' in workspaces
     assert 'data-yield-label="{{ recipe.yield_label }}"' in workspaces
-    assert 'name="planned_servings"' in workspaces
-    assert 'type="number"' in workspaces
-    assert 'min="1"' in workspaces
-    assert 'step="any"' in workspaces
-    assert 'data-step="0.5"' in workspaces
-    assert 'aria-label="Decrease planned servings"' in workspaces
-    assert 'aria-label="Increase planned servings"' in workspaces
-    assert 'aria-describedby="mealPlannerServingsHelp"' in workspaces
+    planner_dialog = workspaces[workspaces.index('<dialog id="mealPlannerDialog"'):workspaces.index('<dialog id="mealPlannerDeleteDialog"')]
+    assert planner_dialog.count("<form ") == 1, "The shared schedule must not be nested in another form"
+    assert 'id="mealPlannerPlannedServings"' not in planner_dialog
+    assert 'data-meal-ingredient-options' in planner_dialog
+    assert 'data-ingredient-requirements="{{ recipe.ingredient_requirements | tojson | forceescape }}"' in planner_dialog
     assert 'data-app-page-target="mealPlannerPage"' in index
     assert "{% for slot in home_meal_plan.slots %}" in index
     assert "{% for meal in slot.meals %}" in index
@@ -678,15 +676,11 @@ def test_desktop_workspace_wires_meal_planner_and_sidebar_controls():
     assert "data-app-sidebar-collapse" in sidebar
     assert 'mealPlannerPage: "mealPlannerPage"' in script
     assert "function setAppSidebarCollapsed" in script
-    assert "async function submitMealPlannerForm" in script
+    assert "new MealPlanPanel(" in script
     assert "async function confirmMealPlannerDelete" in script
     assert "function openHomeMealPlanSlot" in script
     assert "function handleHomeMealPlanSlotKeydown" in script
     assert "function syncMealPlannerServingsFromRecipe" in script
-    assert "function adjustMealPlannerServings" in script
-    assert "function updateMealPlannerServingControls" in script
-    assert "Recipe yields ${yieldLabel}." in script
-    assert "planned_servings: plannedServings" in script
     assert "document.body.dataset.appInitialPage" in script
     assert "openAppPage(initialPage" in script
 

@@ -785,71 +785,39 @@
     </div>
 
     <dialog id="mealPlannerDialog" class="app-dialog" aria-labelledby="mealPlannerDialogTitle">
-        <form method="dialog" class="app-dialog-card" onsubmit="return submitMealPlannerForm(event)">
+        <div class="app-dialog-card app-meal-schedule-dialog-card">
             <div class="app-dialog-header">
-                <div><h3 id="mealPlannerDialogTitle">Add Meal</h3><p>Choose a saved recipe, date, and meal type.</p></div>
-                <button type="button" class="app-dialog-close" aria-label="Close add meal dialog" onclick="return closeMealPlannerDialog()">&times;</button>
+                <div><h3 id="mealPlannerDialogTitle">Add Meal</h3><p>Choose a recipe, then plan dates, meals, and portions for your household.</p></div>
+                <button type="button" class="app-dialog-close" data-meal-schedule-close aria-label="Close add meal dialog" onclick="return closeMealPlannerDialog()">&times;</button>
             </div>
-            <label>Date<input id="mealPlannerDate" name="date" type="date" required value="{{ meal_plan.week_start }}"></label>
-            <label>Meal Type
-                <select id="mealPlannerType" name="meal_type" required>
-                    {% for meal_type in meal_plan.meal_types %}<option value="{{ meal_type }}">{{ meal_type | title }}</option>{% endfor %}
-                </select>
-            </label>
-            <label>Recipe
-                <select id="mealPlannerRecipe" name="recipe_url" required onchange="return syncMealPlannerServingsFromRecipe()">
-                    <option value="" data-default-servings="1" data-yield-label="">Choose a recipe</option>
-                    {% for recipe in meal_plan_recipe_options %}
-                        <option value="{{ recipe.url }}"
-                                data-default-servings="{{ recipe.default_servings }}"
-                                data-yield-label="{{ recipe.yield_label }}"
-                                data-ingredient-requirements="{{ recipe.ingredient_requirements | tojson | forceescape }}">{{ recipe.name }}</option>
-                    {% endfor %}
-                </select>
-            </label>
-            <section class="app-meal-ingredient-options"
-                     data-meal-ingredient-options
-                     aria-live="polite"
-                     hidden>
-                <div class="app-meal-ingredient-options-heading">
-                    <strong>Ingredient choices</strong>
-                    <span>Choose now or leave unresolved and decide later.</span>
-                </div>
-                <div data-meal-ingredient-option-list></div>
-            </section>
-            <div class="app-dialog-field app-meal-planner-servings-field">
-                <label for="mealPlannerPlannedServings">Planned Servings</label>
-                <div class="app-meal-planner-servings-stepper" role="group" aria-label="Planned servings controls">
-                    <button type="button"
-                            data-meal-servings-decrease
-                            aria-label="Decrease planned servings"
-                            aria-controls="mealPlannerPlannedServings"
-                            onclick="return adjustMealPlannerServings(-1)">&minus;</button>
-                    <input id="mealPlannerPlannedServings"
-                           name="planned_servings"
-                           type="number"
-                           min="1"
-                           step="any"
-                           data-step="0.5"
-                           value="1"
-                           inputmode="decimal"
-                           required
-                           aria-describedby="mealPlannerServingsHelp"
-                           oninput="return updateMealPlannerServingControls()">
-                    <button type="button"
-                            aria-label="Increase planned servings"
-                            aria-controls="mealPlannerPlannedServings"
-                            onclick="return adjustMealPlannerServings(1)">+</button>
-                </div>
+            <fieldset id="mealPlannerRecipeFields">
+                <label for="mealPlannerRecipe">Recipe
+                    <select id="mealPlannerRecipe" name="recipe_url" required aria-describedby="mealPlannerServingsHelp" onchange="return syncMealPlannerServingsFromRecipe()">
+                        <option value="" data-default-servings="1" data-yield-label="">Choose a recipe</option>
+                        {% for recipe in meal_plan_recipe_options %}
+                            <option value="{{ recipe.url }}"
+                                    data-default-servings="{{ recipe.default_servings }}"
+                                    data-yield-label="{{ recipe.yield_label }}"
+                                    data-ingredient-requirements="{{ recipe.ingredient_requirements | tojson | forceescape }}">{{ recipe.name }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <section class="app-meal-ingredient-options"
+                         data-meal-ingredient-options
+                         aria-live="polite"
+                         hidden>
+                    <div class="app-meal-ingredient-options-heading">
+                        <strong>Ingredient choices</strong>
+                        <span>Choose now or leave unresolved and decide later.</span>
+                    </div>
+                    <div data-meal-ingredient-option-list></div>
+                </section>
                 <small id="mealPlannerServingsHelp" class="app-dialog-helper" data-meal-servings-help aria-live="polite">Select a recipe to use its default yield.</small>
-            </div>
+            </fieldset>
+            <p class="app-meal-schedule-empty" data-meal-schedule-empty>Select a recipe to choose one day, a date range, or individual days and assign meal portions.</p>
             <div class="app-dialog-status" data-meal-plan-status aria-live="polite"></div>
-            <label>Meal-prep notes <textarea name="prep_notes" rows="2" placeholder="Notes for this scheduled meal"></textarea></label>
-            <div class="app-dialog-actions">
-                <button type="button" class="app-page-secondary-action" onclick="return closeMealPlannerDialog()">Cancel</button>
-                <button type="submit" class="app-page-primary-action" data-meal-plan-submit>Add Meal</button>
-            </div>
-        </form>
+            <form id="mealPlannerScheduleForm" class="recipe-preview-meal-panel" hidden></form>
+        </div>
     </dialog>
 
     <dialog id="mealPlannerDeleteDialog" class="app-dialog" aria-labelledby="mealPlannerDeleteTitle">

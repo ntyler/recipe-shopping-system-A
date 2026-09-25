@@ -1672,6 +1672,13 @@ async function refreshMealPlannerWorkspace({ date = "" } = {}) {
         delete page.dataset.mealPlannerStale;
         page.querySelectorAll("[data-meal-family-details]").forEach(item => { item.open = expanded.has(item.dataset.mealFamilyDetails); });
         initDeferredImages(page);
+        // Keep reloads and meal deletions on the week currently displayed. A
+        // background refresh beneath recipe preview must not change its URL.
+        if (!page.hidden && !page.inert && window.location.hash === "#mealPlannerPage") {
+            const plannerUrl = new URL(window.location.href);
+            plannerUrl.searchParams.set("meal_week", page.dataset.mealWeek);
+            window.history.replaceState(window.history.state, "", plannerUrl);
+        }
         return true;
     } catch (error) {
         if (!controller.signal.aborted) {
@@ -1787,20 +1794,6 @@ function formatMealPlannerServingNumber(value) {
     return String(Number(numeric.toFixed(4)));
 }
 
-function updateMealPlannerServingControls() {
-    const input = document.getElementById("mealPlannerPlannedServings");
-    const decrease = document.querySelector("[data-meal-servings-decrease]");
-    if (!input) {
-        return false;
-    }
-    const minimum = Number.parseFloat(input.min || "1") || 1;
-    const current = Number.parseFloat(input.value);
-    if (decrease) {
-        decrease.disabled = !Number.isFinite(current) || current <= minimum;
-    }
-    return false;
-}
-
 function mealPlannerIngredientRequirements(option) {
     const value = String(option?.dataset.ingredientRequirements || "").trim();
     if (!value) return [];
@@ -1874,130 +1867,125 @@ function collectMealPlannerIngredientOptionSelections(form) {
     return selections;
 }
 
-function syncMealPlannerServingsFromRecipe() {
-    const recipeInput = document.getElementById("mealPlannerRecipe");
-    const servingsInput = document.getElementById("mealPlannerPlannedServings");
-    const helper = document.querySelector("[data-meal-servings-help]");
-    if (!recipeInput || !servingsInput) {
-        return false;
+function mealPlannerScheduleState(dialog) {
+    if (!dialog.mealPlanScheduleState) {
+        dialog.mealPlanScheduleState = {
+            panel: null, date: MealPlanSchedule.formatDate(new Date()), meal: "dinner",
+            recipeUrl: "", defaultServings: 1,
+        };
+        // Native Escape follows the same pending-save protection as Cancel.
+        dialog.addEventListener("cancel", event => {
+            event.preventDefault();
+            closeMealPlannerDialog();
+        });
     }
-
-    const option = recipeInput.selectedOptions && recipeInput.selectedOptions[0];
-    const selectedRecipe = String(option?.value || "").trim();
-    const parsedDefault = Number.parseFloat(option?.dataset.defaultServings || "1");
-    const defaultServings = Number.isFinite(parsedDefault) && parsedDefault >= 1 ? parsedDefault : 1;
-    const yieldLabel = String(option?.dataset.yieldLabel || "").trim().replace(/[.]+$/, "");
-
-    servingsInput.value = formatMealPlannerServingNumber(defaultServings);
-    servingsInput.dataset.defaultServings = servingsInput.value;
-    if (helper) {
-        helper.textContent = selectedRecipe
-            ? (yieldLabel
-                ? `Recipe yields ${yieldLabel}.`
-                : "Recipe yield is unavailable. Planned servings default to 1.")
-            : "Select a recipe to use its default yield.";
-    }
-    renderMealPlannerIngredientOptions(option);
-    updateMealPlannerServingControls();
-    return false;
+    return dialog.mealPlanScheduleState;
 }
 
-function adjustMealPlannerServings(delta) {
-    const input = document.getElementById("mealPlannerPlannedServings");
-    if (!input) {
+function syncMealPlannerScheduleControls(dialog, panel) {
+    const busy = panel.ui.busy || panel.ui.memberBusy;
+    const fields = dialog.querySelector("#mealPlannerRecipeFields");
+    const close = dialog.querySelector("[data-meal-schedule-close]");
+    if (fields) fields.disabled = busy;
+    if (close) close.disabled = busy;
+}
+
+function syncMealPlannerServingsFromRecipe() {
+    const dialog = document.getElementById("mealPlannerDialog");
+    const recipeInput = dialog?.querySelector("#mealPlannerRecipe");
+    const form = dialog?.querySelector("#mealPlannerScheduleForm");
+    if (!recipeInput || !form) return false;
+    const state = mealPlannerScheduleState(dialog);
+    if (state.panel?.ui.busy || state.panel?.ui.memberBusy) {
+        recipeInput.value = state.recipeUrl;
         return false;
     }
+    const option = recipeInput.selectedOptions?.[0];
+    const selectedRecipe = String(option?.value || "").trim();
+    const parsedDefault = Number(option?.dataset.defaultServings);
+    const defaultServings = Number.isFinite(parsedDefault) && parsedDefault > 0 ? parsedDefault : 1;
+    const yieldLabel = String(option?.dataset.yieldLabel || "").trim().replace(/[.]+$/, "");
+    const helper = dialog.querySelector("[data-meal-servings-help]");
+    if (helper) helper.textContent = selectedRecipe
+        ? `Recipe yields ${yieldLabel || `${formatMealPlannerServingNumber(defaultServings)} servings`}. Adjust portions for each meal below.`
+        : "Select a recipe to set dates, meals, and portions.";
+    const empty = dialog.querySelector("[data-meal-schedule-empty]");
+    if (empty) empty.hidden = Boolean(selectedRecipe);
+    form.hidden = !selectedRecipe;
+    renderMealPlannerIngredientOptions(option);
+    if (!selectedRecipe) return false;
 
-    const minimum = Number.parseFloat(input.min || "1") || 1;
-    const step = Number.parseFloat(input.dataset.step || "0.5") || 0.5;
-    const current = Number.parseFloat(input.value);
-    const fallback = Number.parseFloat(input.dataset.defaultServings || String(minimum));
-    const base = Number.isFinite(current) ? current : (Number.isFinite(fallback) ? fallback : minimum);
-    const direction = Number(delta) < 0 ? -1 : 1;
-    const next = Math.max(minimum, base + (direction * step));
-
-    input.value = formatMealPlannerServingNumber(next);
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    input.dispatchEvent(new Event("change", { bubbles: true }));
-    updateMealPlannerServingControls();
+    const recipeTitle = option.textContent.trim();
+    if (!state.panel) {
+        state.panel = new MealPlanPanel(form, {
+            today: state.date, servings: defaultServings, title: recipeTitle,
+            getContext: () => {
+                if (!dialog.open || document.getElementById("mealPlannerDialog") !== dialog || !recipeInput.value) return null;
+                return {recipe_url: recipeInput.value, ingredient_option_selections: collectMealPlannerIngredientOptionSelections(dialog)};
+            },
+            onRender: panel => syncMealPlannerScheduleControls(dialog, panel),
+            onCancel: () => closeMealPlannerDialog(),
+            onMembersChanged: async () => {
+                const page = document.getElementById("mealPlannerPage");
+                if (page) page.dataset.mealPlannerStale = "1";
+                if (typeof refreshRecipePreviewMeals === "function") await refreshRecipePreviewMeals();
+            },
+            onSaved: async (_result, date) => {
+                // Close before refresh: refreshing must never replace an open dialog.
+                dialog.close();
+                await refreshMealPlannerWorkspace({date});
+                if (typeof refreshRecipePreviewMeals === "function") await refreshRecipePreviewMeals();
+            },
+        });
+        MealPlanSchedule.setMeals(state.panel.draft, [state.meal]);
+    } else if (selectedRecipe !== state.recipeUrl) {
+        // Changing recipes updates untouched yield defaults, retaining the schedule
+        // and portions that the user has already customized.
+        MealPlanSchedule.MEAL_TYPES.forEach(meal => {
+            if (Number(state.panel.draft.householdDefaults[meal]) === state.defaultServings) {
+                MealPlanSchedule.setHouseholdDefault(state.panel.draft, meal, defaultServings);
+            }
+        });
+    }
+    state.recipeUrl = selectedRecipe;
+    state.defaultServings = defaultServings;
+    Object.assign(state.panel.options, {title: recipeTitle, servings: defaultServings});
+    state.panel.render();
+    // Keep focus at the recipe selector; its menu should not jump out from under the user.
+    if (!state.panel.ui.membersLoaded && !state.panel.ui.loading) void state.panel.loadMembers();
     return false;
 }
 
 function openMealPlannerDialog(dateValue = "", mealType = "") {
     const dialog = document.getElementById("mealPlannerDialog");
-    if (!dialog || typeof dialog.showModal !== "function") {
-        return false;
-    }
-    const dateInput = dialog.querySelector('[name="date"]');
-    const typeInput = dialog.querySelector('[name="meal_type"]');
-    if (dateInput && dateValue) {
-        dateInput.value = dateValue;
-    }
-    if (typeInput && mealType) {
-        typeInput.value = mealType;
+    if (!dialog || typeof dialog.showModal !== "function" || dialog.open) return false;
+    const state = mealPlannerScheduleState(dialog);
+    if (state.panel?.ui.busy || state.panel?.ui.memberBusy) return false;
+    state.date = MealPlanSchedule.parseDate(dateValue) ? dateValue : MealPlanSchedule.formatDate(new Date());
+    state.meal = MealPlanSchedule.MEAL_TYPES.includes(mealType) ? mealType : "dinner";
+    if (state.panel) {
+        state.panel.options.today = state.date;
+        state.panel.draft = MealPlanSchedule.create({today: state.date, servings: state.defaultServings, members: state.panel.draft.members});
+        MealPlanSchedule.setMeals(state.panel.draft, [state.meal]);
+        state.panel.ui.openDays.clear();
+        state.panel.ui.openSections.clear();
+        state.panel.setMessage("");
     }
     setMealPlannerStatus("");
-    const prepNotesInput = dialog.querySelector('[name="prep_notes"]');
-    if (prepNotesInput) prepNotesInput.value = "";
     syncMealPlannerServingsFromRecipe();
     dialog.showModal();
-    const recipeInput = dialog.querySelector('[name="recipe_url"]');
-    (recipeInput || dateInput)?.focus();
+    dialog.querySelector("#mealPlannerRecipe")?.focus();
     return false;
 }
 
 function closeMealPlannerDialog() {
     const dialog = document.getElementById("mealPlannerDialog");
-    if (dialog && dialog.open) {
+    const panel = dialog?.mealPlanScheduleState?.panel;
+    if (panel?.ui.busy || panel?.ui.memberBusy) return false;
+    if (dialog?.open) {
         dialog.close();
-    }
-    return false;
-}
-
-async function submitMealPlannerForm(event) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const submitButton = form.querySelector("[data-meal-plan-submit]");
-    const formData = new FormData(form);
-    const servingsInput = form.querySelector('[name="planned_servings"]');
-    const plannedServings = Number.parseFloat(formData.get("planned_servings"));
-    if (!Number.isFinite(plannedServings) || plannedServings < 1) {
-        setMealPlannerStatus("Planned servings must be a number of 1 or more.", true);
-        servingsInput?.focus();
-        return false;
-    }
-    const originalLabel = submitButton ? submitButton.textContent : "Add Meal";
-    if (submitButton) {
-        submitButton.disabled = true;
-        submitButton.textContent = "Adding...";
-    }
-    setMealPlannerStatus("Adding meal...");
-    try {
-        const response = await fetch("/api/meal-plan", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                date: formData.get("date"),
-                meal_type: formData.get("meal_type"),
-                recipe_url: formData.get("recipe_url"),
-                planned_servings: plannedServings,
-                ingredient_option_selections: collectMealPlannerIngredientOptionSelections(form),
-                prep_notes: formData.get("prep_notes"),
-            }),
-        });
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok || !payload.ok) {
-            throw new Error(payload.error || "The meal could not be added.");
-        }
-        setMealPlannerStatus("Meal added.");
-        const weekValue = formData.get("date");
-        window.location.assign(`/?meal_week=${encodeURIComponent(weekValue)}#mealPlannerPage`);
-    } catch (error) {
-        setMealPlannerStatus(error.message || "The meal could not be added.", true);
-        if (submitButton) {
-            submitButton.disabled = false;
-            submitButton.textContent = originalLabel;
-        }
+        // Member edits may have changed names on existing meal cards.
+        if (document.getElementById("mealPlannerPage")?.dataset.mealPlannerStale === "1") void refreshMealPlannerWorkspace();
     }
     return false;
 }

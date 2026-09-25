@@ -2,12 +2,12 @@
 body.recipe-preview-active #appContent > [hidden], body.recipe-preview-active #recipeEditModal { display: none !important; }
 body.recipe-preview-active { overflow: auto; }
 .recipe-preview-page { width: 100%; min-width: 0; color: var(--app-text); padding-bottom: 24px; }
-.recipe-preview-page *, .recipe-preview-page *::before, .recipe-preview-page *::after { box-sizing: border-box; }
-.recipe-preview-page [hidden] { display: none !important; }
-.recipe-preview-page button { width: auto; min-width: 0; margin: 0; border: 1px solid var(--app-border-strong, #37454b); border-radius: 7px; background: var(--app-surface, #172021); color: var(--app-text); padding: 9px 13px; font-family: inherit; font-size: 13px; font-weight: 600; line-height: 1.3; cursor: pointer; box-shadow: none; }
-.recipe-preview-page button:hover { background: var(--app-surface-soft); border-color: var(--app-primary); }
-.recipe-preview-page :is(button, input, a, summary):focus-visible { outline: 2px solid var(--app-primary-hover, #31dfa0); outline-offset: 3px; }
-.recipe-preview-page button:disabled { opacity: .5; cursor: wait; }
+.recipe-preview-page *, .recipe-preview-page *::before, .recipe-preview-page *::after, .meal-schedule-panel, .meal-schedule-panel *, .meal-schedule-panel *::before, .meal-schedule-panel *::after { box-sizing: border-box; }
+.recipe-preview-page [hidden], .meal-schedule-panel[hidden], .meal-schedule-panel [hidden] { display: none !important; }
+.recipe-preview-page button, .meal-schedule-panel button { width: auto; min-width: 0; margin: 0; border: 1px solid var(--app-border-strong, #37454b); border-radius: 7px; background: var(--app-surface, #172021); color: var(--app-text); padding: 9px 13px; font-family: inherit; font-size: 13px; font-weight: 600; line-height: 1.3; cursor: pointer; box-shadow: none; }
+.recipe-preview-page button:hover, .meal-schedule-panel button:hover { background: var(--app-surface-soft); border-color: var(--app-primary); }
+.recipe-preview-page :is(button, input, a, summary):focus-visible, .meal-schedule-panel :is(button, input, select, textarea, summary, [tabindex]):focus-visible { outline: 2px solid var(--app-primary-hover, #31dfa0); outline-offset: 3px; }
+.recipe-preview-page button:disabled, .meal-schedule-panel button:disabled { opacity: .5; cursor: wait; }
 .recipe-preview-page svg { display: block; flex: 0 0 auto; width: 19px; height: 19px; }
 .recipe-preview-heading { display: flex; justify-content: space-between; align-items: center; min-height: 66px; gap: 12px; margin: 0 0 12px; padding: 0 0 10px; }
 .recipe-preview-heading nav { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 12px; line-height: 1.4; min-width: 0; }
@@ -168,10 +168,10 @@ body.recipe-preview-active { overflow: auto; }
 .recipe-preview-notes { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--app-border-strong); }
 .recipe-preview-notes summary { font-size: 1.15em; font-weight: 600; cursor: pointer; }
 .recipe-preview-notes p, .recipe-preview-meal-panel p { color: var(--app-muted); font-size: 13px; }
-.recipe-preview-page :is(.recipe-preview-notes, .recipe-preview-meal-panel) fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
-.recipe-preview-page :is(.recipe-preview-notes, .recipe-preview-meal-panel) label { display: grid; gap: 6px; margin-bottom: 12px; font-size: 13px; }
-.recipe-preview-page :is(.recipe-preview-notes, .recipe-preview-meal-panel) :is(input, select, textarea) { width: 100%; min-width: 0; padding: 9px; border: 1px solid var(--app-border-strong); border-radius: 6px; background: var(--app-surface); color: var(--app-text); font: inherit; }
-.recipe-preview-page :is(.recipe-preview-notes, .recipe-preview-meal-panel) textarea { min-height: 76px; height: auto; resize: vertical; }
+.recipe-preview-page .recipe-preview-notes fieldset, .meal-schedule-panel fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
+.recipe-preview-page .recipe-preview-notes label, .meal-schedule-panel label { display: grid; gap: 6px; margin-bottom: 12px; font-size: 13px; }
+.recipe-preview-page .recipe-preview-notes :is(input, select, textarea), .meal-schedule-panel :is(input, select, textarea) { width: 100%; min-width: 0; padding: 9px; border: 1px solid var(--app-border-strong); border-radius: 6px; background: var(--app-surface); color: var(--app-text); font: inherit; }
+.recipe-preview-page .recipe-preview-notes textarea, .meal-schedule-panel textarea { min-height: 76px; height: auto; resize: vertical; }
 .recipe-preview-note-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 [data-preview-note-row] { border-bottom: 1px solid var(--app-border); padding: 14px 0; }
 .recipe-preview-meal-panel { border: 1px solid var(--app-border-strong); border-radius: 10px; padding: 18px; margin-bottom: 16px; background: var(--app-surface); }
@@ -192,8 +192,8 @@ body.recipe-preview-active { overflow: auto; }
 .meal-schedule-calendar-grid .is-other-month { color: var(--app-muted); background: transparent; }
 .meal-schedule-calendar-grid button[aria-pressed="true"], .meal-schedule-panel .is-primary { background: var(--app-primary); color: #06251b; border-color: var(--app-primary); }
 .meal-schedule-meals { display: flex; align-items: center; flex-wrap: wrap; gap: 14px 20px; margin-bottom: 20px; }
-#recipePreviewMealPanel .meal-schedule-check { display: flex; align-items: center; gap: 8px; margin: 0; cursor: pointer; }
-#recipePreviewMealPanel input[type="checkbox"] { appearance: auto; width: 18px; height: 18px; min-width: 18px; margin: 0; padding: 0; accent-color: var(--app-primary); flex: 0 0 18px; }
+.meal-schedule-panel .meal-schedule-check { display: flex; align-items: center; gap: 8px; margin: 0; cursor: pointer; }
+.meal-schedule-panel input[type="checkbox"] { appearance: auto; width: 18px; height: 18px; min-width: 18px; margin: 0; padding: 0; accent-color: var(--app-primary); flex: 0 0 18px; }
 .meal-schedule-columns { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1.05fr); gap: 24px; }
 .meal-schedule-columns > section { min-width: 0; }
 .meal-schedule-columns > section + section { padding-left: 24px; border-left: 1px solid var(--app-border-strong); }
@@ -201,7 +201,7 @@ body.recipe-preview-active { overflow: auto; }
 .meal-schedule-portion { display: flex; align-items: center; gap: 8px; }
 .meal-schedule-stepper { display: flex; min-width: 0; flex: 1 1 auto; border: 1px solid var(--app-border-strong); border-radius: 6px; overflow: hidden; }
 .meal-schedule-stepper button { border: 0; border-radius: 0; padding: 7px 9px; min-width: 30px; min-height: 36px; }
-#recipePreviewMealPanel .meal-schedule-stepper input { appearance: textfield; border: 0; border-inline: 1px solid var(--app-border-strong); border-radius: 0; width: 50px; flex: 1 1 50px; min-width: 36px; padding: 4px; text-align: center; }
+.meal-schedule-panel .meal-schedule-stepper input { appearance: textfield; border: 0; border-inline: 1px solid var(--app-border-strong); border-radius: 0; width: 50px; flex: 1 1 50px; min-width: 36px; padding: 4px; text-align: center; }
 .meal-schedule-stepper input::-webkit-inner-spin-button { -webkit-appearance: none; }
 .meal-schedule-stepper input:disabled { opacity: .45; }
 .meal-schedule-table-scroll { width: 100%; overflow-x: auto; margin-bottom: 12px; border: 1px solid var(--app-border-strong); border-radius: 8px; }
@@ -216,7 +216,7 @@ body.recipe-preview-active { overflow: auto; }
 .meal-schedule-members, .meal-schedule-prep { margin-top: 20px; }
 .meal-schedule-members > summary, .meal-schedule-prep > summary { cursor: pointer; padding: 8px 0; }
 .meal-schedule-member-row { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 12px; align-items: end; margin: 12px 0; }
-#recipePreviewMealPanel .meal-schedule-member-row label { margin-bottom: 0; }
+.meal-schedule-panel .meal-schedule-member-row label { margin-bottom: 0; }
 .meal-schedule-notes { margin-top: 20px; }
 .meal-schedule-days { display: grid; gap: 10px; }
 .meal-schedule-day { border: 1px solid var(--app-border-strong); background: var(--app-surface-soft); border-radius: 8px; min-width: 0; }
@@ -230,7 +230,7 @@ body.recipe-preview-active { overflow: auto; }
 .meal-schedule-day-body { padding: 0 12px 12px; }
 .meal-schedule-day-body .meal-schedule-meals { gap: 10px; margin-top: 10px; }
 .meal-schedule-prep-row { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1.6fr) auto; gap: 10px; align-items: end; margin: 15px 0; }
-#recipePreviewMealPanel .meal-schedule-prep-row label { margin-bottom: 0; }
+.meal-schedule-panel .meal-schedule-prep-row label { margin-bottom: 0; }
 .meal-schedule-summary { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px 24px; margin-top: 24px; padding: 16px; border: 1px solid var(--app-primary); border-radius: 8px; background: var(--app-primary-soft); }
 .meal-schedule-summary strong { display: block; color: var(--app-primary-hover); font-size: 17px; }
 .meal-schedule-summary span { display: block; font-size: 12px; margin-top: 5px; }
@@ -239,6 +239,35 @@ body.recipe-preview-active { overflow: auto; }
 .meal-schedule-errors:empty { display: none; }
 .meal-schedule-footer { display: flex; justify-content: flex-end; gap: 12px; margin: 18px 0 0; }
 .meal-schedule-panel [data-schedule-status] { margin-top: 12px; }
+#mealPlannerDialog { width: min(1160px, calc(100vw - 32px)); max-width: calc(100vw - 32px); max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); overflow: auto; color: var(--app-text); }
+#mealPlannerDialog, #mealPlannerDialog * { box-sizing: border-box; }
+#mealPlannerDialog [hidden] { display: none !important; }
+#mealPlannerDialog .app-meal-schedule-dialog-card { min-width: 0; }
+#mealPlannerDialog .app-dialog-header { align-items: flex-start; }
+#mealPlannerDialog .app-dialog-header > div { min-width: 0; }
+#mealPlannerDialog .app-dialog-close { flex: 0 0 36px; min-height: 36px; margin: 0; }
+#mealPlannerDialog .app-dialog-close:disabled { opacity: .5; cursor: wait; }
+#mealPlannerRecipeFields { display: grid; gap: 12px; min-width: 0; margin: 0; padding: 0; border: 0; }
+#mealPlannerRecipeFields:disabled { opacity: .65; }
+#mealPlannerRecipeFields > label { display: grid; gap: 6px; color: var(--app-text-strong); font-size: 13px; font-weight: 600; }
+#mealPlannerRecipe { width: 100%; min-width: 0; min-height: 42px; padding: 9px 11px; border: 1px solid var(--app-border-strong); border-radius: 6px; background: var(--app-surface); color: var(--app-text); font: inherit; }
+#mealPlannerDialog :is(button, input, select, textarea, summary, [tabindex]):focus-visible { outline: 2px solid var(--app-primary-hover, #31dfa0); outline-offset: 3px; }
+#mealPlannerDialog .app-dialog-status:empty { display: none; }
+#mealPlannerDialog .app-meal-schedule-empty { margin: 0; padding: 16px; border: 1px dashed var(--app-border-strong); border-radius: 8px; font-size: 13px; line-height: 1.6; color: var(--app-muted); }
+#mealPlannerScheduleForm { min-width: 0; margin: 0; padding: 20px 0 0; border: 0; border-top: 1px solid var(--app-border-strong); border-radius: 0; }
+#mealPlannerScheduleForm .meal-schedule-heading { display: none; }
+#mealPlannerScheduleForm :is(h2, h3) { text-align: left; color: var(--app-text-strong); }
+#mealPlannerScheduleForm input { min-height: 36px; }
+#mealPlannerScheduleForm input[type="checkbox"] { min-height: 18px; }
+@media (max-width: 600px) {
+    #mealPlannerDialog { width: calc(100vw - 16px); max-width: calc(100vw - 16px); max-height: calc(100vh - 16px); max-height: calc(100dvh - 16px); }
+    #mealPlannerDialog .app-meal-schedule-dialog-card { padding: 16px 12px; }
+    #mealPlannerDialog .app-dialog-close { flex-basis: 44px; min-height: 44px; }
+    #mealPlannerScheduleForm :is(.meal-schedule-household, .meal-schedule-date-range) { grid-template-columns: minmax(0,1fr); }
+    #mealPlannerScheduleForm :is(button, input:not([type="checkbox"])), #mealPlannerScheduleForm .meal-schedule-check { min-height: 44px; }
+    #mealPlannerScheduleForm .meal-schedule-footer { flex-wrap: wrap; }
+    #mealPlannerScheduleForm .meal-schedule-footer button { flex: 1 1 auto; }
+}
 @media (max-width: 1000px) {
     .meal-schedule-columns { grid-template-columns: minmax(0,1fr); }
     .meal-schedule-columns > section + section { border-left: 0; padding-left: 0; border-top: 1px solid var(--app-border); padding-top: 20px; }

@@ -130,6 +130,85 @@ vm.runInContext(handler, ctx);
 
 
 @pytest.mark.skipif(not shutil.which("node"), reason="Node.js is required for the interaction check")
+def test_visible_planner_url_tracks_loaded_week_without_disturbing_preview_or_failed_refreshes():
+    script = r"""
+const assert = require('node:assert/strict'), fs = require('node:fs'), vm = require('node:vm');
+const source = fs.readFileSync(process.argv[1], 'utf8');
+const handler = source.slice(source.indexOf('let mealPlannerRefreshController'), source.indexOf('function openMealPlannerPageAndDialog'));
+let dialogOpen = false, calls = [], replacements = [], responseFactory;
+const status = {hidden:true,textContent:'',classList:{add(){}}};
+const page = {
+ dataset:{mealWeek:'2026-09-21'},hidden:false,inert:false,innerHTML:'old-week',
+ setAttribute(){},removeAttribute(){},querySelectorAll(){return [];},
+ querySelector(selector){return selector === 'dialog[open]' ? dialogOpen : status;},
+};
+const historyState = {workspace:'mealPlannerPage',unrelatedState:{keep:true}};
+const window = {
+ location:new URL('https://pantry.test/?meal_week=2026-09-21&viewer_user_id=test-user&scope=household#mealPlannerPage'),
+ history:{state:historyState,replaceState(state,title,url){
+  replacements.push({state,title,url:String(url)});
+  this.state=state;window.location=new URL(String(url),window.location.href);
+ }},
+};
+const ctx = {
+ AbortController,Set,URL,window,document:{getElementById:()=>page},
+ withCanonicalViewerUserId:url=>`${url}&viewer_user_id=test-user`,initDeferredImages(){},
+ DOMParser:class {parseFromString(week){return {getElementById:()=>({innerHTML:`week:${week}`,dataset:{mealWeek:week}})};}},
+ fetch:async(url,options)=>{calls.push({url,options});return responseFactory();},
+};
+vm.createContext(ctx);vm.runInContext(handler,ctx);
+const ok = week => ({ok:true,redirected:false,text:async()=>week});
+(async()=>{
+ responseFactory=()=>ok('2026-10-05');
+ assert.equal(await ctx.refreshMealPlannerWorkspace({date:'2026-10-07'}),true);
+ assert.equal(window.location.searchParams.get('meal_week'),'2026-10-05','Reload must reopen the week actually displayed');
+ assert.equal(window.location.pathname,'/');assert.equal(window.location.hash,'#mealPlannerPage');
+ assert.equal(window.location.searchParams.get('viewer_user_id'),'test-user');
+ assert.equal(window.location.searchParams.get('scope'),'household');
+ assert.equal(replacements.length,1);assert.equal(replacements[0].state,historyState,'Keep existing browser history state');
+ const visibleUrl=window.location.href;
+
+ page.hidden=true;responseFactory=()=>ok('2026-11-02');
+ assert.equal(await ctx.refreshMealPlannerWorkspace({date:'2026-11-03'}),true);
+ assert.equal(window.location.href,visibleUrl,'Updating a hidden planner must not change the active workspace URL');
+ page.hidden=false;page.inert=true;responseFactory=()=>ok('2026-12-07');
+ assert.equal(await ctx.refreshMealPlannerWorkspace({date:'2026-12-09'}),true);
+ assert.equal(window.location.href,visibleUrl,'The planner underneath recipe preview must not take over its URL');
+ page.inert=false;window.location.hash='#recipe-preview';
+ const previewUrl=window.location.href;responseFactory=()=>ok('2027-01-04');
+ assert.equal(await ctx.refreshMealPlannerWorkspace(),true);
+ assert.equal(window.location.href,previewUrl);assert.equal(replacements.length,1);
+
+ window.location.hash='#mealPlannerPage';const beforeFailure=window.location.href;
+ responseFactory=()=>({ok:false});
+ assert.equal(await ctx.refreshMealPlannerWorkspace({date:'2027-02-02'}),false);
+ assert.equal(window.location.href,beforeFailure);assert.equal(replacements.length,1);
+ dialogOpen=true;const beforeDeferred=calls.length;
+ assert.equal(await ctx.refreshMealPlannerWorkspace({date:'2027-03-02'}),false);
+ assert.equal(calls.length,beforeDeferred);assert.equal(window.location.href,beforeFailure);
+ assert.equal(replacements.length,1,'Neither failed nor deferred requests change the URL');
+ dialogOpen=false;responseFactory=()=>ok('2027-03-01');
+ assert.equal(await ctx.refreshMealPlannerWorkspace(),true);
+ assert.match(calls.at(-1).url,/meal_week=2027-03-02/,'Retry retains the requested future week');
+ assert.equal(window.location.searchParams.get('meal_week'),'2027-03-01');assert.equal(replacements.length,2);
+
+ let releaseOld;responseFactory=()=>new Promise(resolve=>releaseOld=resolve);
+ const old=ctx.refreshMealPlannerWorkspace({date:'2027-04-01'});
+ responseFactory=()=>ok('2027-05-03');
+ assert.equal(await ctx.refreshMealPlannerWorkspace({date:'2027-05-05'}),true);
+ releaseOld(ok('2027-03-29'));assert.equal(await old,false);
+ assert.equal(window.location.searchParams.get('meal_week'),'2027-05-03','An older response must not revert calendar or URL');
+ assert.equal(replacements.length,3);assert.equal(window.history.state,historyState);
+})().catch(error=>{console.error(error);process.exitCode=1;});
+"""
+    result = subprocess.run(
+        [shutil.which("node"), "-e", script, str(ROOT / "PushShoppingList/static/js/app.js")],
+        capture_output=True, text=True, timeout=15,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+@pytest.mark.skipif(not shutil.which("node"), reason="Node.js is required for the interaction check")
 def test_planner_refresh_preserves_preview_state_and_rejects_stale_responses():
     script = r"""
 const assert = require('node:assert/strict');

@@ -1,4 +1,4 @@
-/* One scheduling panel shared by the recipe preview's planning entry points. */
+/* Scheduling controls shared by recipe preview and the Meal Planner dialog. */
 (function (root) {
     'use strict';
     const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[c]));
@@ -70,6 +70,7 @@
                 replacement?.focus({preventScroll:true});
             if (position !== null && replacement?.setSelectionRange) replacement.setSelectionRange(position, position);
             }
+            this.options.onRender?.(this);
         }
 
         static check(meal, enabled, action, extra = '') {
