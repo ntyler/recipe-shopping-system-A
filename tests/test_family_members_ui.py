@@ -305,3 +305,61 @@ for(const search of ['', '?status=unknown', '?status=%3Cscript%3E', '?status=ARC
 }
 ctx.location.search='?status=active';assert.equal(new ctx.FamilyMembersPage(page,members).filter,'active');
 """)
+
+
+def test_edit_groups_opens_the_selected_member_and_saves_multiple_memberships_without_losing_drafts():
+    run_page(r"""
+panel.groups=[{id:'home',name:'Household',archived:false},{id:'friends',name:'Friends',archived:false},{id:'team',name:'Team',archived:false}];
+panel.members[0]={...members[0],group_ids:['home'],first_name:'Nathan',last_name:'Tyler',default_portion:1};
+panel.members.push({id:'sam',name:'Sam',group_ids:['friends'],archived:false,meal_count:1});
+panel.drafts.set('nate','Nate T');panel.drafts.set('sam','Samuel');
+panel.profiles.set('nate',{first_name:'Nathan',last_name:'Tyler',default_portion:'0.5',group_ids:['home','team']});
+panel.profiles.set('sam',{first_name:'Sam',last_name:'',default_portion:2,group_ids:['friends']});
+const profilesBefore=plain([...panel.profiles]),membersBefore=plain(panel.members),draftsBefore=plain([...panel.drafts]);
+const firstCheckbox=node(),otherCheckbox=node(),picker=node(),otherPicker=node();
+picker.scrollIntoView=options=>{picker.scrolled=options.block;};
+picker.querySelector=selector=>selector==='input:not(:disabled)'?firstCheckbox:null;
+otherPicker.querySelector=()=>otherCheckbox;
+const details=[{dataset:{familyDetailId:'sam'},querySelector:()=>otherPicker},{dataset:{familyDetailId:'nate'},querySelector:()=>picker}];
+page.querySelectorAll=selector=>selector==='[data-family-detail-id]'?details:[];
+const nameInput=node();nameInput.value='Nate T';
+const row={dataset:{familyMemberId:'nate'},querySelector:()=>nameInput};
+const editButton={disabled:false,matches:selector=>selector==='[data-family-edit-groups]',closest:selector=>selector==='[data-family-member-id]'?row:null};
+panel.render();
+assert.match(rows(),/data-family-edit-groups[^>]+aria-label="Edit groups for Nate"/);
+panel.click({target:{closest:()=>editButton}});
+assert.equal(panel.expanded.has('nate'),true);assert.equal(panel.expanded.has('sam'),false);
+assert.equal(firstCheckbox.focused,true);assert.notEqual(otherCheckbox.focused,true);
+assert.equal(picker.scrolled,'nearest');
+assert.deepEqual(plain([...panel.profiles]),profilesBefore);assert.deepEqual(plain([...panel.drafts]),draftsBefore);
+assert.deepEqual(plain(panel.members),membersBefore);assert.equal(requests.length,0);
+assert.match(rows(),/data-family-member-group[^>]+value="home" checked/);
+assert.match(rows(),/data-family-member-group[^>]+value="team" checked/);
+panel.change({target:{value:'friends',checked:true,dataset:{familyMember:'nate'},matches:selector=>selector==='[data-family-member-group]'}});
+reply={ok:true,member:{...panel.members[0],name:'Nate T',default_portion:0.5,group_ids:['home','team','friends']}};
+await panel.saveRow(row,panel.members[0]);
+assert.deepEqual(JSON.parse(requests[0].options.body),{name:'Nate T',first_name:'Nathan',last_name:'Tyler',default_portion:0.5,group_ids:['home','team','friends']});
+assert.deepEqual(plain(panel.members[0].group_ids),['home','team','friends']);
+assert.deepEqual(plain(panel.members.at(-1).group_ids),['friends']);
+assert.equal(panel.drafts.get('sam'),'Samuel');assert.deepEqual(plain(panel.profiles.get('sam')),profilesBefore[1][1]);
+""")
+
+
+def test_edit_groups_focuses_the_empty_picker_and_does_not_toggle_it_closed():
+    run_page(r"""
+const picker=node();
+picker.scrollIntoView=options=>{picker.scrolled=options.block;};
+const detail={dataset:{familyDetailId:'nate'},querySelector:()=>picker};
+page.querySelectorAll=selector=>selector==='[data-family-detail-id]'?[detail]:[];
+const row={dataset:{familyMemberId:'nate'}};
+const button={disabled:false,matches:selector=>selector==='[data-family-edit-groups]',closest:selector=>selector==='[data-family-member-id]'?row:null};
+panel.click({target:{closest:()=>button}});
+assert.equal(panel.expanded.has('nate'),true);assert.equal(picker.focused,true);
+assert.match(rows(),/<fieldset[^>]+id="familyMemberGroups0"[^>]+tabindex="-1"/);
+picker.focused=false;panel.click({target:{closest:()=>button}});
+assert.equal(panel.expanded.has('nate'),true);assert.equal(picker.focused,true);
+assert.equal(panel.profiles.size,0);assert.equal(panel.drafts.size,0);assert.equal(requests.length,0);
+button.disabled=true;picker.focused=false;panel.expanded.clear();
+panel.click({target:{closest:()=>button}});
+assert.equal(panel.expanded.size,0);assert.equal(picker.focused,false);
+""")

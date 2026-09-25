@@ -88,7 +88,7 @@
             if (element?.dataset?.familyFocus) return {key:element.dataset.familyFocus, memberId:element.closest('[data-family-detail-id]')?.dataset.familyDetailId, start:element.selectionStart, end:element.selectionEnd};
             const row = element?.closest?.('[data-family-member-id]');
             if (!row) return null;
-            const control = ['name', 'save', 'cancel', 'archive', 'details'].find(key => element.matches(`[data-family-${key}]`));
+            const control = ['name', 'save', 'cancel', 'archive', 'details', 'edit-groups'].find(key => element.matches(`[data-family-${key}]`));
             return control ? {memberId:row.dataset.familyMemberId, control, start:element.selectionStart, end:element.selectionEnd} : null;
         }
 
@@ -126,7 +126,8 @@
                     <td data-mobile-label="Name"><label class="family-members-name"><span class="sr-only">Name for ${esc(member.name)}</span>
                         <input type="text" value="${esc(this.drafts.get(member.id) ?? member.name)}" maxlength="100" required autocomplete="off" data-family-name aria-describedby="familyMemberError${index}"${error ? ' aria-invalid="true"' : ''}${disabled}>
                     </label><p id="familyMemberError${index}" class="family-members-error" role="alert"${error ? '' : ' hidden'}>${esc(error)}</p></td>
-                    <td data-mobile-label="Groups"><div class="family-members-group-badges">${groupLabels.length ? groupLabels.map(group => `<span class="family-members-badge${group.archived ? ' is-archived' : ''}">${esc(group.name)}${group.archived ? ' (Archived)' : ''}</span>`).join('') : '<span class="family-members-help">Ungrouped</span>'}</div></td>
+                    <td data-mobile-label="Groups"><div class="family-members-group-badges">${groupLabels.length ? groupLabels.map(group => `<span class="family-members-badge${group.archived ? ' is-archived' : ''}">${esc(group.name)}${group.archived ? ' (Archived)' : ''}</span>`).join('') : '<span class="family-members-help">Ungrouped</span>'}
+                        <button type="button" class="family-members-edit-groups" data-family-edit-groups aria-expanded="${detailsOpen}" aria-controls="familyMemberGroups${index}" aria-label="Edit groups for ${esc(member.name)}"${disabled}>Edit groups</button></div></td>
                     <td data-mobile-label="Default portion">${esc(member.default_portion ?? 1)}</td>
                     <td data-mobile-label="Status"><span class="family-members-badge${member.archived ? ' is-archived' : ''}">${member.archived ? 'Archived' : 'Active'}</span></td>
                     <td data-mobile-label="Used in meal plans">${Number(member.meal_count) || 0} scheduled ${(Number(member.meal_count) || 0) === 1 ? 'meal' : 'meals'}</td>
@@ -142,7 +143,8 @@
                             <label>Last name (optional)<input type="text" maxlength="100" value="${esc(values.last_name)}" data-family-profile="last_name" data-family-focus="${esc(member.id)}:last_name"${disabled}></label>
                             <label>Default portion<input type="number" min="0" step="any" required value="${esc(values.default_portion)}" data-family-profile="default_portion" data-family-focus="${esc(member.id)}:default_portion"${disabled}></label>
                         </div>
-                        <fieldset class="family-members-group-picker"><legend>Groups for ${esc(member.name)}</legend><div>${this.groupChoices(values.group_ids, `data-family-member-group data-family-member="${esc(member.id)}"`, busy)}</div></fieldset>
+                        <fieldset id="familyMemberGroups${index}" class="family-members-group-picker" tabindex="-1"><legend>Groups for ${esc(member.name)}</legend><div>${this.groupChoices(values.group_ids, `data-family-member-group data-family-member="${esc(member.id)}"`, busy)}</div>
+                            <p class="family-members-help">Select one or more groups, or uncheck all to leave this person ungrouped. Click Save to keep your changes.</p></fieldset>
                         <p class="family-members-help">Default portions apply when starting a new meal plan. Existing scheduled portions stay unchanged.</p>
                     </td></tr>`;
             }).join('');
@@ -469,6 +471,15 @@
             const row = button.closest('[data-family-member-id]');
             const member = row && this.members.find(item => item.id === row.dataset.familyMemberId);
             if (!member) return;
+            if (button.matches('[data-family-edit-groups]')) {
+                this.expanded.add(member.id);
+                this.render();
+                const detail = [...this.page.querySelectorAll('[data-family-detail-id]')].find(node => node.dataset.familyDetailId === member.id);
+                const picker = detail?.querySelector('.family-members-group-picker');
+                picker?.scrollIntoView({block:'nearest'});
+                (picker?.querySelector('input:not(:disabled)') || picker)?.focus({preventScroll:true});
+                return;
+            }
             if (button.matches('[data-family-details]')) {
                 this.expanded[this.expanded.has(member.id) ? 'delete' : 'add'](member.id);
                 this.render();
