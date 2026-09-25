@@ -60,15 +60,26 @@ function mountGroupEditorRows() {
  choices.querySelector=selector=>selector.includes('input')&&choices.innerHTML.includes('type="checkbox"')?firstChoice:null;
  const domRows=panel.members.map(member=>{
   const row=node();row.dataset.familyMemberId=member.id;
-  const name=node(),edit=node(),save=node(),cancel=node(),details=node(),badges=node();name.value=panel.drafts.get(member.id)??member.name;
+  const name=node(),edit=node(),save=node(),cancel=node(),badges=node();name.value=panel.drafts.get(member.id)??member.name;
+  const profiles=Object.fromEntries(['first_name','last_name','default_portion'].map(field=>{
+   const input=node();input.value=String(panel.memberProfile(member)[field]);input.type=field==='default_portion'?'number':'text';
+   input.dataset={familyProfile:field,familyFocus:member.id+':'+field};
+   input.matches=selector=>selector==='[data-family-profile]'||selector===`[data-family-profile="${field}"]`;
+   input.focus=()=>focus(input);input.closest=selector=>selector==='[data-family-member-id]'?row:null;
+   return [field,input];
+  }));
+  name.matches=selector=>selector==='[data-family-name]';name.focus=()=>focus(name);
   edit.matches=selector=>selector==='[data-family-edit-groups]';edit.focus=()=>focus(edit);
-  save.focus=()=>focus(save);details.focus=()=>focus(details);
-  for(const control of [name,edit,save,cancel,details])control.closest=selector=>selector==='[data-family-member-id]'?row:null;
+  save.focus=()=>focus(save);
+  for(const control of [name,edit,save,cancel])control.closest=selector=>selector==='[data-family-member-id]'?row:null;
   row.querySelector=selector=>({'[data-family-name]':name,'[data-family-edit-groups]':edit,'[data-family-save]':save,'[data-family-cancel]':cancel,
-   '[data-family-details]':details,'[data-family-group-badges]':badges,'.family-members-group-badges':badges}[selector]||null);
-  row.children=[name,edit,save,cancel,details,badges];return row;
+   '[data-family-group-badges]':badges,'.family-members-group-badges':badges,
+   ...Object.fromEntries(Object.entries(profiles).map(([field,input])=>[`[data-family-profile="${field}"]`,input]))}[selector]||null);
+  row.querySelectorAll=selector=>selector.includes('data-family-profile')?Object.values(profiles):[];
+  row.children=[name,edit,save,cancel,badges,...Object.values(profiles)];return row;
  });
- page.querySelectorAll=selector=>selector==='[data-family-member-id]'?domRows:selector==='[data-family-edit-groups]'?domRows.map(row=>row.querySelector(selector)):[];
+ page.querySelectorAll=selector=>selector==='[data-family-member-id]'?domRows:selector==='[data-family-edit-groups]'?domRows.map(row=>row.querySelector(selector)):
+  selector==='[data-family-focus]'?domRows.flatMap(row=>row.querySelectorAll('[data-family-profile]')):[];
  const row=id=>domRows.find(item=>item.dataset.familyMemberId===id);
  const edit=id=>row(id).querySelector('[data-family-edit-groups]');
  return {editor,choices,title,close,firstChoice,row,edit};
@@ -177,21 +188,27 @@ assert.equal(panel.drafts.has('nate'),false);assert.equal(prevented,2);assert.eq
 """)
 
 
-def test_async_other_row_completion_keeps_keyboard_focus_and_caret():
+@pytest.mark.parametrize("field", ["name", "first_name", "last_name"])
+def test_async_other_row_completion_keeps_keyboard_focus_and_caret(field):
     run_page(r"""
 panel.members.push({id:'sam',name:'Sam',archived:false,meal_count:1});
 ctx.document.body={};ctx.document.activeElement=ctx.document.body;
 let domRows=[],html='';
-page.querySelectorAll=()=>domRows;
+page.querySelectorAll=selector=>selector==='[data-family-member-id]'?domRows:
+ selector==='[data-family-focus]'?domRows.flatMap(row=>row.querySelectorAll('[data-family-profile]')):[];
 Object.defineProperty(page.querySelector('[data-family-rows]'),'innerHTML',{
  get(){return html;},set(value){
   html=value;
   if(ctx.document.activeElement?.closest?.('[data-family-member-id]'))ctx.document.activeElement=ctx.document.body;
   domRows=[...value.matchAll(/<tr[^>]*data-family-member-id="([^"]+)"[^>]*aria-busy="([^"]+)"[^>]*>/g)].map(match=>{
-   const controls={};const row={dataset:{familyMemberId:match[1]},querySelector:selector=>controls[selector]};
-   for(const key of ['name','save','cancel','archive']){
-    const selector=`[data-family-${key}]`,control=node();controls[selector]=control;
-    control.disabled=match[2]==='true';control.matches=value=>value===selector;control.closest=()=>row;
+   const controls={};const row={...node(),dataset:{familyMemberId:match[1]},querySelector:selector=>controls[selector],
+    querySelectorAll:selector=>selector==='[data-family-profile]'?Object.values(controls).filter(control=>control.dataset.familyProfile):[]};
+   for(const key of ['name','save','cancel','archive','first_name','last_name','default_portion']){
+    const isProfile=['first_name','last_name','default_portion'].includes(key);
+    const selector=isProfile?`[data-family-profile="${key}"]`:`[data-family-${key}]`,control=node();controls[selector]=control;
+    if(isProfile)control.dataset={familyProfile:key,familyFocus:match[1]+':'+key};
+    control.disabled=match[2]==='true';control.matches=value=>value===selector||(isProfile&&value==='[data-family-profile]');
+    control.closest=selector=>selector==='[data-family-member-id]'?row:null;
     control.focus=()=>{ctx.document.activeElement=control;};
     control.setSelectionRange=(start,end)=>{control.selectionStart=start;control.selectionEnd=end;};
    }
@@ -201,14 +218,15 @@ Object.defineProperty(page.querySelector('[data-family-rows]'),'innerHTML',{
 });
 panel.render();let release;ctx.fetch=(url,options)=>new Promise(resolve=>release=resolve);
 const pending=panel.update(panel.members[0],{archived:true});
-const sam=domRows.find(row=>row.dataset.familyMemberId==='sam').querySelector('[data-family-name]');
-sam.focus();sam.selectionStart=1;sam.selectionEnd=2;panel.drafts.set('sam','Samuel');
+const field=__FIELD__,selector=field==='name'?'[data-family-name]':`[data-family-profile="${field}"]`;
+const sam=domRows.find(row=>row.dataset.familyMemberId==='sam').querySelector(selector);
+sam.focus();sam.selectionStart=1;sam.selectionEnd=2;sam.value='Samuel';panel.input({target:sam});
 release({ok:true,json:async()=>({ok:true,member:{id:'nate',name:'Nate',archived:true,meal_count:3}})});await pending;
-const replacement=domRows.find(row=>row.dataset.familyMemberId==='sam').querySelector('[data-family-name]');
+const replacement=domRows.find(row=>row.dataset.familyMemberId==='sam').querySelector(selector);
 assert.equal(ctx.document.activeElement,replacement);assert.equal(replacement.selectionStart,1);assert.equal(replacement.selectionEnd,2);
-assert.equal(panel.drafts.get('sam'),'Samuel');assert(rows().includes('value="Samuel"'));
+assert.equal(field==='name'?panel.drafts.get('sam'):panel.memberProfile(panel.members.at(-1))[field],'Samuel');assert(rows().includes('value="Samuel"'));
 assert.notEqual(page.querySelector('[data-family-filter]').focused,true);
-""")
+""".replace("__FIELD__", repr(field)))
 
 
 def test_archiving_the_focused_member_returns_focus_to_status_filter():
@@ -224,7 +242,7 @@ def test_legacy_display_names_stay_unchanged_and_profiles_save_explicit_fields()
     run_page(r"""
 assert.deepEqual(plain(panel.memberProfile(members[0])),{first_name:'',last_name:'',default_portion:1,group_ids:[]});
 panel.groups=[{id:'house',name:'Household',archived:false},{id:'friends',name:'Friends',archived:false}];
-panel.expanded.add('nate');panel.profiles.set('nate',{first_name:'Nathan',last_name:'Tyler',default_portion:'0.5',group_ids:['house','friends','house']});
+panel.profiles.set('nate',{first_name:'Nathan',last_name:'Tyler',default_portion:'0.5',group_ids:['house','friends','house']});
 const picker=mountGroupEditorRows();panel.render();assert(rows().includes('value="Nate"'));assert(rows().includes('value="Nathan"'));assert(rows().includes('value="0.5"'));
 panel.openGroupEditor(members[0]);
 assert.match(picker.choices.innerHTML,/data-family-member-group[^>]+value="house" checked/);assert.match(picker.choices.innerHTML,/data-family-member-group[^>]+value="friends" checked/);
@@ -234,6 +252,89 @@ await panel.saveRow(row,members[0]);
 assert.deepEqual(JSON.parse(requests[0].options.body),{name:'Nate',first_name:'Nathan',last_name:'Tyler',default_portion:0.5,group_ids:['house','friends']});
 assert.equal(panel.members[0].name,'Nate');assert.equal(panel.profiles.size,0);assert.equal(panel.members[0].meal_count,3);
 panel.search='Nathan Tyler';assert.equal(panel.visibleMembers().length,1);
+""")
+
+
+def test_inline_profile_edits_save_names_fractional_portions_and_group_drafts_together():
+    run_page(r"""
+panel.members[0]={...members[0],first_name:'Nathan',last_name:'Tyler',default_portion:1,group_ids:['home']};
+panel.groups=[{id:'home',name:'Home',archived:false},{id:'friends',name:'Friends',archived:false}];
+const picker=mountGroupEditorRows();panel.render();
+const row=picker.row('nate'),savedBefore=plain(panel.members[0]);
+const markup=rows().match(/<tr[^>]*data-family-member-id="nate"[^>]*>([\s\S]*?)<\/tr>/)[1];
+for(const field of ['first_name','last_name','default_portion'])assert(markup.includes(`data-family-profile="${field}"`));
+assert(!rows().includes('data-family-details'));assert(!rows().includes('data-family-detail-id'));
+for(const [field,value] of Object.entries({first_name:' Nathaniel ',last_name:' Tyler Jr ',default_portion:'0.5'})){
+ const input=row.querySelector(`[data-family-profile="${field}"]`);input.value=value;panel.input({target:input});
+}
+assert.equal(row.querySelector('[data-family-save]').disabled,false);assert.equal(row.querySelector('[data-family-cancel]').hidden,false);
+assert.deepEqual(plain(panel.members[0]),savedBefore);assert.equal(requests.length,0);
+panel.openGroupEditor(panel.members[0]);
+panel.change({target:{value:'friends',checked:true,dataset:{familyMember:'nate'},matches:selector=>selector==='[data-family-member-group]'}});
+panel.closeGroupEditor();
+reply={ok:true,member:{...savedBefore,first_name:'Nathaniel',last_name:'Tyler Jr',default_portion:0.5,group_ids:['home','friends']}};
+await panel.saveRow(row,panel.members[0]);
+assert.deepEqual(JSON.parse(requests[0].options.body),{name:'Nate',first_name:'Nathaniel',last_name:'Tyler Jr',default_portion:0.5,group_ids:['home','friends']});
+assert.equal(panel.members[0].name,'Nate');assert.equal(panel.profiles.has('nate'),false);assert.equal(panel.dirty(panel.members[0]),false);
+assert(rows().includes('value="Nathaniel"'));assert(rows().includes('value="0.5"'));
+""")
+
+
+def test_inline_profile_cancel_restores_all_fields_groups_and_display_name():
+    run_page(r"""
+panel.members[0]={...members[0],first_name:'Nathan',last_name:'Tyler',default_portion:1,group_ids:['home']};
+panel.groups=[{id:'home',name:'Home',archived:false},{id:'friends',name:'Friends',archived:false}];
+const picker=mountGroupEditorRows(),row=picker.row('nate');
+const input=row.querySelector('[data-family-name]');input.value='Different name';panel.input({target:input});
+for(const [field,value] of Object.entries({first_name:'New first',last_name:'New last',default_portion:'2.5'})){
+ const input=row.querySelector(`[data-family-profile="${field}"]`);input.value=value;panel.input({target:input});
+}
+panel.change({target:{value:'friends',checked:true,dataset:{familyMember:'nate'},matches:selector=>selector==='[data-family-member-group]'}});
+panel.cancelRow('nate');
+assert.equal(panel.drafts.has('nate'),false);assert.equal(panel.profiles.has('nate'),false);assert.equal(panel.dirty(panel.members[0]),false);
+assert.deepEqual(plain(panel.memberProfile(panel.members[0])),{first_name:'Nathan',last_name:'Tyler',default_portion:1,group_ids:['home']});
+assert(rows().includes('value="Nate"'));assert(rows().includes('value="Nathan"'));assert(rows().includes('value="Tyler"'));
+assert(!rows().includes('New first'));assert(!rows().includes('New last'));assert(!rows().includes('Different name'));
+assert.equal(ctx.document.activeElement,input);assert.equal(requests.length,0);
+""")
+
+
+def test_inline_invalid_portions_block_save_and_focus_the_field_without_losing_other_drafts():
+    run_page(r"""
+const picker=mountGroupEditorRows(),row=picker.row('nate');
+const first=row.querySelector('[data-family-profile="first_name"]');first.value='Nathan';panel.input({target:first});
+const portion=row.querySelector('[data-family-profile="default_portion"]');
+for(const value of ['0','-1','','not-a-number']){
+ portion.value=value;panel.input({target:portion});ctx.document.activeElement=first;
+ await panel.saveRow(row,panel.members[0]);
+ assert.equal(requests.length,0);assert.equal(ctx.document.activeElement,portion);
+ assert.equal(panel.memberProfile(panel.members[0]).default_portion,value);
+ assert.equal(panel.memberProfile(panel.members[0]).first_name,'Nathan');
+ assert.match(panel.errors.get('nate'),/greater than zero/i);
+ assert.equal(panel.members[0].default_portion,undefined);
+}
+portion.value='0.25';panel.input({target:portion});
+reply={ok:true,member:{...members[0],first_name:'Nathan',last_name:'',default_portion:0.25,group_ids:[]}};
+await panel.saveRow(row,panel.members[0]);
+assert.equal(requests.length,1);assert.equal(JSON.parse(requests[0].options.body).default_portion,0.25);
+assert.equal(panel.errors.has('nate'),false);assert.equal(panel.profiles.has('nate'),false);
+""")
+
+
+def test_inline_profile_keyboard_enter_saves_and_escape_cancels_the_whole_row():
+    run_page(r"""
+const picker=mountGroupEditorRows(),row=picker.row('nate');
+const first=row.querySelector('[data-family-profile="first_name"]'),last=row.querySelector('[data-family-profile="last_name"]');
+first.value='Nathan';panel.input({target:first});
+let prevented=0;reply={ok:true,member:{...members[0],first_name:'Nathan',last_name:'',default_portion:1,group_ids:[]}};
+panel.keydown({target:first,key:'Enter',preventDefault(){prevented++;}});
+await new Promise(resolve=>setTimeout(resolve,0));
+assert.equal(requests.length,1);assert.equal(panel.members[0].first_name,'Nathan');assert.equal(prevented,1);
+first.value='Unsaved first';last.value='Unsaved last';panel.input({target:first});panel.input({target:last});
+const portion=row.querySelector('[data-family-profile="default_portion"]');portion.value='2';panel.input({target:portion});
+panel.keydown({target:last,key:'Escape',preventDefault(){prevented++;}});
+assert.equal(prevented,2);assert.equal(panel.profiles.has('nate'),false);assert.equal(requests.length,1);
+assert.deepEqual(plain(panel.memberProfile(panel.members[0])),{first_name:'Nathan',last_name:'',default_portion:1,group_ids:[]});
 """)
 
 
@@ -344,7 +445,7 @@ ctx.location.search='?status=active';assert.equal(new ctx.FamilyMembersPage(page
 """)
 
 
-def test_group_popover_opens_without_expanding_details_and_saves_memberships_only_with_row_save():
+def test_group_popover_leaves_profile_fields_inline_and_saves_memberships_only_with_row_save():
     run_page(r"""
 panel.groups=[{id:'home',name:'Household',archived:false},{id:'friends',name:'Friends',archived:false},{id:'team',name:'Team',archived:false}];
 panel.members[0]={...members[0],group_ids:['home'],first_name:'Nathan',last_name:'Tyler',default_portion:1};
@@ -357,14 +458,14 @@ const picker=mountGroupEditorRows();
 panel.render();
 assert.match(rows(),/data-family-edit-groups[^>]+aria-label="Edit groups for Nate"/);
 panel.click({target:{closest:()=>picker.edit('nate')}});
-assert.equal(panel.expanded.has('nate'),false);assert.equal(panel.expanded.has('sam'),false);
+assert(!rows().includes('data-family-details'));assert(!rows().includes('data-family-detail-id'));
 assert.equal(panel.groupEditorMemberId,'nate');assert.equal(picker.editor.popoverOpen,true);
 assert.equal(picker.firstChoice.focused,true);
 assert.deepEqual(plain([...panel.profiles]),profilesBefore);assert.deepEqual(plain([...panel.drafts]),draftsBefore);
 assert.deepEqual(plain(panel.members),membersBefore);assert.equal(requests.length,0);
 assert.match(picker.choices.innerHTML,/data-family-member-group[^>]+value="home" checked/);
 assert.match(picker.choices.innerHTML,/data-family-member-group[^>]+value="team" checked/);
-assert(!rows().includes('data-family-member-group'),'The shared picker is not rendered inside table rows or Details');
+assert(!rows().includes('data-family-member-group'),'The shared picker is not rendered inside table rows');
 panel.change({target:{value:'friends',checked:true,dataset:{familyMember:'nate'},matches:selector=>selector==='[data-family-member-group]'}});
 assert.deepEqual(plain(panel.members[0].group_ids),['home'],'Checkbox changes are unsaved row drafts');
 assert.equal(requests.length,0);assert.equal(panel.dirty(panel.members[0]),true);
@@ -384,14 +485,14 @@ def test_empty_group_popover_is_focusable_and_close_preserves_drafts():
 const picker=mountGroupEditorRows();panel.drafts.set('nate','Nathan');
 panel.openGroupEditor(members[0]);
 assert.equal(panel.groupEditorMemberId,'nate');assert.equal(picker.editor.popoverOpen,true);
-assert.equal(picker.editor.focused,true);assert.equal(panel.expanded.size,0);
+assert.equal(picker.editor.focused,true);assert(!rows().includes('data-family-details'));
 assert(picker.choices.innerHTML.includes('No groups yet'));
 panel.click({target:{closest:()=>picker.close}});
 assert.equal(picker.editor.popoverOpen,false);assert.equal(picker.edit('nate').focused,true);
 assert.equal(panel.drafts.get('nate'),'Nathan');assert.equal(requests.length,0);
 picker.edit('nate').disabled=true;picker.editor.focused=false;
 panel.click({target:{closest:()=>picker.edit('nate')}});
-assert.equal(panel.expanded.size,0);assert.equal(picker.editor.focused,false);assert.equal(picker.editor.popoverOpen,false);
+assert(!rows().includes('data-family-detail-id'));assert.equal(picker.editor.focused,false);assert.equal(picker.editor.popoverOpen,false);
 """)
 
 
@@ -435,7 +536,7 @@ panel.openGroupEditor(members[0]);panel.keydown(event(picker.close,'Tab'));
 assert.equal(picker.editor.hidden,true);assert.equal(ctx.document.activeElement,picker.row('nate').querySelector('[data-family-save]'));
 panel.openGroupEditor(members[0]);picker.row('nate').querySelector('[data-family-save]').disabled=true;
 panel.keydown(event(picker.close,'Tab'));
-assert.equal(ctx.document.activeElement,picker.row('nate').querySelector('[data-family-details]'));
+assert.equal(ctx.document.activeElement,picker.row('nate').querySelector('[data-family-profile="default_portion"]'));
 assert.equal(prevented,4);assert.deepEqual(plain(panel.memberProfile(members[0]).group_ids),['home']);
 assert.equal(requests.length,0);
 """)

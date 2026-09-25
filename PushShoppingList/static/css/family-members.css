@@ -26,20 +26,24 @@
 .family-members-create label { flex: 1 1 240px; }
 .family-members-create .family-members-error { flex-basis: 100%; }
 .family-members-page .family-members-table-wrap { border-color: var(--app-border); background: var(--app-surface); }
-.family-members-page .family-members-table { min-width: 0; table-layout: auto; }
+.family-members-page .family-members-table { min-width: 0; table-layout: fixed; }
 .family-members-page .family-members-table th, .family-members-page .family-members-table td { padding: 10px 12px; border-color: var(--app-border); color: var(--app-text); vertical-align: middle; font-size: 12px; }
 .family-members-page .family-members-table th { background: var(--app-surface-soft); color: var(--app-muted); font-size: 11px; font-weight: 700; }
-.family-members-page .family-members-table th:nth-child(1) { width: 25%; }
-.family-members-page .family-members-table th:nth-child(2) { width: 19%; }
-.family-members-page .family-members-table th:nth-child(3) { width: 10%; }
-.family-members-page .family-members-table th:nth-child(4) { width: 10%; }
-.family-members-page .family-members-table th:nth-child(5) { width: 13%; }
-.family-members-page .family-members-table th:nth-child(6) { width: 23%; }
+.family-members-page .family-members-table th:nth-child(1) { width: 16%; }
+.family-members-page .family-members-table th:nth-child(2) { width: 11%; }
+.family-members-page .family-members-table th:nth-child(3) { width: 11%; }
+.family-members-page .family-members-table th:nth-child(4) { width: 20%; }
+.family-members-page .family-members-table th:nth-child(5) { width: 10%; }
+.family-members-page .family-members-table th:nth-child(6) { width: 8%; }
+.family-members-page .family-members-table th:nth-child(7) { width: 11%; }
+.family-members-page .family-members-table th:nth-child(8) { width: 13%; }
 .family-members-table .family-members-name { max-width: 460px; }
-.family-members-page .family-members-table input[data-family-name] { min-height: 34px; padding: 6px 7px; border-color: transparent; border-radius: 5px; background: transparent; color: var(--app-text-strong); font-size: 13px; font-weight: 650; box-shadow: none; }
-.family-members-page .family-members-table input[data-family-name]:hover:not(:disabled) { border-color: var(--app-border); }
-.family-members-page .family-members-table input[data-family-name]:focus { border-color: var(--app-primary); }
-.family-members-page .family-members-table input[data-family-name][aria-invalid="true"] { border-color: var(--app-danger, #f28f92); }
+.family-members-page .family-members-table input:is([data-family-name], [data-family-profile]) { min-height: 34px; padding: 6px 7px; border-color: transparent; border-radius: 5px; background: transparent; color: var(--app-text-strong); font-size: 13px; font-weight: 650; box-shadow: none; }
+.family-members-page .family-members-table input:is([data-family-name], [data-family-profile]):hover:not(:disabled) { border-color: var(--app-border); }
+.family-members-page .family-members-table input:is([data-family-name], [data-family-profile]):focus { border-color: var(--app-primary); }
+.family-members-page .family-members-table input:is([data-family-name], [data-family-profile])[aria-invalid="true"] { border-color: var(--app-danger, #f28f92); }
+.family-members-page .family-members-table input[data-family-profile]::placeholder { color: var(--app-muted); font-weight: 400; opacity: 1; }
+.family-members-page .family-members-table input[data-family-profile="default_portion"] { max-width: 110px; }
 .family-members-page .family-members-table tr:is(.is-dirty, .is-group-editing) > td { background: color-mix(in srgb, var(--app-primary) 6%, var(--app-surface)); }
 .family-members-page .family-members-table tr.is-group-editing > td:first-child { box-shadow: inset 3px 0 var(--app-primary); }
 .family-members-badge { display: inline-flex; max-width: 100%; box-sizing: border-box; overflow-wrap: anywhere; border: 1px solid var(--app-border); color: var(--app-primary); padding: 3px 7px; border-radius: 5px; font-size: 11px; font-weight: 600; line-height: 1.3; }
@@ -79,8 +83,6 @@ html[data-app-resolved-theme="light"] .family-members-group-popover { box-shadow
 .family-members-group-picker > div { display: flex; align-items: center; flex-wrap: wrap; gap: 9px 16px; }
 .family-members-page .family-members-check { display: inline-flex; align-items: center; gap: 8px; color: var(--app-text); padding: 5px 0; font-size: 13px; }
 .family-members-page .family-members-check input { width: 17px; height: 17px; min-height: 0; padding: 0; margin: 0; accent-color: var(--app-primary); }
-.family-members-detail-row > td { background: var(--app-surface-soft); }
-.family-members-detail-row .family-members-group-picker { margin-top: 16px; }
 .family-members-groups-section { margin-bottom: 18px; padding: 14px; border: 1px solid var(--app-border); border-radius: 8px; background: var(--app-surface-soft); }
 .family-members-groups-section > summary { cursor: pointer; font-size: 14px; font-weight: 600; }
 .family-members-groups-section > summary:focus-visible { outline: 2px solid var(--app-primary); outline-offset: 4px; }
@@ -94,7 +96,7 @@ html[data-app-resolved-theme="light"] .family-members-group-popover { box-shadow
 .family-members-bulk-person { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--app-border); border-radius: 8px; background: var(--app-surface-soft); }
 .family-members-bulk-person > button { justify-self: end; }
 .family-members-bulk > button { justify-self: start; }
-@media (max-width: 1050px) {
+@media (max-width: 1300px) {
     .family-members-page .master-data-header { align-items: flex-start; flex-direction: column; }
     .family-members-header-actions { justify-content: flex-start; }
     .family-members-panel { padding: 12px; }
@@ -105,13 +107,11 @@ html[data-app-resolved-theme="light"] .family-members-group-popover { box-shadow
     .family-members-table tr { min-width: 0; border: 1px solid var(--app-border); border-radius: 8px; padding: 8px; }
     .family-members-page .family-members-table td { border: 0; padding: 8px; }
     .family-members-table td::before { content: attr(data-mobile-label); display: block; margin-bottom: 7px; color: var(--app-muted); font-size: 12px; font-weight: 600; }
-    .family-members-table .family-members-detail-row { margin-top: -12px; border-top: 0; border-radius: 0 0 8px 8px; }
-    .family-members-table .family-members-detail-row td::before { display: none; }
     .family-members-table .family-members-name { max-width: none; }
     .family-members-filters label:first-child { flex: 1 1 200px; }
 }
 @media (max-width: 760px) {
-    .family-members-page .family-members-table input[data-family-name] { min-height: 44px; font-size: 16px; }
+    .family-members-page .family-members-table input:is([data-family-name], [data-family-profile]) { min-height: 44px; font-size: 16px; }
     .family-members-page .family-members-table .family-members-row-actions button, .family-members-page .family-members-group-popover > footer button { min-height: 44px; }
     .family-members-page button.family-members-edit-groups { flex-basis: 44px; width: 44px; min-width: 44px; max-width: 44px; height: 44px; min-height: 44px; max-height: 44px; color: var(--app-primary); font-size: 20px; }
     .family-members-page .family-members-group-popover .family-members-check { min-height: 44px; box-sizing: border-box; }

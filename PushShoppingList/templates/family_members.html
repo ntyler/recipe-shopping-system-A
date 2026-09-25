@@ -85,12 +85,13 @@ data-viewer-user-id="{{ family_members.viewer_user_id }}"
         </details>
         <div class="master-data-table-wrap family-members-table-wrap">
             <table class="master-data-table family-members-table">
-                <caption class="sr-only">Saved family members, groups, portions, status, scheduled meal usage, and actions</caption>
-                <thead><tr><th scope="col">Display name</th><th scope="col">Groups</th><th scope="col">Default portion</th><th scope="col">Status</th><th scope="col">Used in meal plans</th><th scope="col">Actions</th></tr></thead>
+                <caption class="sr-only">Saved family members with editable display name, first name, last name, groups, default portion, status, scheduled meal usage, and actions</caption>
+                <thead><tr><th scope="col">Display name</th><th scope="col">First name</th><th scope="col">Last name</th><th scope="col">Groups</th><th scope="col">Default portion</th><th scope="col">Status</th><th scope="col">Used in meal plans</th><th scope="col">Actions</th></tr></thead>
                 <tbody data-family-rows></tbody>
             </table>
         </div>
         <p class="family-members-empty" data-family-empty hidden></p>
+        <p class="family-members-help">Default portions apply when starting a new meal plan. Existing scheduled portions stay unchanged.</p>
         <p class="family-members-help">Usage counts include scheduled meals assigned to each member. Archived members stay in existing meal plans. Restore them to include them in new meals.</p>
         <noscript><p>Enable JavaScript to manage family members.</p></noscript>
     </section>

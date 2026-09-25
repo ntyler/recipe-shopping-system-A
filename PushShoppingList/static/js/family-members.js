@@ -14,7 +14,6 @@
             this.members = Array.isArray(members) ? members : [];
             this.drafts = new Map();
             this.profiles = new Map();
-            this.expanded = new Set();
             this.groupEditorMemberId = '';
             this.groupEditor = page.querySelector('[data-family-group-editor]');
             if (this.groupEditor) this.groupEditor.hidden = true;
@@ -102,10 +101,10 @@
 
         focusState() {
             const element = document.activeElement;
-            if (element?.dataset?.familyFocus) return {key:element.dataset.familyFocus, memberId:element.closest('[data-family-detail-id]')?.dataset.familyDetailId || (this.groupEditor?.contains(element) ? this.groupEditorMemberId : undefined), start:element.selectionStart, end:element.selectionEnd};
+            if (element?.dataset?.familyFocus) return {key:element.dataset.familyFocus, memberId:element.closest('[data-family-member-id]')?.dataset.familyMemberId || (this.groupEditor?.contains(element) ? this.groupEditorMemberId : undefined), start:element.selectionStart, end:element.selectionEnd};
             const row = element?.closest?.('[data-family-member-id]');
             if (!row) return null;
-            const control = ['name', 'save', 'cancel', 'archive', 'details', 'edit-groups'].find(key => element.matches(`[data-family-${key}]`));
+            const control = ['name', 'save', 'cancel', 'archive', 'edit-groups'].find(key => element.matches(`[data-family-${key}]`));
             return control ? {memberId:row.dataset.familyMemberId, control, start:element.selectionStart, end:element.selectionEnd} : null;
         }
 
@@ -179,31 +178,23 @@
                 const disabled = busy ? ' disabled' : '';
                 const values = this.memberProfile(member);
                 const groupLabels = ids(values.group_ids).map(id => this.groups.find(group => group.id === id)).filter(Boolean);
-                const detailsOpen = this.expanded.has(member.id);
+                const invalidPortion = !!error && !positive(values.default_portion);
                 const groupsOpen = this.groupEditorMemberId === member.id;
                 return `<tr data-family-member-id="${esc(member.id)}" aria-busy="${busy}" class="${this.dirty(member) ? 'is-dirty' : ''}${groupsOpen ? ' is-group-editing' : ''}">
-                    <td data-mobile-label="Name"><label class="family-members-name"><span class="sr-only">Name for ${esc(member.name)}</span>
-                        <input type="text" value="${esc(this.drafts.get(member.id) ?? member.name)}" maxlength="100" required autocomplete="off" data-family-name aria-describedby="familyMemberError${index}"${error ? ' aria-invalid="true"' : ''}${disabled}>
+                    <td data-mobile-label="Display name"><label class="family-members-name"><span class="sr-only">Display name for ${esc(member.name)}</span>
+                        <input type="text" value="${esc(this.drafts.get(member.id) ?? member.name)}" maxlength="100" required autocomplete="off" data-family-name aria-describedby="familyMemberError${index}"${error && !invalidPortion ? ' aria-invalid="true"' : ''}${disabled}>
                     </label><p id="familyMemberError${index}" class="family-members-error" role="alert"${error ? '' : ' hidden'}>${esc(error)}</p></td>
+                    ${[['first_name','First name'],['last_name','Last name']].map(([field,label]) => `<td data-mobile-label="${label}"><input type="text" maxlength="100" value="${esc(values[field])}" placeholder="Optional" autocomplete="off" aria-label="${label} for ${esc(member.name)}" data-family-profile="${field}" data-family-focus="${esc(member.id)}:${field}"${disabled}></td>`).join('')}
                     <td data-mobile-label="Groups"><div class="family-members-group-badges"><span class="family-members-group-chip-list">${groupLabels.length ? groupLabels.map(group => `<span class="family-members-group-chip${group.archived ? ' is-archived' : ''}">${esc(group.name)}${group.archived ? ' (Archived)' : ''}</span>`).join('') : '<span class="family-members-help">Ungrouped</span>'}</span>
                         <button type="button" class="family-members-edit-groups" data-family-edit-groups aria-expanded="${groupsOpen}" aria-controls="familyMemberGroupEditor" aria-haspopup="dialog" aria-label="Edit groups for ${esc(member.name)}" title="Edit groups for ${esc(member.name)}"${disabled}>+</button></div></td>
-                    <td data-mobile-label="Default portion">${esc(member.default_portion ?? 1)}</td>
+                    <td data-mobile-label="Default portion"><input type="number" min="0" step="any" required value="${esc(values.default_portion)}" aria-label="Default portion for ${esc(member.name)}" aria-describedby="familyMemberError${index}"${invalidPortion ? ' aria-invalid="true"' : ''} data-family-profile="default_portion" data-family-focus="${esc(member.id)}:default_portion"${disabled}></td>
                     <td data-mobile-label="Status"><span class="family-members-badge${member.archived ? ' is-archived' : ''}">${member.archived ? 'Archived' : 'Active'}</span></td>
                     <td data-mobile-label="Used in meal plans">${Number(member.meal_count) || 0} scheduled ${(Number(member.meal_count) || 0) === 1 ? 'meal' : 'meals'}</td>
                     <td data-mobile-label="Actions"><div class="family-members-row-actions">
-                        <button type="button" data-family-details aria-expanded="${detailsOpen}" aria-controls="familyMemberDetails${index}" aria-label="Edit details for ${esc(member.name)}"${disabled}>Details</button>
                         <button type="button" data-family-save aria-label="Save ${esc(member.name)}"${busy || !this.dirty(member) || !clean(this.drafts.get(member.id) ?? member.name) ? ' disabled' : ''}>Save</button>
                         <button type="button" data-family-cancel aria-label="Cancel changes to ${esc(member.name)}"${this.dirty(member) ? '' : ' hidden'}${disabled}>Cancel</button>
                         <button type="button" data-family-archive aria-label="${member.archived ? 'Restore' : 'Archive'} ${esc(member.name)}"${disabled}>${member.archived ? 'Restore' : 'Archive'}</button>
-                    </div></td></tr>
-                    <tr id="familyMemberDetails${index}" class="family-members-detail-row" data-family-detail-id="${esc(member.id)}"${detailsOpen ? '' : ' hidden'}><td colspan="6">
-                        <div class="family-members-profile-fields">
-                            <label>First name (optional)<input type="text" maxlength="100" value="${esc(values.first_name)}" data-family-profile="first_name" data-family-focus="${esc(member.id)}:first_name"${disabled}></label>
-                            <label>Last name (optional)<input type="text" maxlength="100" value="${esc(values.last_name)}" data-family-profile="last_name" data-family-focus="${esc(member.id)}:last_name"${disabled}></label>
-                            <label>Default portion<input type="number" min="0" step="any" required value="${esc(values.default_portion)}" data-family-profile="default_portion" data-family-focus="${esc(member.id)}:default_portion"${disabled}></label>
-                        </div>
-                        <p class="family-members-help">Default portions apply when starting a new meal plan. Existing scheduled portions stay unchanged.</p>
-                    </td></tr>`;
+                    </div></td></tr>`;
             }).join('');
             const empty = this.page.querySelector('[data-family-empty]');
             empty.hidden = visible.length > 0;
@@ -445,9 +436,9 @@
                 return;
             }
             if (target.matches('[data-family-profile]')) {
-                const id = target.closest('[data-family-detail-id]').dataset.familyDetailId;
+                const id = target.closest('[data-family-member-id]')?.dataset.familyMemberId;
                 const member = this.members.find(item => item.id === id);
-                if (!member) return;
+                if (!member || this.loading || this.pending.has(id)) return;
                 this.profiles.set(id, {...this.memberProfile(member), [target.dataset.familyProfile]:target.value});
                 this.syncMemberActions(member);
                 return;
@@ -490,7 +481,12 @@
             const patch = {name:clean(input.value)};
             if (this.profiles.has(member.id)) {
                 const values = this.memberProfile(member);
-                if (!positive(values.default_portion)) { this.errors.set(member.id, 'Default portion must be greater than zero.'); this.expanded.add(member.id); this.render(); return; }
+                if (!positive(values.default_portion)) {
+                    this.errors.set(member.id, 'Default portion must be greater than zero.');
+                    this.render();
+                    this.restoreFocus({key:`${member.id}:default_portion`});
+                    return;
+                }
                 Object.assign(patch, {first_name:clean(values.first_name), last_name:clean(values.last_name), default_portion:Number(values.default_portion), group_ids:ids(values.group_ids)});
             }
             return this.update(member, patch);
@@ -539,13 +535,6 @@
             if (button.matches('[data-family-edit-groups]')) {
                 return this.openGroupEditor(member);
             }
-            if (button.matches('[data-family-details]')) {
-                this.expanded[this.expanded.has(member.id) ? 'delete' : 'add'](member.id);
-                this.render();
-                if (this.expanded.has(member.id)) this.restoreFocus({key:`${member.id}:first_name`});
-                else this.restoreFocus({memberId:member.id,control:'details'});
-                return;
-            }
             if (button.matches('[data-family-save]')) return this.saveRow(row, member);
             if (button.matches('[data-family-archive]')) return this.update(member, {archived:!member.archived});
             if (button.matches('[data-family-cancel]')) this.cancelRow(member.id);
@@ -572,7 +561,7 @@
                     if (!event.shiftKey) {
                         const row = this.memberRow(id);
                         const save = row?.querySelector('[data-family-save]');
-                        (save && !save.disabled ? save : row?.querySelector('[data-family-details]'))?.focus({preventScroll:true});
+                        (save && !save.disabled ? save : row?.querySelector('[data-family-profile="default_portion"]'))?.focus({preventScroll:true});
                     }
                     return;
                 }
@@ -585,8 +574,7 @@
                 return;
             }
             if (!event.target.matches('[data-family-name]') && !event.target.matches('[data-family-profile]')) return;
-            const detail = event.target.closest('[data-family-detail-id]');
-            const row = detail ? [...this.page.querySelectorAll('[data-family-member-id]')].find(node => node.dataset.familyMemberId === detail.dataset.familyDetailId) : event.target.closest('[data-family-member-id]');
+            const row = event.target.closest('[data-family-member-id]');
             if (!row) return;
             const member = this.members.find(item => item.id === row.dataset.familyMemberId);
             if (!member || this.pending.has(member.id) || this.loading) return;
