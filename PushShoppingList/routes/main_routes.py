@@ -170,10 +170,13 @@ from PushShoppingList.services.menu_store_service import menus_by_cookbook
 from PushShoppingList.services.meal_plan_service import add_meal
 from PushShoppingList.services.meal_plan_service import add_meal_prep_batch
 from PushShoppingList.services.meal_plan_service import add_meal_plan_member
+from PushShoppingList.services.meal_plan_service import add_meal_plan_members_bulk
+from PushShoppingList.services.meal_plan_service import add_meal_plan_group
 from PushShoppingList.services.meal_plan_service import delete_meal
 from PushShoppingList.services.meal_plan_service import delete_meal_prep_batch
 from PushShoppingList.services.meal_plan_service import load_meal_plan
 from PushShoppingList.services.meal_plan_service import list_meal_plan_members
+from PushShoppingList.services.meal_plan_service import list_meal_plan_groups
 from PushShoppingList.services.meal_plan_service import meal_prep_batch_summary
 from PushShoppingList.services.meal_plan_service import meal_plan_yield_label
 from PushShoppingList.services.meal_plan_service import meal_plan_home_preview
@@ -183,6 +186,7 @@ from PushShoppingList.services.meal_plan_service import planned_servings_from_yi
 from PushShoppingList.services.meal_plan_service import update_meal_ingredient_option_selections
 from PushShoppingList.services.meal_plan_service import update_meal_prep_step
 from PushShoppingList.services.meal_plan_service import update_meal_plan_member
+from PushShoppingList.services.meal_plan_service import update_meal_plan_group
 from PushShoppingList.services.global_search_service import global_search
 from PushShoppingList.services.global_search_service import ACTUAL_RECORD_GROUPS
 from PushShoppingList.services.global_search_service import DEFAULT_RESULT_LIMIT
@@ -5971,10 +5975,12 @@ def family_members_route():
         "family_members.html",
         family_members={
             "members": list_meal_plan_members(include_archived=True),
+            "groups": list_meal_plan_groups(include_archived=True),
             "viewer_user_id": "" if is_guest_session() else viewer_user_id,
             "settings_url": url_for("main_bp.index", _anchor="settingsProfilePanel"),
             "meal_planner_url": url_for("main_bp.index", _anchor="mealPlannerPage"),
             "api_url": url_for("main_bp.meal_plan_members_route"),
+            "groups_api_url": url_for("main_bp.meal_plan_groups_route"),
         },
         current_user=current_public_user(),
         is_guest_demo=is_guest_session(),
@@ -6016,10 +6022,13 @@ def meal_plan_members_route():
     validate_master_data_viewer_scope()
     if request.method == "GET":
         include_archived = request.args.get("include_archived", "false").strip().lower() == "true"
-        return jsonify({"ok": True, "members": list_meal_plan_members(include_archived=include_archived)})
+        return jsonify({"ok": True, "members": list_meal_plan_members(include_archived=include_archived),
+                        "groups": list_meal_plan_groups(include_archived=include_archived)})
     payload = request.get_json(silent=True)
     try:
-        member = add_meal_plan_member(payload.get("name") if isinstance(payload, dict) else None)
+        if not isinstance(payload, dict) or "name" not in payload or set(payload) - {"name", "first_name", "last_name", "default_portion", "group_ids"}:
+            raise ValueError("Provide a name and supported member details.")
+        member = add_meal_plan_member(**payload)
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
     return jsonify({"ok": True, "member": member}), 201
@@ -6032,14 +6041,64 @@ def update_meal_plan_member_route(member_id):
     validate_master_data_viewer_scope()
     payload = request.get_json(silent=True)
     try:
-        if not isinstance(payload, dict) or not payload or set(payload) - {"name", "archived"}:
-            raise ValueError("Provide a name or archived status to update.")
+        if not isinstance(payload, dict) or not payload or set(payload) - {"name", "archived", "first_name", "last_name", "default_portion", "group_ids"}:
+            raise ValueError("Provide supported member details to update.")
         member = update_meal_plan_member(member_id, **payload)
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
     if not member:
         return jsonify({"ok": False, "error": "That family member was not found."}), 404
     return jsonify({"ok": True, "member": member})
+
+
+@main_bp.route("/api/meal-plan/members/bulk", methods=["POST"])
+def add_meal_plan_members_bulk_route():
+    if not current_public_user() and not is_guest_session():
+        return jsonify({"ok": False, "error": "Sign in or start a guest workspace to manage family members."}), 403
+    validate_master_data_viewer_scope()
+    payload = request.get_json(silent=True)
+    try:
+        if not isinstance(payload, dict) or "members" not in payload or set(payload) - {"members", "group_ids"}:
+            raise ValueError("Provide members and optional group IDs to add.")
+        members = add_meal_plan_members_bulk(**payload)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    return jsonify({"ok": True, "members": members}), 201
+
+
+@main_bp.route("/api/meal-plan/groups", methods=["GET", "POST"])
+def meal_plan_groups_route():
+    if not current_public_user() and not is_guest_session():
+        return jsonify({"ok": False, "error": "Sign in or start a guest workspace to manage family groups."}), 403
+    validate_master_data_viewer_scope()
+    if request.method == "GET":
+        include_archived = request.args.get("include_archived", "false").strip().lower() == "true"
+        return jsonify({"ok": True, "groups": list_meal_plan_groups(include_archived=include_archived)})
+    payload = request.get_json(silent=True)
+    try:
+        if not isinstance(payload, dict) or set(payload) != {"name"}:
+            raise ValueError("Provide a group name.")
+        group = add_meal_plan_group(payload["name"])
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    return jsonify({"ok": True, "group": group}), 201
+
+
+@main_bp.route("/api/meal-plan/groups/<group_id>", methods=["PATCH"])
+def update_meal_plan_group_route(group_id):
+    if not current_public_user() and not is_guest_session():
+        return jsonify({"ok": False, "error": "Sign in or start a guest workspace to manage family groups."}), 403
+    validate_master_data_viewer_scope()
+    payload = request.get_json(silent=True)
+    try:
+        if not isinstance(payload, dict) or not payload or set(payload) - {"name", "archived"}:
+            raise ValueError("Provide a group name or archived status to update.")
+        group = update_meal_plan_group(group_id, **payload)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    if not group:
+        return jsonify({"ok": False, "error": "That family group was not found."}), 404
+    return jsonify({"ok": True, "group": group})
 
 
 @main_bp.route("/api/meal-plan/batches", methods=["POST"])

@@ -99,9 +99,18 @@ def normalize_member(value):
         return None
     member_id = clean_text(value.get("id"))
     name = clean_text(value.get("name"))
+    try:
+        default_portion = normalize_positive_servings(value.get("default_portion", 1), "Default portion")
+    except ValueError:
+        default_portion = 1
+    group_ids = value.get("group_ids") if isinstance(value.get("group_ids"), list) else []
     return {
         "id": member_id,
         "name": name,
+        "first_name": value.get("first_name", "").strip() if isinstance(value.get("first_name", ""), str) else "",
+        "last_name": value.get("last_name", "").strip() if isinstance(value.get("last_name", ""), str) else "",
+        "default_portion": default_portion,
+        "group_ids": list(dict.fromkeys(item.strip() for item in group_ids if isinstance(item, str) and item.strip())),
         "archived": value.get("archived") is True,
     } if member_id and name else None
 
@@ -113,6 +122,39 @@ def normalize_member_name(value):
     if len(name) > 100:
         raise ValueError("Family member names must be 100 characters or fewer.")
     return name
+
+
+def normalize_optional_member_name(value, label):
+    if not isinstance(value, str) or len(value.strip()) > 100:
+        raise ValueError(f"{label} must be text of 100 characters or fewer.")
+    return value.strip()
+
+
+def normalize_group(value):
+    if not isinstance(value, dict):
+        return None
+    group_id, name = clean_text(value.get("id")), clean_text(value.get("name"))
+    return {"id": group_id, "name": name, "archived": value.get("archived") is True} if group_id and name else None
+
+
+def normalize_group_name(value):
+    if not isinstance(value, str) or not value.strip() or len(value.strip()) > 100:
+        raise ValueError("Enter a group name of 100 characters or fewer.")
+    return value.strip()
+
+
+def validate_member_group_ids(value, groups, previous_ids=()):
+    if not isinstance(value, list) or any(not isinstance(item, str) or not item.strip() for item in value):
+        raise ValueError("Group IDs must be a list of saved group IDs.")
+    group_ids = list(dict.fromkeys(item.strip() for item in value))
+    by_id = {group["id"]: group for group in groups}
+    for group_id in group_ids:
+        group = by_id.get(group_id)
+        if not group:
+            raise ValueError("Choose groups from your current workspace.")
+        if group["archived"] and group_id not in previous_ids:
+            raise ValueError("That group is archived. Restore it before assigning new members.")
+    return group_ids
 
 
 def normalize_member_portions(value, members=None):
@@ -164,6 +206,50 @@ def list_meal_plan_members(include_archived=False):
     ]
 
 
+def list_meal_plan_groups(include_archived=False):
+    return [group for group in load_meal_plan()["groups"] if include_archived or not group["archived"]]
+
+
+def validate_unique_group_name(name, groups, group_id=None):
+    existing = next((group for group in groups if group["id"] != group_id and group["name"].casefold() == name.casefold()), None)
+    if existing:
+        if existing["archived"]:
+            raise ValueError("An archived group with that name already exists. Restore it in Family Members.")
+        raise ValueError("A group with that name already exists.")
+
+
+def add_meal_plan_group(name):
+    name = normalize_group_name(name)
+    with MEAL_PLAN_LOCK:
+        payload = load_meal_plan()
+        validate_unique_group_name(name, payload["groups"])
+        group = {"id": uuid.uuid4().hex, "name": name, "archived": False}
+        payload["groups"].append(group)
+        save_meal_plan(payload)
+        return group
+
+
+def update_meal_plan_group(group_id, name=_UNSET, *, archived=_UNSET):
+    if name is _UNSET and archived is _UNSET:
+        raise ValueError("Provide a group name or archived status to update.")
+    if name is not _UNSET:
+        name = normalize_group_name(name)
+    if archived is not _UNSET and not isinstance(archived, bool):
+        raise ValueError("Archived must be true or false.")
+    with MEAL_PLAN_LOCK:
+        payload = load_meal_plan()
+        group = next((item for item in payload["groups"] if item["id"] == clean_text(group_id)), None)
+        if not group:
+            return None
+        if name is not _UNSET:
+            validate_unique_group_name(name, payload["groups"], group["id"])
+            group["name"] = name
+        if archived is not _UNSET:
+            group["archived"] = archived
+        save_meal_plan(payload)
+        return group
+
+
 def validate_unique_member_name(name, members, member_id=None):
     existing = next((
         member for member in members
@@ -175,22 +261,34 @@ def validate_unique_member_name(name, members, member_id=None):
         raise ValueError("A family member with that name already exists.")
 
 
-def add_meal_plan_member(name):
+def add_meal_plan_member(name, *, first_name="", last_name="", default_portion=1, group_ids=_UNSET):
     name = normalize_member_name(name)
+    first_name = normalize_optional_member_name(first_name, "First name")
+    last_name = normalize_optional_member_name(last_name, "Last name")
+    default_portion = normalize_positive_servings(default_portion, "Default portion")
     with MEAL_PLAN_LOCK:
         payload = load_meal_plan()
         validate_unique_member_name(name, payload["members"])
-        member = {"id": uuid.uuid4().hex, "name": name, "archived": False}
+        group_ids = validate_member_group_ids([] if group_ids is _UNSET else group_ids, payload["groups"])
+        member = {"id": uuid.uuid4().hex, "name": name, "first_name": first_name, "last_name": last_name,
+                  "default_portion": default_portion, "group_ids": group_ids, "archived": False}
         payload["members"].append(member)
         save_meal_plan(payload)
         return meal_plan_member_summary(member, payload["meals"])
 
 
-def update_meal_plan_member(member_id, name=_UNSET, *, archived=_UNSET):
-    if name is _UNSET and archived is _UNSET:
-        raise ValueError("Provide a name or archived status to update.")
+def update_meal_plan_member(member_id, name=_UNSET, *, archived=_UNSET, first_name=_UNSET,
+                            last_name=_UNSET, default_portion=_UNSET, group_ids=_UNSET):
+    if all(value is _UNSET for value in (name, archived, first_name, last_name, default_portion, group_ids)):
+        raise ValueError("Provide member details to update.")
     if name is not _UNSET:
         name = normalize_member_name(name)
+    if first_name is not _UNSET:
+        first_name = normalize_optional_member_name(first_name, "First name")
+    if last_name is not _UNSET:
+        last_name = normalize_optional_member_name(last_name, "Last name")
+    if default_portion is not _UNSET:
+        default_portion = normalize_positive_servings(default_portion, "Default portion")
     if archived is not _UNSET and not isinstance(archived, bool):
         raise ValueError("Archived must be true or false.")
     with MEAL_PLAN_LOCK:
@@ -198,13 +296,44 @@ def update_meal_plan_member(member_id, name=_UNSET, *, archived=_UNSET):
         member = next((item for item in payload["members"] if item["id"] == clean_text(member_id)), None)
         if not member:
             return None
+        if group_ids is not _UNSET:
+            group_ids = validate_member_group_ids(group_ids, payload["groups"], member["group_ids"])
         if name is not _UNSET:
             validate_unique_member_name(name, payload["members"], member["id"])
             member["name"] = name
         if archived is not _UNSET:
             member["archived"] = archived
+        for key, value in (("first_name", first_name), ("last_name", last_name), ("default_portion", default_portion), ("group_ids", group_ids)):
+            if value is not _UNSET:
+                member[key] = value
         save_meal_plan(payload)
         return meal_plan_member_summary(member, payload["meals"])
+
+
+def add_meal_plan_members_bulk(members, *, group_ids=_UNSET):
+    """Validate the complete paste/import before committing one scoped write."""
+    if not isinstance(members, list) or not 1 <= len(members) <= 100:
+        raise ValueError("Add between 1 and 100 family members at a time.")
+    allowed = {"name", "first_name", "last_name", "default_portion"}
+    with MEAL_PLAN_LOCK:
+        payload = load_meal_plan()
+        selected_groups = validate_member_group_ids([] if group_ids is _UNSET else group_ids, payload["groups"])
+        added = []
+        for row in members:
+            if not isinstance(row, dict) or "name" not in row or set(row) - allowed:
+                raise ValueError("Each member needs a name and supported member details.")
+            name = normalize_member_name(row["name"])
+            validate_unique_member_name(name, payload["members"] + added)
+            added.append({
+                "id": uuid.uuid4().hex, "name": name, "archived": False,
+                "first_name": normalize_optional_member_name(row.get("first_name", ""), "First name"),
+                "last_name": normalize_optional_member_name(row.get("last_name", ""), "Last name"),
+                "default_portion": normalize_positive_servings(row.get("default_portion", 1), "Default portion"),
+                "group_ids": list(selected_groups),
+            })
+        payload["members"].extend(added)
+        save_meal_plan(payload)
+        return [meal_plan_member_summary(member, payload["meals"]) for member in added]
 
 
 def planned_servings_from_yield(value):
@@ -418,11 +547,15 @@ def load_meal_plan():
             member for value in (payload.get("members", []) if isinstance(payload, dict) else [])
             for member in [normalize_member(value)] if member
         ]
+        groups = [
+            group for value in (payload.get("groups", []) if isinstance(payload, dict) else [])
+            for group in [normalize_group(value)] if group
+        ]
         members_by_id = {member["id"]: member for member in members}
         for meal in meals:
             for portion in meal.get("member_portions") or []:
                 portion["name"] = members_by_id.get(portion["member_id"], {}).get("name") or portion["name_snapshot"]
-        return {"meals": meals, "batches": batches, "members": members}
+        return {"meals": meals, "batches": batches, "members": members, "groups": groups}
 
 
 def save_meal_plan(payload):
@@ -441,6 +574,7 @@ def save_meal_plan(payload):
             if batch
         ],
         "members": [member for value in payload.get("members", []) for member in [normalize_member(value)] if member],
+        "groups": [group for value in payload.get("groups", []) for group in [normalize_group(value)] if group],
     }
     with MEAL_PLAN_LOCK:
         return durable_runtime.save_json_document(

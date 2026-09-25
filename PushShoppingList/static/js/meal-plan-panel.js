@@ -16,7 +16,7 @@
         constructor(form, options) {
             this.form = form;
             this.options = options;
-            this.ui = {openDays:new Set(), openSections:new Set(), names:{}, newName:'', busy:false, memberBusy:false, loading:false, membersLoaded:false, memberReview:[], message:'', error:false};
+            this.ui = {openDays:new Set(), openSections:new Set(), names:{}, newName:'', groupIds:[], busy:false, memberBusy:false, loading:false, membersLoaded:false, memberReview:[], message:'', error:false};
             this.draft = root.MealPlanSchedule.create({today:options.today, servings:options.servings, members:[]});
             this.form.classList.add('meal-schedule-panel');
             form.addEventListener('submit', event => this.submit(event));
@@ -43,9 +43,12 @@
                 const data = await response.json();
                 if (!response.ok || !data.ok) throw new Error(data.error || 'Unable to load family members.');
                 if (!Array.isArray(data.members)) throw new Error('Unable to load family members.');
+                if (data.groups !== undefined && !Array.isArray(data.groups)) throw new Error('Unable to load family groups.');
                 // A member added elsewhere becomes an available choice without
                 // silently increasing portions in an already configured draft.
                 this.syncMembers(data.members, {newMembersEnabled:!this.ui.membersLoaded});
+                root.MealPlanSchedule.setGroups(this.draft, data.groups || []);
+                this.ui.groupIds = this.ui.groupIds.filter(id => this.draft.groups.some(group => group.id === id));
                 this.ui.membersLoaded = true;
                 this.ui.message = '';
                 this.ui.error = false;
@@ -120,6 +123,16 @@
             }).join('')}</tr></tfoot></table></div>`;
         }
 
+        static groupChooser(draft, ui, manageMembersUrl) {
+            if (draft.portionMode !== 'family') return '';
+            return `<section class="meal-schedule-groups" aria-label="Select people by group"><h3>Select people by group</h3>
+                ${draft.groups.length ? `<div class="meal-schedule-group-choices">${draft.groups.map(group => `<label class="meal-schedule-check"><input type="checkbox" data-schedule-field="group" data-group="${esc(group.id)}" data-focus-key="group-${esc(group.id)}" ${ui.groupIds.includes(group.id) ? 'checked' : ''} ${ui.loading ? 'disabled' : ''}><span>${esc(group.name)}</span></label>`).join('')}</div>
+                    <button type="button" data-schedule-action="select-group-members" data-focus-key="select-group-members" aria-label="Select everyone in selected groups" ${!ui.groupIds.length || ui.loading || !ui.membersLoaded ? 'disabled' : ''}>Select everyone</button>
+                    <p>Replaces the people selected in default portions with everyone in the selected groups. Each person is counted once. Adjusted days stay unchanged until you choose Apply to selected days.</p>`
+                    : `<p>No active groups yet. <a href="${esc(manageMembersUrl)}" target="_blank" rel="noopener">Manage Family Members</a> to create groups, then refresh members below.</p>`}
+            </section>`;
+        }
+
         static html(draft, ui, recipeTitle = '') {
             const model = root.MealPlanSchedule, totals = model.summary(draft);
             const disabled = ui.busy || ui.memberBusy;
@@ -149,6 +162,7 @@
                 <div class="meal-schedule-dates">${dates}</div>
                 <div class="meal-schedule-meals"><strong>Meals on selected days</strong>${model.MEAL_TYPES.map(meal => MealPlanPanel.check(meal, draft.mealTypes.includes(meal), 'meal', `data-focus-key="meal-${meal}"`)).join('')}</div>
                 <div class="meal-schedule-columns"><section><h3>Who is eating?</h3><div class="recipe-preview-segment meal-schedule-modes" role="group" aria-label="Portion allocation">${[['household','Household total'],['family','By family member']].map(([mode,label]) => `<button type="button" data-schedule-portion-mode="${mode}" data-focus-key="portion-mode-${mode}" aria-pressed="${draft.portionMode === mode}">${label}</button>`).join('')}</div>
+                ${MealPlanPanel.groupChooser(draft, ui, manageMembersUrl)}
                 <h3>Default portions</h3><p>Apply to selected dates. Adjust individual days on the right.</p>
                 ${MealPlanPanel.portionsTable(draft, draft.mealTypes)}
                 ${draft.portionMode === 'family' ? '<p>Unchecked means not eating this meal.</p>' : ''}
@@ -252,6 +266,10 @@
             else if (field === 'end-date') model.setRange(draft, draft.startDate, input.value);
             else if (field === 'meal') model.setMeals(draft, [...this.form.querySelectorAll('[data-schedule-field="meal"]:checked')].map(node => node.dataset.meal));
             else if (field === 'day-meal') model.setDayMeal(draft, input.dataset.date, input.dataset.meal, input.checked);
+            else if (field === 'group') {
+                if (this.ui.loading || !draft.groups.some(group => group.id === input.dataset.group)) return;
+                this.ui.groupIds = input.checked ? [...new Set([...this.ui.groupIds, input.dataset.group])] : this.ui.groupIds.filter(id => id !== input.dataset.group);
+            }
             else this.updateField(input);
             // Keep typed inputs mounted on blur: replacing them here can swallow
             // a click on the adjacent stepper or submit button.
@@ -274,6 +292,14 @@
                 case 'month': draft.calendarMonth = model.shiftMonth(draft.calendarMonth, Number(button.dataset.direction)); break;
                 case 'date': model.toggleDate(draft, button.dataset.date); break;
                 case 'apply': model.applyDefaults(draft); this.setMessage('Defaults applied to selected days.'); break;
+                case 'select-group-members': {
+                    if (this.ui.loading || !this.ui.membersLoaded || draft.portionMode !== 'family') return;
+                    try {
+                        model.selectGroupMembers(draft, this.ui.groupIds);
+                        this.setMessage('People from the selected groups are selected in default portions. Adjusted days are unchanged; use Apply to selected days to update them.');
+                    } catch (error) { this.setMessage(error.message, true); }
+                    break;
+                }
                 case 'step': {
                     const input = button.parentElement.querySelector('input');
                     input.value = Math.max(0.01, Math.round(((Number(input.value) || 0) + Number(button.dataset.direction) * 0.5) * 100) / 100);
@@ -304,7 +330,7 @@
                 const response = await fetch(`/api/meal-plan/members${id ? '/' + encodeURIComponent(id) : ''}`, {method:id ? 'PATCH' : 'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name})});
                 const data = await response.json();
                 if (!response.ok || !data.ok) throw new Error(data.error || 'Unable to save this family member.');
-                const members = id ? this.draft.members.map(member => member.id === id ? data.member : member) : [...this.draft.members, data.member];
+                const members = id ? this.draft.members.map(member => member.id === id ? {...member, ...data.member} : member) : [...this.draft.members, data.member];
                 this.syncMembers(members);
                 if (id) delete this.ui.names[id]; else this.ui.newName = '';
                 this.setMessage('Family member saved.');
@@ -343,11 +369,15 @@
             }
             // A refresh failure must never turn a successful save into a retry.
             const firstDate = this.draft.selectedDates[0];
-            const members = this.draft.members;
-            this.draft = root.MealPlanSchedule.create({today:this.options.today, servings:this.options.servings, members});
+            const groups = this.draft.groups;
+            // The next open starts a new plan and must use the latest saved
+            // personal defaults. Ordinary refreshes still preserve an open draft.
+            this.draft = root.MealPlanSchedule.create({today:this.options.today, servings:this.options.servings, members:[], groups});
+            this.ui.membersLoaded = false;
             this.ui.busy = false;
             this.ui.openDays.clear();
             this.ui.memberReview = [];
+            this.ui.groupIds = [];
             this.setMessage('Meal plan saved.');
             this.render();
             this.form.hidden = true;

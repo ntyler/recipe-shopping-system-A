@@ -10,6 +10,9 @@ from PushShoppingList.services import meal_plan_service as service
 from PushShoppingList.services import storage_service
 
 
+MEMBER_DETAILS = {"first_name": "", "last_name": "", "default_portion": 1, "group_ids": []}
+
+
 @pytest.fixture
 def isolated_plan(monkeypatch, tmp_path):
     monkeypatch.setenv("SHOPPING_APP_DURABLE_DATA_BACKEND", "json")
@@ -34,9 +37,10 @@ def family_batch(member, other=None):
 
 def test_legacy_members_are_active_and_archive_status_survives_save(isolated_plan):
     isolated_plan.write_text(json.dumps({"members": [{"id": "nate", "name": "Nate"}]}), encoding="utf-8")
-    assert service.list_meal_plan_members() == [{"id": "nate", "name": "Nate", "archived": False, "meal_count": 0}]
+    assert service.list_meal_plan_members() == [{**MEMBER_DETAILS, "id": "nate", "name": "Nate", "archived": False, "meal_count": 0}]
     service.save_meal_plan(service.load_meal_plan())
-    assert json.loads(isolated_plan.read_text())["members"] == [{"id": "nate", "name": "Nate", "archived": False}]
+    assert json.loads(isolated_plan.read_text())["members"] == [{**MEMBER_DETAILS, "id": "nate", "name": "Nate", "archived": False}]
+    assert json.loads(isolated_plan.read_text())["groups"] == []
     service.update_meal_plan_member("nate", archived=True)
     assert service.list_meal_plan_members() == []
     assert service.load_meal_plan()["members"][0]["archived"] is True
@@ -77,7 +81,7 @@ def test_archive_and_restore_keep_meal_history_and_stable_identity(isolated_plan
     assert renamed["archived"] is True
     assert renamed["meal_count"] == 3
     restored = service.update_meal_plan_member(nate["id"], archived=False)
-    assert restored == {"id": nate["id"], "name": "Nathan", "archived": False, "meal_count": 3}
+    assert restored == {**MEMBER_DETAILS, "id": nate["id"], "name": "Nathan", "archived": False, "meal_count": 3}
     history = service.load_meal_plan()
     for old, current in zip(original["meals"], history["meals"]):
         assert current["id"] == old["id"]
@@ -152,7 +156,7 @@ def test_member_management_api_shapes_archiving_and_usage(scoped_client):
     created = client.post("/api/meal-plan/members", json={"name": "Nate"})
     assert created.status_code == 201
     member = created.json["member"]
-    assert member == {"id": member["id"], "name": "Nate", "archived": False, "meal_count": 0}
+    assert member == {**MEMBER_DETAILS, "id": member["id"], "name": "Nate", "archived": False, "meal_count": 0}
     meal_data = {"recipe_url": "recipe://soup", "portion_mode": "family", "allocations": [
         {"date": "2026-09-28", "meal_type": "dinner", "member_portions": [{"member_id": member["id"], "servings": 2.5}]},
     ]}
@@ -251,10 +255,12 @@ def test_family_members_page_shares_saved_members_counts_and_workspace_scope(sco
     assert template == "family_members.html"
     assert context["family_members"] == {
         "members": [{**nate, "archived": True, "meal_count": 2}, alex],
+        "groups": [],
         "viewer_user_id": "" if guest else identity,
         "settings_url": "/#settingsProfilePanel",
         "meal_planner_url": "/#mealPlannerPage",
         "api_url": "/api/meal-plan/members",
+        "groups_api_url": "/api/meal-plan/groups",
     }
     assert context["is_guest_demo"] is guest
     assert context["current_user"] == (None if guest else {"user_id": identity})
@@ -304,3 +310,215 @@ def test_family_members_page_renders_shared_shell_and_safe_member_bootstrap(scop
     data = html.split('<script id="familyMembersData" type="application/json">', 1)[1].split('</script>', 1)[0]
     assert '<Nate' not in data
     assert json.loads(data) == [{**member, "archived": True}]
+
+
+def test_member_details_and_explicit_groups_persist_without_name_inference(isolated_plan):
+    household = service.add_meal_plan_group("  Tyler Family  ")
+    friends = service.add_meal_plan_group("Friends")
+    nate = service.add_meal_plan_member("Nate", first_name=" Nathaniel ", last_name=" Tyler ",
+        default_portion=0.5, group_ids=[household["id"], household["id"], friends["id"]])
+    alex = service.add_meal_plan_member("Alex", last_name="Tyler")
+    assert nate == {"id": nate["id"], "name": "Nate", "first_name": "Nathaniel", "last_name": "Tyler",
+        "default_portion": 0.5, "group_ids": [household["id"], friends["id"]], "archived": False, "meal_count": 0}
+    assert alex["group_ids"] == []  # Shared surnames never imply membership.
+    assert household["name"] == "Tyler Family"
+    assert service.list_meal_plan_members() == [nate, alex]
+    assert service.list_meal_plan_groups() == [household, friends]
+    stored = json.loads(isolated_plan.read_text())
+    assert stored["members"][0] == {key: value for key, value in nate.items() if key != "meal_count"}
+    assert stored["groups"] == [household, friends]
+
+
+def test_member_metadata_changes_leave_historical_meals_and_portions_unchanged(isolated_plan):
+    member = service.add_meal_plan_member("Nate", default_portion=0.5)
+    family_batch(member)
+    group = service.add_meal_plan_group("Family")
+    before = service.load_meal_plan()
+    changed = service.update_meal_plan_member(member["id"], first_name="Nathaniel", last_name="Tyler",
+        default_portion=2.5, group_ids=[group["id"]])
+    assert changed["meal_count"] == 3
+    assert changed["name"] == "Nate"
+    assert changed["default_portion"] == 2.5
+    after = service.load_meal_plan()
+    assert before["meals"] == after["meals"]
+    assert before["batches"] == after["batches"]
+
+
+def test_archived_groups_keep_associations_but_reject_new_assignments(isolated_plan):
+    group = service.add_meal_plan_group("Family")
+    member = service.add_meal_plan_member("Nate", group_ids=[group["id"]])
+    other = service.add_meal_plan_member("Alex")
+    family_batch(member)
+    before = service.load_meal_plan()
+    archived = service.update_meal_plan_group(group["id"], archived=True)
+    assert service.list_meal_plan_groups() == []
+    assert service.list_meal_plan_groups(include_archived=True) == [archived]
+    assert service.load_meal_plan()["meals"] == before["meals"]
+    assert service.load_meal_plan()["batches"] == before["batches"]
+    assert service.list_meal_plan_members()[0]["group_ids"] == [group["id"]]
+    # Existing associations can be retained while changing independent details.
+    assert service.update_meal_plan_member(member["id"], first_name="Nathaniel", group_ids=[group["id"]])["group_ids"] == [group["id"]]
+    assert service.update_meal_plan_member(member["id"], default_portion=0.5)["group_ids"] == [group["id"]]
+    current_bytes = isolated_plan.read_bytes()
+    for operation in (
+        lambda: service.add_meal_plan_member("New", group_ids=[group["id"]]),
+        lambda: service.update_meal_plan_member(other["id"], group_ids=[group["id"]]),
+        lambda: service.add_meal_plan_members_bulk([{"name": "Bulk"}], group_ids=[group["id"]]),
+    ):
+        with pytest.raises(ValueError, match="archived"):
+            operation()
+        assert isolated_plan.read_bytes() == current_bytes
+    assert service.update_meal_plan_member(member["id"], group_ids=[])["group_ids"] == []
+    with pytest.raises(ValueError, match="archived"):
+        service.update_meal_plan_member(member["id"], group_ids=[group["id"]])
+    service.update_meal_plan_group(group["id"], "Relatives", archived=False)
+    assert service.update_meal_plan_member(other["id"], group_ids=[group["id"]])["group_ids"] == [group["id"]]
+    assert service.list_meal_plan_groups()[0]["name"] == "Relatives"
+
+
+def test_group_names_are_unique_across_active_and_archived_records(isolated_plan):
+    group = service.add_meal_plan_group("Family")
+    other = service.add_meal_plan_group("Friends")
+    with pytest.raises(ValueError, match="already exists"):
+        service.add_meal_plan_group(" family ")
+    service.update_meal_plan_group(group["id"], archived=True)
+    before = isolated_plan.read_bytes()
+    with pytest.raises(ValueError, match="Restore"):
+        service.add_meal_plan_group("FAMILY")
+    with pytest.raises(ValueError, match="Restore"):
+        service.update_meal_plan_group(other["id"], "Family", archived=True)
+    assert isolated_plan.read_bytes() == before
+    assert service.update_meal_plan_group("unknown", archived=True) is None
+
+
+def test_bulk_member_creation_is_one_write_with_shared_explicit_groups(isolated_plan, monkeypatch):
+    group = service.add_meal_plan_group("Lunch Crew")
+    saves = []
+    original_save = service.save_meal_plan
+
+    def count_save(payload):
+        saves.append(payload)
+        return original_save(payload)
+
+    monkeypatch.setattr(service, "save_meal_plan", count_save)
+    result = service.add_meal_plan_members_bulk([
+        {"name": "Nate", "first_name": "Nathaniel", "last_name": "Tyler", "default_portion": 1.5},
+        {"name": "Alex", "default_portion": 0.5},
+    ], group_ids=[group["id"], group["id"]])
+    assert len(saves) == 1
+    assert len({member["id"] for member in result}) == 2
+    assert [member["name"] for member in result] == ["Nate", "Alex"]
+    assert [member["default_portion"] for member in result] == [1.5, 0.5]
+    assert all(member["group_ids"] == [group["id"]] for member in result)
+    assert service.list_meal_plan_members() == result
+
+
+@pytest.mark.parametrize("rows", [
+    [], None, "Nate", [{"name": "Same"}, {"name": " same "}],
+    [{"name": "Good"}, {"name": "Existing"}], [{"name": "Good"}, {"name": "Archived"}],
+    [{"name": "Good"}, {"name": ""}], [{"name": "Good"}, {"name": "Bad", "default_portion": 0}],
+    [{"name": "Good"}, {"name": "Bad", "unknown": "x"}], [{"name": "Good"}, {"name": "Bad", "group_ids": []}],
+    [{"name": "Good"}, {"first_name": "No display name"}], [{"name": "Good"}, None],
+    [{"name": "Good"}, {"name": "Bad", "first_name": None}], [{"name": str(i)} for i in range(101)],
+])
+def test_invalid_bulk_member_batch_never_partially_writes(isolated_plan, rows):
+    service.add_meal_plan_member("Existing")
+    archived = service.add_meal_plan_member("Archived")
+    service.update_meal_plan_member(archived["id"], archived=True)
+    before = isolated_plan.read_bytes()
+    with pytest.raises(ValueError):
+        service.add_meal_plan_members_bulk(rows)
+    assert isolated_plan.read_bytes() == before
+
+
+@pytest.mark.parametrize("details", [
+    {"first_name": None}, {"last_name": []}, {"first_name": "x" * 101}, {"last_name": "x" * 101},
+    {"default_portion": 0}, {"default_portion": -1}, {"default_portion": True}, {"default_portion": None},
+    {"default_portion": float("inf")}, {"default_portion": float("nan")}, {"default_portion": "many"},
+    {"group_ids": "group"}, {"group_ids": None}, {"group_ids": [""]}, {"group_ids": [1]}, {"group_ids": ["not-in-workspace"]},
+])
+def test_invalid_member_details_rejected_on_create_and_patch(scoped_client, details):
+    client = scoped_client
+    sign_in(client, "alice")
+    member = client.post("/api/meal-plan/members", json={"name": "Nate"}).json["member"]
+    assert client.post("/api/meal-plan/members", json={"name": "New", **details}).status_code == 400
+    assert client.patch(f"/api/meal-plan/members/{member['id']}", json=details).status_code == 400
+    assert client.get("/api/meal-plan/members").json["members"] == [member]
+
+
+def test_groups_and_bulk_routes_share_workspace_and_return_member_metadata(scoped_client, monkeypatch):
+    client = scoped_client
+    sign_in(client, "alice")
+    group = client.post("/api/meal-plan/groups", json={"name": "Family"}).json["group"]
+    assert group == {"id": group["id"], "name": "Family", "archived": False}
+    response = client.post("/api/meal-plan/members/bulk", json={"members": [
+        {"name": "Nate", "first_name": "Nathaniel", "last_name": "Tyler", "default_portion": 0.5},
+        {"name": "Alex"},
+    ], "group_ids": [group["id"]]})
+    assert response.status_code == 201
+    members = response.json["members"]
+    assert len(members) == 2
+    assert members[0]["first_name"] == "Nathaniel" and members[0]["default_portion"] == 0.5
+    assert all(member["group_ids"] == [group["id"]] for member in members)
+    assert client.get("/api/meal-plan/members").json == {"ok": True, "members": members, "groups": [group]}
+    assert client.get("/api/meal-plan/groups").json == {"ok": True, "groups": [group]}
+    archived = client.patch(f"/api/meal-plan/groups/{group['id']}", json={"archived": True}).json["group"]
+    assert client.get("/api/meal-plan/groups").json["groups"] == []
+    assert client.get("/api/meal-plan/members").json["groups"] == []
+    assert client.get("/api/meal-plan/members?include_archived=true").json["groups"] == [archived]
+    assert client.get("/api/meal-plan/groups?include_archived=true").json["groups"] == [archived]
+    captured = []
+    monkeypatch.setattr(main_routes, "render_template", lambda *args, **kwargs: captured.append(kwargs) or "page")
+    assert client.get("/settings/family-members").status_code == 200
+    assert captured[0]["family_members"]["groups"] == [archived]
+    assert captured[0]["family_members"]["groups_api_url"] == "/api/meal-plan/groups"
+    assert client.delete(f"/api/meal-plan/groups/{group['id']}").status_code == 405
+    for identity, guest in (("bob", False), ("guest1", True)):
+        sign_in(client, identity, guest)
+        assert client.get("/api/meal-plan/groups?include_archived=true").json["groups"] == []
+        assert client.patch(f"/api/meal-plan/groups/{group['id']}", json={"archived": False}).status_code == 404
+        assert client.post("/api/meal-plan/members", json={"name": "New", "group_ids": [group["id"]]}).status_code == 400
+        assert client.post("/api/meal-plan/members/bulk", json={"members": [{"name": "New"}], "group_ids": [group["id"]]}).status_code == 400
+        own_group = client.post("/api/meal-plan/groups", json={"name": "Family"}).json["group"]
+        assert own_group["id"] != group["id"]
+
+
+def test_group_and_bulk_routes_enforce_auth_and_viewer_scope(scoped_client):
+    client = scoped_client
+    assert client.get("/api/meal-plan/groups").status_code == 403
+    assert client.post("/api/meal-plan/groups", json={"name": "Family"}).status_code == 403
+    assert client.patch("/api/meal-plan/groups/missing", json={"archived": True}).status_code == 403
+    assert client.post("/api/meal-plan/members/bulk", json={"members": [{"name": "Nate"}]}).status_code == 403
+    for identity, guest in (("alice", False), ("guest1", True)):
+        sign_in(client, identity, guest)
+        for query, status in (("?viewer_user_id=other", 403), ("?viewer_user_id=alice&viewer_user_id=alice", 400)):
+            assert client.get(f"/api/meal-plan/groups{query}").status_code == status
+            assert client.post(f"/api/meal-plan/groups{query}", json={"name": "Family"}).status_code == status
+            assert client.patch(f"/api/meal-plan/groups/missing{query}", json={"archived": True}).status_code == status
+            assert client.post(f"/api/meal-plan/members/bulk{query}", json={"members": [{"name": "Nate"}]}).status_code == status
+
+
+@pytest.mark.parametrize("payload", [None, [], {}, {"name": ""}, {"name": None}, {"name": "x" * 101}, {"name": "Family", "unknown": 1}])
+def test_malformed_group_requests_do_not_write(scoped_client, payload):
+    client = scoped_client
+    sign_in(client, "alice")
+    group = client.post("/api/meal-plan/groups", json={"name": "Family"}).json["group"]
+    assert client.post("/api/meal-plan/groups", json=payload).status_code == 400
+    assert client.patch(f"/api/meal-plan/groups/{group['id']}", json=payload).status_code == 400
+    assert client.get("/api/meal-plan/groups").json["groups"] == [group]
+
+
+@pytest.mark.parametrize("archived", [None, 0, 1, "false", [], {}])
+def test_group_archive_state_requires_boolean(scoped_client, archived):
+    sign_in(scoped_client, "alice")
+    group = scoped_client.post("/api/meal-plan/groups", json={"name": "Family"}).json["group"]
+    assert scoped_client.patch(f"/api/meal-plan/groups/{group['id']}", json={"archived": archived}).status_code == 400
+    assert scoped_client.get("/api/meal-plan/groups").json["groups"] == [group]
+
+
+@pytest.mark.parametrize("payload", [None, [], {}, {"members": []}, {"members": [{"name": "Nate"}], "unexpected": 1},
+    {"members": [{"name": "Nate"}, {"name": "nate"}]}, {"members": [{"name": "Nate"}], "group_ids": ["unknown"]}])
+def test_malformed_bulk_request_never_adds_members(scoped_client, payload):
+    sign_in(scoped_client, "alice")
+    assert scoped_client.post("/api/meal-plan/members/bulk", json=payload).status_code == 400
+    assert scoped_client.get("/api/meal-plan/members").json["members"] == []

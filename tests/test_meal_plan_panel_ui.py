@@ -191,7 +191,7 @@ ctx.fetch=async(url,options)=>{
 options.onSaved=async(result,date)=>{
  assert.equal(result.batch.id,'saved');assert.equal(date,'2026-10-05');
  assert.equal(form.hidden,true);assert.equal(panel.ui.busy,false);assert.equal(panel.ui.error,false);
- assert.equal(panel.draft.notes,'');assert.equal(panel.draft.members.length,3);assert.equal(panel.ui.openDays.size,0);
+ assert.equal(panel.draft.notes,'');assert.equal(panel.draft.members.length,0);assert.equal(panel.ui.membersLoaded,false);assert.equal(panel.ui.openDays.size,0);
  saved.push(result);
 };
 await submit();assert.equal(requests.length,1);assert.equal(saved.length,1);assert.equal(panel.ui.message,'Meal plan saved.');

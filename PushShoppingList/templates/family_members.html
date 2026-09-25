@@ -16,8 +16,9 @@ data-viewer-user-id="{{ family_members.viewer_user_id }}"
 
 {% block app_content %}
 <section class="master-data-page family-members-page" aria-labelledby="familyMembersTitle"
-         data-family-members-page data-api-url="{{ family_members.api_url }}">
+         data-family-members-page data-api-url="{{ family_members.api_url }}" data-groups-api-url="{{ family_members.groups_api_url }}">
     <script id="familyMembersData" type="application/json">{{ family_members.members | tojson }}</script>
+    <script id="familyGroupsData" type="application/json">{{ family_members.groups | default([]) | tojson }}</script>
     <header class="master-data-header">
         <div>
             <a class="master-data-home-link" href="{{ family_members.settings_url }}">Settings</a>
@@ -31,6 +32,7 @@ data-viewer-user-id="{{ family_members.viewer_user_id }}"
         </div>
         <div class="family-members-header-actions">
             <a href="{{ family_members.meal_planner_url }}" class="family-members-link">Meal Planner</a>
+            <button type="button" data-family-add-bulk aria-controls="familyMemberBulk" aria-expanded="false">Add multiple people</button>
             <button type="button" class="family-members-primary" data-family-add
                     aria-controls="familyMemberCreate" aria-expanded="false">{{ shell.svg_icon('plus') }} Add member</button>
         </div>
@@ -46,19 +48,45 @@ data-viewer-user-id="{{ family_members.viewer_user_id }}"
         <div class="family-members-filters">
             <label>Search<input type="search" placeholder="Member name" autocomplete="off" data-family-search></label>
             <label>Status<select data-family-filter><option value="active">Active</option><option value="all">All</option><option value="archived">Archived</option></select></label>
+            <label>Group<select data-family-group-filter><option value="all">All groups</option><option value="ungrouped">Ungrouped</option></select></label>
         </div>
         <form id="familyMemberCreate" class="family-members-create" data-family-create hidden>
-            <label for="familyMemberNewName">New family member
-                <input id="familyMemberNewName" type="text" name="name" maxlength="100" required autocomplete="off" placeholder="Name" aria-describedby="familyMemberCreateError">
-            </label>
-            <button type="submit" class="family-members-primary">Add member</button>
-            <button type="button" data-family-cancel-create>Cancel</button>
+            <h3>Add family member</h3>
+            <div class="family-members-profile-fields">
+                <label for="familyMemberNewName">Display name
+                    <input id="familyMemberNewName" type="text" name="name" maxlength="100" required autocomplete="off" placeholder="Name shown in meal plans" aria-describedby="familyMemberCreateError">
+                </label>
+                <label>First name (optional)<input type="text" name="first_name" maxlength="100" autocomplete="off"></label>
+                <label>Last name (optional)<input type="text" name="last_name" maxlength="100" autocomplete="off"></label>
+                <label>Default portion<input type="number" name="default_portion" value="1" min="0" step="any" required></label>
+            </div>
+            <fieldset class="family-members-group-picker"><legend>Groups (optional)</legend><div data-family-create-groups></div></fieldset>
+            <div class="family-members-row-actions"><button type="submit" class="family-members-primary">Add member</button><button type="button" data-family-cancel-create>Cancel</button></div>
             <p id="familyMemberCreateError" class="family-members-error" role="alert" data-family-create-error hidden></p>
         </form>
+        <form id="familyMemberBulk" class="family-members-create family-members-bulk" data-family-bulk hidden>
+            <h3>Add multiple people</h3>
+            <p class="family-members-help">Enter a display name for each person. First and last names are optional. Each person gets their own saved record.</p>
+            <div class="family-members-bulk-rows" data-family-bulk-rows></div>
+            <button type="button" data-family-bulk-add-row>Add another person</button>
+            <fieldset class="family-members-group-picker"><legend>Groups for everyone in this list (optional)</legend><div data-family-bulk-groups></div></fieldset>
+            <p class="family-members-error" role="alert" data-family-bulk-error hidden></p>
+            <div class="family-members-row-actions"><button type="submit" class="family-members-primary" data-family-bulk-submit>Add people</button><button type="button" data-family-cancel-bulk>Cancel</button></div>
+        </form>
+        <details class="family-members-groups-section" data-family-groups-section>
+            <summary>Manage groups (<span data-family-group-count>{{ family_members.groups | default([]) | length }}</span>)</summary>
+            <p class="family-members-help">A person can belong to several groups. Archiving a group keeps its existing members and meal history.</p>
+            <form class="family-members-group-create" data-family-group-create>
+                <label>New group<input type="text" name="name" placeholder="Group name" maxlength="100" required autocomplete="off" aria-describedby="familyGroupCreateError"></label>
+                <button type="submit">Add group</button>
+                <p id="familyGroupCreateError" class="family-members-error" role="alert" data-family-group-create-error hidden></p>
+            </form>
+            <div data-family-groups></div>
+        </details>
         <div class="master-data-table-wrap family-members-table-wrap">
             <table class="master-data-table family-members-table">
-                <caption class="sr-only">Saved family members, status, scheduled meal usage, and actions</caption>
-                <thead><tr><th scope="col">Name</th><th scope="col">Status</th><th scope="col">Used in meal plans</th><th scope="col">Actions</th></tr></thead>
+                <caption class="sr-only">Saved family members, groups, portions, status, scheduled meal usage, and actions</caption>
+                <thead><tr><th scope="col">Display name</th><th scope="col">Groups</th><th scope="col">Default portion</th><th scope="col">Status</th><th scope="col">Used in meal plans</th><th scope="col">Actions</th></tr></thead>
                 <tbody data-family-rows></tbody>
             </table>
         </div>

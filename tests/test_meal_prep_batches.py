@@ -102,7 +102,7 @@ def test_invalid_allocation_never_saves_partial_batch(isolated_plan, candidate):
     with pytest.raises(ValueError):
         service.add_meal_prep_batch(batch_input(), candidate)
     assert not isolated_plan.exists()
-    assert service.load_meal_plan() == {"meals": [], "batches": [], "members": []}
+    assert service.load_meal_plan() == {"meals": [], "batches": [], "members": [], "groups": []}
 
 
 def test_existing_slot_conflict_is_atomic_but_other_recipes_can_share_slot(isolated_plan):

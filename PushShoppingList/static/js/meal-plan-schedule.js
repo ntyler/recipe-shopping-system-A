@@ -83,12 +83,26 @@
             if (!member || member.archived === true || typeof member.id !== 'string' || !member.id || seen.has(member.id)) return false;
             seen.add(member.id);
             return true;
-        }).map(member => ({id: member.id, name: String(member.name || '')}));
+        }).map(member => ({
+            id: member.id, name: String(member.name || [member.first_name, member.last_name].filter(Boolean).join(' ')),
+            first_name: String(member.first_name || ''), last_name: String(member.last_name || ''),
+            default_portion: portion(member.default_portion) || 1,
+            group_ids: [...new Set((Array.isArray(member.group_ids) ? member.group_ids : []).filter(id => typeof id === 'string' && id))]
+        }));
+    }
+
+    function normalizedGroups(groups) {
+        const seen = new Set();
+        return (Array.isArray(groups) ? groups : []).filter(group => {
+            if (!group || group.archived === true || typeof group.id !== 'string' || !group.id || seen.has(group.id)) return false;
+            seen.add(group.id);
+            return true;
+        }).map(group => ({id: group.id, name: String(group.name || '')}));
     }
 
     function newFamilyDefaults(members) {
         return Object.fromEntries(members.map(member => [member.id,
-            Object.fromEntries(MEAL_TYPES.map(meal => [meal, {enabled: true, servings: 1}]))]));
+            Object.fromEntries(MEAL_TYPES.map(meal => [meal, {enabled: true, servings: member.default_portion}]))]));
     }
 
     function defaultDay(draft) {
@@ -132,7 +146,7 @@
             selectedDates: [], selectedDays: [today], calendarMonth: today.slice(0, 7),
             portionMode: 'household', mealTypes: ['dinner'],
             householdDefaults: Object.fromEntries(MEAL_TYPES.map(meal => [meal, servings])),
-            familyDefaults: newFamilyDefaults(members), members, days: {}, prepSteps: [], notes: ''
+            familyDefaults: newFamilyDefaults(members), members, groups: normalizedGroups(options.groups), days: {}, prepSteps: [], notes: ''
         });
     }
 
@@ -255,6 +269,25 @@
         return draft;
     }
 
+    function setGroups(draft, groups) {
+        draft.groups = normalizedGroups(groups);
+        return draft;
+    }
+
+    function selectGroupMembers(draft, groupIds) {
+        const activeGroups = new Set(draft.groups.map(group => group.id));
+        const selected = new Set((Array.isArray(groupIds) ? groupIds : []).filter(id => activeGroups.has(id)));
+        if (!selected.size) throw new Error('Choose at least one active group.');
+        for (const member of draft.members) {
+            const enabled = member.group_ids.some(id => selected.has(id));
+            MEAL_TYPES.forEach(meal => { draft.familyDefaults[member.id][meal].enabled = enabled; });
+        }
+        // Group membership is resolved now, never bound to future group edits.
+        // Like other default edits, this preserves explicit per-day overrides.
+        syncDefaults(draft);
+        return draft;
+    }
+
     function summary(draft) {
         const errors = [];
         if (draft.dateMode === 'range' && (!parseDate(draft.startDate) || !parseDate(draft.endDate))) errors.push('Choose a valid start and end date.');
@@ -323,6 +356,6 @@
         MEAL_TYPES, parseDate, formatDate, dateRange, shiftMonth, calendarMonth, create,
         setDateMode, setSingleDate, setRange, setDates, toggleDate, setPortionMode, setMeals,
         setHouseholdDefault, setFamilyDefault, setDayMeal, setDayHousehold, setDayFamily,
-        setDayNotes, applyDefaults, setMembers, summary, payload
+        setDayNotes, applyDefaults, setMembers, setGroups, selectGroupMembers, summary, payload
     });
 })(globalThis);
