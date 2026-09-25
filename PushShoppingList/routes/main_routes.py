@@ -6012,6 +6012,62 @@ def family_members_route():
     )
 
 
+@main_bp.route("/api/planning/week", methods=["GET"])
+def planning_week_route():
+    from PushShoppingList.services import shopping_trip_service as service
+    if not current_public_user() and not is_guest_session():
+        return jsonify({"ok": False, "error": "Sign in or start a guest workspace to view your plan."}), 403
+    validate_master_data_viewer_scope()
+    try:
+        return jsonify({"ok": True, **service.planning_week(
+            request.args.get("week_start"), reference_date=request_local_calendar_date(),
+        )})
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), getattr(exc, "status", 400)
+
+
+@main_bp.route("/api/shopping-trips/options", methods=["GET"])
+def shopping_trip_options_route():
+    from PushShoppingList.services import shopping_trip_service as service
+    if not current_public_user() and not is_guest_session():
+        return jsonify({"ok": False, "error": "Sign in or start a guest workspace to schedule shopping."}), 403
+    validate_master_data_viewer_scope()
+    try:
+        return jsonify({"ok": True, **service.shopping_trip_options()})
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), getattr(exc, "status", 400)
+
+
+@main_bp.route("/api/shopping-trips", methods=["POST"])
+def shopping_trips_route():
+    from PushShoppingList.services import shopping_trip_service as service
+    if not current_public_user() and not is_guest_session():
+        return jsonify({"ok": False, "error": "Sign in or start a guest workspace to schedule shopping."}), 403
+    validate_master_data_viewer_scope()
+    try:
+        return jsonify({"ok": True, "trip": service.add_shopping_trip(request.get_json(silent=True))}), 201
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), getattr(exc, "status", 400)
+
+
+@main_bp.route("/api/shopping-trips/<trip_id>", methods=["GET", "PATCH", "DELETE"])
+def shopping_trip_route(trip_id):
+    from PushShoppingList.services import shopping_trip_service as service
+    if not current_public_user() and not is_guest_session():
+        return jsonify({"ok": False, "error": "Sign in or start a guest workspace to manage shopping trips."}), 403
+    validate_master_data_viewer_scope()
+    try:
+        if request.method == "DELETE":
+            return jsonify({"ok": True, "removed_id": service.delete_shopping_trip(trip_id)})
+        if request.method == "PATCH":
+            trip = service.update_shopping_trip(trip_id, request.get_json(silent=True))
+        else:
+            trip = service.shopping_trip_detail(trip_id)
+        return jsonify({"ok": True, "trip": trip})
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), getattr(exc, "status", 400)
+
+
 @main_bp.route("/api/meal-plan/shopping/review", methods=["POST"])
 def meal_plan_shopping_review_route():
     from PushShoppingList.services import meal_plan_shopping_service as service

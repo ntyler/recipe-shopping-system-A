@@ -174,6 +174,31 @@ else if(__DESTINATION__==='saved/1'){
 
 
 @requires_node
+def test_successful_shopping_save_schedules_selected_review_sources_on_the_saved_list():
+    run_shopping(r"""
+const scheduled=[],opener=element();window.PlannerViews={openTrip(initial,actualOpener){
+ assert.equal(shopping.open,false,'Close the shopping review before opening the trip form');
+ scheduled.push({initial:plain(initial),opener:actualOpener});
+}};
+respond=async()=>ok(review());UI.open({week_start:'2026-09-21'},opener);await flush();
+assert.equal(shopping.querySelector('[data-shopping-action="schedule"]'),null);
+shopping.querySelectorAll('[data-shopping-source]')[0].checked=false;
+await reviewStep(review({selection:{batch_ids:[],meal_ids:['meal-1']},sources:[source('meal','meal-1')],items:[review().items[1]]}));
+const destination=shopping.querySelector('[data-shopping-destination]');destination.value='saved/1';change(destination);
+respond=async()=>ok({list:{id:'saved/1',name:'Weekend list',sources:[source('batch','older-batch'),source('meal','meal-1')]}});
+click('save');await flush();
+assert.equal(scheduled.length,0,'Saving ingredients does not implicitly schedule a trip');
+assert(shopping.querySelector('[data-shopping-action="schedule"]'));assert(shopping.querySelector('[data-shopping-action="view"]'),'Opening the list remains available');
+click('schedule');
+assert.equal(scheduled.length,1);assert.equal(scheduled[0].opener,opener);
+assert.deepEqual(scheduled[0].initial,{list_id:'saved/1',source_ids:['meal:meal-1']},'Use the reviewed source subset, not other provenance already on the destination list');
+assert.equal(calls.filter(call=>call.path.endsWith('/add')).length,1);
+assert(!calls.some(call=>call.path.startsWith('/api/shopping-trips')),'Trip persistence waits for its own form confirmation');
+assert.equal(navigations.length,0);
+""")
+
+
+@requires_node
 def test_empty_selection_blank_list_name_and_blocked_review_cannot_commit():
     run_shopping(r"""
 await open();await reviewStep();

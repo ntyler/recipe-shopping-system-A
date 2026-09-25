@@ -307,9 +307,10 @@ const page = {
     querySelector: selector => selector === 'dialog[open]' ? dialogOpen : status,
     querySelectorAll: () => [details],
 };
-let responseFactory, calls = [];
+let responseFactory, calls = [], viewInits = [];
 const ctx = {
     AbortController, Set, encodeURIComponent,
+    window: {PlannerViews: {init(root) {viewInits.push({root, html:root.innerHTML, hidden:root.hidden, inert:root.inert});}}},
     document: {getElementById: () => page},
     withCanonicalViewerUserId: url => `${url}&viewer_user_id=test-user`,
     initDeferredImages() {},
@@ -330,6 +331,9 @@ const ok = html => ({ok: true, redirected: false, text: async () => html});
     assert.equal(page.dataset.mealWeek, '2026-10-05');
     assert.equal(page.dataset.mealPlannerStale, undefined);
     assert.equal(attrs.has('aria-busy'), false);
+    assert.equal(viewInits.length, 1);
+    assert.equal(viewInits[0].root, page, 'Reinitialize views on the retained planner root');
+    assert.deepEqual(viewInits[0], {root:page, html:'fresh', hidden:true, inert:true});
 
     responseFactory = () => ({ok: false});
     assert.equal(await ctx.refreshMealPlannerWorkspace(), false);
@@ -337,6 +341,7 @@ const ok = html => ({ok: true, redirected: false, text: async () => html});
     assert.equal(page.dataset.mealPlannerStale, '1');
     assert.equal(status.hidden, false);
     assert.match(status.textContent, /Unable to refresh/);
+    assert.equal(viewInits.length, 1, 'A failed refresh must not reinitialize views from an error response');
 
     const requestCount = calls.length;
     dialogOpen = true;
@@ -354,6 +359,9 @@ const ok = html => ({ok: true, redirected: false, text: async () => html});
     releaseOld(ok('outdated'));
     assert.equal(await oldRequest, false);
     assert.equal(page.innerHTML, 'newest', 'An older response must not overwrite a newer plan');
+    assert.equal(viewInits.length, 2, 'The stale response must not reinitialize or overwrite the selected planner view');
+    assert.equal(viewInits[1].root, page);
+    assert.deepEqual(viewInits[1], {root:page, html:'newest', hidden:true, inert:true});
 })().catch(error => {console.error(error); process.exitCode = 1;});
 """
     result = subprocess.run(

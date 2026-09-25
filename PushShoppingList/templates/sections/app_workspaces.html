@@ -655,28 +655,40 @@
          {% if initial_app_page|default("") != "mealPlannerPage" %}hidden{% endif %}>
     <div class="app-page-heading-row">
         <div>
-            <h2>Meal Planner</h2>
-            <p>Plan meals for the week using recipes already saved in AI Pantry.</p>
+            <h2 data-planner-title>Meal Planner</h2>
+            <p data-planner-description>Plan meals for the week using recipes already saved in AI Pantry.</p>
         </div>
         <div class="app-page-actions">
             <button type="button"
                     class="app-page-primary-action"
+                    data-planner-add-meal
                     onclick="return openMealPlannerDialog()"
                     {% if not meal_plan_recipe_options %}disabled aria-disabled="true" title="Add a recipe before planning meals"{% endif %}>
                 {{ shell.svg_icon("plus") }}
                 <span>Add Meal</span>
             </button>
+            <button type="button" class="app-page-primary-action" data-planner-add-trip hidden onclick="return PlannerViews.openTrip()">
+                {{ shell.svg_icon("plus") }}
+                <span>Schedule shopping trip</span>
+            </button>
         </div>
     </div>
 
     <div class="app-meal-planner-toolbar" aria-label="Meal planner week controls">
-        <a href="?meal_week={{ meal_plan.previous_week }}#mealPlannerPage" aria-label="Previous week">&larr;</a>
+        <a data-planner-week-link href="?meal_week={{ meal_plan.previous_week }}#mealPlannerPage" aria-label="Previous week">&larr;</a>
         <strong>{{ meal_plan.range_label }}</strong>
-        <a href="?meal_week={{ meal_plan.next_week }}#mealPlannerPage" aria-label="Next week">&rarr;</a>
-        <a class="app-page-secondary-action" href="?meal_week={{ meal_plan.today_week }}#mealPlannerPage">Today</a>
+        <a data-planner-week-link href="?meal_week={{ meal_plan.next_week }}#mealPlannerPage" aria-label="Next week">&rarr;</a>
+        <a data-planner-week-link class="app-page-secondary-action" href="?meal_week={{ meal_plan.today_week }}#mealPlannerPage">Today</a>
+    </div>
+
+    <div class="planner-view-tabs" role="tablist" aria-label="Planning views">
+        <button type="button" id="plannerMealsTab" role="tab" data-planner-view="meals" aria-selected="true" aria-controls="plannerMealsPanel" tabindex="0">Meals</button>
+        <button type="button" id="plannerPrepTab" role="tab" data-planner-view="prep" aria-selected="false" aria-controls="plannerPrepPanel" tabindex="-1">Meal Prep</button>
+        <button type="button" id="plannerShoppingTab" role="tab" data-planner-view="shopping" aria-selected="false" aria-controls="plannerShoppingPanel" tabindex="-1">Shopping</button>
     </div>
 
     <p class="app-dialog-status" data-meal-planner-refresh-status role="status" aria-live="polite" hidden></p>
+    <div id="plannerMealsPanel" data-planner-panel="meals" role="tabpanel" aria-labelledby="plannerMealsTab" tabindex="0">
     <div class="app-page-layout">
         <div class="app-page-main-column">
             <section class="app-meal-planner-grid" aria-label="Weekly meal plan">
@@ -804,6 +816,10 @@
             </article>
         </aside>
     </div>
+    </div>
+
+    <div id="plannerPrepPanel" data-planner-panel="prep" role="tabpanel" aria-labelledby="plannerPrepTab" tabindex="0" hidden></div>
+    <div id="plannerShoppingPanel" data-planner-panel="shopping" role="tabpanel" aria-labelledby="plannerShoppingTab" tabindex="0" hidden></div>
 
     <dialog id="mealPlannerDialog" class="app-dialog" aria-labelledby="mealPlannerDialogTitle">
         <div class="app-dialog-card app-meal-schedule-dialog-card">
@@ -862,6 +878,20 @@
         </form>
     </dialog>
 </section>
+
+<dialog id="shoppingTripDialog" class="app-dialog planner-trip-dialog" aria-labelledby="shoppingTripDialogTitle">
+    <div class="app-dialog-card">
+        <div class="app-dialog-header">
+            <div>
+                <h3 id="shoppingTripDialogTitle">Schedule shopping trip</h3>
+                <p>Choose a date and a shopping list for your trip.</p>
+            </div>
+            <button type="button" class="app-dialog-close" data-trip-close aria-label="Close shopping trip" onclick="return PlannerViews.closeTrip()">&times;</button>
+        </div>
+        <p class="planner-trip-status" data-trip-status role="status" aria-live="polite"></p>
+        <div data-trip-content></div>
+    </div>
+</dialog>
 
 <dialog id="mealPlanShoppingDialog" class="app-dialog meal-shopping-dialog" aria-labelledby="mealPlanShoppingDialogTitle">
     <div class="app-dialog-card">

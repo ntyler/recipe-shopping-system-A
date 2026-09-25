@@ -124,7 +124,7 @@
             const data = await request('/add', payload);
             if (state !== s) return;
             s.step = 'done'; s.savedList = data.list;
-            content(s, `<p class="meal-shopping-summary">Added to ${escape(data.list.name)}.</p><p class="meal-shopping-help">Your other shopping items have been kept.</p><div class="meal-shopping-actions"><button type="button" data-shopping-action="cancel">Done</button><button type="button" class="app-page-primary-action" data-shopping-action="view">Open shopping list</button></div>`);
+            content(s, `<p class="meal-shopping-summary">Added to ${escape(data.list.name)}.</p><p class="meal-shopping-help">Your other shopping items have been kept.</p><div class="meal-shopping-actions"><button type="button" data-shopping-action="cancel">Done</button><button type="button" data-shopping-action="schedule">Schedule shopping trip</button><button type="button" class="app-page-primary-action" data-shopping-action="view">Open shopping list</button></div>`);
             status(s.dialog, '[data-meal-shopping-status]', 'Shopping list saved.');
         } catch (error) {
             if (state !== s) return;
@@ -155,12 +155,12 @@
             if (action === 'save') void save(s);
             if (action === 'view') {
                 const id = s.savedList.id; close();
-                if (id === 'current') {
-                    // A fresh document also refreshes an already-loaded shopping workspace.
-                    const destination = `/?shopping_updated=${Date.now()}#shoppingListsPage`;
-                    global.location.assign(typeof global.withCanonicalViewerUserId === 'function' ? global.withCanonicalViewerUserId(destination) : destination);
-                }
-                else void openLists(id);
+                openList(id, s.opener);
+            }
+            if (action === 'schedule') {
+                const initial = {list_id:s.savedList.id,source_ids:s.review.sources.map(source => source.id)};
+                close();
+                void global.PlannerViews.openTrip(initial,s.opener);
             }
         };
         s.dialog.onchange = event => {
@@ -236,5 +236,13 @@
         const s = listsState; listsState = null; s.controller?.abort(); s.dialog.close(); s.opener?.focus({preventScroll:true});
         return false;
     }
-    global.MealPlanShopping = {open,close,openLists,closeLists};
+    function openList(id,opener = document.activeElement) {
+        if (id === 'current') {
+            // A fresh document also refreshes an already-loaded shopping workspace.
+            const destination = `/?shopping_updated=${Date.now()}#shoppingListsPage`;
+            global.location.assign(typeof global.withCanonicalViewerUserId === 'function' ? global.withCanonicalViewerUserId(destination) : destination);
+        } else void openLists(id,opener);
+        return false;
+    }
+    global.MealPlanShopping = {open,close,openLists,closeLists,openList};
 })(window);

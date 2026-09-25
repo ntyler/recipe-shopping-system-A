@@ -1679,6 +1679,7 @@ async function refreshMealPlannerWorkspace({ date = "" } = {}) {
             plannerUrl.searchParams.set("meal_week", page.dataset.mealWeek);
             window.history.replaceState(window.history.state, "", plannerUrl);
         }
+        window.PlannerViews?.init(page);
         return true;
     } catch (error) {
         if (!controller.signal.aborted) {
