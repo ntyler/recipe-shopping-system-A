@@ -2431,6 +2431,35 @@ function globalAppSearchQuery(form) {
     return input ? String(input.value || "").trim() : "";
 }
 
+function globalAppSearchFavorites(form) {
+    const value = form?.querySelector("[data-global-search-favorites-value]");
+    return Boolean(value && !value.disabled);
+}
+
+function toggleGlobalAppSearchFavorites(form) {
+    const value = form?.querySelector("[data-global-search-favorites-value]");
+    if (!value) return false;
+    value.disabled = !value.disabled;
+    const favorites = globalAppSearchFavorites(form);
+    form.querySelector("[data-global-search-favorites]")?.setAttribute("aria-pressed", String(favorites));
+    const scope = form.querySelector("[data-global-search-scope]");
+    if (scope) scope.textContent = favorites ? "Favorite recipes only" : "All records";
+    const input = globalAppSearchInput(form);
+    if (input) input.placeholder = favorites ? "Search favorite recipes..." : "Search recipes, ingredients, or menus...";
+    input?.focus();
+    globalAppSearchSchedule(form);
+    return false;
+}
+
+function globalAppSearchResultsUrl(form, query) {
+    const resultsUrl = new URL(form.dataset.globalSearchResultsUrl || "/search", window.location.origin);
+    if (query) resultsUrl.searchParams.set("q", query);
+    else resultsUrl.searchParams.delete("q");
+    if (globalAppSearchFavorites(form)) resultsUrl.searchParams.set("favorites", "1");
+    else resultsUrl.searchParams.delete("favorites");
+    return `${resultsUrl.pathname}${resultsUrl.search}`;
+}
+
 function globalAppSearchOpenDropdown(form) {
     const input = globalAppSearchInput(form);
     const dropdown = globalAppSearchDropdown(form);
@@ -2448,8 +2477,12 @@ function globalAppSearchCloseDropdown(form) {
         return;
     }
     dropdown.hidden = true;
+    window.clearTimeout(form._globalSearchTimer);
+    form._globalSearchAbortController?.abort();
+    form._globalSearchAbortController = null;
     input.setAttribute("aria-expanded", "false");
     input.removeAttribute("aria-activedescendant");
+    input.removeAttribute("aria-busy");
     form._globalSearchActiveIndex = -1;
 }
 
@@ -2724,15 +2757,16 @@ function globalAppSearchRenderGroups(form, groups, query, options = {}) {
         content.append(empty);
     }
 
-    if (options.includeViewAll !== false && String(query || "").trim().length >= GLOBAL_APP_SEARCH_MIN_QUERY_LENGTH) {
-        const resultsUrl = new URL(form.dataset.globalSearchResultsUrl || "/search", window.location.origin);
-        resultsUrl.searchParams.set("q", String(query || "").trim());
+    const favorites = globalAppSearchFavorites(form);
+    if (options.includeViewAll !== false && (favorites || String(query || "").trim().length >= GLOBAL_APP_SEARCH_MIN_QUERY_LENGTH)) {
         const viewAll = {
-            title: `View all results for “${String(query || "").trim()}”`,
+            title: favorites
+                ? (query ? `View all favorites for “${String(query).trim()}”` : "View all favorite recipes")
+                : `View all results for “${String(query || "").trim()}”`,
             type: "Search",
             secondary: options.totalCount ? `${options.totalCount} matching records` : "Open grouped search results",
             icon: "pages",
-            url: `${resultsUrl.pathname}${resultsUrl.search}`,
+            url: globalAppSearchResultsUrl(form, String(query || "").trim()),
             isViewAll: true,
         };
         content.append(globalAppSearchCreateOption(form, viewAll, "", renderedResults.length));
@@ -2762,6 +2796,7 @@ function globalAppSearchRecentResults(payload) {
 }
 
 function globalAppSearchRenderEmpty(form) {
+    if (globalAppSearchFavorites(form)) return;
     const groups = [];
     const recent = Array.isArray(form._globalSearchRecentResults)
         ? form._globalSearchRecentResults.slice(0, GLOBAL_APP_SEARCH_RECENT_LIMIT)
@@ -2802,7 +2837,7 @@ async function globalAppSearchFetchRecent(form) {
     } finally {
         form._globalSearchRecentLoaded = true;
         form._globalSearchRecentRequest = null;
-        if (!globalAppSearchQuery(form)) {
+        if (!globalAppSearchQuery(form) && !globalAppSearchFavorites(form) && !globalAppSearchDropdown(form)?.hidden) {
             globalAppSearchRenderEmpty(form);
         }
     }
@@ -2814,12 +2849,17 @@ async function globalAppSearchFetch(form, query) {
     }
     const controller = new AbortController();
     form._globalSearchAbortController = controller;
+    const favorites = globalAppSearchFavorites(form);
+    const current = () => form._globalSearchAbortController === controller && !controller.signal.aborted
+        && globalAppSearchQuery(form) === query && globalAppSearchFavorites(form) === favorites;
     globalAppSearchInput(form)?.setAttribute("aria-busy", "true");
     globalAppSearchMessage(form, "Searching…", "loading");
     try {
         const endpoint = new URL(form.dataset.globalSearchEndpoint || "/api/global-search", window.location.origin);
         endpoint.searchParams.set("q", query);
         endpoint.searchParams.set("limit", String(GLOBAL_APP_SEARCH_RESULT_LIMIT));
+        if (favorites) endpoint.searchParams.set("favorites", "1");
+        else endpoint.searchParams.delete("favorites");
         const response = await fetch(endpoint, {
             headers: { "X-Requested-With": "fetch" },
             credentials: "same-origin",
@@ -2827,14 +2867,13 @@ async function globalAppSearchFetch(form, query) {
             signal: controller.signal,
         });
         const payload = await response.json().catch(() => ({}));
+        if (!current()) return;
         if (!response.ok || !payload.ok) {
             throw new Error(payload.error || "Global search is unavailable.");
         }
-        if (globalAppSearchQuery(form) !== query) {
-            return;
-        }
         const groups = globalAppSearchNormalizedGroups(payload)
             .filter(group => group.key !== "pages" && group.key !== "recent")
+            .filter(group => !favorites || group.key === "recipes")
             .map(group => ({
                 ...group,
                 results: group.results.map(result => ({
@@ -2842,19 +2881,22 @@ async function globalAppSearchFetch(form, query) {
                     trackingGroup: group.key,
                 })),
             }));
-        const pages = globalAppSearchPageResults(form, query, GLOBAL_APP_SEARCH_TYPED_PAGE_LIMIT);
+        const pages = favorites ? [] : globalAppSearchPageResults(form, query, GLOBAL_APP_SEARCH_TYPED_PAGE_LIMIT);
         if (pages.length) {
             groups.push({ key: "pages", label: "PAGES", results: pages });
         }
         if (!groups.length) {
-            globalAppSearchMessage(form, `No results for “${query}”`, "empty");
+            const emptyMessage = favorites
+                ? (query ? `No favorite recipes match “${query}”.` : "No favorite recipes yet. Mark a recipe with the heart to find it here.")
+                : `No results for “${query}”`;
+            globalAppSearchMessage(form, emptyMessage, "empty");
             return;
         }
         globalAppSearchRenderGroups(form, groups, query, {
             totalCount: Number(payload.total_count || 0),
         });
     } catch (error) {
-        if (error && error.name === "AbortError") {
+        if (!current() || (error && error.name === "AbortError")) {
             return;
         }
         globalAppSearchMessage(form, ["Search could not be completed.", "Try again."], "error");
@@ -2874,19 +2916,22 @@ function globalAppSearchSchedule(form) {
         globalAppSearchInput(form)?.removeAttribute("aria-busy");
     }
     const query = globalAppSearchQuery(form);
-    if (!query) {
+    const favorites = globalAppSearchFavorites(form);
+    if (!query && !favorites) {
         globalAppSearchRenderEmpty(form);
         globalAppSearchFetchRecent(form);
         return;
     }
-    if (query.length < GLOBAL_APP_SEARCH_MIN_QUERY_LENGTH) {
-        const pages = globalAppSearchPageResults(form, query);
+    if (query && query.length < GLOBAL_APP_SEARCH_MIN_QUERY_LENGTH) {
+        const pages = favorites ? [] : globalAppSearchPageResults(form, query);
         if (pages.length) {
             globalAppSearchRenderGroups(form, [{ key: "pages", label: "PAGES", results: pages }], query, {
                 includeViewAll: false,
             });
         } else {
-            globalAppSearchMessage(form, "Type at least 2 characters to search your AI Pantry records.", "hint");
+            globalAppSearchMessage(form, favorites
+                ? "Type at least 2 characters to search your favorites, or clear the text to see all favorites."
+                : "Type at least 2 characters to search your AI Pantry records.", "hint");
         }
         return;
     }
@@ -2938,14 +2983,12 @@ function submitGlobalAppSearch(form) {
     if (activeIndex >= 0) {
         return globalAppSearchOpenResult(form, activeIndex);
     }
-    if (query.length < GLOBAL_APP_SEARCH_MIN_QUERY_LENGTH) {
+    if (query.length < GLOBAL_APP_SEARCH_MIN_QUERY_LENGTH && !(globalAppSearchFavorites(form) && !query)) {
         globalAppSearchSchedule(form);
         globalAppSearchInput(form)?.focus();
         return false;
     }
-    const resultsUrl = new URL(form.dataset.globalSearchResultsUrl || "/search", window.location.origin);
-    resultsUrl.searchParams.set("q", query);
-    window.location.assign(`${resultsUrl.pathname}${resultsUrl.search}`);
+    window.location.assign(globalAppSearchResultsUrl(form, query));
     return false;
 }
 
@@ -2962,6 +3005,13 @@ function initGlobalAppSearch() {
         }
         input.addEventListener("focus", () => globalAppSearchSchedule(form));
         input.addEventListener("input", () => globalAppSearchSchedule(form));
+        form.querySelector("[data-global-search-favorites]")?.addEventListener("keydown", event => {
+            if (event.key === "Escape") {
+                event.preventDefault();
+                input.focus();
+                globalAppSearchCloseDropdown(form);
+            }
+        });
         input.addEventListener("keydown", event => {
             if (event.key === "Escape") {
                 event.preventDefault();

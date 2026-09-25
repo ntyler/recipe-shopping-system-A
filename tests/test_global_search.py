@@ -716,10 +716,194 @@ def test_global_search_dropdown_and_full_results_are_responsive_dark_theme_surfa
     assert ".app-global-search-dropdown {" in css
     assert "width: 100%;" in css
     assert "max-height: min(70vh, 440px);" in css
+    assert "max-height: min(60vh, 440px);" in css
     assert "min-height: 48px;" in css
     assert ".app-global-search-result.is-active" in css
     assert ".app-global-search-result-copy mark" in css
     assert ".app-global-search-state.is-loading::before" in css
     assert ".global-search-results-page {" in css
     assert ".global-search-result-filters a[aria-current=\"page\"]" in css
-    assert "max-height: min(60vh, 440px);" in css
+
+
+def seed_search_recipe_output(root, slug, *, favorite=False, **fields):
+    from PushShoppingList.services.recipe_extract_service import recipe_output_json_path
+
+    url = "https://example.test/recipes/" + slug
+    payload = {"source_url": url, "recipe_title": slug.replace("-", " ").title(), "favorite": favorite, **fields}
+    path = recipe_output_json_path(url, output_folder=root / "recipe-extractor" / "data" / "output")
+    write_json(path, payload)
+    return url, path
+
+
+def test_favorite_search_browses_only_canonical_saved_favorites_without_unrelated_entities(monkeypatch, tmp_path):
+    from PushShoppingList.services import global_search_service
+
+    monkeypatch.setenv("SHOPPING_APP_DURABLE_DATA_BACKEND", "json")
+    app, user_data = configured_app(monkeypatch, tmp_path)
+    root = user_data / "user-one"
+    favorite_url, favorite_path = seed_search_recipe_output(root, "tomato-soup", favorite=True,
+        description="Garden vegetables with smoky paprika", ingredients=["tomatoes", "basil"], equipment=["immersion blender"])
+    _, regular_path = seed_search_recipe_output(root, "regular-soup", favorite=False, description="Tomato soup")
+    _, foreign_path = seed_search_recipe_output(user_data / "user-two", "foreign-secret-recipe", favorite=True)
+    before = {path: path.read_bytes() for path in (favorite_path, regular_path, foreign_path)}
+    monkeypatch.setattr(global_search_service, "cached_projection", lambda: (_ for _ in ()).throw(AssertionError("Favorites do not need unrelated records")))
+    monkeypatch.setattr(global_search_service, "master_data_candidates", lambda query: (_ for _ in ()).throw(AssertionError("Favorites do not search master data")))
+    with app.test_client() as client:
+        sign_in(client, "user-one")
+        response = client.get("/api/global-search?viewer_user_id=user-one&favorites=1")
+        assert response.status_code == 200
+        payload = response.get_json()
+        assert payload["favorites"] is True
+        assert payload["query"] == ""
+        assert payload["query_too_short"] is False
+        assert payload["total_count"] == payload["all_total_count"] == 1
+        assert [group["key"] for group in payload["groups"]] == ["recipes"]
+        assert flattened_results(payload)[0]["id"] == favorite_url
+        assert parse_qs(urlsplit(payload["view_all_url"]).query) == {"viewer_user_id": ["user-one"], "favorites": ["1"]}
+        assert_private_no_store(response)
+        for query in ("mato", "paprika", "basil", "immersion", "weeknight"):
+            result = client.get("/api/global-search", query_string={"viewer_user_id": "user-one", "q": query, "favorites": "1"}).get_json()
+            assert result["total_count"] == 1, query
+            assert flattened_results(result)[0]["id"] == favorite_url
+        assert client.get("/api/global-search?viewer_user_id=user-one&q=regular&favorites=1").get_json()["groups"] == []
+        assert client.get("/api/global-search?viewer_user_id=user-one&q=tomato&favorites=1").get_json()["available_groups"] == [{"key": "recipes", "label": "RECIPES", "count": 1}]
+    assert all(path.read_bytes() == data for path, data in before.items())
+    assert not (root / "global_search_recent.json").exists()
+
+
+def test_favorite_search_refreshes_after_flag_changes_and_ignores_cached_cookbook_flags(monkeypatch, tmp_path):
+    monkeypatch.setenv("SHOPPING_APP_DURABLE_DATA_BACKEND", "json")
+    app, user_data = configured_app(monkeypatch, tmp_path)
+    root = user_data / "user-one"
+    url, _ = seed_search_recipe_output(root, "tomato-soup", favorite=False)
+    cookbook_path = root / "cookbooks.json"
+    cookbook = json.loads(cookbook_path.read_text())
+    cookbook["cookbooks"][0]["recipes"][0]["favorite"] = True
+    write_json(cookbook_path, cookbook)
+    endpoint = "/api/global-search?viewer_user_id=user-one&q=tomato&favorites=1"
+    with app.test_client() as client:
+        sign_in(client, "user-one")
+        assert client.get("/api/global-search?viewer_user_id=user-one&q=tomato").get_json()["groups"]
+        assert client.get(endpoint).get_json()["total_count"] == 0
+        enabled = client.post("/api/recipe_favorite", json={"url": url, "favorite": True})
+        assert enabled.status_code == 200
+        assert enabled.get_json()["favorite"] is True
+        assert client.get(endpoint).get_json()["total_count"] == 1
+        disabled = client.post("/api/recipe_favorite", json={"url": url, "favorite": False})
+        assert disabled.status_code == 200
+        assert client.get(endpoint).get_json()["total_count"] == 0
+
+
+def test_favorite_search_canonical_boolean_and_type_scope(monkeypatch, tmp_path):
+    app, user_data = configured_app(monkeypatch, tmp_path)
+    seed_search_recipe_output(user_data / "user-one", "tomato-soup", favorite=True)
+    with app.test_client() as client:
+        sign_in(client, "user-one")
+        redirected = client.get("/api/global-search?q=tomato&type=menus&favorites=TRUE&limit=008")
+        assert redirected.status_code == 302
+        assert parse_qsl(urlsplit(redirected.headers["Location"]).query) == [
+            ("viewer_user_id", "user-one"), ("q", "tomato"), ("favorites", "1"), ("limit", "8"),
+        ]
+        result = client.get(redirected.headers["Location"])
+        assert result.status_code == 200
+        assert [group["key"] for group in result.get_json()["groups"]] == ["recipes"]
+        for value in ("0", "false", "no", "off", "unknown"):
+            normalized = client.get("/api/global-search", query_string={"viewer_user_id": "user-one", "q": "tomato", "favorites": value}, follow_redirects=True)
+            assert normalized.status_code == 200
+            assert "favorites" not in normalized.request.args
+            assert normalized.get_json()["favorites"] is False
+        assert client.get("/api/global-search?viewer_user_id=user-one&favorites=1&favorites=0").status_code == 400
+
+
+def test_favorite_search_keeps_short_query_guard_and_empty_recent_behavior(monkeypatch, tmp_path):
+    from PushShoppingList.services import global_search_service
+
+    app, _user_data = configured_app(monkeypatch, tmp_path)
+    monkeypatch.setattr(global_search_service, "build_recipe_candidates", lambda **kwargs: (_ for _ in ()).throw(AssertionError("No recipe scan expected")))
+    with app.test_client() as client:
+        sign_in(client, "user-one")
+        short = client.get("/api/global-search?viewer_user_id=user-one&q=r&favorites=1").get_json()
+        assert short["favorites"] is True
+        assert short["query_too_short"] is True
+        assert short["groups"] == []
+        recent = client.get("/api/global-search?viewer_user_id=user-one").get_json()
+        assert recent["favorites"] is False
+        assert recent["groups"] == []
+
+
+def test_favorite_search_full_results_caps_counts_and_failure_context(monkeypatch, tmp_path):
+    from flask import jsonify
+    from PushShoppingList.routes import main_routes
+
+    monkeypatch.setenv("SHOPPING_APP_DURABLE_DATA_BACKEND", "json")
+    app, user_data = configured_app(monkeypatch, tmp_path)
+    for index in range(55):
+        seed_search_recipe_output(user_data / "user-one", f"saved-favorite-{index:02d}", favorite=True)
+    monkeypatch.setattr(main_routes, "render_template", lambda name, **context: jsonify({
+        "template": name, "payload": context["search_payload"], "favorites": context["search_favorites"],
+        "type": context["search_type_filter"], "error": context["search_error"],
+    }))
+    with app.test_client() as client:
+        sign_in(client, "user-one")
+        compact = client.get("/api/global-search?viewer_user_id=user-one&favorites=1&limit=12").get_json()
+        assert compact["total_count"] == 55
+        assert len(flattened_results(compact)) == 4
+        full = client.get(compact["view_all_url"]).get_json()
+        assert full["template"] == "search_results.html"
+        assert full["favorites"] is True
+        assert full["type"] == ""
+        assert full["payload"]["total_count"] == 55
+        assert len(flattened_results(full["payload"])) == 50
+        assert [group["key"] for group in full["payload"]["groups"]] == ["recipes"]
+        monkeypatch.setattr(main_routes, "global_search", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("private failure")))
+        failed_api = client.get("/api/global-search?viewer_user_id=user-one&favorites=1")
+        assert failed_api.status_code == 500
+        assert failed_api.get_json()["favorites"] is True
+        failed_page = client.get("/search?viewer_user_id=user-one&favorites=1").get_json()
+        assert failed_page["favorites"] is True
+        assert failed_page["payload"]["favorites"] is True
+        assert "private failure" not in failed_page["error"]
+
+
+def test_favorite_search_users_guests_and_missing_favorites_stay_isolated(monkeypatch, tmp_path):
+    from PushShoppingList.services import storage_service
+
+    monkeypatch.setenv("SHOPPING_APP_DURABLE_DATA_BACKEND", "json")
+    app, user_data = configured_app(monkeypatch, tmp_path)
+    seed_search_recipe_output(user_data / "user-one", "tomato-soup", favorite=True)
+    seed_search_recipe_output(user_data / "user-two", "foreign-secret-recipe", favorite=True)
+    with app.test_client() as client:
+        assert client.get("/api/global-search?favorites=1").status_code == 401
+        assert client.get("/search?favorites=1").status_code == 302
+        sign_in(client, "user-one")
+        own = client.get("/api/global-search?viewer_user_id=user-one&favorites=1").get_json()
+        assert [row["title"] for row in flattened_results(own)] == ["Tomato Soup"]
+        assert client.get("/api/global-search?viewer_user_id=user-two&favorites=1").status_code == 403
+        sign_in(client, "user-two")
+        other = client.get("/api/global-search?viewer_user_id=user-two&favorites=1").get_json()
+        assert [row["title"] for row in flattened_results(other)] == ["Foreign Secret Recipe"]
+        with client.session_transaction() as session:
+            session.clear()
+        assert client.get("/guest/start").status_code == 302
+        assert client.get("/api/global-search?favorites=1").get_json()["groups"] == []
+        with client.session_transaction() as session:
+            guest_id = session["guest_session_id"]
+        seed_search_recipe_output(storage_service.GUEST_DATA_DIR / guest_id, "guest-favorite", favorite=True)
+        guest = client.get("/api/global-search?favorites=1").get_json()
+        assert [row["title"] for row in flattened_results(guest)] == ["Guest Favorite"]
+        assert "viewer_user_id" not in parse_qs(urlsplit(guest["view_all_url"]).query)
+        assert client.get("/api/global-search?viewer_user_id=user-one&favorites=1").status_code == 403
+
+
+def test_favorite_menu_recipe_uses_unique_saved_recipe_identity(monkeypatch, tmp_path):
+    app, user_data = configured_app(monkeypatch, tmp_path)
+    identity = "manual://restaurant-items/soup-1"
+    seed_search_recipe_output(user_data / "user-one", "menu-page", favorite=True,
+        recipe_record_url=identity, recipe_title="Special menu soup")
+    with app.test_client() as client:
+        sign_in(client, "user-one")
+        result = client.get("/api/global-search?viewer_user_id=user-one&favorites=1").get_json()
+    rows = flattened_results(result)
+    assert len(rows) == 1
+    assert rows[0]["id"] == identity
+    assert parse_qs(urlsplit(rows[0]["url"]).query)["url"] == [identity]

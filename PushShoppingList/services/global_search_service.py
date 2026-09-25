@@ -318,7 +318,7 @@ def build_workspace_candidates():
     return [item for item in candidates if item]
 
 
-def build_recipe_candidates():
+def build_recipe_candidates(*, favorites_only=False):
     recipes = {}
     cookbook_names = {}
     structured_recipe_loader = None
@@ -367,6 +367,18 @@ def build_recipe_candidates():
         key = recipe_url_service.normalize_recipe_url_key(recipe_url)
         if key:
             recipes[key] = {**recipes.get(key, {}), **record, "url": recipe_url}
+
+    if favorites_only:
+        # Favorites belong to saved recipe output, not cached shopping/cookbook
+        # metadata. The existing index is workspace scoped, supports durable
+        # storage, and is refreshed for each request after a favorite changes.
+        from PushShoppingList.services.recipe_edit_service import recipe_output_identity_url, recipe_output_index
+
+        recipes = {
+            key: {**recipes.get(key, {}), **record, "url": recipe_output_identity_url(record, fallback_url=key)}
+            for key, record in recipe_output_index().items()
+            if isinstance(record, dict) and bool(record.get("favorite"))
+        }
 
     menu_store = menu_store_service.load_menu_store()
     restaurant_by_id = {
@@ -946,6 +958,7 @@ def recent_global_search(limit=4):
     return {
         "ok": True,
         "query": "",
+        "favorites": False,
         "normalized_query": "",
         "min_query_length": MIN_QUERY_LENGTH,
         "query_too_short": False,
@@ -984,15 +997,17 @@ def limited_header_results(ranked, limit):
     return visible
 
 
-def global_search(query, limit=DEFAULT_RESULT_LIMIT, group_filter=None, full=False, include_pages=True):
+def global_search(query, limit=DEFAULT_RESULT_LIMIT, group_filter=None, full=False, include_pages=True, favorites=False):
     """Search only the active session's workspace and return grouped results."""
     query = clean_text(query)[:160]
     normalized_query = normalize_search_text(query)
-    selected_groups = normalize_group_filter(group_filter)
+    selected_groups = {"recipes"} if favorites else normalize_group_filter(group_filter)
     too_short = bool(normalized_query) and len(normalized_query) < MIN_QUERY_LENGTH
 
-    matches = page_candidates(query) if include_pages else []
-    if normalized_query and not too_short:
+    matches = page_candidates(query) if include_pages and not favorites else []
+    if favorites and not too_short:
+        matches.extend(build_recipe_candidates(favorites_only=True)[0])
+    elif normalized_query and not too_short:
         matches.extend(cached_projection().matching_candidates(query))
         matches.extend(master_data_candidates(query))
 
@@ -1062,6 +1077,7 @@ def global_search(query, limit=DEFAULT_RESULT_LIMIT, group_filter=None, full=Fal
     return {
         "ok": True,
         "query": query,
+        "favorites": bool(favorites),
         "normalized_query": normalized_query,
         "min_query_length": MIN_QUERY_LENGTH,
         "query_too_short": too_short,
@@ -1073,5 +1089,5 @@ def global_search(query, limit=DEFAULT_RESULT_LIMIT, group_filter=None, full=Fal
             for group, label in GROUPS
             if counts.get(group, 0)
         ],
-        "view_all_url": private_result_url("/search", q=query),
+        "view_all_url": private_result_url("/search", q=query, **({"favorites": "1"} if favorites else {})),
     }

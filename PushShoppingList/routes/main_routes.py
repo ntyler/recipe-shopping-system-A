@@ -5829,11 +5829,11 @@ def clean_global_search_group(value):
     return group if group in GROUP_LABELS else ""
 
 
-def clean_global_search_limit(value, *, query):
+def clean_global_search_limit(value, *, query, favorites=False):
     """Return the effective compact-search limit and its canonical value."""
 
-    default = DEFAULT_RESULT_LIMIT if query else 4
-    maximum = MAX_RESULT_LIMIT if query else 4
+    default = DEFAULT_RESULT_LIMIT if query or favorites else 4
+    maximum = MAX_RESULT_LIMIT if query or favorites else 4
     try:
         limit = int(str(value).strip())
     except (TypeError, ValueError):
@@ -5847,6 +5847,14 @@ def canonical_global_search_request(*, api):
     viewer = validate_authenticated_viewer(request.args)
     query = clean_global_search_query(request.args.get("q"))
     group_filter = clean_global_search_group(request.args.get("type"))
+    favorite_values = request.args.getlist("favorites")
+    if len(favorite_values) > 1:
+        abort(400)
+    favorite_value = str(favorite_values[0] if favorite_values else "").strip().lower()
+    favorites = favorite_value in {"1", "true", "on", "yes"}
+    if favorites:
+        # Favorites are a recipe-only scope, not an additional entity type.
+        group_filter = ""
     if api and not query:
         # An empty API query returns recent records, so a record type is not a
         # meaningful filter and must not survive in a canonical URL.
@@ -5856,13 +5864,15 @@ def canonical_global_search_request(*, api):
         ("viewer_user_id", viewer.viewer_user_id),
         ("q", query),
         ("type", group_filter),
+        ("favorites", "1" if favorites else ""),
     ]
-    allowed_keys = {"viewer_user_id", "q", "type"}
+    allowed_keys = {"viewer_user_id", "q", "type", "favorites"}
     limit = DEFAULT_RESULT_LIMIT
     if api:
         limit, default_limit = clean_global_search_limit(
             request.args.get("limit"),
             query=query,
+            favorites=favorites,
         )
         overrides.append(("limit", "" if limit == default_limit else str(limit)))
         allowed_keys.add("limit")
@@ -5878,6 +5888,7 @@ def canonical_global_search_request(*, api):
         "viewer_user_id": viewer.viewer_user_id,
         "query": query,
         "group_filter": group_filter,
+        "favorites": favorites,
         "limit": limit,
         "redirect": redirect(canonical_url) if requested_url != canonical_url else None,
     }
@@ -5896,8 +5907,9 @@ def global_search_route():
     query = canonical_request["query"]
     group_filter = canonical_request["group_filter"]
     limit = canonical_request["limit"]
+    favorites = canonical_request["favorites"]
     try:
-        if not query.strip():
+        if not query.strip() and not favorites:
             return jsonify(recent_global_search(limit=limit))
         # Header page shortcuts are sourced from the rendered shared Sidebar so
         # their SPA handlers remain intact. The API supplies record results only.
@@ -5906,12 +5918,14 @@ def global_search_route():
             limit=limit,
             group_filter=[group_filter] if group_filter else None,
             include_pages=False,
+            favorites=favorites,
         ))
     except Exception:
         current_app.logger.exception("Global application search failed")
         return jsonify({
             "ok": False,
             "query": query,
+            "favorites": favorites,
             "error": "AI Pantry search is temporarily unavailable.",
         }), 500
 
@@ -5956,11 +5970,13 @@ def global_search_results_route():
     query = canonical_request["query"]
     group_filter = canonical_request["group_filter"]
     viewer_user_id = canonical_request["viewer_user_id"]
+    favorites = canonical_request["favorites"]
     try:
         search_payload = global_search(
             query,
             group_filter=[group_filter] if group_filter else None,
             full=True,
+            favorites=favorites,
         )
         search_error = ""
     except Exception:
@@ -5968,6 +5984,7 @@ def global_search_results_route():
         search_payload = {
             "ok": False,
             "query": query,
+            "favorites": favorites,
             "total_count": 0,
             "groups": [],
             "available_groups": [],
@@ -5979,6 +5996,7 @@ def global_search_results_route():
         search_payload=search_payload,
         search_error=search_error,
         search_type_filter=group_filter,
+        search_favorites=favorites,
         search_viewer_user_id=viewer_user_id,
         current_user=current_public_user(),
         is_guest_demo=is_guest_session(),

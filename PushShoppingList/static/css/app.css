@@ -32146,6 +32146,80 @@ img[data-deferred-src] {
     display: none;
 }
 
+.app-global-search-scope-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px 12px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--app-border);
+    background: var(--app-surface);
+}
+
+.app-global-search .app-global-search-favorites {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: auto;
+    min-height: 32px;
+    margin: 0;
+    padding: 5px 9px;
+    border: 1px solid var(--app-border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--app-text);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 650;
+    line-height: 1.4;
+    cursor: pointer;
+}
+
+.app-global-search-favorites .app-icon-svg,
+.global-search-results-favorites .app-icon-svg {
+    flex: 0 0 16px;
+    width: 16px;
+    height: 16px;
+}
+
+.app-global-search .app-global-search-favorites[aria-pressed="true"] {
+    border-color: var(--app-primary);
+    background: var(--app-primary-soft);
+    color: var(--app-primary);
+}
+
+.app-global-search-favorites[aria-pressed="true"] .app-icon-svg {
+    fill: currentColor;
+}
+
+.app-global-search .app-global-search-favorites:hover {
+    border-color: var(--app-primary);
+}
+
+.app-global-search .app-global-search-favorites:focus-visible {
+    outline: 2px solid var(--app-focus);
+    outline-offset: 2px;
+}
+
+.app-global-search-scope {
+    min-width: 0;
+    color: var(--app-muted);
+    font-size: 11px;
+    line-height: 1.4;
+}
+
+@media (max-width: 760px), (pointer: coarse) {
+    .app-global-search .app-global-search-favorites {
+        min-height: 44px;
+    }
+}
+
 .app-global-search-dropdown-content {
     display: grid;
     padding: 6px;
@@ -32373,7 +32447,7 @@ img[data-deferred-src] {
     gap: 8px;
 }
 
-.global-search-results-form input,
+.global-search-results-form input[type="search"],
 .global-search-results-form button {
     min-height: 42px;
     margin: 0;
@@ -32381,7 +32455,7 @@ img[data-deferred-src] {
     font: inherit;
 }
 
-.global-search-results-form input {
+.global-search-results-form input[type="search"] {
     min-width: 0;
     padding: 0 13px;
     border: 1px solid var(--app-border);
@@ -32390,7 +32464,7 @@ img[data-deferred-src] {
     outline: none;
 }
 
-.global-search-results-form input:focus-visible {
+.global-search-results-form input[type="search"]:focus-visible {
     border-color: var(--app-primary);
     box-shadow: 0 0 0 3px rgba(46, 182, 111, 0.15);
 }
@@ -32410,6 +32484,63 @@ img[data-deferred-src] {
     border-color: var(--app-primary-hover);
     background: var(--app-primary-hover);
     outline: none;
+}
+
+.global-search-results-form > .global-search-results-scope-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px 16px;
+}
+
+.global-search-results-scope-row .global-search-results-favorites {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 36px;
+    margin: 0;
+    color: var(--app-text);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.global-search-results-favorites input[type="checkbox"] {
+    flex: 0 0 16px;
+    width: 16px;
+    min-width: 16px;
+    height: 16px;
+    min-height: 16px;
+    margin: 0;
+    padding: 0;
+    accent-color: var(--app-primary);
+}
+
+.global-search-results-favorites input:focus-visible,
+.global-search-results-scope-row a:focus-visible {
+    outline: 2px solid var(--app-focus);
+    outline-offset: 3px;
+}
+
+.global-search-results-favorites input:checked + .app-icon-svg {
+    fill: currentColor;
+    color: var(--app-primary);
+}
+
+.global-search-results-scope-row a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 36px;
+    color: var(--app-primary);
+    font-size: 12px;
+}
+
+@media (max-width: 760px), (pointer: coarse) {
+    .global-search-results-scope-row .global-search-results-favorites,
+    .global-search-results-scope-row a {
+        min-height: 44px;
+    }
 }
 
 .global-search-result-filters {

@@ -4,6 +4,7 @@
 {% set search_id = app_search_id|default("appGlobalSearch") %}
 {% set search_results_id = search_id ~ "Results" %}
 {% set search_popover_id = search_results_id ~ "Popover" %}
+{% set search_favorites_enabled = app_search_initial_favorites|default(false) %}
 {% set search_viewer_user_id = current_user.user_id|default("") if current_user else "" %}
 {% set global_search_endpoint = url_for("main_bp.global_search_route", viewer_user_id=search_viewer_user_id or none) %}
 {% set global_search_recent_url = url_for("main_bp.record_global_search_recent_route", viewer_user_id=search_viewer_user_id or none) %}
@@ -32,6 +33,7 @@
         {% if search_viewer_user_id %}
         <input type="hidden" name="viewer_user_id" value="{{ search_viewer_user_id }}">
         {% endif %}
+        <input type="hidden" name="favorites" value="1" data-global-search-favorites-value{% if not search_favorites_enabled %} disabled{% endif %}>
         <label class="sr-only" for="{{ search_id }}">Search AI Pantry</label>
         <span class="app-global-search-icon" aria-hidden="true">{{ shell.svg_icon("search") }}</span>
         <input id="{{ search_id }}"
@@ -45,7 +47,7 @@
                aria-expanded="false"
                aria-controls="{{ search_results_id }}"
                value="{{ app_search_initial_query|default('') }}"
-               placeholder="Search recipes, ingredients, or menus...">
+               placeholder="{{ 'Search favorite recipes...' if search_favorites_enabled else 'Search recipes, ingredients, or menus...' }}">
         <span class="app-global-search-shortcut" aria-hidden="true">Ctrl + K</span>
         <button type="submit" class="app-search-submit" tabindex="-1">Search</button>
         <span class="sr-only" data-app-global-search-status aria-live="polite"></span>
@@ -53,6 +55,17 @@
              class="app-global-search-dropdown"
              data-global-search-dropdown
              hidden>
+            <div class="app-global-search-scope-toolbar">
+                <button type="button"
+                        class="app-global-search-favorites"
+                        data-global-search-favorites
+                        aria-pressed="{{ 'true' if search_favorites_enabled else 'false' }}"
+                        onclick="return toggleGlobalAppSearchFavorites(this.form)">
+                    {{ shell.svg_icon("heart") }}
+                    <span>Favorites</span>
+                </button>
+                <span class="app-global-search-scope" data-global-search-scope>{{ 'Favorite recipes only' if search_favorites_enabled else 'All records' }}</span>
+            </div>
             <div class="app-global-search-state"
                  data-global-search-visible-status
                  role="status"
