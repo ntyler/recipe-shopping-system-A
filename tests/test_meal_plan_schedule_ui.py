@@ -12,6 +12,77 @@ SOURCE = Path(__file__).resolve().parents[1] / "PushShoppingList/static/js/meal-
 pytestmark = pytest.mark.skipif(not shutil.which("node"), reason="Node.js is required for scheduling logic checks")
 
 
+def test_distribution_keeps_full_meal_portions_in_date_and_meal_order_without_mutating_source():
+    run_model(r"""
+M.setDates(draft,M.dateRange('2026-09-25','2026-10-03'));
+M.setMeals(draft,['lunch']);M.setHouseholdDefault(draft,'lunch',2);
+draft.notes='Batch note';draft.prepSteps=[{date:'2026-09-24',instruction:'Prepare'}];
+M.setDayNotes(draft,'2026-09-25','Pack separately');
+const before=JSON.stringify(draft);
+let result=M.distributeRecipeServings(draft,4,{mode:'keep',servingsPerMeal:2});
+assert.equal(JSON.stringify(draft),before,'A preview must not mutate the original');
+assert.deepEqual(plain(result.allocations),[
+ {date:'2026-09-25',meal_type:'lunch',planned_servings:2},
+ {date:'2026-09-26',meal_type:'lunch',planned_servings:2}]);
+assert.equal(result.selectedMealCount,9);assert.equal(result.usedServings,4);assert.equal(result.remainingServings,0);
+assert.equal(M.payload(result.draft).allocations[0].prep_notes,'Pack separately');
+assert.equal(result.draft.notes,'Batch note');assert.deepEqual(plain(result.draft.prepSteps),plain(draft.prepSteps));
+M.setMeals(draft,['breakfast','lunch']);
+result=M.distributeRecipeServings(draft,5.5,{mode:'keep',servingsPerMeal:2});
+assert.deepEqual(plain(result.allocations.map(slot=>[slot.date,slot.meal_type])),[['2026-09-25','breakfast'],['2026-09-25','lunch']]);
+assert.equal(result.selectedMealCount,18);assert.equal(result.usedServings,4);assert.equal(result.remainingServings,1.5);
+assert.deepEqual(plain(result.draft.selectedDates),['2026-09-25']);
+result=M.distributeRecipeServings(draft,0.3,{mode:'keep',servingsPerMeal:0.1});
+assert.equal(result.allocations.length,3);assert.equal(result.remainingServings,0);
+""")
+
+
+def test_distribution_spreads_exact_yield_while_retaining_family_ratios_and_day_overrides():
+    run_model(r"""
+M.setMembers(draft,members.slice(0,2));M.setPortionMode(draft,'family');
+M.setDates(draft,M.dateRange('2026-09-25','2026-10-03'));M.setMeals(draft,['lunch']);
+M.setDayFamily(draft,'2026-09-26','partner','lunch',{enabled:false});
+const before=JSON.stringify(draft), result=M.distributeRecipeServings(draft,4,{mode:'spread'});
+assert.equal(JSON.stringify(draft),before);
+assert.equal(result.usedServings,4);assert.equal(result.remainingServings,0);assert.equal(result.allocations.length,9);
+const payload=M.payload(result.draft);
+assert.deepEqual(plain(payload.allocations[0].member_portions),[{member_id:'you',servings:0.222222},{member_id:'partner',servings:0.222222}]);
+assert.deepEqual(plain(payload.allocations[1].member_portions),[{member_id:'you',servings:0.444444}]);
+assert.equal(M.sum(payload.allocations.flatMap(meal=>meal.member_portions.map(part=>part.servings))),4);
+M.setMembers(result.draft,members.slice(0,2));
+assert.equal(JSON.stringify(M.payload(result.draft)),JSON.stringify(payload),'Refreshing members preserves the distribution');
+""")
+
+
+def test_distribution_rejects_invalid_or_unfillable_requests_and_leaves_source_unchanged():
+    run_model(r"""
+const before=JSON.stringify(draft);
+for(const budget of [0,-1,null,Infinity,'bad']) assert.throws(()=>M.distributeRecipeServings(draft,budget,{mode:'spread'}),/No servings remain/);
+for(const amount of [0,-1,'',Infinity]) assert.throws(()=>M.distributeRecipeServings(draft,4,{servingsPerMeal:amount}),/Enter servings per meal/);
+assert.throws(()=>M.distributeRecipeServings(draft,1,{servingsPerMeal:2}),/not enough servings/);
+assert.throws(()=>M.distributeRecipeServings(draft,4,{mode:'invalid'}),/Choose how/);
+assert.equal(JSON.stringify(draft),before);
+M.setDates(draft,[]);assert.throws(()=>M.distributeRecipeServings(draft,4,{mode:'spread'}),/Select at least one date/);
+""")
+
+
+def test_automatic_recipes_skip_slots_fully_covered_by_a_distributed_recipe():
+    run_model(r"""
+M.setMembers(draft,members.slice(0,2));M.setPortionMode(draft,'family');M.setMeals(draft,['lunch']);
+M.setDates(draft,M.dateRange('2026-09-25','2026-10-03'));
+const custom=M.distributeRecipeServings(draft,4,{servingsPerMeal:2}).draft;
+const before=JSON.stringify(draft), plans=M.splitSharedPlan(draft,[custom,null]);
+assert.equal(JSON.stringify(draft),before);
+assert(plans.every(plan=>M.summary(plan).valid));
+assert.equal(M.summary(plans[0]).mealCount,2);assert.equal(M.summary(plans[1]).mealCount,7);
+assert.equal(M.sum(plans.map(plan=>M.summary(plan).totalServings)),18);
+assert.deepEqual(plain(M.payload(plans[1]).allocations.map(meal=>meal.date)),plain(M.dateRange('2026-09-27','2026-10-03')));
+M.setPortionMode(draft,'household');M.setHouseholdDefault(draft,'lunch',2);
+const household=M.distributeRecipeServings(draft,4,{servingsPerMeal:2}).draft;
+assert.equal(M.summary(M.splitSharedPlan(draft,[household,null])[1]).totalServings,14);
+""")
+
+
 def test_shared_family_servings_are_conserved_per_person_date_and_meal():
     run_model(r"""
 M.setMembers(draft,members.slice(0,2));M.setPortionMode(draft,'family');

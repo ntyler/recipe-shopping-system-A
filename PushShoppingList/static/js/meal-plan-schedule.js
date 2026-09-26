@@ -125,7 +125,15 @@
             const remaining = sum([meal.planned_servings, ...custom.map(item => -item.planned_servings)]);
             const fail = message => errors.push(`${day.date} ${type}: ${message}`);
             if (remaining < 0) fail('Custom portions exceed the shared meal total. Reduce custom portions or increase the shared total.');
-            else if (!remaining && count) fail('No servings remain for the shared recipes. Reduce custom portions, increase the shared total, or remove a recipe.');
+            else if (!remaining && count) {
+                // A custom recipe can fully cover some slots while automatic
+                // recipes cover the rest of the shared calendar.
+                drafts.forEach(draft => {
+                    draft.days[day.date].mealEnabled[type] = false;
+                    draft.days[day.date].overrides.meals = true;
+                });
+                return;
+            }
             if (shared.portionMode === 'household') {
                 const shares = splitServings(remaining, count);
                 drafts.forEach((draft, index) => {
@@ -167,6 +175,9 @@
             }
             seeded.add(type);
         }));
+        if (count && drafts.every(draft => !summary(draft).mealCount)) {
+            errors.push('No servings remain for the shared recipes. Reduce custom portions, increase the shared total, or remove a recipe.');
+        }
         drafts.forEach(draft => { draft.sharedPortionErrors = errors; });
         let index = 0;
         return plans.map(plan => plan ? (count ? plan : {...plan, sharedPortionErrors:errors}) : drafts[index++]);
@@ -238,38 +249,86 @@
         return draft;
     }
 
+    // Scale named portions proportionally, conserving the requested amount.
+    function scaleFamilyServings(family, members, meal, value) {
+        const target = portion(value);
+        const cells = members.map(member => family[member.id][meal]).filter(cell => cell.enabled);
+        const weights = cells.map(cell => portion(cell.servings));
+        if (weights.some(weight => weight === null)) return; // Keep invalid source fields visible to validation.
+        const total = sum(weights);
+        let allocated = 0;
+        cells.forEach((cell, index) => {
+            if (target === null) { cell.servings = value; return; }
+            const amount = index === cells.length - 1 ? sum([target, -allocated])
+                : Math.min(sum([target, -allocated]), Number((target * weights[index] / total).toPrecision(12)));
+            cell.servings = amount;
+            allocated = sum([allocated, amount]);
+        });
+    }
+
     // A recipe-level amount follows the schedule and retains who is eating.
-    // Scale named portions proportionally, with the last person receiving the
-    // decimal remainder so the requested amount is conserved.
     function withMealServings(source, value) {
-        const draft = clone(source), target = portion(value);
+        const draft = clone(source);
         delete draft.sharedPortionErrors;
         delete draft.recipePortions;
         delete draft.recipeSplitError;
         if (draft.portionMode === 'recipe') draft.portionMode = 'household';
-        const scaleFamily = (family, meal) => {
-            const cells = draft.members.map(member => family[member.id][meal]).filter(cell => cell.enabled);
-            const weights = cells.map(cell => portion(cell.servings));
-            if (weights.some(weight => weight === null)) return; // Keep invalid source fields visible to validation.
-            const total = sum(weights);
-            let allocated = 0;
-            cells.forEach((cell, index) => {
-                if (target === null) { cell.servings = value; return; }
-                const amount = index === cells.length - 1 ? sum([target, -allocated])
-                    : Math.min(sum([target, -allocated]), Number((target * weights[index] / total).toPrecision(12)));
-                cell.servings = amount;
-                allocated = sum([allocated, amount]);
-            });
-        };
         MEAL_TYPES.forEach(meal => {
-            if (draft.portionMode === 'family') scaleFamily(draft.familyDefaults, meal);
+            if (draft.portionMode === 'family') scaleFamilyServings(draft.familyDefaults, draft.members, meal, value);
             else draft.householdDefaults[meal] = value;
         });
         Object.values(draft.days).forEach(day => MEAL_TYPES.forEach(meal => {
-            if (draft.portionMode === 'family') scaleFamily(day.family, meal);
+            if (draft.portionMode === 'family') scaleFamilyServings(day.family, draft.members, meal, value);
             else day.household[meal] = value;
         }));
         return draft;
+    }
+
+    // A distribution is a preview until its independent draft is applied.
+    // One slot is a date + meal, so two meals on a day consume two portions.
+    function distributeRecipeServings(source, budget, {mode = 'keep', servingsPerMeal} = {}) {
+        if (portion(budget) === null) throw new Error('No servings remain from this recipe. Adjust its other entries first.');
+        if (!['keep', 'spread'].includes(mode)) throw new Error('Choose how to distribute this recipe.');
+        const clean = clone(source);
+        delete clean.sharedPortionErrors;
+        const total = summary(clean);
+        if (!total.valid) throw new Error(total.errors[0]);
+        const slots = total.days.slice().sort((a, b) => a.date.localeCompare(b.date)).flatMap(day =>
+            day.meals.map(meal => ({date:day.date, meal:meal.meal_type})));
+        let amounts;
+        if (mode === 'spread') amounts = splitServings(budget, slots.length);
+        else {
+            const amount = portion(servingsPerMeal);
+            if (amount === null) throw new Error('Enter servings per meal, or choose to spread across all selected meals.');
+            amounts = [];
+            let remaining = budget;
+            for (const slot of slots) {
+                if (remaining < amount) break;
+                amounts.push(amount);
+                remaining = sum([remaining, -amount]);
+            }
+            if (!amounts.length) throw new Error('There are not enough servings for one meal at this amount. Lower servings per meal or choose to spread them.');
+        }
+        const draft = withMealServings(clean, amounts[0]);
+        draft.selectedDates.forEach(date => {
+            const day = draft.days[date];
+            MEAL_TYPES.forEach(meal => { day.mealEnabled[meal] = false; });
+            day.overrides.meals = true;
+            day.overrides[draft.portionMode] = true;
+            if (draft.portionMode === 'family') day.family = clone(clean.days[date].family);
+        });
+        const allocations = amounts.map((amount, index) => {
+            const {date, meal} = slots[index], day = draft.days[date];
+            day.mealEnabled[meal] = true;
+            if (draft.portionMode === 'family') scaleFamilyServings(day.family, draft.members, meal, amount);
+            else day.household[meal] = amount;
+            return {date, meal_type:meal, planned_servings:amount};
+        });
+        setDates(draft, allocations.map(meal => meal.date));
+        const result = summary(draft);
+        if (!result.valid) throw new Error(result.errors[0]);
+        return {draft, allocations, selectedMealCount:slots.length, usedServings:result.totalServings,
+            remainingServings:sum([budget, -result.totalServings])};
     }
 
     function refreshDates(draft) {
@@ -676,6 +735,6 @@
         setDateMode, setSingleDate, setRange, setDates, toggleDate, setPortionMode, setMeals,
         setHouseholdDefault, setFamilyDefault, setDayMeal, setDayHousehold, setDayFamily,
         setDayNotes, setMealNotes, mealPortionMode, canAssignMember, fromSaved,
-        applyDefaults, setMembers, setGroups, selectGroupMembers, withPortions, withMealServings, splitRecipeYield, splitSharedPlan, sum, summary, payload
+        applyDefaults, setMembers, setGroups, selectGroupMembers, withPortions, withMealServings, distributeRecipeServings, splitRecipeYield, splitSharedPlan, sum, summary, payload
     });
 })(globalThis);

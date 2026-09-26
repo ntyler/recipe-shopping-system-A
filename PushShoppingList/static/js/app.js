@@ -2003,6 +2003,104 @@ function syncMealPlannerRecipeServings(entry, summary, state, busy) {
     }
 }
 
+function mealPlannerDistributionPreview(state, entry, summaries) {
+    if (!entry.yieldServings) throw new Error('Add a recipe yield before distributing servings.');
+    const related = [...summaries].filter(([other]) => other !== entry && other.recipeUrl === entry.recipeUrl).map(([, total]) => total);
+    if (related.some(total => !total.valid)) throw new Error('Fix this recipe’s other entries before distributing its remaining servings.');
+    const reserved = MealPlanSchedule.sum(related.map(total => total.totalServings));
+    const budget = MealPlanSchedule.sum([entry.yieldServings, -reserved]);
+    const source = mealPlannerRecipeDraft(state, entry);
+    const preview = MealPlanSchedule.distributeRecipeServings(source, budget, {
+        mode:entry.distributionMode || 'keep', servingsPerMeal:entry.root.querySelector('[data-meal-recipe-servings]').value,
+    });
+    // Derive the entire plan with this candidate so automatic recipes can fill
+    // uncovered slots, while the real drafts remain untouched until Apply.
+    const candidate = {...entry, panel:{draft:preview.draft}, servingsPerMeal:undefined};
+    const projected = {...state, entries:state.entries.map(other => other === entry ? candidate : other)};
+    const totals = projected.entries.filter(other => other.recipeUrl).map(other => MealPlanSchedule.summary(mealPlannerRecipeDraft(projected, other)));
+    const invalid = totals.find(total => !total.valid);
+    if (invalid) throw new Error(invalid.errors[0]);
+    const planned = new Map();
+    totals.forEach(total => total.days.forEach(day => day.meals.forEach(meal => {
+        const key = `${day.date}/${meal.meal_type}`;
+        planned.set(key, MealPlanSchedule.sum([planned.get(key) || 0, meal.planned_servings]));
+    })));
+    const needsPortions = state.panel.draft.portionMode !== 'recipe';
+    const unfilled = needsPortions ? MealPlanSchedule.summary(state.panel.draft).days.reduce((count, day) => count + day.meals.filter(meal =>
+        MealPlanSchedule.sum([meal.planned_servings, -(planned.get(`${day.date}/${meal.meal_type}`) || 0)]) > 0).length, 0)
+        : preview.selectedMealCount - preview.allocations.length;
+    return {...preview, reserved, budget, unfilled, needsPortions};
+}
+
+function syncMealPlannerDistribution(entry, summary, state, busy, summaries) {
+    const button = entry.root.querySelector('[data-meal-distribute]');
+    const box = entry.root.querySelector('[data-meal-distribution]');
+    if (!button || !box) return;
+    button.disabled = Boolean(busy || state.edit || state.panel.ui.loading || entry.panel?.ui.loading || !entry.yieldServings);
+    box.hidden = !entry.distributionOpen || Boolean(state.edit || !entry.recipeUrl);
+    button.setAttribute('aria-expanded', String(!box.hidden));
+    if (box.hidden) return;
+    box.querySelector('[data-meal-distribution-choices]').disabled = button.disabled;
+    const value = entry.root.querySelector('[data-meal-recipe-servings]').value;
+    box.querySelector('[data-meal-distribution-keep]').textContent = Number(value) > 0
+        ? `Keep ${formatMealPlannerServingNumber(value)} servings per meal` : 'Keep servings per meal (enter an amount above)';
+    box.querySelector('[data-meal-distribution-spread]').textContent = `Spread across all ${summary.mealCount} selected ${summary.mealCount === 1 ? 'meal' : 'meals'}`;
+    box.querySelectorAll('[data-meal-distribution-mode]').forEach(input => { input.checked = input.value === (entry.distributionMode || 'keep'); });
+    const budget = box.querySelector('[data-meal-distribution-budget]');
+    budget.textContent = `One recipe makes ${formatMealPlannerServingNumber(entry.yieldServings)} servings.`;
+    const text = box.querySelector('[data-meal-distribution-preview]');
+    const list = box.querySelector('[data-meal-distribution-meals]');
+    const review = box.querySelector('[data-meal-distribution-review]');
+    const apply = box.querySelector('[data-meal-distribution-apply]');
+    list.replaceChildren();
+    try {
+        const preview = mealPlannerDistributionPreview(state, entry, summaries);
+        if (preview.reserved) budget.textContent += ` ${formatMealPlannerServingNumber(preview.reserved)} already assigned in other entries; ${formatMealPlannerServingNumber(preview.budget)} available here.`;
+        const coverage = preview.needsPortions ? `${preview.unfilled} ${preview.unfilled === 1 ? 'meal still needs' : 'meals still need'} portions`
+            : `${preview.unfilled} selected ${preview.unfilled === 1 ? 'meal without' : 'meals without'} this recipe`;
+        text.textContent = `${formatMealPlannerServingNumber(preview.usedServings)} servings used · ${formatMealPlannerServingNumber(preview.remainingServings)} remaining · ${coverage}.`;
+        text.dataset.error = 'false';
+        preview.allocations.forEach(meal => {
+            const item = document.createElement('li');
+            const date = MealPlanSchedule.parseDate(meal.date).toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'});
+            item.textContent = `${date} · ${meal.meal_type} · ${formatMealPlannerServingNumber(meal.planned_servings)} servings`;
+            list.appendChild(item);
+        });
+        review.hidden = false;
+        apply.disabled = button.disabled;
+    } catch (error) {
+        text.textContent = error.message;
+        text.dataset.error = 'true';
+        review.hidden = true;
+        apply.disabled = true;
+    }
+    box.querySelector('[data-meal-distribution-cancel]').disabled = Boolean(busy);
+}
+
+function applyMealPlannerDistribution(dialog, entry) {
+    const state = mealPlannerScheduleState(dialog);
+    if (state.edit || mealPlannerBusy(state) || state.panel.ui.loading || entry.panel?.ui.loading || !state.entries.includes(entry)) return;
+    const summaries = new Map(state.entries.filter(other => other.recipeUrl).map(other => [other, MealPlanSchedule.summary(mealPlannerRecipeDraft(state, other))]));
+    try {
+        // Recompute on Apply; a preview never commits stale dates or budgets.
+        const preview = mealPlannerDistributionPreview(state, entry, summaries);
+        entry.distributionOpen = false;
+        delete entry.servingsPerMeal;
+        if (!entry.panel) customizeMealPlannerRecipe(dialog, entry, preview.draft);
+        else {
+            entry.panel.endCalendarDrag();
+            entry.panel.draft = preview.draft;
+            entry.panel.render();
+        }
+        entry.touched = true;
+        entry.root.querySelector('[data-meal-editor-error]').hidden = true;
+        syncMealPlannerBatchControls(dialog);
+        entry.root.querySelector('[data-meal-distribute]').focus({preventScroll:true});
+    } catch (error) {
+        mealPlannerEditorError(entry, error.message, state.entries.indexOf(entry));
+    }
+}
+
 function syncMealPlannerBatchControls(dialog) {
     const state = mealPlannerScheduleState(dialog);
     const footer = dialog.querySelector('[data-meal-batch-footer]');
@@ -2040,6 +2138,7 @@ function syncMealPlannerBatchControls(dialog) {
             : 'Choose a recipe to calculate servings.';
         updateMealPlannerYieldBalance(entry, summaries, state.edit);
         syncMealPlannerRecipeServings(entry, summary, state, busy);
+        syncMealPlannerDistribution(entry, summary, state, busy, summaries);
         const customize = entry.root.querySelector('[data-meal-editor-customize]');
         customize.disabled = Boolean(busy);
         customize.textContent = entry.expanded ? 'Hide custom plan' : entry.panel ? 'Show custom plan' : 'Customize';
@@ -2078,6 +2177,10 @@ function createMealPlannerEditor(dialog, root) {
     root.querySelector('[data-meal-editor-customize]').setAttribute('aria-controls', container.id);
     container.hidden = true;
     root.querySelector('[data-meal-override-form-host]').replaceChildren();
+    const distribution = root.querySelector('[data-meal-distribution]');
+    distribution.id = `${entry.id}-distribution`;
+    distribution.querySelectorAll('[data-meal-distribution-mode]').forEach(input => { input.name = `${entry.id}-distribution-mode`; });
+    root.querySelector('[data-meal-distribute]').setAttribute('aria-controls', distribution.id);
     // These listeners belong to the persistent section, not its rendered fields.
     root.mealPlannerEntry = entry;
     if (!root.mealPlannerBound) {
@@ -2110,6 +2213,23 @@ function createMealPlannerEditor(dialog, root) {
             root.querySelector('[data-meal-editor-error]').hidden = true;
             syncMealPlannerBatchControls(dialog);
         });
+        root.querySelector('[data-meal-distribute]').addEventListener('click', () => {
+            if (mealPlannerBusy(state) || state.edit) return;
+            const current = root.mealPlannerEntry;
+            current.distributionOpen = !current.distributionOpen;
+            current.distributionMode ||= 'keep';
+            syncMealPlannerBatchControls(dialog);
+        });
+        root.querySelectorAll('[data-meal-distribution-mode]').forEach(input => input.addEventListener('change', () => {
+            root.mealPlannerEntry.distributionMode = input.value;
+            syncMealPlannerBatchControls(dialog);
+        }));
+        root.querySelector('[data-meal-distribution-cancel]').addEventListener('click', () => {
+            root.mealPlannerEntry.distributionOpen = false;
+            syncMealPlannerBatchControls(dialog);
+            root.querySelector('[data-meal-distribute]').focus({preventScroll:true});
+        });
+        root.querySelector('[data-meal-distribution-apply]').addEventListener('click', () => applyMealPlannerDistribution(dialog, root.mealPlannerEntry));
     }
     syncMealPlannerBatchControls(dialog);
     return entry;
@@ -2148,11 +2268,11 @@ function removeMealPlannerEditor(dialog, entry) {
     next.root.querySelector('[name="recipe_url"]').focus({preventScroll: true});
 }
 
-function customizeMealPlannerRecipe(dialog, entry) {
+function customizeMealPlannerRecipe(dialog, entry, distributionDraft = null) {
     const state = mealPlannerScheduleState(dialog);
     if (state.edit || mealPlannerBusy(state) || !state.entries.includes(entry)) return;
     if (!entry.panel) {
-        const initialDraft = JSON.parse(JSON.stringify(mealPlannerRecipeDraft(state, entry)));
+        const initialDraft = JSON.parse(JSON.stringify(distributionDraft || mealPlannerRecipeDraft(state, entry)));
         // Allocation errors belong to the shared calculation, not to the new
         // independent draft a user is about to adjust.
         delete initialDraft.sharedPortionErrors;

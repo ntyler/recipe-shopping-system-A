@@ -847,7 +847,23 @@
                             <button type="button" data-meal-portion-step="1" aria-label="Increase recipe servings">+</button>
                         </span></label>
                         <button type="button" class="app-page-secondary-action" data-meal-portions-auto hidden>Auto split</button>
+                        <button type="button" class="app-page-secondary-action" data-meal-distribute aria-expanded="false">Distribute recipe servings</button>
                         <small data-meal-portions-help></small>
+                        <div class="app-meal-distribution" data-meal-distribution hidden>
+                            <fieldset data-meal-distribution-choices>
+                                <legend>Distribute one recipe</legend>
+                                <p data-meal-distribution-budget></p>
+                                <label><input type="radio" value="keep" data-meal-distribution-mode checked><span data-meal-distribution-keep>Keep servings per meal</span></label>
+                                <label><input type="radio" value="spread" data-meal-distribution-mode><span data-meal-distribution-spread>Spread across all selected meals</span></label>
+                            </fieldset>
+                            <p class="app-meal-distribution-preview" data-meal-distribution-preview aria-live="polite" aria-atomic="true"></p>
+                            <details data-meal-distribution-review><summary>Review proposed meals</summary><ol data-meal-distribution-meals></ol></details>
+                            <p class="app-dialog-helper">Uses this recipe’s current schedule, earliest meals first. The shared calendar and family targets stay unchanged.</p>
+                            <div class="app-meal-distribution-actions">
+                                <button type="button" class="app-page-primary-action" data-meal-distribution-apply>Apply distribution</button>
+                                <button type="button" class="app-page-secondary-action" data-meal-distribution-cancel>Cancel</button>
+                            </div>
+                        </div>
                     </div>
                     <div class="app-meal-yield-balance" data-meal-yield-balance aria-live="polite" aria-atomic="true" hidden>
                         <strong data-meal-yield-remaining></strong><span data-meal-yield-planned></span>
