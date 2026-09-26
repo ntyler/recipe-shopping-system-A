@@ -2611,6 +2611,7 @@ function openMealPlannerDialog(dateValue = "", mealType = "") {
     state.panel.options.title = "Shared plan";
     state.panel.options.servings = 1;
     state.panel.form.hidden = false;
+    MealPlanSchedule.setDateMode(state.panel.draft, 'days');
     MealPlanSchedule.setMeals(state.panel.draft, [state.meal]);
     createMealPlannerEditor(dialog, state.firstEditor);
     syncMealPlannerServingsFromRecipe();
