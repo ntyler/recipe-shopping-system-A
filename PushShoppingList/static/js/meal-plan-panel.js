@@ -251,7 +251,7 @@
                 const calendar = model.calendarMonth(draft.calendarMonth);
                 dates = `<div class="meal-schedule-calendar"><div class="meal-schedule-calendar-heading"><button type="button" data-schedule-action="month" data-direction="-1" data-focus-key="previous-month" aria-label="Previous month">‹</button><strong>${esc(calendar.label)}</strong><button type="button" data-schedule-action="month" data-direction="1" data-focus-key="next-month" aria-label="Next month">›</button></div>
                     <div class="meal-schedule-calendar-grid">${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(day => `<span aria-hidden="true">${day}</span>`).join('')}${calendar.days.map(day => `<button type="button" data-schedule-action="date" data-date="${day.date}" data-focus-key="calendar-${day.date}" aria-label="${esc(dateLabel(day.date))}" aria-pressed="${draft.selectedDates.includes(day.date)}" class="${day.inMonth ? '' : 'is-other-month'}">${day.day}</button>`).join('')}</div>
-                    <p>Click or drag across dates, including other months. Drag from a selected day to clear dates.</p></div>`;
+                    <p>Drag across dates to select a range, including other months. Click a date to select or clear it.</p></div>`;
             }
             const dayCards = totals.days.map(day => {
                 const data = draft.days[day.date], meals = model.MEAL_TYPES.filter(meal => data.mealEnabled[meal]);
@@ -423,13 +423,14 @@
                 || this.form.hidden || this.ui.busy || this.ui.memberBusy || this.ui.saved) return;
             this.endCalendarDrag();
             this.calendarDrag = {pointerId:event.pointerId, anchor:button.dataset.date,
-                before:[...this.draft.selectedDays], selecting:!this.draft.selectedDays.includes(button.dataset.date),
+                before:[...this.draft.selectedDays],
                 draft:this.draft, generation:this.generation};
             this.calendarClickPointer = event.pointerId;
             event.preventDefault();
             button.focus({preventScroll:true});
             this.form.setPointerCapture(event.pointerId);
-            this.selectCalendarDragDate(button.dataset.date);
+            // Wait for another date or release before changing the selection.
+            // A selected anchor must stay selected when extending a range.
         }
 
         moveCalendarDrag(event, releasing = false) {
@@ -441,19 +442,22 @@
             // Captured events target the form. Hit-test only this editor's dates
             // so dragging outside it cannot change a neighboring meal's calendar.
             const button = document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-schedule-action="date"]');
-            if (button && this.form.contains(button) && !button.disabled) this.selectCalendarDragDate(button.dataset.date);
+            if (!button || !this.form.contains(button) || button.disabled) return;
+            const date = button.dataset.date, drag = this.calendarDrag;
+            if (date !== drag.anchor || drag.lastDate) this.selectCalendarDragDate(date);
+            else if (releasing) this.selectCalendarDragDate(date, true);
         }
 
-        selectCalendarDragDate(date) {
+        selectCalendarDragDate(date, toggle = false) {
             const drag = this.calendarDrag;
             if (!drag || drag.lastDate === date) return;
             drag.lastDate = date;
             const dates = new Set(drag.before);
             const [start, end] = [drag.anchor, date].sort();
-            root.MealPlanSchedule.dateRange(start, end).forEach(day => {
-                if (drag.selecting) dates.add(day);
-                else dates.delete(day);
-            });
+            // Only a press and release on one date toggles it. Range gestures
+            // always select, preserving dates that were selected beforehand.
+            if (toggle && dates.has(date)) dates.delete(date);
+            else root.MealPlanSchedule.dateRange(start, end).forEach(day => dates.add(day));
             root.MealPlanSchedule.setDates(this.draft, [...dates]);
             this.render();
             // Notify the containing editor even when capture consumes the click

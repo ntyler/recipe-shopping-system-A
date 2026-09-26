@@ -37,11 +37,12 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         // the mouse moves too quickly to emit an event over every individual cell.
         await drag(0,'2026-10-10','2026-10-13');
         assert.equal((await selected(0)).length,9);
+        const beforeReverse = await selected(0);
         await drag(0,'2026-10-13','2026-10-08');
-        assert.deepEqual(await selected(0),['2026-10-05','2026-10-06','2026-10-07']);
+        assert.deepEqual(await selected(0),beforeReverse,'Dragging from a selected date keeps existing dates');
         await move(day(0,'2026-10-15'));await page.mouse.down();
         await move(day(0,'2026-10-12'));await move(day(0,'2026-10-14'));await page.mouse.up();
-        assert.deepEqual(await selected(0),['2026-10-05','2026-10-06','2026-10-07','2026-10-14','2026-10-15']);
+        assert.deepEqual(await selected(0),[...beforeReverse,'2026-10-14','2026-10-15']);
         await day(0,'2026-10-20').click();assert((await selected(0)).includes('2026-10-20'));
         await day(0,'2026-10-20').click();assert(!(await selected(0)).includes('2026-10-20'));
         await day(0,'2026-10-20').focus();await page.keyboard.press('Space');
@@ -75,6 +76,21 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         await editor(0).getByRole('button',{name:'Select days',exact:true}).click();
         await drag(0,'2026-10-06','2026-10-08');
         assert(await dialog.locator('[data-meal-batch-save]').isDisabled(),'Shared calendar alone does not create a blank recipe');
+        // Regression: the first drag from an already selected Sep 25 must
+        // select Sep 25–27, without deselecting the anchor on mouse down.
+        for (const date of await selected(0)) await day(0,date).click();
+        await editor(0).getByRole('button',{name:'Previous month',exact:true}).click();
+        await day(0,'2026-09-25').click();
+        await editor(0).locator('.meal-schedule-calendar').scrollIntoViewIfNeeded();
+        await move(day(0,'2026-09-25'));await page.mouse.down();
+        assert.deepEqual(await selected(0),['2026-09-25']);
+        await move(day(0,'2026-09-27'));await page.mouse.up();
+        assert.deepEqual(await selected(0),['2026-09-25','2026-09-26','2026-09-27']);
+        if(artifacts) await page.screenshot({path:path.join(artifacts,'selected-start-range.png')});
+        await row(0).locator('[name="recipe_url"]').selectOption('recipe://rice');
+        await dialog.locator('[data-meal-batch-save]').click();await dialog.waitFor({state:'hidden'});
+        const rice=await (await context.request.get(base+'/api/meal-plan?recipe_url=recipe://rice')).json();
+        assert.deepEqual(rice.meals.map(meal=>meal.date).sort(),['2026-09-25','2026-09-26','2026-09-27']);
         assert.deepEqual(errors,[]);
 
         const mobile=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
@@ -85,6 +101,6 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         await touchDay.tap();assert.equal(await touchDay.getAttribute('aria-pressed'),'true');
         await touchDay.tap();assert.equal(await touchDay.getAttribute('aria-pressed'),'false');
         assert.equal(await phone.locator('.meal-schedule-calendar-grid').evaluate(e=>getComputedStyle(e).touchAction),'auto');
-        console.log('PASS: drag ranges, reverse/clear, row/month boundaries, outside release, independent meals, stored dates, keyboard and touch');
+        console.log('PASS: selected-anchor retention, reverse ranges, click toggles, row/month boundaries, outside release, independent meals, stored dates, keyboard and touch');
     } finally { await browser.close(); }
 })().catch(error=>{console.error(error);process.exitCode=1;});

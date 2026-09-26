@@ -368,14 +368,47 @@ assert.deepEqual(plain(panel.draft.selectedDates),['2026-10-05',...M.dateRange('
 move('2026-10-09');
 assert.deepEqual(plain(panel.draft.selectedDates),['2026-10-05','2026-10-07','2026-10-08','2026-10-09']);
 assert.equal(panel.draft.days['2026-10-05'].household.dinner,3.5);
-assert.equal(captured,7);assert.equal(changes,3);
+assert.equal(captured,7);assert.equal(changes,2);
 form.handlers.pointerup({pointerId:7,buttons:0});assert.equal(panel.calendarDrag,null);assert.equal(captured,null);
 await panel.click({target:day('2026-10-09'),detail:1,pointerId:7,preventDefault(){}});
 assert(panel.draft.selectedDates.includes('2026-10-09'),'Release click cannot toggle the endpoint back off');
 press('2026-10-09');move('2026-10-07');panel.endCalendarDrag();
-assert.deepEqual(plain(panel.draft.selectedDates),['2026-10-05'],'Starting on a selected day removes the inclusive range');
+assert.deepEqual(plain(panel.draft.selectedDates),['2026-10-05','2026-10-07','2026-10-08','2026-10-09'],'Starting on a selected day keeps the inclusive range');
 await panel.click({target:day('2026-10-09'),detail:0});
-assert(panel.draft.selectedDates.includes('2026-10-09'),'Keyboard clicks remain available');
+assert(!panel.draft.selectedDates.includes('2026-10-09'),'Keyboard clicks still toggle individual dates');
+""")
+
+
+def test_calendar_drag_keeps_selected_anchor_and_single_click_toggles_on_release():
+    run_panel(r"""
+form.hidden=false;let captured=null,hit=null,changes=0;
+form.setPointerCapture=id=>captured=id;form.hasPointerCapture=id=>captured===id;
+form.releasePointerCapture=()=>captured=null;form.contains=button=>button?.own===true;
+form.dispatchEvent=()=>changes++;ctx.Event=class {};ctx.document.elementFromPoint=()=>hit;
+const day=date=>({own:true,dataset:{date,scheduleAction:'date'},focus(){},closest(){return this;}});
+const press=date=>{hit=day(date);panel.startCalendarDrag({target:hit,pointerId:7,pointerType:'mouse',button:0,preventDefault(){}});};
+const move=date=>{hit=day(date);panel.moveCalendarDrag({pointerId:7,buttons:1});};
+const release=async()=>{
+    form.handlers.pointerup({pointerId:7,buttons:0});
+    await panel.click({target:hit,detail:1,pointerId:7,preventDefault(){}});
+};
+M.setDates(panel.draft,['2026-09-25']);
+M.setDayHousehold(panel.draft,'2026-09-25','dinner',3.5);
+press('2026-09-25');
+assert.deepEqual(plain(panel.draft.selectedDates),['2026-09-25'],'Mouse down must not clear the anchor or move the calendar');
+assert.equal(changes,0);
+move('2026-09-27');await release();
+assert.deepEqual(plain(panel.draft.selectedDates),['2026-09-25','2026-09-26','2026-09-27']);
+assert.equal(panel.draft.days['2026-09-25'].household.dinner,3.5,'The anchor keeps its customized portions');
+press('2026-09-25');move('2026-09-28');move('2026-09-25');await release();
+assert.deepEqual(plain(panel.draft.selectedDates),['2026-09-25','2026-09-26','2026-09-27'],'Returning a drag to its anchor must not toggle it off');
+press('2026-09-25');await release();
+assert.deepEqual(plain(panel.draft.selectedDates),['2026-09-26','2026-09-27'],'A single click clears only its date');
+press('2026-09-25');await release();
+assert.deepEqual(plain(panel.draft.selectedDates),['2026-09-25','2026-09-26','2026-09-27'],'A second click selects the date again');
+press('2026-09-25');form.handlers.pointercancel({pointerId:7});
+assert.deepEqual(plain(panel.draft.selectedDates),['2026-09-25','2026-09-26','2026-09-27'],'Cancelling a press leaves dates unchanged');
+assert.equal(captured,null);
 """)
 
 
@@ -393,7 +426,7 @@ assert.deepEqual(plain(panel.draft.selectedDates),['2026-10-05']);
 for(const key of ['busy','memberBusy','saved']){panel.ui[key]=true;press();assert(!panel.calendarDrag);panel.ui[key]=false;}
 panel.edit={scope:'meal'};press();assert(!panel.calendarDrag);panel.edit=null;
 press();hit={own:false,dataset:{date:'2026-10-20'},closest(){return this;}};
-panel.moveCalendarDrag({pointerId:1,buttons:1});assert.deepEqual(plain(panel.draft.selectedDates),['2026-10-05','2026-10-06']);
+panel.moveCalendarDrag({pointerId:1,buttons:1});assert.deepEqual(plain(panel.draft.selectedDates),['2026-10-05']);
 form.handlers.pointercancel({pointerId:1});assert.equal(panel.calendarDrag,null);assert.equal(captured,null);
 press();panel.generation++;panel.moveCalendarDrag({pointerId:1,buttons:1});assert.equal(panel.calendarDrag,null);
 press();panel.moveCalendarDrag({pointerId:1,buttons:0});assert.equal(panel.calendarDrag,null,'A missed release must not leave selection active');
