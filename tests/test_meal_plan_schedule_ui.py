@@ -12,6 +12,71 @@ SOURCE = Path(__file__).resolve().parents[1] / "PushShoppingList/static/js/meal-
 pytestmark = pytest.mark.skipif(not shutil.which("node"), reason="Node.js is required for scheduling logic checks")
 
 
+def test_shared_family_servings_are_conserved_per_person_date_and_meal():
+    run_model(r"""
+M.setMembers(draft,members.slice(0,2));M.setPortionMode(draft,'family');
+M.setDates(draft,['2026-10-05','2026-10-07']);M.setMeals(draft,['lunch','dinner']);
+M.setDayFamily(draft,'2026-10-07','you','lunch',{servings:0.25});
+M.setDayFamily(draft,'2026-10-07','partner','dinner',{enabled:false});
+const before=JSON.stringify(draft), plans=M.splitSharedPlan(draft,[null,null,null]);
+assert.equal(JSON.stringify(draft),before);
+const payloads=plans.map(plan=>M.payload(plan));
+M.payload(draft).allocations.forEach((meal,index)=>meal.member_portions.forEach(part=>{
+ assert.equal(M.sum(payloads.map(plan=>plan.allocations[index].member_portions.find(p=>p.member_id===part.member_id).servings)),part.servings);
+}));
+assert.equal(M.sum(plans.map(plan=>M.summary(plan).totalServings)),M.summary(draft).totalServings);
+assert.deepEqual(plain(payloads[0].allocations[0].member_portions),[{member_id:'you',servings:0.333333},{member_id:'partner',servings:0.333333}]);
+""")
+
+
+def test_custom_family_shares_reserve_only_matching_slots_and_members():
+    run_model(r"""
+M.setMembers(draft,members.slice(0,2));M.setPortionMode(draft,'family');M.setMeals(draft,['lunch']);
+M.setDates(draft,['2026-10-05','2026-10-07']);
+const custom=M.splitSharedPlan(draft,[null,null])[0];delete custom.sharedPortionErrors;
+M.setDates(custom,['2026-10-05']);M.setFamilyDefault(custom,'you','lunch',{servings:0.75});
+M.setFamilyDefault(custom,'partner','lunch',{enabled:false});
+let rest=M.splitSharedPlan(draft,[custom,null])[1], meals=M.payload(rest).allocations;
+assert.deepEqual(plain(meals[0].member_portions),[{member_id:'you',servings:0.25},{member_id:'partner',servings:1}]);
+assert.deepEqual(plain(meals[1].member_portions),[{member_id:'you',servings:1},{member_id:'partner',servings:1}]);
+M.setFamilyDefault(custom,'you','lunch',{servings:1});
+rest=M.splitSharedPlan(draft,[custom,null])[1];
+assert.deepEqual(plain(M.payload(rest).allocations[0].member_portions),[{member_id:'partner',servings:1}]);
+M.setFamilyDefault(custom,'you','lunch',{servings:1.25});
+assert.throws(()=>M.payload(M.splitSharedPlan(draft,[custom,null])[1]),/exceed.*You/);
+""")
+
+
+def test_shared_household_and_mixed_custom_modes_preserve_total_and_block_exhaustion():
+    run_model(r"""
+M.setMeals(draft,['lunch']);M.setHouseholdDefault(draft,'lunch',2);
+const custom=M.splitSharedPlan(draft,[null,null])[0];delete custom.sharedPortionErrors;
+assert.equal(custom.householdDefaults.lunch,1);
+M.setHouseholdDefault(custom,'lunch',0.5);
+assert.equal(M.summary(M.splitSharedPlan(draft,[null,custom])[0]).totalServings,1.5);
+M.setMembers(draft,members.slice(0,2));M.setPortionMode(draft,'family');
+let family=M.splitSharedPlan(draft,[null,custom])[0];
+assert.deepEqual(plain(M.payload(family).allocations[0].member_portions),[{member_id:'you',servings:0.75},{member_id:'partner',servings:0.75}]);
+M.setHouseholdDefault(custom,'lunch',2);
+assert.throws(()=>M.payload(M.splitSharedPlan(draft,[null,custom])[0]),/No servings remain/);
+M.setSingleDate(custom,'2026-10-06');
+assert.equal(M.summary(M.splitSharedPlan(draft,[null,custom])[0]).totalServings,2);
+""")
+
+
+def test_customizing_every_recipe_cannot_bypass_the_meal_budget():
+    run_model(r"""
+M.setMeals(draft,['lunch']);M.setHouseholdDefault(draft,'lunch',2);
+const custom=M.splitSharedPlan(draft,[null,null]);
+custom.forEach(plan=>delete plan.sharedPortionErrors);
+assert(M.splitSharedPlan(draft,custom).every(plan=>M.summary(plan).valid));
+M.setHouseholdDefault(custom[0],'lunch',1.5);
+assert.throws(()=>M.payload(M.splitSharedPlan(draft,custom)[0]),/exceed.*total/);
+M.setHouseholdDefault(draft,'lunch',3);
+assert(M.splitSharedPlan(draft,custom).every(plan=>M.summary(plan).valid));
+""")
+
+
 def test_saved_single_meal_keeps_allocations_when_date_is_cleared_then_date_and_meal_change():
     run_model(r"""
 const meal={id:'meal1',date:'2026-10-05',meal_type:'dinner',portion_mode:'family',planned_servings:1.25,prep_notes:'Pack cold',

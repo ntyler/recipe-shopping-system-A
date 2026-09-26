@@ -39,7 +39,7 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         await shared.getByRole('button',{name:'Date range',exact:true}).click();
         await shared.locator('[data-schedule-field="end-date"]').fill('2026-10-06');
         await shared.locator('[data-schedule-field="meal"][data-meal="lunch"]').check();
-        assert.equal(await save.textContent(),'Save 12 Meals');
+        assert.equal(await save.textContent(),'Save 4 Meals');
         for (const [index,total,perMeal] of [[0,8,2],[1,4,1],[2,6,1.5]]) {
             assert((await summary(index).textContent()).includes(`4 meals · ${total} servings (${perMeal} per meal)`));
         }
@@ -55,7 +55,7 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         await soup.getByRole('button',{name:'Split recipe yield',exact:true}).click();
         assert.match(await summary(1).textContent(),/1 meal · 4 servings/);
         await row(1).locator('[data-meal-editor-customize]').click();
-        assert.equal(await save.textContent(),'Save 9 Meals');
+        assert.equal(await save.textContent(),'Save 5 Meals');
         await dialog.evaluate(element => {element.scrollTop = 0;});
         await screenshot('add-meals-split-desktop.png');
         await page.setViewportSize({width:390,height:844});
@@ -85,13 +85,13 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         assert.equal(result.batches[0].allocated_servings,6);
         assert.equal(result.meals.length,7);
         assert(result.meals.every(meal => meal.planned_servings > 0));
-        // Reproduce the user's screenshot: two entries of the same four-serving
+        // Two entries of the same four-serving
         // recipe in the same date/meal slot must use two servings each.
         await open();await row(0).locator('[name="recipe_url"]').selectOption('recipe://soup');
         await dialog.locator('[data-meal-editor-add]').click();
         await row(1).locator('[name="recipe_url"]').selectOption('recipe://soup');
         for (const index of [0,1]) assert.match(await summary(index).textContent(),/1 meal · 2 servings \(2 per meal\)/);
-        assert.match(await dialog.locator('[data-meal-batch-help]').textContent(),/1 recipe · 2 meals/);
+        assert.match(await dialog.locator('[data-meal-batch-help]').textContent(),/1 recipe · 1 meal/);
         await row(1).locator('[data-meal-editor-customize]').click();
         assert.match(await soup.locator('[data-schedule-summary]').textContent(),/1 meal · 2 servings/);
         await soup.getByRole('button',{name:'Household total',exact:true}).click();

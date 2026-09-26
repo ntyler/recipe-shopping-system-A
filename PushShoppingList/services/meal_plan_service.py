@@ -1207,6 +1207,6 @@ def meal_plan_for_week(value=None, reference_date=None):
         "meals_by_slot": meals_by_slot,
         "meals_by_day": meals_by_day,
         "prep_steps_by_day": prep_steps_by_day,
-        "meal_count": len(meals),
+        "meal_count": len(meals_by_slot),
         "unique_recipe_count": len({meal["recipe_url"] for meal in meals}),
     }

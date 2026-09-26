@@ -67,6 +67,26 @@ def test_week_and_overlapping_selections_shop_full_batch_once(isolated_shopping)
     assert not shopping.SHOPPING_LIST_FILE.exists()
 
 
+def test_split_family_lunch_shops_saved_shares_and_survives_reload_and_edit(isolated_shopping):
+    members = [plans.add_meal_plan_member(name) for name in ('Nate', 'Gary')]
+    entries = []
+    for url, amounts in [('recipe://bread', (0.25, 0.5)), ('recipe://soup', (0.75, 0.5))]:
+        entries.append({
+            'batch': {'recipe_url': url, 'recipe_name': url, 'portion_mode': 'family'},
+            'allocations': [{'date': '2026-09-25', 'meal_type': 'lunch',
+                             'member_portions': [{'member_id': member['id'], 'servings': amount}
+                                                 for member, amount in zip(members, amounts)]}],
+            'ingredient_data': plans.meal_ingredient_snapshot(RECIPE, RECIPE['ingredients']),
+        })
+    batches, meals = plans.add_meal_prep_batches(entries)
+    assert [batch['batch_servings'] for batch in batches] == [0.75, 1.25]
+    assert sum(meal['planned_servings'] for meal in plans.load_meal_plan()['meals']) == 2
+    plans.update_meal(meals[0]['id'], {'prep_notes': 'Pack together'})
+    review = service.review_meal_plan_shopping({'batch_ids': [batch['id'] for batch in batches]})
+    assert sorted(source['servings'] for source in review['sources']) == [0.75, 1.25]
+    assert quantities(review['items']) == {'flour': '1/2 cup', 'milk': '1 cup'}
+
+
 def test_batch_yield_includes_unallocated_portions_and_distinct_meals_sum(isolated_shopping):
     batch, meals = seed_batch(16)
     single = plans.add_meal({"date": "2026-09-29", "meal_type": "breakfast", "recipe_url": "recipe://other", "recipe_name": "Other", "planned_servings": 2, "ingredients": [RECIPE["ingredients"][0]]})

@@ -1894,10 +1894,17 @@ function mealPlannerBusy(state) {
 }
 
 function mealPlannerRecipeDraft(state, entry, draft = (entry.panel || state.panel).draft) {
-    if (draft.portionMode !== 'recipe' || !entry.recipeUrl) return draft;
-    const related = state.entries.filter(other => other.recipeUrl === entry.recipeUrl);
-    const plans = related.map(other => other === entry ? draft : (other.panel || state.panel).draft);
-    return MealPlanSchedule.splitRecipeYield(plans, entry.defaultServings)[related.indexOf(entry)] || draft;
+    if (state.edit || !entry.recipeUrl) return draft;
+    const raw = other => other === entry ? draft : (other.panel || state.panel).draft;
+    const recipeDraft = other => {
+        if (raw(other).portionMode !== 'recipe') return raw(other);
+        const related = state.entries.filter(item => item.recipeUrl === other.recipeUrl);
+        return MealPlanSchedule.splitRecipeYield(related.map(raw), other.defaultServings)[related.indexOf(other)];
+    };
+    if (state.panel.draft.portionMode === 'recipe') return recipeDraft(entry);
+    const selected = state.entries.filter(other => other.recipeUrl);
+    const plans = selected.map(other => other.panel ? recipeDraft(other) : null);
+    return MealPlanSchedule.splitSharedPlan(state.panel.draft, plans)[selected.indexOf(entry)] || draft;
 }
 
 function syncMealPlannerScheduleControls(dialog, panel) {
@@ -1920,10 +1927,11 @@ function syncMealPlannerBatchControls(dialog) {
     }
     const busy = mealPlannerBusy(state);
     const loading = state.panel?.ui.loading || state.entries.some(entry => entry.panel?.ui.loading);
-    const recipes = state.entries.filter(entry => entry.recipeUrl || entry.touched);
+    const recipes = state.entries.filter(entry => entry.recipeUrl);
     const summaries = new Map(recipes.map(entry => [entry, MealPlanSchedule.summary(mealPlannerRecipeDraft(state, entry))]));
-    const count = recipes.reduce((sum, entry) => sum + summaries.get(entry).mealCount, 0);
-    const servings = recipes.reduce((sum, entry) => sum + summaries.get(entry).totalServings, 0);
+    const count = new Set(recipes.flatMap(entry => summaries.get(entry).days.flatMap(day =>
+        day.meals.map(meal => `${day.date}/${meal.meal_type}`)))).size;
+    const servings = MealPlanSchedule.sum(recipes.map(entry => summaries.get(entry).totalServings));
     const recipeCount = new Set(recipes.map(entry => entry.recipeUrl).filter(Boolean)).size;
     const save = dialog.querySelector('[data-meal-batch-save]');
     save.disabled = Boolean(busy || loading || !state.entries.some(entry => entry.recipeUrl || entry.touched));
@@ -1942,7 +1950,7 @@ function syncMealPlannerBatchControls(dialog) {
         const perMeal = portions.length && portions.every(value => value === portions[0])
             ? ` (${formatMealPlannerServingNumber(portions[0])} per meal)` : '';
         entry.root.querySelector('[data-meal-editor-summary]').textContent = entry.recipeUrl
-            ? `${entry.panel ? 'Custom plan' : 'Uses shared plan'} · ${summary.dayCount} ${summary.dayCount === 1 ? 'day' : 'days'} · ${summary.mealCount} ${summary.mealCount === 1 ? 'meal' : 'meals'} · ${formatMealPlannerServingNumber(summary.totalServings)} servings${perMeal}`
+            ? `${entry.panel ? 'Custom plan' : 'Uses shared plan'} · ${summary.dayCount} ${summary.dayCount === 1 ? 'day' : 'days'} · ${summary.mealCount} ${summary.mealCount === 1 ? 'meal' : 'meals'} · ${formatMealPlannerServingNumber(summary.totalServings)} servings${perMeal}${!entry.panel && state.panel.draft.portionMode !== 'recipe' ? ' · Share of meal total' : ''}`
             : 'Choose a recipe to calculate servings.';
         const customize = entry.root.querySelector('[data-meal-editor-customize]');
         customize.disabled = Boolean(busy);
@@ -2040,13 +2048,17 @@ function customizeMealPlannerRecipe(dialog, entry) {
     const state = mealPlannerScheduleState(dialog);
     if (state.edit || mealPlannerBusy(state) || !state.entries.includes(entry)) return;
     if (!entry.panel) {
+        const initialDraft = JSON.parse(JSON.stringify(mealPlannerRecipeDraft(state, entry)));
+        // Allocation errors belong to the shared calculation, not to the new
+        // independent draft a user is about to adjust.
+        delete initialDraft.sharedPortionErrors;
         const form = document.createElement('form');
         form.className = 'recipe-preview-meal-panel';
         form.dataset.mealEditorForm = '';
         form.noValidate = true;
         entry.root.querySelector('[data-meal-override-form-host]').appendChild(form);
         entry.panel = new MealPlanPanel(form, mealPlannerPanelOptions(dialog, entry, entry.title || 'Custom recipe plan', entry.defaultServings));
-        entry.panel.draft = JSON.parse(JSON.stringify({...state.panel.draft, recipeYield: entry.defaultServings}));
+        entry.panel.draft = {...initialDraft, recipeYield: entry.defaultServings};
         // Share the current roster by value, keeping all portion overrides local.
         ['membersLoaded', 'memberLoadError', 'archivedMembers', 'memberReview'].forEach(key => {
             entry.panel.ui[key] = JSON.parse(JSON.stringify(state.panel.ui[key]));
@@ -2106,7 +2118,7 @@ async function saveMealPlannerBatch() {
         if (!entry.recipeUrl && !entry.touched) return; // Untouched placeholders are never sent.
         let message = '';
         let plan = entry.recipeUrl ? (entry.panel ? entry.panel.collectPayload() : sharedPayload) : null;
-        if (plan && !entry.panel && state.panel.draft.portionMode === 'recipe') {
+        if (plan && !entry.panel) {
             try { plan = MealPlanSchedule.payload(mealPlannerRecipeDraft(state, entry)); }
             catch (error) { message = error.message; plan = null; }
         }
@@ -2174,6 +2186,8 @@ function mealPlannerPanelOptions(dialog, entry, recipeTitle, defaultServings) {
         splitRecipeYield: true, sharedPlan: !entry,
         getDraft: draft => {
             if (state.edit) return draft;
+            // The shared controls always show the entire meal budget.
+            if (!entry && draft.portionMode !== 'recipe') return draft;
             const recipe = entry || state.entries.find(item => item.recipeUrl && !item.panel);
             return recipe ? mealPlannerRecipeDraft(state, recipe, draft) : draft;
         },
@@ -2184,8 +2198,6 @@ function mealPlannerPanelOptions(dialog, entry, recipeTitle, defaultServings) {
         },
         onRender: panel => {
             if (!entry && !state.edit) {
-                const detail = panel.form.querySelector('[data-schedule-summary] span');
-                if (detail && panel.draft.portionMode !== 'recipe') detail.textContent = 'Per recipe using the shared plan.';
                 dialog.querySelector('[data-meal-shared-error]').hidden = true;
             }
             syncMealPlannerScheduleControls(dialog, panel);

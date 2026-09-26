@@ -153,7 +153,7 @@
             enabled = enabled && !blocked;
             return `<div class="meal-schedule-portion">${checkbox ? `<input type="checkbox" data-schedule-field="${field}-enabled" ${attrs} data-focus-key="${esc(key)}-enabled" aria-label="Include ${esc(label)}" ${enabled ? 'checked' : ''} ${blocked ? 'disabled' : ''}>` : ''}
                 <div class="meal-schedule-stepper"><button type="button" data-schedule-action="step" data-direction="-1" data-focus-key="${esc(key)}-less" ${enabled ? '' : 'disabled'} aria-label="Decrease ${esc(label)}">−</button>
-                <input type="number" min="0.01" step="any" inputmode="decimal" data-schedule-field="${field}" ${attrs} data-focus-key="${esc(key)}" aria-label="${esc(label)}" value="${esc(value)}" ${enabled ? 'required' : 'disabled'}>
+                <input type="number" min="0" step="any" inputmode="decimal" data-schedule-field="${field}" ${attrs} data-focus-key="${esc(key)}" aria-label="${esc(label)}" value="${esc(value)}" ${enabled ? 'required' : 'disabled'}>
                 <button type="button" data-schedule-action="step" data-direction="1" data-focus-key="${esc(key)}-more" ${enabled ? '' : 'disabled'} aria-label="Increase ${esc(label)}">+</button></div></div>`;
         }
 
@@ -284,7 +284,11 @@
 
         static summaryHtml(draft, totals, options = {}) {
             const sharedSplit = options.sharedPlan && draft.portionMode === 'recipe';
-            return `<div><strong>${totals.dayCount} ${totals.dayCount === 1 ? 'day' : 'days'} · ${totals.mealCount} ${totals.mealCount === 1 ? 'meal' : 'meals'}${sharedSplit ? ' per entry' : ` · ${number(totals.totalServings)} servings`}</strong><span>${sharedSplit ? 'Each recipe’s yield is shared across its entries.' : draft.edit?.scope === 'meal' ? 'Only this meal will change.' : 'Prepare one batch for these meals.'}</span></div>${draft.portionMode === 'family' ? `<p>${draft.members.filter(member => totals.memberTotals[member.id]).map(member => `${esc(member.name)}: ${number(totals.memberTotals[member.id])} servings`).join(' · ')}</p>` : ''}`;
+            const detail = sharedSplit ? 'Each recipe’s yield is shared across its entries.'
+                : draft.edit?.scope === 'meal' ? 'Only this meal will change.'
+                : options.sharedPlan && !draft.edit ? 'Meal totals are divided between recipes. Custom recipes use their share first.'
+                : 'Prepare one batch for these meals.';
+            return `<div><strong>${totals.dayCount} ${totals.dayCount === 1 ? 'day' : 'days'} · ${totals.mealCount} ${totals.mealCount === 1 ? 'meal' : 'meals'}${sharedSplit ? ' per entry' : ` · ${number(totals.totalServings)} servings`}</strong><span>${detail}</span></div>${draft.portionMode === 'family' ? `<p>${draft.members.filter(member => totals.memberTotals[member.id]).map(member => `${esc(member.name)}: ${number(totals.memberTotals[member.id])} servings`).join(' · ')}</p>` : ''}`;
         }
 
         static validationMessage(draft, ui, totals) {

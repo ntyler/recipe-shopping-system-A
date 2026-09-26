@@ -175,6 +175,8 @@ def test_meal_plan_appends_multiple_recipes_and_removes_only_one(isolated_meal_p
 
     context = meal_plan_service.meal_plan_for_week("2026-07-06")
     slot = context["meals_by_day"]["2026-07-06"]["breakfast"]
+    assert context["meal_count"] == 1
+    assert context["unique_recipe_count"] == 3
     assert [meal["id"] for meal in slot] == [meal["id"] for meal in added]
     assert [meal["recipe_name"] for meal in slot] == [name for _, name in recipes]
     assert len(json.loads(isolated_meal_plan.read_text(encoding="utf-8"))["meals"]) == 3

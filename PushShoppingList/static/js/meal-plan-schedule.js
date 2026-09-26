@@ -108,6 +108,70 @@
         });
     }
 
+    // Shared household/family portions describe a whole meal. Custom recipes
+    // reserve their portions in matching slots; inherited recipes split the rest.
+    // A null plan is an inherited recipe. Neither input draft is mutated.
+    function splitSharedPlan(shared, plans) {
+        const count = plans.filter(plan => !plan).length;
+        if (shared.portionMode === 'recipe') return plans.map(plan => plan || shared);
+        const drafts = Array.from({length: count}, () => clone(shared));
+        const customMeals = plans.filter(Boolean).flatMap(plan => summary(plan).days.flatMap(day =>
+            day.meals.map(meal => ({...meal, date: day.date}))));
+        const totals = summary(shared), errors = count ? [...totals.errors] : [];
+        const seeded = new Set();
+        totals.days.forEach(day => day.meals.forEach(meal => {
+            const type = meal.meal_type;
+            const custom = customMeals.filter(item => item.date === day.date && item.meal_type === type);
+            const remaining = sum([meal.planned_servings, ...custom.map(item => -item.planned_servings)]);
+            const fail = message => errors.push(`${day.date} ${type}: ${message}`);
+            if (remaining < 0) fail('Custom portions exceed the shared meal total. Reduce custom portions or increase the shared total.');
+            else if (!remaining && count) fail('No servings remain for the shared recipes. Reduce custom portions, increase the shared total, or remove a recipe.');
+            if (shared.portionMode === 'household') {
+                const shares = splitServings(remaining, count);
+                drafts.forEach((draft, index) => {
+                    draft.days[day.date].household[type] = shares[index] || 0;
+                    if (!seeded.has(type)) draft.householdDefaults[type] = shares[index] || 0;
+                    draft.days[day.date].overrides.household ||= draft.householdDefaults[type] !== shares[index];
+                });
+            } else {
+                const available = new Map(meal.member_portions.map(part => [part.member_id, part.servings]));
+                custom.flatMap(item => item.member_portions).forEach(part => {
+                    available.set(part.member_id, sum([available.get(part.member_id) || 0, -part.servings]));
+                });
+                for (const [id, amount] of available) {
+                    if (amount < 0) fail(`Custom portions exceed the shared total for ${shared.members.find(member => member.id === id)?.name || 'a family member'}.`);
+                }
+                // Household custom portions have no named eaters. Reserve them
+                // proportionally from the remaining family portions.
+                const unnamed = sum(custom.filter(item => !item.member_portions.length).map(item => item.planned_servings));
+                const positive = [...available].filter(([, value]) => value > 0);
+                const total = sum(positive.map(([, value]) => value));
+                let allocated = 0;
+                positive.forEach(([id, value], index) => {
+                    const amount = unnamed ? (index === positive.length - 1 ? sum([remaining, -allocated])
+                        : Number((value * Math.max(0, total - unnamed) / total).toFixed(6))) : value;
+                    allocated = sum([allocated, amount]);
+                    const shares = splitServings(amount, count);
+                    drafts.forEach((draft, recipeIndex) => {
+                        draft.days[day.date].family[id][type] = {enabled:amount > 0, servings:shares[recipeIndex] || value};
+                    });
+                });
+                drafts.forEach(draft => {
+                    shared.members.forEach(member => {
+                        const cells = draft.days[day.date].family[member.id];
+                        if (!(available.get(member.id) > 0)) cells[type].enabled = false;
+                        if (!seeded.has(type)) draft.familyDefaults[member.id][type] = clone(cells[type]);
+                        draft.days[day.date].overrides.family ||= JSON.stringify(cells[type]) !== JSON.stringify(draft.familyDefaults[member.id][type]);
+                    });
+                });
+            }
+            seeded.add(type);
+        }));
+        drafts.forEach(draft => { draft.sharedPortionErrors = errors; });
+        let index = 0;
+        return plans.map(plan => plan ? (count ? plan : {...plan, sharedPortionErrors:errors}) : drafts[index++]);
+    }
+
     function normalizedMembers(members, retained = new Set()) {
         const seen = new Set();
         return (Array.isArray(members) ? members : []).filter(member => {
@@ -430,7 +494,7 @@
     }
 
     function summary(draft) {
-        const errors = [];
+        const errors = [...(draft.sharedPortionErrors || [])];
         if (draft.dateMode === 'range' && (!parseDate(draft.startDate) || !parseDate(draft.endDate))) errors.push('Choose a valid start and end date.');
         else if (draft.dateMode === 'range' && draft.startDate > draft.endDate) errors.push('The end date must be on or after the start date.');
         else if (!draft.selectedDates.length) errors.push('Select at least one date.');
@@ -578,6 +642,6 @@
         setDateMode, setSingleDate, setRange, setDates, toggleDate, setPortionMode, setMeals,
         setHouseholdDefault, setFamilyDefault, setDayMeal, setDayHousehold, setDayFamily,
         setDayNotes, setMealNotes, mealPortionMode, canAssignMember, fromSaved,
-        applyDefaults, setMembers, setGroups, selectGroupMembers, withPortions, splitRecipeYield, summary, payload
+        applyDefaults, setMembers, setGroups, selectGroupMembers, withPortions, splitRecipeYield, splitSharedPlan, sum, summary, payload
     });
 })(globalThis);
