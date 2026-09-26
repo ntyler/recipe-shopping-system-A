@@ -31,6 +31,7 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         const notes=async(form,value)=>{if(!await note(form).isVisible())await form.locator('[data-schedule-section="notes"] > summary').click();await note(form).fill(value);};
         const screenshot=async name=>{const dir=process.env.AI_PANTRY_BROWSER_ARTIFACTS;if(dir){fs.mkdirSync(dir,{recursive:true});await page.screenshot({path:path.join(dir,name)});}};
         await open();await recipe(0).selectOption('recipe://bread');
+        await shared.getByRole('button',{name:'Household total',exact:true}).click();
         await notes(shared,'Shared prep notes');
         await shared.locator('[data-schedule-section="prep"] > summary').click();
         await shared.locator('[data-schedule-action="add-prep"]').click();

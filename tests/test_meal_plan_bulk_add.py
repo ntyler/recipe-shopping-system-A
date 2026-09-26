@@ -27,12 +27,12 @@ def test_multiple_recipes_keep_independent_plans_in_one_write(isolated_plan, mon
         assert len(batch["prep_steps"]) == 3
 
 
-@pytest.mark.parametrize("kind", ["duplicate", "invalid-date", "invalid-portions", "existing-slot", "archived-member"])
+@pytest.mark.parametrize("kind", ["duplicate-allocation", "invalid-date", "invalid-portions", "existing-slot", "archived-member"])
 def test_invalid_later_recipe_never_saves_earlier_recipes(isolated_plan, kind):
     service.add_meal({"date": "2026-09-28", "meal_type": "lunch", "recipe_url": "recipe://existing", "recipe_name": "Existing"})
     second = entry("recipe://bread")
-    if kind == "duplicate":
-        second = entry()
+    if kind == "duplicate-allocation":
+        second["allocations"].append(dict(second["allocations"][0]))
     elif kind == "invalid-date":
         second["allocations"][1]["date"] = "bad"
     elif kind == "invalid-portions":
@@ -55,6 +55,31 @@ def test_invalid_collection_does_not_create_a_plan(isolated_plan, value):
     with pytest.raises(ValueError):
         service.add_meal_prep_batches(value)
     assert not isolated_plan.exists()
+
+
+def test_intentional_repeated_meals_save_together_and_retry_is_atomic(isolated_plan):
+    first = entry()
+    first["batch"].pop("batch_servings")
+    first["allocations"] = [{"date": "2026-09-25", "meal_type": "breakfast", "planned_servings": 2}]
+    second = {**first, "batch": {**first["batch"], "prep_notes": "Second portion"}}
+    batches, meals = service.add_meal_prep_batches([first, second])
+    assert len(batches) == len(meals) == 2
+    assert sum(meal["planned_servings"] for meal in meals) == 4
+    assert len({meal["id"] for meal in meals}) == 2
+    assert [batch["batch_servings"] for batch in batches] == [2, 2]
+    before = isolated_plan.read_bytes()
+    with pytest.raises(ValueError, match="Recipe 1:.*already planned"):
+        service.add_meal_prep_batches([first, second])
+    assert isolated_plan.read_bytes() == before
+    # Both records remain independently editable after occupying the same slot.
+    result = service.update_meal(meals[0]["id"], {"planned_servings": 1.5, "prep_notes": "First portion"})
+    assert result["meal"]["planned_servings"] == 1.5
+    result = service.update_meal_prep_batch(batches[1]["id"], {"prep_notes": "Keep second portion"})
+    assert result["batch"]["prep_notes"] == "Keep second portion"
+    assert result["meals"][0]["planned_servings"] == 2
+    service.update_meal(meals[0]["id"], {"date": "2026-09-26"})
+    with pytest.raises(ValueError, match="already planned"):
+        service.update_meal(meals[0]["id"], {"date": "2026-09-25"})
 
 
 def test_bulk_route_collection_scope_and_atomic_retry(scoped_client, monkeypatch):

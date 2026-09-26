@@ -73,8 +73,39 @@
         });
         const scale = Math.max(0, ...decimals.map(value => value.scale));
         const digits = decimals.reduce((total, value) => total + value.digits * 10n ** BigInt(scale - value.scale), 0n);
-        const text = digits.toString().padStart(scale + 1, '0');
-        return Number(scale ? `${text.slice(0, -scale)}.${text.slice(-scale)}` : text);
+        const text = (digits < 0n ? -digits : digits).toString().padStart(scale + 1, '0');
+        return Number(`${digits < 0n ? '-' : ''}${scale ? `${text.slice(0, -scale)}.${text.slice(-scale)}` : text}`);
+    }
+
+    function splitServings(servings, count) {
+        if (!count || portion(servings) === null) return [];
+        const [mantissa, exponent = '0'] = String(servings).toLowerCase().split('e');
+        const [whole, fraction = ''] = mantissa.split('.');
+        const decimals = fraction.length - Number(exponent);
+        const scale = Math.max(6, decimals + Math.ceil(Math.log10(count)));
+        const units = BigInt(whole + fraction) * 10n ** BigInt(scale - decimals);
+        const each = units / BigInt(count), remainder = units % BigInt(count);
+        // Keep the recipe total exact, assigning any rounding remainder to the
+        // last meal instead of rounding every meal up and creating servings.
+        return Array.from({length: count}, (_, index) =>
+            Number(`${each + (index === count - 1 ? remainder : 0n)}e-${scale}`));
+    }
+
+    function splitRecipeYield(drafts, servings) {
+        // All rows for one recipe share one serving budget. Explicit household
+        // or family portions consume that budget before automatic portions.
+        const totals = drafts.map(draft => summary({...draft, recipePortions: undefined, recipeSplitError: ''}));
+        const remaining = sum([servings, ...totals.map((total, index) => drafts[index].portionMode === 'recipe' ? 0 : -total.totalServings)]);
+        const count = totals.reduce((value, total, index) => value + (drafts[index].portionMode === 'recipe' ? total.mealCount : 0), 0);
+        const portions = splitServings(remaining, count);
+        let offset = 0;
+        return drafts.map((draft, index) => {
+            if (draft.portionMode !== 'recipe') return draft;
+            const recipePortions = portions.slice(offset, offset + totals[index].mealCount);
+            offset += totals[index].mealCount;
+            return {...draft, recipeYield: servings, recipePortions,
+                recipeSplitError: remaining <= 0 ? 'No servings remain to split. Reduce this recipe’s custom portions or use Household total for every entry.' : ''};
+        });
     }
 
     function normalizedMembers(members, retained = new Set()) {
@@ -158,7 +189,8 @@
         return refreshDates({
             dateMode: 'single', singleDate: today, startDate: today, endDate: today,
             selectedDates: [], selectedDays: [today], calendarMonth: today.slice(0, 7),
-            portionMode: 'household', mealTypes: ['dinner'],
+            portionMode: options.splitRecipeYield ? 'recipe' : 'household', mealTypes: ['dinner'],
+            ...(options.splitRecipeYield ? {recipeYield: servings} : {}),
             householdDefaults: Object.fromEntries(MEAL_TYPES.map(meal => [meal, servings])),
             familyDefaults: newFamilyDefaults(members), members, groups: normalizedGroups(options.groups), days: {}, prepSteps: [], notes: ''
         });
@@ -202,9 +234,18 @@
         return setDates(draft, [...dates]);
     }
 
-    function setPortionMode(draft, mode) {
-        if (!['household', 'family'].includes(mode)) throw new Error('Choose a valid portions mode.');
+    function setPortionMode(draft, mode, source = draft) {
+        if (!['household', 'family'].includes(mode) && !(mode === 'recipe' && !draft.edit && portion(draft.recipeYield))) throw new Error('Choose a valid portions mode.');
         if (draft.portionMode === mode) return draft;
+        if (draft.portionMode === 'recipe' && mode === 'household') {
+            const seeded = new Set();
+            summary(source).days.forEach(day => day.meals.forEach(meal => {
+                draft.days[day.date].household[meal.meal_type] = meal.planned_servings;
+                draft.days[day.date].overrides.household = false;
+                if (!seeded.has(meal.meal_type)) draft.householdDefaults[meal.meal_type] = meal.planned_servings;
+                seeded.add(meal.meal_type);
+            }));
+        }
         draft.portionMode = mode;
         if (draft.edit) Object.values(draft.days).forEach(day => { day.mealPortionModes = {}; });
         return draft;
@@ -235,6 +276,7 @@
     }
 
     function setHouseholdDefault(draft, meal, value) {
+        if (draft.portionMode === 'recipe') setPortionMode(draft, 'household');
         if (validMeal(meal)) draft.householdDefaults[meal] = value;
         syncDefaults(draft);
         return draft;
@@ -258,6 +300,7 @@
     }
 
     function setDayHousehold(draft, date, meal, value) {
+        if (draft.portionMode === 'recipe') setPortionMode(draft, 'household');
         const day = ensureDay(draft, date);
         if (day && validMeal(meal)) {
             day.household[meal] = value;
@@ -325,9 +368,11 @@
             day.mealEnabled = defaults.mealEnabled;
             day.overrides.meals = false;
             // Applying family defaults does not destroy the household draft, or vice versa.
-            day[draft.portionMode] = defaults[draft.portionMode];
+            if (draft.portionMode !== 'recipe') {
+                day[draft.portionMode] = defaults[draft.portionMode];
+                day.overrides[draft.portionMode] = false;
+            }
             if (draft.edit) day.mealPortionModes = {};
-            day.overrides[draft.portionMode] = false;
         });
         return draft;
     }
@@ -391,6 +436,13 @@
         else if (!draft.selectedDates.length) errors.push('Select at least one date.');
         if (draft.portionMode === 'family' && !draft.members.length) errors.push('Add at least one family member.');
 
+        const splitCount = draft.portionMode === 'recipe' ? draft.selectedDates.reduce((count, date) =>
+            count + MEAL_TYPES.filter(meal => ensureDay(draft, date).mealEnabled[meal]).length, 0) : 0;
+        const split = draft.recipePortions || splitServings(draft.recipeYield, splitCount);
+        let splitIndex = 0;
+        if (draft.portionMode === 'recipe' && portion(draft.recipeYield) === null) errors.push('The recipe needs a valid serving yield.');
+        if (draft.portionMode === 'recipe' && draft.recipeSplitError) errors.push(draft.recipeSplitError);
+
         const memberValues = Object.fromEntries(draft.members.map(member => [member.id, []]));
         const days = draft.selectedDates.map(date => {
             const day = ensureDay(draft, date);
@@ -400,8 +452,8 @@
                 let servings;
                 const memberPortions = [];
                 const mode = mealPortionMode(draft, date, meal);
-                if (mode === 'household') {
-                    servings = portion(day.household[meal]);
+                if (mode === 'household' || mode === 'recipe') {
+                    servings = portion(mode === 'recipe' ? split[splitIndex++] : day.household[meal]);
                     if (servings === null) errors.push(`${date} ${meal}: enter a finite number of servings greater than zero.`);
                 } else {
                     for (const member of draft.members) {
@@ -446,7 +498,7 @@
             if (!parseDate(step.date) || !step.instruction) throw new Error('Every preparation task needs a valid date and an instruction.');
         }
         return {
-            portion_mode: draft.portionMode,
+            portion_mode: draft.portionMode === 'recipe' ? 'household' : draft.portionMode,
             prep_notes: String(draft.notes || ''),
             prep_steps: steps,
             allocations: totals.days.flatMap(day => day.meals.map(meal => ({
@@ -526,6 +578,6 @@
         setDateMode, setSingleDate, setRange, setDates, toggleDate, setPortionMode, setMeals,
         setHouseholdDefault, setFamilyDefault, setDayMeal, setDayHousehold, setDayFamily,
         setDayNotes, setMealNotes, mealPortionMode, canAssignMember, fromSaved,
-        applyDefaults, setMembers, setGroups, selectGroupMembers, withPortions, summary, payload
+        applyDefaults, setMembers, setGroups, selectGroupMembers, withPortions, splitRecipeYield, summary, payload
     });
 })(globalThis);

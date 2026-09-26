@@ -19,7 +19,7 @@
             this.edit = null;
             this.generation = 0;
             this.ui = {openDays:new Set(), openSections:new Set(), names:{}, newName:'', groupIds:[], busy:false, memberBusy:false, loading:false, membersLoaded:false, refreshMemberDefaults:false, memberLoadError:false, archivedMembers:[], memberReview:[], message:'', error:false};
-            this.draft = root.MealPlanSchedule.create({today:options.today, servings:options.servings, members:[]});
+            this.draft = root.MealPlanSchedule.create({today:options.today, servings:options.servings, splitRecipeYield:options.splitRecipeYield, members:[]});
             this.form.classList.add('meal-schedule-panel');
             form.addEventListener('submit', event => this.submit(event));
             form.addEventListener('click', event => this.click(event));
@@ -49,7 +49,7 @@
         clearEdit() {
             this.generation += 1;
             this.edit = null;
-            this.draft = root.MealPlanSchedule.create({today:this.options.today,servings:this.options.servings,members:this.draft.members,groups:this.draft.groups});
+            this.draft = root.MealPlanSchedule.create({today:this.options.today,servings:this.options.servings,splitRecipeYield:this.options.splitRecipeYield,members:this.draft.members,groups:this.draft.groups});
             Object.assign(this.ui, {busy:false,loading:false,saved:false,membersLoaded:false,refreshMemberDefaults:true,memberReview:[],groupIds:[],names:{},newName:'',message:'',error:false});
             this.ui.openDays.clear();
             this.ui.openSections.clear();
@@ -103,6 +103,8 @@
 
         setMessage(message, error = false) { this.ui.message = message; this.ui.error = error; }
 
+        schedulingDraft() { return this.options.getDraft?.(this.draft) || this.draft; }
+
         syncMembers(members, options) {
             const previousMembers = this.draft.members;
             root.MealPlanSchedule.setMembers(this.draft, members, options);
@@ -129,7 +131,7 @@
             const active = this.form.contains(document.activeElement) ? document.activeElement : null;
             const key = active?.dataset.focusKey;
             const position = active && ['text','search'].includes(active.type) ? active.selectionStart : null;
-            this.form.innerHTML = MealPlanPanel.html(this.draft, this.ui, this.edit?.title || this.options.title, this.options);
+            this.form.innerHTML = MealPlanPanel.html(this.schedulingDraft(), this.ui, this.edit?.title || this.options.title, this.options);
             const footer = this.form.querySelector('.meal-schedule-footer');
             if (footer) footer.hidden = Boolean(this.options.onSubmit && !this.edit);
             if (key) {
@@ -157,6 +159,7 @@
 
         static portionsTable(draft, meals, date) {
             if (!meals.length) return '<p>Select at least one meal.</p>';
+            if (draft.portionMode === 'recipe') return '<p>Servings are divided evenly across the scheduled meals. Choose Household total to adjust portions.</p>';
             if (draft.portionMode === 'household') return `<div class="meal-schedule-household">${meals.map(meal => `<label>${title(meal)} servings${MealPlanPanel.portion(date ? draft.days[date].household[meal] : draft.householdDefaults[meal], {field:date ? 'day-household' : 'household', meal, date})}</label>`).join('')}</div>`;
             if (!draft.members.length) return '<p>No active people are available for this meal.</p>';
             const portions = date ? draft.days[date].family : draft.familyDefaults;
@@ -187,7 +190,13 @@
             </details>`;
         }
 
-        static peopleSection(draft, ui, manageMembersUrl) {
+        static recipeYieldHelp(draft, options) {
+            return options.sharedPlan ? 'Repeated entries of the same recipe share one yield across all their meals. Custom portions are taken out first.'
+                : `This entry uses ${number(root.MealPlanSchedule.summary(draft).totalServings)} of the recipe’s ${number(draft.recipeYield)} servings. Repeated entries share the same yield.`;
+        }
+
+        static peopleSection(draft, ui, manageMembersUrl, options = {}) {
+            if (draft.portionMode === 'recipe') return `<h3>Split recipe yield</h3><p data-recipe-yield-help>${MealPlanPanel.recipeYieldHelp(draft, options)}</p><p>Changing dates or meal types recalculates the servings per meal.</p>`;
             if (draft.portionMode !== 'family') return `<h3>Servings per meal</h3>${MealPlanPanel.portionsTable(draft, draft.mealTypes)}`;
             const archivedUrl = typeof root.withCanonicalViewerUserId === 'function'
                 ? root.withCanonicalViewerUserId('/settings/family-members?status=archived') : '/settings/family-members?status=archived';
@@ -211,7 +220,8 @@
         }
 
         static portionModes(draft) {
-            return `<h3>Who is eating?</h3><div class="recipe-preview-segment meal-schedule-modes" role="group" aria-label="Portion allocation">${[['household','Household total'],['family','By family member']].map(([mode,label]) => `<button type="button" data-schedule-portion-mode="${mode}" data-focus-key="portion-mode-${mode}" aria-pressed="${draft.portionMode === mode}">${label}</button>`).join('')}</div>`;
+            const modes = [...(!draft.edit && draft.recipeYield !== undefined ? [['recipe','Split recipe yield']] : []), ['household','Household total'], ['family','By family member']];
+            return `<h3>Who is eating?</h3><div class="recipe-preview-segment meal-schedule-modes" role="group" aria-label="Portion allocation">${modes.map(([mode,label]) => `<button type="button" data-schedule-portion-mode="${mode}" data-focus-key="portion-mode-${mode}" aria-pressed="${draft.portionMode === mode}">${label}</button>`).join('')}</div>`;
         }
 
         static memberReviewHtml(ui) {
@@ -220,6 +230,7 @@
 
         static html(draft, ui, recipeTitle = '', options = {}) {
             const model = root.MealPlanSchedule, totals = model.summary(draft);
+            const sharedSplit = options.sharedPlan && draft.portionMode === 'recipe';
             const singleEdit = draft.edit?.scope === 'meal';
             const disabled = ui.busy || ui.memberBusy || ui.saved;
             const reviewRequired = draft.portionMode === 'family' && ui.memberReview.length > 0;
@@ -227,8 +238,8 @@
                 ? root.withCanonicalViewerUserId('/settings/family-members') : '/settings/family-members';
             if (options.portionsOnly) return `<fieldset ${disabled ? 'disabled' : ''}>
                 <p>People and portions for this recipe. Dates, meal types, notes, and prep tasks follow the shared plan.</p>
-                ${MealPlanPanel.portionModes(draft)}${MealPlanPanel.peopleSection(draft, ui, manageMembersUrl)}
-                <div class="meal-schedule-summary" data-schedule-summary aria-live="polite">${MealPlanPanel.summaryHtml(draft, totals)}</div>
+                ${MealPlanPanel.portionModes(draft)}${MealPlanPanel.peopleSection(draft, ui, manageMembersUrl, options)}
+                <div class="meal-schedule-summary" data-schedule-summary aria-live="polite">${MealPlanPanel.summaryHtml(draft, totals, options)}</div>
                 ${MealPlanPanel.memberReviewHtml(ui)}
                 <p class="meal-schedule-errors" data-schedule-errors role="status">${esc(MealPlanPanel.validationMessage(draft, ui, totals))}</p></fieldset>
                 <p class="recipe-preview-status ${ui.error ? 'is-error' : ''}" data-schedule-status role="${ui.error ? 'alert' : 'status'}">${esc(ui.message)}</p>`;
@@ -244,7 +255,7 @@
             }
             const dayCards = totals.days.map(day => {
                 const data = draft.days[day.date], meals = model.MEAL_TYPES.filter(meal => data.mealEnabled[meal]);
-                return `<details class="meal-schedule-day" data-schedule-day="${day.date}" ${ui.openDays.has(day.date) ? 'open' : ''}><summary><span><strong>${esc(dateLabel(day.date))}</strong><small data-day-summary="${day.date}">${day.meals.map(meal => `${title(meal.meal_type)}: ${number(meal.planned_servings)}`).join(' · ') || 'No meals selected'}</small></span><span data-day-total="${day.date}">${number(day.totalServings)} servings</span></summary>
+                return `<details class="meal-schedule-day" data-schedule-day="${day.date}" ${ui.openDays.has(day.date) ? 'open' : ''}><summary><span><strong>${esc(dateLabel(day.date))}</strong><small data-day-summary="${day.date}">${day.meals.map(meal => sharedSplit ? title(meal.meal_type) : `${title(meal.meal_type)}: ${number(meal.planned_servings)}`).join(' · ') || 'No meals selected'}</small></span><span data-day-total="${day.date}">${sharedSplit ? 'Split per recipe' : `${number(day.totalServings)} servings`}</span></summary>
                     <div class="meal-schedule-day-body"><div class="meal-schedule-meals">${model.MEAL_TYPES.map(meal => MealPlanPanel.check(meal, data.mealEnabled[meal], 'day-meal', `data-date="${day.date}" data-focus-key="day-meal-${day.date}-${meal}"`)).join('')}</div>
                     ${draft.edit ? meals.map(meal => `${MealPlanPanel.portionsTable({...draft,portionMode:model.mealPortionMode(draft,day.date,meal)}, [meal], day.date)}<label>${title(meal)} notes (optional)<input type="text" data-schedule-field="meal-notes" data-meal="${meal}" data-date="${day.date}" data-focus-key="meal-notes-${day.date}-${meal}" value="${esc(data.mealNotes[meal] ?? data.notes)}"></label>`).join('') : `${MealPlanPanel.portionsTable(draft, meals, day.date)}<label>Notes for this day (optional)<input type="text" data-schedule-field="day-notes" data-date="${day.date}" data-focus-key="day-notes-${day.date}" value="${esc(data.notes)}"></label>`}
                     <p data-day-default-status="${day.date}">${day.customized ? 'Adjusted for this day.' : 'Using default portions.'}</p></div></details>`;
@@ -254,25 +265,26 @@
                 <div class="meal-schedule-dates">${dates}</div>
                 <div class="meal-schedule-meals">${singleEdit ? `<label>Meal<select data-schedule-field="single-meal" data-focus-key="single-meal">${model.MEAL_TYPES.map(meal => `<option value="${meal}" ${draft.mealTypes[0] === meal ? 'selected' : ''}>${title(meal)}</option>`).join('')}</select></label>` : `<strong>Meals on selected days</strong>${model.MEAL_TYPES.map(meal => MealPlanPanel.check(meal, draft.mealTypes.includes(meal), 'meal', `data-focus-key="meal-${meal}"`)).join('')}`}</div>
                 <div class="meal-schedule-columns"><section>${MealPlanPanel.portionModes(draft)}
-                ${MealPlanPanel.peopleSection(draft, ui, manageMembersUrl)}
+                ${MealPlanPanel.peopleSection(draft, ui, manageMembersUrl, options)}
                 <div data-schedule-apply ${totals.days.some(day => day.customized) ? '' : 'hidden'}><p class="meal-schedule-apply-help">Some days have individual changes. Apply these portions to replace those changes.</p><button type="button" data-schedule-action="apply" data-focus-key="apply">Apply to selected days</button></div>
                 <details class="meal-schedule-members" data-schedule-section="members" ${ui.openSections.has('members') ? 'open' : ''}><summary>Add or edit people</summary>
                     <p><a href="${esc(manageMembersUrl)}" target="_blank" rel="noopener">Manage Family Members</a> (opens in a new tab). Refresh members here after making changes.</p>
-                    ${draft.portionMode === 'household' ? `<button type="button" data-schedule-action="retry-members" data-focus-key="refresh-members" ${ui.loading ? 'disabled' : ''}>${ui.membersLoaded ? 'Refresh members' : 'Retry loading members'}</button>` : ''}
+                    ${draft.portionMode !== 'family' ? `<button type="button" data-schedule-action="retry-members" data-focus-key="refresh-members" ${ui.loading ? 'disabled' : ''}>${ui.membersLoaded ? 'Refresh members' : 'Retry loading members'}</button>` : ''}
                     ${draft.members.filter(member => !member.archived).map(member => `<div class="meal-schedule-member-row"><label>Name<input type="text" maxlength="100" data-member-name="${esc(member.id)}" data-focus-key="member-${esc(member.id)}" value="${esc(ui.names[member.id] ?? member.name)}"></label><button type="button" data-schedule-action="save-member" data-member="${esc(member.id)}" ${ui.loading ? 'disabled' : ''}>Save name</button></div>`).join('')}
                     <div class="meal-schedule-member-row"><label>New family member<input type="text" maxlength="100" data-new-member data-focus-key="new-member" value="${esc(ui.newName)}" placeholder="Name"></label><button type="button" data-schedule-action="add-member" ${!ui.membersLoaded || ui.loading ? 'disabled' : ''}>Add member</button></div>
                 </details><details class="meal-schedule-notes" data-schedule-section="notes" ${ui.openSections.has('notes') || draft.notes ? 'open' : ''}><summary>${singleEdit ? 'Notes for this meal' : 'Meal-prep notes'} (optional)</summary><label><span class="sr-only">Meal-prep notes</span><textarea rows="2" data-schedule-field="notes" data-focus-key="notes" placeholder="${singleEdit ? 'Notes for this scheduled meal' : 'Notes shared by this meal plan'}">${esc(draft.notes)}</textarea></label></details></section>
                 ${singleEdit ? '' : `<section><h3>Scheduled meals</h3><p>Expand a day to adjust meals, people, and portions.</p><div class="meal-schedule-days">${dayCards || '<p>Select dates to build your schedule.</p>'}</div>
                 <details class="meal-schedule-prep" data-schedule-section="prep" ${ui.openSections.has('prep') ? 'open' : ''}><summary>Prep tasks (optional)</summary><p>Schedule preparation on its own dates.</p>${draft.prepSteps.map((step,index) => `<div class="meal-schedule-prep-row"><label>Prep date<input type="date" data-schedule-field="prep-date" data-step="${index}" data-focus-key="prep-date-${index}" value="${esc(step.date)}" required></label><label>Task<input type="text" maxlength="2000" data-schedule-field="prep-instruction" data-step="${index}" data-focus-key="prep-instruction-${index}" value="${esc(step.instruction)}" placeholder="e.g. Chop vegetables" required></label><button type="button" data-schedule-action="remove-prep" data-step="${index}" aria-label="Remove prep task ${index+1}">Remove</button></div>`).join('')}<button type="button" data-schedule-action="add-prep">Add prep task</button></details></section>`}</div>
-                <div class="meal-schedule-summary" data-schedule-summary aria-live="polite">${MealPlanPanel.summaryHtml(draft, totals)}</div>
+                <div class="meal-schedule-summary" data-schedule-summary aria-live="polite">${MealPlanPanel.summaryHtml(draft, totals, options)}</div>
                 ${MealPlanPanel.memberReviewHtml(ui)}
                 <p class="meal-schedule-errors" data-schedule-errors role="status">${esc(MealPlanPanel.validationMessage(draft, ui, totals))}</p>
                 <div class="meal-schedule-footer"><button type="button" data-schedule-action="cancel">Cancel</button><button type="submit" class="is-primary" data-schedule-submit ${!totals.valid || ui.loading || reviewRequired || ui.saved ? 'disabled' : ''}>${ui.busy ? 'Saving…' : draft.edit ? 'Save changes' : `Add ${totals.mealCount} ${totals.mealCount === 1 ? 'meal' : 'meals'}`}</button></div></fieldset>
                 <p class="recipe-preview-status ${ui.error ? 'is-error' : ''}" data-schedule-status role="${ui.error ? 'alert' : 'status'}">${esc(ui.message)}</p>`;
         }
 
-        static summaryHtml(draft, totals) {
-            return `<div><strong>${totals.dayCount} ${totals.dayCount === 1 ? 'day' : 'days'} · ${totals.mealCount} ${totals.mealCount === 1 ? 'meal' : 'meals'} · ${number(totals.totalServings)} servings</strong><span>${draft.edit?.scope === 'meal' ? 'Only this meal will change.' : 'Prepare one batch for these meals.'}</span></div>${draft.portionMode === 'family' ? `<p>${draft.members.filter(member => totals.memberTotals[member.id]).map(member => `${esc(member.name)}: ${number(totals.memberTotals[member.id])} servings`).join(' · ')}</p>` : ''}`;
+        static summaryHtml(draft, totals, options = {}) {
+            const sharedSplit = options.sharedPlan && draft.portionMode === 'recipe';
+            return `<div><strong>${totals.dayCount} ${totals.dayCount === 1 ? 'day' : 'days'} · ${totals.mealCount} ${totals.mealCount === 1 ? 'meal' : 'meals'}${sharedSplit ? ' per entry' : ` · ${number(totals.totalServings)} servings`}</strong><span>${sharedSplit ? 'Each recipe’s yield is shared across its entries.' : draft.edit?.scope === 'meal' ? 'Only this meal will change.' : 'Prepare one batch for these meals.'}</span></div>${draft.portionMode === 'family' ? `<p>${draft.members.filter(member => totals.memberTotals[member.id]).map(member => `${esc(member.name)}: ${number(totals.memberTotals[member.id])} servings`).join(' · ')}</p>` : ''}`;
         }
 
         static validationMessage(draft, ui, totals) {
@@ -284,10 +296,13 @@
             }).join(' ');
         }
 
-        updateTotals() {
-            const totals = root.MealPlanSchedule.summary(this.draft);
-            this.form.querySelector('[data-schedule-summary]').innerHTML = MealPlanPanel.summaryHtml(this.draft, totals);
-            this.form.querySelector('[data-schedule-errors]').textContent = MealPlanPanel.validationMessage(this.draft, this.ui, totals);
+        updateTotals(notify = true) {
+            const draft = this.schedulingDraft(), totals = root.MealPlanSchedule.summary(draft);
+            const sharedSplit = this.options.sharedPlan && draft.portionMode === 'recipe';
+            this.form.querySelector('[data-schedule-summary]').innerHTML = MealPlanPanel.summaryHtml(draft, totals, this.options);
+            this.form.querySelector('[data-schedule-errors]').textContent = MealPlanPanel.validationMessage(draft, this.ui, totals);
+            const yieldHelp = this.form.querySelector('[data-recipe-yield-help]');
+            if (yieldHelp && draft.portionMode === 'recipe') yieldHelp.textContent = MealPlanPanel.recipeYieldHelp(draft, this.options);
             const apply = this.form.querySelector('[data-schedule-apply]');
             if (apply) apply.hidden = !totals.days.some(day => day.customized);
             const button = this.form.querySelector('[data-schedule-submit]');
@@ -297,9 +312,9 @@
             }
             totals.days.forEach(day => {
                 const total = this.form.querySelector(`[data-day-total="${day.date}"]`);
-                if (total) total.textContent = `${number(day.totalServings)} servings`;
+                if (total) total.textContent = sharedSplit ? 'Split per recipe' : `${number(day.totalServings)} servings`;
                 const summary = this.form.querySelector(`[data-day-summary="${day.date}"]`);
-                if (summary) summary.textContent = day.meals.map(meal => `${title(meal.meal_type)}: ${number(meal.planned_servings)}`).join(' · ') || 'No meals selected';
+                if (summary) summary.textContent = day.meals.map(meal => sharedSplit ? title(meal.meal_type) : `${title(meal.meal_type)}: ${number(meal.planned_servings)}`).join(' · ') || 'No meals selected';
                 const label = this.form.querySelector(`[data-day-default-status="${day.date}"]`);
                 if (label) label.textContent = day.customized ? 'Adjusted for this day.' : 'Using default portions.';
             });
@@ -311,7 +326,7 @@
                 }, 0);
                 cell.textContent = `${number(total)} servings`;
             });
-            this.options.onRender?.(this);
+            if (notify) this.options.onRender?.(this);
         }
 
         syncPortionControls(active) {
@@ -460,7 +475,7 @@
             const model = root.MealPlanSchedule, draft = this.draft;
             if (this.edit?.scope === 'meal' && (button.dataset.scheduleMode || ['month','date','add-prep','remove-prep','apply'].includes(button.dataset.scheduleAction))) return;
             if (button.dataset.scheduleMode) model.setDateMode(draft, button.dataset.scheduleMode);
-            else if (button.dataset.schedulePortionMode) model.setPortionMode(draft, button.dataset.schedulePortionMode);
+            else if (button.dataset.schedulePortionMode) model.setPortionMode(draft, button.dataset.schedulePortionMode, this.schedulingDraft());
             else switch (button.dataset.scheduleAction) {
                 case 'cancel': this.form.hidden = true; this.options.onCancel?.(); return;
                 case 'month': draft.calendarMonth = model.shiftMonth(draft.calendarMonth, Number(button.dataset.direction)); break;
@@ -521,7 +536,7 @@
                 this.render(); return;
             }
             let payload;
-            try { payload = root.MealPlanSchedule.payload(this.draft); }
+            try { payload = root.MealPlanSchedule.payload(this.schedulingDraft()); }
             catch (error) { this.setMessage(error.message, true); this.render(); return; }
             if (!this.form.reportValidity()) return;
             const context = this.edit ? {} : this.options.getContext();

@@ -150,6 +150,80 @@ M.setRange(draft,'','2027-01-02');assert.match(M.summary(draft).errors[0],/valid
 """, timezone)
 
 
+def test_recipe_yield_is_split_across_actual_meals_and_rebalances_with_dates_and_meal_types():
+    run_model(r"""
+const split=M.create({today:'2026-10-05',servings:8,splitRecipeYield:true});
+assert.equal(M.summary(split).totalServings,8);
+M.setDates(split,['2026-10-05','2026-10-07']);M.setMeals(split,['lunch','dinner']);
+assert.deepEqual(plain(M.payload(split).allocations.map(meal=>meal.planned_servings)),[2,2,2,2]);
+assert.equal(M.payload(split).portion_mode,'household');
+M.setDayMeal(split,'2026-10-07','dinner',false);
+assert.equal(M.summary(split).mealCount,3);assert.equal(M.summary(split).totalServings,8);
+M.setDates(split,['2026-10-05']);
+assert.deepEqual(plain(M.payload(split).allocations.map(meal=>meal.planned_servings)),[4,4]);
+M.setHouseholdDefault(split,'lunch',1.5);
+assert.equal(split.portionMode,'household');
+assert.deepEqual(plain(M.payload(split).allocations.map(meal=>meal.planned_servings)),[1.5,4]);
+M.setPortionMode(split,'recipe');
+assert.deepEqual(plain(M.payload(split).allocations.map(meal=>meal.planned_servings)),[4,4]);
+M.setDayMeal(split,'2026-10-05','lunch',false);M.applyDefaults(split);
+assert.deepEqual(plain(M.payload(split).allocations.map(meal=>meal.planned_servings)),[4,4]);
+assert.deepEqual(Object.keys(split.days['2026-10-05'].overrides).sort(),['family','household','meals']);
+M.setDates(split,[]);assert.equal(M.summary(split).valid,false);
+""")
+
+
+@pytest.mark.parametrize('servings', [1, 1.5, 0.1, 8, 12.25])
+def test_split_fractional_recipe_yield_preserves_total_instead_of_rounding_every_meal_up(servings):
+    run_model(r"""
+const split=M.create({today:'2026-10-05',servings:SERVINGS,splitRecipeYield:true});
+M.setDates(split,['2026-10-05','2026-10-06','2026-10-07']);
+const amounts=plain(M.payload(split).allocations.map(meal=>meal.planned_servings));
+assert.equal(M.summary(split).totalServings,SERVINGS);
+assert(amounts.every(value=>value>0&&Math.abs(value-SERVINGS/3)<0.000003));
+M.setDayHousehold(split,'2026-10-06','dinner',0.5);
+assert.equal(split.portionMode,'household');
+assert.deepEqual(plain(M.payload(split).allocations.map(meal=>meal.planned_servings)),[amounts[0],0.5,amounts[2]]);
+""".replace('SERVINGS', str(servings)))
+
+
+def test_repeated_recipe_rows_share_a_yield_by_meal_count_without_rounding_each_row():
+    run_model(r"""
+const first=M.create({today:'2026-10-05',servings:4,splitRecipeYield:true});
+const second=M.create({today:'2026-10-05',servings:4,splitRecipeYield:true});
+let plans=M.splitRecipeYield([first,second],4);
+assert.deepEqual(plans.map(plan=>M.summary(plan).totalServings),[2,2]);
+M.setDates(second,['2026-10-05','2026-10-06','2026-10-07']);
+plans=M.splitRecipeYield([first,second],4);
+assert.deepEqual(plans.map(plan=>M.summary(plan).totalServings),[1,3]);
+assert.deepEqual(plain(plans.flatMap(plan=>M.payload(plan).allocations.map(meal=>meal.planned_servings))),[1,1,1,1]);
+M.setDates(second,['2026-10-05','2026-10-06']);
+plans=M.splitRecipeYield([first,second],1);
+assert.deepEqual(plain(plans.flatMap(plan=>M.payload(plan).allocations.map(meal=>meal.planned_servings))),[0.333333,0.333333,0.333334]);
+assert.equal(first.recipePortions,undefined,'Derivation must not mutate the editable drafts');
+assert.equal(second.recipePortions,undefined);
+""")
+
+
+def test_explicit_portions_consume_the_shared_recipe_yield_before_splitting_the_remainder():
+    run_model(r"""
+const first=M.create({today:'2026-10-05',servings:4,splitRecipeYield:true});
+const second=M.create({today:'2026-10-05',servings:4,splitRecipeYield:true});
+M.setHouseholdDefault(second,'dinner',1.5);
+let plans=M.splitRecipeYield([first,second],4);
+assert.deepEqual(plans.map(plan=>M.summary(plan).totalServings),[2.5,1.5]);
+M.setPortionMode(first,'household',plans[0]);
+assert.equal(M.summary(first).totalServings,2.5,'Switching modes starts with the displayed share');
+M.setPortionMode(first,'recipe');M.setHouseholdDefault(second,'dinner',4.01);
+plans=M.splitRecipeYield([first,second],4);
+assert.equal(M.summary(plans[0]).valid,false);
+assert.throws(()=>M.payload(plans[0]),/No servings remain/);
+M.setMembers(second,members);M.setPortionMode(second,'family');
+plans=M.splitRecipeYield([first,second],4);
+assert.deepEqual(plans.map(plan=>M.summary(plan).totalServings),[1,3]);
+""")
+
+
 def test_defaults_preserve_date_overrides_and_reapply_only_selected_dates():
     run_model(r"""
 M.setDates(draft,['2026-10-05','2026-10-07','2026-10-09']);

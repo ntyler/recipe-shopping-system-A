@@ -31,7 +31,8 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         await editor(0).getByRole('button',{name:'Select days',exact:true}).click();
         await drag(0,'2026-10-06','2026-10-09');
         assert.deepEqual(await selected(0),['2026-10-05','2026-10-06','2026-10-07','2026-10-08','2026-10-09']);
-        assert.match(await editor(0).locator('[data-schedule-summary]').textContent(),/5 days · 5 meals · 40 servings/);
+        assert.match(await editor(0).locator('[data-schedule-summary]').textContent(),/5 days · 5 meals per entry/);
+        assert.match(await row(0).locator('[data-meal-editor-summary]').textContent(),/5 meals · 8 servings \(1.6 per meal\)/);
         // Jump across a week boundary: intervening dates are included even when
         // the mouse moves too quickly to emit an event over every individual cell.
         await drag(0,'2026-10-10','2026-10-13');

@@ -184,7 +184,8 @@ assert(panel instanceof ctx.MealPlanPanel);
 assert.equal(panel.form,activeDialog.form);assert.equal(panel.form.hidden,false);
 assert.equal(panel.draft.singleDate,'2026-10-07');
 assert.deepEqual(plain(panel.draft.mealTypes),['breakfast']);
-assert.equal(Number(panel.draft.householdDefaults.breakfast),12);
+assert.equal(panel.draft.portionMode,'recipe');
+assert.equal(M.summary(panel.draft).totalServings,12);
 assert.equal(panel.options.title,'Shared plan');
 assert.match(activeDialog.helper.textContent,/12 servings/);
 assert.equal(panel.draft.members.length,2);
@@ -493,7 +494,7 @@ assert.equal(requests.length,0);
 """)
 
 
-def test_recipe_switch_keeps_scheduling_work_and_only_updates_untouched_yield_defaults():
+def test_recipe_switch_keeps_scheduling_work_and_explicit_portions():
     run_dialog(r"""
 await open();const panel=await choose('recipe://bread');
 M.setDates(panel.draft,['2026-10-05','2026-10-07']);M.setMeals(panel.draft,['breakfast','dinner']);
@@ -508,7 +509,7 @@ assert.equal(panel.options.title,'Shared plan');
 assert.deepEqual(plain(panel.draft.selectedDates),['2026-10-05','2026-10-07']);
 assert.deepEqual(plain(panel.draft.mealTypes),['breakfast','dinner']);
 assert.equal(Number(panel.draft.householdDefaults.breakfast),0.5);
-assert.equal(Number(panel.draft.householdDefaults.dinner),4);
+assert.equal(Number(panel.draft.householdDefaults.dinner),3,'Switching recipes preserves explicitly chosen household portions');
 assert.equal(Number(panel.draft.days['2026-10-07'].household.dinner),2.5);
 assert.equal(Number(panel.draft.days['2026-10-07'].family.child.dinner.servings),0.5);
 assert.equal(panel.draft.days['2026-10-07'].notes,'Pack separately');
@@ -578,6 +579,71 @@ assert.equal(activeDialog.open,false);
 """)
 
 
+def test_batch_splits_each_recipe_yield_and_custom_dates_and_reset_use_that_recipes_total():
+    run_dialog(r"""
+await open();const shared=await choose('recipe://bread'),state=activeDialog.mealPlanScheduleState;
+M.setDates(shared.draft,['2026-10-05','2026-10-07']);M.setMeals(shared.draft,['lunch','dinner']);
+ctx.addMealPlannerEditor();const soup=state.entries[1];
+soup.root.querySelector('[name="recipe_url"]').value='recipe://soup';
+ctx.syncMealPlannerServingsFromRecipe(soup.root.querySelector('[name="recipe_url"]'));
+assert.match(state.entries[0].root.querySelector('[data-meal-editor-summary]').textContent,/4 meals.*12 servings \(3 per meal\)/);
+assert.match(soup.root.querySelector('[data-meal-editor-summary]').textContent,/4 meals.*4 servings \(1 per meal\)/);
+ctx.customizeMealPlannerRecipe(activeDialog,soup);
+assert.equal(M.summary(soup.panel.draft).totalServings,4);
+M.setDates(soup.panel.draft,['2026-10-09']);soup.panel.render();
+assert.match(soup.root.querySelector('[data-meal-editor-summary]').textContent,/2 meals.*4 servings \(2 per meal\)/);
+ctx.resetMealPlannerRecipe(activeDialog,soup);
+assert.match(soup.root.querySelector('[data-meal-editor-summary]').textContent,/4 meals.*4 servings \(1 per meal\)/);
+requests=[];responseFactory=async()=>ok({batches:[],meals:[]});
+await ctx.saveMealPlannerBatch();
+const plans=JSON.parse(requests[0].options.body).batches;
+assert.equal(plans.length,2);
+assert.deepEqual(plans[0].allocations.map(meal=>meal.planned_servings),[3,3,3,3]);
+assert.deepEqual(plans[1].allocations.map(meal=>meal.planned_servings),[1,1,1,1]);
+assert(plans.every(plan=>plan.portion_mode==='household'));assert.equal(activeDialog.open,false);
+""")
+
+
+def test_repeated_recipe_entries_rebalance_on_add_customize_remove_and_change_then_save():
+    run_dialog(r"""
+await open();const shared=await choose('recipe://soup'),state=activeDialog.mealPlanScheduleState;
+const select=(entry,url)=>{const input=entry.root.querySelector('[name="recipe_url"]');input.value=url;ctx.syncMealPlannerServingsFromRecipe(input);};
+const text=entry=>entry.root.querySelector('[data-meal-editor-summary]').textContent;
+ctx.addMealPlannerEditor();const second=state.entries[1];select(second,'recipe://soup');
+for(const entry of state.entries)assert.match(text(entry),/1 meal.*2 servings \(2 per meal\)/);
+assert.match(activeDialog.querySelector('[data-meal-batch-help]').textContent,/1 recipe · 2 meals/);
+ctx.customizeMealPlannerRecipe(activeDialog,second);
+assert.equal(M.summary(second.panel.schedulingDraft()).totalServings,2);
+M.setDates(second.panel.draft,['2026-10-06','2026-10-07','2026-10-08']);second.panel.render();
+assert.match(text(state.entries[0]),/1 meal.*1 servings/);assert.match(text(second),/3 meals.*3 servings/);
+ctx.addMealPlannerEditor();const third=state.entries[2];select(third,'recipe://bread');
+assert.match(text(third),/12 servings/);
+select(third,'recipe://soup');assert.match(text(third),/0.8 servings/);
+ctx.removeMealPlannerEditor(activeDialog,third);
+assert.match(second.panel.form.querySelector('[data-schedule-summary]').innerHTML,/3 servings/);
+ctx.resetMealPlannerRecipe(activeDialog,second);
+requests=[];responseFactory=async()=>ok({batches:[],meals:[]});await ctx.saveMealPlannerBatch();
+const plans=JSON.parse(requests[0].options.body).batches;
+assert.deepEqual(plans.map(plan=>plan.allocations[0].planned_servings),[2,2]);
+assert.equal(plans[0].allocations[0].date,plans[1].allocations[0].date);
+assert.equal(activeDialog.open,false);
+""")
+
+
+def test_removing_first_recipe_rebases_split_preview_without_changing_other_recipes():
+    run_dialog(r"""
+await open();const shared=await choose('recipe://bread'),state=activeDialog.mealPlanScheduleState;
+M.setDates(shared.draft,['2026-10-05','2026-10-07']);
+ctx.addMealPlannerEditor();const soup=state.entries[1];
+soup.root.querySelector('[name="recipe_url"]').value='recipe://soup';
+ctx.syncMealPlannerServingsFromRecipe(soup.root.querySelector('[name="recipe_url"]'));
+ctx.removeMealPlannerEditor(activeDialog,state.entries[0]);
+M.setPortionMode(shared.draft,'household');shared.render();
+assert.equal(shared.draft.householdDefaults.dinner,2);
+assert.match(soup.root.querySelector('[data-meal-editor-summary]').textContent,/2 meals.*4 servings \(2 per meal\)/);
+""")
+
+
 def test_reset_custom_recipe_rejoins_current_shared_family_plan_and_save_counts_allocations():
     run_dialog(r"""
 await open();const shared=await choose('recipe://bread'),state=activeDialog.mealPlanScheduleState;
@@ -600,7 +666,7 @@ assert.equal(body.batches[1].allocations[0].member_portions[1].servings,0.5);
 """)
 
 
-def test_shared_and_custom_validation_duplicates_and_placeholders_preserve_values():
+def test_shared_and_custom_validation_and_placeholders_preserve_values():
     run_dialog(r"""
 await open();const shared=await choose('recipe://bread');shared.draft.notes='Keep shared';
 ctx.addMealPlannerEditor();const state=activeDialog.mealPlanScheduleState,second=state.entries[1];
@@ -608,8 +674,7 @@ assert.equal(activeDialog.querySelector('[data-meal-batch-save]').textContent,'S
 second.touched=true;requests=[];await ctx.saveMealPlannerBatch();
 assert.equal(requests.length,0);assert.match(second.root.querySelector('[data-meal-editor-error]').textContent,/Recipe 2: Please select a recipe/);
 second.root.querySelector('[name="recipe_url"]').value='recipe://bread';ctx.syncMealPlannerServingsFromRecipe(second.root.querySelector('[name="recipe_url"]'));
-await ctx.saveMealPlannerBatch();assert.equal(requests.length,0);
-assert.match(second.root.querySelector('[data-meal-editor-error]').textContent,/already planned/);
+assert.match(second.root.querySelector('[data-meal-editor-summary]').textContent,/1 meal.*6 servings/);
 second.root.querySelector('[name="recipe_url"]').value='recipe://soup';ctx.syncMealPlannerServingsFromRecipe(second.root.querySelector('[name="recipe_url"]'));
 ctx.customizeMealPlannerRecipe(activeDialog,second);M.setDates(second.panel.draft,[]);
 ctx.customizeMealPlannerRecipe(activeDialog,second);assert.equal(second.expanded,false);

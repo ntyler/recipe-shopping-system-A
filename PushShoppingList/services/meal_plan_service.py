@@ -723,14 +723,23 @@ def edited_meal(existing, patch, members, portion_mode=None):
     return candidate
 
 
-def validate_edited_slots(meals, remaining):
+def validate_edited_slots(meals, remaining, previous=()):
     slots = set()
+    previous_slots = {
+        meal["id"]: (meal["date"], meal["meal_type"], normalize_recipe_url_key(meal["recipe_url"]))
+        for meal in previous
+    }
+    moved_slots = set()
     for meal in meals:
         slot = (meal["date"], meal["meal_type"], normalize_recipe_url_key(meal["recipe_url"]))
         if slot in slots:
             raise ValueError("Each meal date and meal type can appear only once in a batch.")
         slots.add(slot)
-    if any((meal["date"], meal["meal_type"], normalize_recipe_url_key(meal["recipe_url"])) in slots for meal in remaining):
+        if previous_slots.get(meal["id"]) != slot:
+            moved_slots.add(slot)
+    # Intentional repeated entries can keep their existing slot while notes or
+    # portions change. Moving or adding a meal into an occupied slot still fails.
+    if any((meal["date"], meal["meal_type"], normalize_recipe_url_key(meal["recipe_url"])) in moved_slots for meal in remaining):
         raise ValueError("That recipe is already planned for one of these meals.")
 
 
@@ -743,7 +752,7 @@ def update_meal(meal_id, patch):
             return None
         members = {member["id"]: member for member in payload["members"]}
         meal = edited_meal(existing, patch, members)
-        validate_edited_slots([meal], [item for item in payload["meals"] if item["id"] != existing["id"]])
+        validate_edited_slots([meal], [item for item in payload["meals"] if item["id"] != existing["id"]], [existing])
         batch = next((item for item in payload["batches"] if item["id"] == existing.get("batch_id")), None)
         if batch:
             # Preserve spare portions while adjusting the amount to prepare.
@@ -828,7 +837,7 @@ def update_meal_prep_batch(batch_id, patch):
             used.add(meal["id"])
             meals.append(meal)
         remaining = [meal for meal in payload["meals"] if meal.get("batch_id") != existing["id"]]
-        validate_edited_slots(meals, remaining)
+        validate_edited_slots(meals, remaining, old_meals)
         batch = {**existing, "portion_mode": mode}
         if "prep_notes" in patch:
             batch["prep_notes"] = patch["prep_notes"].strip()
@@ -859,6 +868,7 @@ def add_meal_prep_batches(entries):
         raise ValueError("Add between 1 and 100 recipe plans to your batch.")
     with MEAL_PLAN_LOCK:
         payload = load_meal_plan()
+        existing_meals = tuple(payload["meals"])
         batches, meals = [], []
         for index, entry in enumerate(entries):
             if not isinstance(entry, dict):
@@ -866,6 +876,7 @@ def add_meal_prep_batches(entries):
             try:
                 batch, allocations = _append_meal_prep_batch(
                     payload, entry.get("batch"), entry.get("allocations"), entry.get("ingredient_data"),
+                    existing_meals=existing_meals,
                 )
             except ValueError as exc:
                 raise ValueError(f"Recipe {index + 1}: {exc}") from exc
@@ -875,7 +886,7 @@ def add_meal_prep_batches(entries):
         return batches, meals
 
 
-def _append_meal_prep_batch(payload, batch, allocations, ingredient_data=None):
+def _append_meal_prep_batch(payload, batch, allocations, ingredient_data=None, *, existing_meals=None):
     """Validate and append to an in-memory plan; the caller owns the lock/write."""
     if not isinstance(batch, dict):
         raise ValueError("Choose a recipe and total batch servings.")
@@ -949,7 +960,7 @@ def _append_meal_prep_batch(payload, batch, allocations, ingredient_data=None):
     if any(
         (meal["date"], meal["meal_type"]) in slots
         and normalize_recipe_url_key(meal["recipe_url"]) == recipe_key
-        for meal in payload["meals"]
+        for meal in (payload["meals"] if existing_meals is None else existing_meals)
     ):
         raise ValueError("That recipe is already planned for one of these meals.")
     payload["batches"].append(normalized)
