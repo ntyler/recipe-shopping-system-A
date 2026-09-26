@@ -12,6 +12,50 @@ SOURCE = Path(__file__).resolve().parents[1] / "PushShoppingList/static/js/meal-
 pytestmark = pytest.mark.skipif(not shutil.which("node"), reason="Node.js is required for scheduling logic checks")
 
 
+def test_shared_distribution_uses_each_visible_meal_amount_and_preserves_defaults():
+    run_model(r"""
+M.setPortionMode(draft,'household');
+M.setDates(draft,['2026-10-05','2026-10-06']);M.setMeals(draft,['breakfast','dinner']);
+M.setHouseholdDefault(draft,'breakfast',0.5);M.setHouseholdDefault(draft,'dinner',1.5);
+M.setDayHousehold(draft,'2026-10-06','dinner',2.5);
+const before=JSON.stringify(draft);
+const keep=M.distributeRecipeServings(draft,4,{mode:'keep',servingsPerMeal:99,useScheduledPortions:true});
+assert.deepEqual(plain(keep.allocations.map(meal=>meal.planned_servings)),[0.5,1.5,0.5]);
+assert.equal(keep.remainingServings,1.5);
+const next=M.distributeRecipeServings(draft,6,{mode:'upcoming',servingsPerMeal:'',useScheduledPortions:true});
+assert.deepEqual(plain(next.allocations.map(meal=>meal.planned_servings)),[0.5,1.5,0.5,2.5,0.5,0.5]);
+assert.equal(next.draft.householdDefaults.dinner,1.5);assert.equal(next.lastMealReduced,true);
+assert.equal(JSON.stringify(draft),before);
+assert.deepEqual(plain(M.distributeRecipeServings(next.draft,6,{mode:'upcoming',useScheduledPortions:true}).allocations),plain(next.allocations));
+M.setHouseholdDefault(draft,'breakfast','');
+assert.throws(()=>M.distributeRecipeServings(draft,6,{mode:'upcoming',servingsPerMeal:1,useScheduledPortions:true}));
+""")
+
+
+def test_preserved_recipe_portions_follow_new_dates_and_remain_editable_after_restoring():
+    run_model(r"""
+M.setPortionMode(draft,'family');M.setDates(draft,['2026-10-05','2026-10-06']);
+M.setFamilyDefault(draft,'you','dinner',{servings:0.5});
+M.setDayFamily(draft,'2026-10-06','you','dinner',{servings:0.75});
+const saved=plain(draft);
+M.setFamilyDefault(draft,'you','dinner',{servings:3});
+M.setDates(draft,['2026-10-05','2026-10-06','2026-10-07']);
+const before=JSON.stringify(draft), preserved=M.withPortions(draft,saved,{perDay:true});
+assert.equal(preserved.days['2026-10-05'].family.you.dinner.servings,0.5);
+assert.equal(preserved.days['2026-10-06'].family.you.dinner.servings,0.75);
+assert.equal(preserved.days['2026-10-07'].family.you.dinner.servings,0.5);
+M.setFamilyDefault(preserved,'you','dinner',{servings:1});
+assert.equal(preserved.days['2026-10-05'].family.you.dinner.servings,1);
+assert.equal(preserved.days['2026-10-06'].family.you.dinner.servings,0.75);
+assert.equal(preserved.days['2026-10-07'].family.you.dinner.servings,1);
+assert.equal(JSON.stringify(draft),before);assert.equal(saved.familyDefaults.you.dinner.servings,0.5);
+M.setMembers(draft,[...draft.members,{id:'guest',name:'Guest',default_portion:1}],{newMembersEnabled:false});
+const refreshed=M.withPortions(draft,saved,{perDay:true});
+assert.equal(refreshed.days['2026-10-05'].family.guest.dinner.enabled,false);
+assert(M.summary(M.withMealServings(refreshed,2)).valid);
+""")
+
+
 def test_yield_coverage_consumes_dates_in_order_and_counts_partial_days_and_all_meals():
     run_model(r"""
 M.setDates(draft,M.dateRange('2026-09-25','2026-10-03'));

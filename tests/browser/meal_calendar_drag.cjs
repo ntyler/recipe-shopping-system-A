@@ -28,7 +28,7 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         const ready = () => page.waitForFunction(() => {const s=document.getElementById('mealPlannerDialog').mealPlanScheduleState;return !s.panel.ui.loading&&s.entries.every(e=>!e.panel?.ui.loading);});
         await page.getByRole('button',{name:'Add Meals',exact:true}).click();await ready();
         await row(0).locator('[name="recipe_url"]').selectOption('recipe://bread');
-        await row(0).getByRole('button',{name:'Auto split',exact:true}).click();
+        await editor(0).getByRole('button',{name:'Split recipe yield',exact:true}).click();
         await editor(0).getByRole('button',{name:'Select days',exact:true}).click();
         await drag(0,'2026-10-06','2026-10-09');
         assert.deepEqual(await selected(0),['2026-10-05','2026-10-06','2026-10-07','2026-10-08','2026-10-09']);

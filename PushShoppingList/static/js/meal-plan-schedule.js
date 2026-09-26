@@ -237,7 +237,7 @@
 
     // Recipe-specific portions follow the shared schedule, including individual
     // day meal choices and notes. Neither source draft is changed.
-    function withPortions(shared, portions) {
+    function withPortions(shared, portions, {perDay = false} = {}) {
         const draft = clone(shared);
         for (const key of ['portionMode', 'householdDefaults', 'familyDefaults']) draft[key] = clone(portions[key]);
         setMembers(draft, shared.members, {newMembersEnabled: false});
@@ -246,6 +246,15 @@
             day.overrides.family = false;
         });
         syncDefaults(draft);
+        if (perDay) Object.entries(draft.days).forEach(([date, day]) => {
+            const saved = portions.days[date];
+            if (!saved) return;
+            for (const mode of ['household', 'family']) {
+                day[mode] = mode === 'family' ? Object.fromEntries(draft.members.map(member =>
+                    [member.id, clone(saved.family[member.id] || day.family[member.id])])) : clone(saved[mode]);
+                day.overrides[mode] = saved.overrides[mode];
+            }
+        });
         return draft;
     }
 
@@ -286,7 +295,7 @@
 
     // A distribution is a preview until its independent draft is applied.
     // One slot is a date + meal, so two meals on a day consume two portions.
-    function distributeRecipeServings(source, budget, {mode = 'keep', servingsPerMeal} = {}) {
+    function distributeRecipeServings(source, budget, {mode = 'keep', servingsPerMeal, useScheduledPortions = false} = {}) {
         if (portion(budget) === null) throw new Error('No servings remain from this recipe. Adjust its other entries first.');
         if (!['keep', 'spread', 'upcoming', 'people'].includes(mode)) throw new Error('Choose how to distribute this recipe.');
         let clean = clone(source);
@@ -296,17 +305,20 @@
         }
         const total = summary(clean);
         if (!total.valid) throw new Error(total.errors[0]);
+        // A single shared recipe reads the visible meal/person portions. Freeze
+        // an automatic yield split before repeating its meals on future dates.
+        if (useScheduledPortions && clean.portionMode === 'recipe') setPortionMode(clean, 'household', clean);
         let slots = total.days.slice().sort((a, b) => a.date.localeCompare(b.date)).flatMap(day =>
-            day.meals.map(meal => ({date:day.date, meal:meal.meal_type})));
+            day.meals.map(meal => ({date:day.date, meal:meal.meal_type, servings:meal.planned_servings})));
         const selectedSlots = new Set(slots.map(slot => `${slot.date}/${slot.meal}`));
         let amounts, lastMealReduced = false;
         if (mode === 'upcoming' || mode === 'people') {
             const amount = portion(servingsPerMeal);
-            if (mode === 'upcoming' && amount === null) throw new Error('Enter servings per meal before filling upcoming days.');
+            if (mode === 'upcoming' && !useScheduledPortions && amount === null) throw new Error('Enter servings per meal before filling upcoming days.');
             // Generate independent future days from the recipe's defaults, while
             // retaining existing per-day meal and family choices. Cap work at
             // the API's 1,000-meal limit even for extremely small portions.
-            if (mode === 'upcoming') clean = withMealServings(clean, amount);
+            if (mode === 'upcoming' && !useScheduledPortions) clean = withMealServings(clean, amount);
             const cursor = parseDate(slots[0].date);
             slots = []; amounts = [];
             let remaining = budget;
@@ -320,7 +332,7 @@
                 for (const meal of day.days[0].meals) {
                     if (!remaining) break;
                     if (amounts.length === 1000) throw new Error('Fill up to 1,000 meals at a time. Increase servings per meal.');
-                    const target = mode === 'people' ? meal.planned_servings : amount;
+                    const target = mode === 'people' || useScheduledPortions ? meal.planned_servings : amount;
                     const servings = Math.min(target, remaining);
                     lastMealReduced = servings < target;
                     slots.push({date, meal:meal.meal_type});
@@ -335,19 +347,20 @@
         } else if (mode === 'spread') amounts = splitServings(budget, slots.length);
         else {
             const amount = portion(servingsPerMeal);
-            if (amount === null) throw new Error('Enter servings per meal, or choose to spread across all selected meals.');
+            if (!useScheduledPortions && amount === null) throw new Error('Enter servings per meal, or choose to spread across all selected meals.');
             amounts = [];
             let remaining = budget;
             for (const slot of slots) {
-                if (remaining < amount) break;
-                amounts.push(amount);
-                remaining = sum([remaining, -amount]);
+                const target = useScheduledPortions ? slot.servings : amount;
+                if (remaining < target) break;
+                amounts.push(target);
+                remaining = sum([remaining, -target]);
             }
             if (!amounts.length) throw new Error('There are not enough servings for one meal at this amount. Lower servings per meal or choose to spread them.');
         }
         // Keep each meal's people and default portions for subsequent days and
         // repeat previews, even when the final meal has a smaller remainder.
-        const draft = mode === 'people' ? clone(clean) : withMealServings(clean, amounts[0]);
+        const draft = mode === 'people' || useScheduledPortions ? clone(clean) : withMealServings(clean, amounts[0]);
         draft.selectedDates.forEach(date => {
             const day = draft.days[date];
             MEAL_TYPES.forEach(meal => { day.mealEnabled[meal] = false; });

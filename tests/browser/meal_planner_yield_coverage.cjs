@@ -2,11 +2,7 @@ const {chromium} = require(process.argv[2]);
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path');
 const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
-// Opt in explicitly: Add Meals now starts with each recipe's fixed preference.
-const selectAuto = async (recipe, value) => {
-    await recipe.selectOption(value);
-    await recipe.locator('xpath=ancestor::*[@data-meal-editor]').getByRole('button',{name:'Auto split',exact:true}).click();
-};
+const {selectAuto} = require('./meal_planner_test_helpers.cjs');
 
 
 (async () => {
@@ -25,7 +21,7 @@ const selectAuto = async (recipe, value) => {
         assert(await page.getByRole('heading',{name:'Meal Planner',exact:true}).isVisible());
         const dialog = page.locator('#mealPlannerDialog'), shared = dialog.locator('[data-meal-shared-form]');
         const row = index => dialog.locator('[data-meal-editor]').nth(index);
-        const amount = row(0).locator('[data-meal-recipe-servings]');
+        const amount = shared.locator('[data-schedule-field="household"][data-meal="dinner"]');
         const date = (form, day) => form.locator(`[data-schedule-action="date"][data-date="${day}"]`);
         const short = form => form.locator('.is-yield-short');
         const screenshot = async name => {
@@ -78,7 +74,7 @@ const selectAuto = async (recipe, value) => {
         await amount.fill('1');
         await shared.locator('[data-schedule-field="household"][data-meal="dinner"]').fill('1');
         // Two entries of one recipe consume one yield and split a same-day shortfall.
-        await row(0).getByRole('button',{name:'Auto split',exact:true}).click();
+        assert(await row(0).locator('[data-meal-recipe-amount]').isHidden());
         await dialog.locator('[data-meal-editor-add]').click();
         await selectAuto(row(1).locator('[name="recipe_url"]'), 'recipe://bread');
         assert.equal(await date(shared,'2026-10-03').locator('small').textContent(),'Short 1');

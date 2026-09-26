@@ -2,11 +2,7 @@ const {chromium} = require(process.argv[2]);
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path');
 const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
-// Opt in explicitly: Add Meals now starts with each recipe's fixed preference.
-const selectAuto = async (recipe, value) => {
-    await recipe.selectOption(value);
-    await recipe.locator('xpath=ancestor::*[@data-meal-editor]').getByRole('button',{name:'Auto split',exact:true}).click();
-};
+const {selectAuto} = require('./meal_planner_test_helpers.cjs');
 
 
 (async () => {

@@ -114,8 +114,14 @@ const flush=()=>new Promise(resolve=>setImmediate(resolve));
 const choose=async(value)=>{activeDialog.recipe.value=value;ctx.syncMealPlannerServingsFromRecipe();await flush();return activeDialog.mealPlanScheduleState.panel;};
 // Existing split-allocation scenarios explicitly opt in to automatic portions.
 const autoSplit=entry=>entry.root.querySelector('[data-meal-portions-auto]').handlers.click[0]();
-const chooseAuto=async value=>{const panel=await choose(value);autoSplit(activeDialog.mealPlanScheduleState.entries[0]);return panel;};
-const selectAuto=input=>{ctx.syncMealPlannerServingsFromRecipe(input);autoSplit(activeDialog.mealPlanScheduleState.entries.find(entry=>entry.root.querySelector('[name="recipe_url"]')===input));};
+const chooseAuto=async value=>{const panel=await choose(value);M.setPortionMode(panel.draft,'recipe');panel.render();return panel;};
+const selectAuto=input=>{
+ ctx.syncMealPlannerServingsFromRecipe(input);
+ // These scenarios explicitly return preserved contributions to Auto split.
+ const entries=activeDialog.mealPlanScheduleState.entries;
+ entries.filter(entry=>entry.portionsDraft).forEach(autoSplit);
+ autoSplit(entries.find(entry=>entry.root.querySelector('[name="recipe_url"]')===input));
+};
 const open=async(date='2026-10-05',meal='dinner')=>{ctx.openMealPlannerDialog(date,meal);await flush();};
 const submit=panel=>panel.submit({preventDefault(){}});
 const ok=data=>({ok:true,json:async()=>({ok:true,...data})});
@@ -201,6 +207,28 @@ M.setDates(entry.panel.draft,['2026-10-08']);entry.panel.render();assert.equal(a
 """)
 
 
+def test_clearing_second_recipe_restores_shared_portions_and_invalid_input_without_resetting():
+    run_dialog(r"""
+await open();const panel=await choose('recipe://bread'),state=activeDialog.mealPlanScheduleState,first=state.entries[0];
+M.setHouseholdDefault(panel.draft,'dinner','2.5');panel.render();
+ctx.addMealPlannerEditor();const second=state.entries[1],input=second.root.querySelector('[name="recipe_url"]');
+input.value='recipe://soup';ctx.syncMealPlannerServingsFromRecipe(input);
+assert.equal(M.summary(ctx.mealPlannerRecipeDraft(state,first)).totalServings,2.5);
+M.setHouseholdDefault(panel.draft,'dinner',4);panel.render();
+assert.equal(M.summary(ctx.mealPlannerRecipeDraft(state,first)).totalServings,2.5);
+input.value='';ctx.syncMealPlannerServingsFromRecipe(input);
+assert.equal(Number(panel.draft.householdDefaults.dinner),2.5);
+assert.equal(first.servingsPerMeal,undefined);assert.equal(first.portionsDraft,undefined);
+M.setHouseholdDefault(panel.draft,'dinner','');panel.render();
+input.value='recipe://soup';ctx.syncMealPlannerServingsFromRecipe(input);
+ctx.removeMealPlannerEditor(activeDialog,second);
+assert.equal(panel.draft.householdDefaults.dinner,'');
+assert.equal(M.summary(panel.draft).valid,false);
+M.setHouseholdDefault(panel.draft,'dinner','1.75');panel.render();
+assert.equal(M.summary(ctx.mealPlannerRecipeDraft(state,first)).totalServings,1.75);
+""")
+
+
 def test_preferences_change_only_after_success_and_are_account_scoped():
     run_dialog(r"""
 await open();await choose('recipe://bread');const entry=activeDialog.mealPlanScheduleState.entries[0];
@@ -212,7 +240,7 @@ let release;responseFactory=()=>new Promise(resolve=>release=resolve);
 const pending=ctx.saveMealPlannerBatch();await flush();assert.equal(storage.get(key),'1.25');
 release(ok({batches:[],meals:[]}));await pending;assert.equal(storage.get(key),'2.5');
 responseFactory=async()=>ok({members:[]});
-await open();await choose('recipe://bread');assert.equal(activeDialog.mealPlanScheduleState.entries[0].servingsPerMeal,2.5);
+await open();await choose('recipe://bread');assert.equal(activeDialog.mealPlanScheduleState.panel.draft.householdDefaults.dinner,2.5);
 ctx.document.body.dataset.viewerUserId='another-user';assert.equal(ctx.loadMealPlannerServingPreference('recipe://bread'),1);
 ctx.document.body.dataset.viewerUserId='qa-user';assert.equal(ctx.loadMealPlannerServingPreference('recipe://bread'),2.5);
 for(const invalid of ['', '0', '-1', 'NaN', 'Infinity', 'bad']) {storage.set(key,invalid);assert.equal(ctx.loadMealPlannerServingPreference('recipe://bread'),1);}
@@ -240,8 +268,9 @@ assert(panel instanceof ctx.MealPlanPanel);
 assert.equal(panel.form,activeDialog.form);assert.equal(panel.form.hidden,false);
 assert.equal(panel.draft.singleDate,'2026-10-07');
 assert.deepEqual(plain(panel.draft.mealTypes),['breakfast']);
-assert.equal(panel.draft.portionMode,'recipe');
-assert.equal(M.summary(panel.draft).totalServings,12);
+assert.equal(panel.draft.portionMode,'household');
+assert.equal(M.summary(panel.draft).totalServings,1);
+assert.equal(panel.draft.recipeYield,12);
 assert.equal(panel.options.title,'Shared plan');
 assert.match(activeDialog.helper.textContent,/12 servings/);
 assert.equal(panel.draft.members.length,2);
@@ -550,7 +579,7 @@ assert.equal(requests.length,0);
 """)
 
 
-def test_recipe_switch_keeps_scheduling_work_and_explicit_portions():
+def test_recipe_switch_keeps_scheduling_work_and_restores_recipe_preference():
     run_dialog(r"""
 await open();const panel=await choose('recipe://bread');
 M.setDates(panel.draft,['2026-10-05','2026-10-07']);M.setMeals(panel.draft,['breakfast','dinner']);
@@ -564,9 +593,9 @@ assert.equal(samePanel,panel,'Switching recipes must not accumulate another cont
 assert.equal(panel.options.title,'Shared plan');
 assert.deepEqual(plain(panel.draft.selectedDates),['2026-10-05','2026-10-07']);
 assert.deepEqual(plain(panel.draft.mealTypes),['breakfast','dinner']);
-assert.equal(Number(panel.draft.householdDefaults.breakfast),0.5);
-assert.equal(Number(panel.draft.householdDefaults.dinner),3,'Switching recipes preserves explicitly chosen household portions');
-assert.equal(Number(panel.draft.days['2026-10-07'].household.dinner),2.5);
+assert.equal(Number(panel.draft.householdDefaults.breakfast),1);
+assert.equal(Number(panel.draft.householdDefaults.dinner),1,'The visible shared controls restore the selected recipe preference');
+assert.equal(Number(panel.draft.days['2026-10-07'].household.dinner),1);
 assert.equal(Number(panel.draft.days['2026-10-07'].family.child.dinner.servings),0.5);
 assert.equal(panel.draft.days['2026-10-07'].notes,'Pack separately');
 assert.equal(panel.draft.notes,'Keep in the fridge');assert.equal(panel.draft.prepSteps[0].instruction,'Cook ahead');
@@ -625,7 +654,8 @@ assert.equal(entry.root.querySelector('[data-meal-override-container]').hidden,t
 assert.equal(entry.root.querySelector('[data-meal-override-form-host]').children.length,0);
 assert.equal(state.panel,shared,'Use the existing main calendar controller');
 if(previousPanel) assert.notEqual(shared.draft,previousPanel.draft,'Retired editors cannot mutate the main calendar');
-const amounts=entry.distributionMode==='keep'?[1,1,1,1]:entry.distributionMode==='people'?[3,1]:[1.5,1.5,1];
+const amounts=!CUSTOM_FIRST ? (entry.distributionMode==='keep'?[3]:[3,1])
+    : entry.distributionMode==='keep'?[1,1,1,1]:entry.distributionMode==='people'?[3,1]:[1.5,1.5,1];
 const dates=amounts.map((_,index)=>`2026-10-${String(9+index).padStart(2,'0')}`);
 assert.deepEqual(plain(shared.draft.selectedDates),dates);
 assert.deepEqual(plain(M.summary(shared.draft).days.flatMap(day=>day.meals.map(meal=>meal.planned_servings))),amounts);
@@ -800,8 +830,8 @@ ctx.addMealPlannerEditor();const state=activeDialog.mealPlanScheduleState,second
 const input=second.root.querySelector('[name="recipe_url"]');input.value='recipe://soup';selectAuto(input);
 assert.match(activeDialog.querySelector('[data-meal-batch-help]').textContent,/2 recipes · 1 meal · 2 servings/);
 input.value='';selectAuto(input);
-assert.match(activeDialog.querySelector('[data-meal-batch-help]').textContent,/1 recipe · 1 meal · 2 servings/);
-assert.match(state.entries[0].root.querySelector('[data-meal-editor-summary]').textContent,/2 servings/);
+assert.match(activeDialog.querySelector('[data-meal-batch-help]').textContent,/1 recipe · 1 meal · 1 serving/);
+assert.match(state.entries[0].root.querySelector('[data-meal-editor-summary]').textContent,/1 serving/);
 requests=[];await ctx.saveMealPlannerBatch();assert.equal(requests.length,0);
 assert.match(second.root.querySelector('[data-meal-editor-error]').textContent,/Please select a recipe/);
 """)
@@ -876,7 +906,7 @@ const option=input.selectedOptions[0];option.dataset.yieldServings='';option.dat
 selectAuto(input);
 assert.equal(remaining(second),'Recipe yield unavailable','Fallback portions must not be presented as a known recipe yield');
 input.value='';selectAuto(input);
-assert.equal(balance(second).hidden,true);assert.match(remaining(state.entries[0]),/^3 servings left/);
+assert.equal(balance(second).hidden,true);assert.match(remaining(state.entries[0]),/^3.5 servings left/);
 """)
 
 

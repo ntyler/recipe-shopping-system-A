@@ -198,7 +198,7 @@
 
         static peopleSection(draft, ui, manageMembersUrl, options = {}) {
             if (draft.portionMode === 'recipe') return `<h3>Split recipe yield</h3><p data-recipe-yield-help>${MealPlanPanel.recipeYieldHelp(draft, options)}</p><p>Changing dates or meal types recalculates the servings per meal.</p>`;
-            if (draft.portionMode !== 'family') return `<h3>Servings per meal</h3>${MealPlanPanel.portionsTable(draft, draft.mealTypes)}`;
+            if (draft.portionMode !== 'family') return `<h3 data-schedule-servings-heading>${options.sharedPlan && options.multipleRecipes ? 'Total servings per meal' : 'Servings per meal'}</h3>${MealPlanPanel.portionsTable(draft, draft.mealTypes)}`;
             const archivedUrl = typeof root.withCanonicalViewerUserId === 'function'
                 ? root.withCanonicalViewerUserId('/settings/family-members?status=archived') : '/settings/family-members?status=archived';
             const archived = ui.archivedMembers || [];
@@ -302,7 +302,7 @@
             const sharedSplit = options.sharedPlan && draft.portionMode === 'recipe';
             const detail = sharedSplit ? 'Each recipe’s yield is shared across its entries.'
                 : draft.edit?.scope === 'meal' ? 'Only this meal will change.'
-                : options.sharedPlan && !draft.edit ? 'Meal totals are divided between recipes. Custom recipes use their share first.'
+                : options.sharedPlan && options.multipleRecipes && !draft.edit ? 'Meal totals are divided between recipes. Custom recipes use their share first.'
                 : 'Prepare one batch for these meals.';
             return `<div><strong>${totals.dayCount} ${totals.dayCount === 1 ? 'day' : 'days'} · ${totals.mealCount} ${totals.mealCount === 1 ? 'meal' : 'meals'}${sharedSplit ? ' per entry' : ` · ${number(totals.totalServings)} servings`}</strong><span>${detail}</span></div>${draft.portionMode === 'family' ? `<p>${draft.members.filter(member => totals.memberTotals[member.id]).map(member => `${esc(member.name)}: ${number(totals.memberTotals[member.id])} servings`).join(' · ')}</p>` : ''}`;
         }

@@ -296,6 +296,7 @@ body.recipe-preview-active { overflow: auto; }
 #mealPlannerDialog .app-meal-recipe-portions { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 8px 0 4px; }
 #mealPlannerDialog .app-meal-recipe-portions[hidden] { display: none; }
 #mealPlannerDialog .app-meal-recipe-portions label { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0; font-size: 13px; color: var(--app-text-strong); }
+#mealPlannerDialog .app-meal-recipe-portions [data-meal-recipe-amount][hidden] { display: none; }
 #mealPlannerDialog .app-meal-recipe-stepper { display: inline-flex; align-items: stretch; }
 #mealPlannerDialog .app-meal-recipe-stepper input { width: 104px; min-width: 0; margin: 0; padding: 8px; min-height: 44px; text-align: center; border: 1px solid var(--app-border-strong); border-radius: 0; background: var(--app-bg); color: var(--app-text); font: inherit; }
 #mealPlannerDialog .app-meal-recipe-stepper button { width: 44px; min-height: 44px; padding: 8px; border: 1px solid var(--app-border-strong); border-radius: 6px 0 0 6px; background: var(--app-surface); color: var(--app-text); }
