@@ -840,6 +840,15 @@
             <section class="app-meal-editor" data-meal-editor>
             <div class="app-meal-editor-heading" data-meal-editor-heading>
                 <div><h4 data-meal-editor-number>Recipe 1</h4><p data-meal-editor-summary>Uses shared plan</p>
+                    <div class="app-meal-recipe-portions" data-meal-recipe-portions hidden>
+                        <label><span>Servings per meal</span><span class="app-meal-recipe-stepper">
+                            <button type="button" data-meal-portion-step="-1" aria-label="Decrease recipe servings">−</button>
+                            <input type="number" min="0" step="any" inputmode="decimal" data-meal-recipe-servings>
+                            <button type="button" data-meal-portion-step="1" aria-label="Increase recipe servings">+</button>
+                        </span></label>
+                        <button type="button" class="app-page-secondary-action" data-meal-portions-auto hidden>Auto split</button>
+                        <small data-meal-portions-help></small>
+                    </div>
                     <div class="app-meal-yield-balance" data-meal-yield-balance aria-live="polite" aria-atomic="true" hidden>
                         <strong data-meal-yield-remaining></strong><span data-meal-yield-planned></span>
                     </div>
@@ -880,7 +889,7 @@
             </div>
             <button type="button" class="app-page-secondary-action" data-meal-editor-add onclick="return addMealPlannerEditor()">+ Add another recipe</button>
             </section>
-            <div class="app-meal-shared-heading" data-meal-shared-heading><h4>Shared plan</h4><p>Household and family portions are totals for each meal, divided between recipes. Customize a recipe to adjust its share or schedule. Split recipe yield shares each recipe’s yield across its entries.</p></div>
+            <div class="app-meal-shared-heading" data-meal-shared-heading><h4>Shared plan</h4><p>Household and family portions are totals for each meal. Set each recipe’s servings above; recipes on Auto split share the remainder. Customize for individual people or dates. Split recipe yield shares each recipe’s yield across its entries.</p></div>
             <p class="app-meal-schedule-empty" data-meal-schedule-empty hidden></p>
             <form id="mealPlannerScheduleForm" class="recipe-preview-meal-panel" data-meal-editor-form data-meal-shared-form novalidate></form>
             <p class="app-meal-editor-error" data-meal-shared-error role="alert" tabindex="-1" hidden></p>

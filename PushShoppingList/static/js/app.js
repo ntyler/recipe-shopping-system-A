@@ -1895,7 +1895,10 @@ function mealPlannerBusy(state) {
 
 function mealPlannerRecipeDraft(state, entry, draft = (entry.panel || state.panel).draft) {
     if (state.edit || !entry.recipeUrl) return draft;
-    const raw = other => other === entry ? draft : (other.panel || state.panel).draft;
+    const raw = other => {
+        const source = other === entry ? draft : (other.panel || state.panel).draft;
+        return other.servingsPerMeal === undefined ? source : MealPlanSchedule.withMealServings(source, other.servingsPerMeal);
+    };
     const recipeDraft = other => {
         if (raw(other).portionMode !== 'recipe') return raw(other);
         const related = state.entries.filter(item => item.recipeUrl === other.recipeUrl);
@@ -1903,7 +1906,7 @@ function mealPlannerRecipeDraft(state, entry, draft = (entry.panel || state.pane
     };
     if (state.panel.draft.portionMode === 'recipe') return recipeDraft(entry);
     const selected = state.entries.filter(other => other.recipeUrl);
-    const plans = selected.map(other => other.panel ? recipeDraft(other) : null);
+    const plans = selected.map(other => other.panel || other.servingsPerMeal !== undefined ? recipeDraft(other) : null);
     return MealPlanSchedule.splitSharedPlan(state.panel.draft, plans)[selected.indexOf(entry)] || draft;
 }
 
@@ -1951,6 +1954,55 @@ function updateMealPlannerYieldBalance(entry, summaries, editing) {
     }
 }
 
+function setMealPlannerRecipeServings(dialog, entry, value) {
+    const state = mealPlannerScheduleState(dialog);
+    if (state.edit || mealPlannerBusy(state) || state.panel.ui.loading || entry.panel?.ui.loading || !entry.recipeUrl || !state.entries.includes(entry)) return;
+    entry.touched = true;
+    entry.root.querySelector('[data-meal-editor-error]').hidden = true;
+    if (entry.panel) {
+        if (Number.isFinite(Number(value)) && Number(value) > 0) {
+            delete entry.servingsPerMeal;
+            entry.panel.draft = MealPlanSchedule.withMealServings(entry.panel.draft, value);
+        } else {
+            // Keep the last valid family proportions while the user clears or
+            // types an incomplete amount. Validation still sees the input.
+            entry.servingsPerMeal = value;
+        }
+        entry.panel.render();
+    } else {
+        entry.servingsPerMeal = value;
+        syncMealPlannerBatchControls(dialog);
+    }
+}
+
+function syncMealPlannerRecipeServings(entry, summary, state, busy) {
+    const controls = entry.root.querySelector('[data-meal-recipe-portions]');
+    if (!controls) return;
+    controls.hidden = Boolean(state.edit || !entry.recipeUrl);
+    const input = entry.root.querySelector('[data-meal-recipe-servings]');
+    const meals = summary.days.flatMap(day => day.meals);
+    const uniform = meals.length && meals.every(meal => meal.planned_servings === meals[0].planned_servings);
+    if (document.activeElement !== input) input.value = entry.servingsPerMeal ?? (uniform ? meals[0].planned_servings : '');
+    input.placeholder = 'Varies';
+    input.disabled = Boolean(busy || state.panel?.ui.loading || entry.panel?.ui.loading);
+    input.setAttribute('aria-label', `${entry.title || 'Recipe'} servings per meal`);
+    entry.root.querySelectorAll('[data-meal-portion-step]').forEach(button => {
+        button.disabled = input.disabled || !uniform && entry.servingsPerMeal === undefined;
+        button.setAttribute('aria-label', `${button.dataset.mealPortionStep === '-1' ? 'Decrease' : 'Increase'} ${entry.title || 'recipe'} servings per meal`);
+    });
+    const automatic = entry.root.querySelector('[data-meal-portions-auto]');
+    automatic.hidden = Boolean(entry.panel || entry.servingsPerMeal === undefined);
+    automatic.disabled = input.disabled;
+    const help = entry.root.querySelector('[data-meal-portions-help]');
+    help.textContent = entry.panel ? 'Applies to every scheduled meal. Customize for individual people or dates.'
+        : entry.servingsPerMeal !== undefined ? 'Fixed servings per meal. Dates and people follow the shared plan.'
+        : 'Auto split. Set an amount to control this recipe’s share.';
+    if (meals.length && meals[0].member_portions.length && meals.every(meal => JSON.stringify(meal.member_portions) === JSON.stringify(meals[0].member_portions))) {
+        help.textContent += ' ' + meals[0].member_portions.map(part =>
+            `${state.panel.draft.members.find(member => member.id === part.member_id)?.name || 'Family member'}: ${formatMealPlannerServingNumber(part.servings)}`).join(' · ');
+    }
+}
+
 function syncMealPlannerBatchControls(dialog) {
     const state = mealPlannerScheduleState(dialog);
     const footer = dialog.querySelector('[data-meal-batch-footer]');
@@ -1984,9 +2036,10 @@ function syncMealPlannerBatchControls(dialog) {
         const perMeal = portions.length && portions.every(value => value === portions[0])
             ? ` (${formatMealPlannerServingNumber(portions[0])} per meal)` : '';
         entry.root.querySelector('[data-meal-editor-summary]').textContent = entry.recipeUrl
-            ? `${entry.panel ? 'Custom plan' : 'Uses shared plan'} · ${summary.dayCount} ${summary.dayCount === 1 ? 'day' : 'days'} · ${summary.mealCount} ${summary.mealCount === 1 ? 'meal' : 'meals'} · ${formatMealPlannerServingNumber(summary.totalServings)} servings${perMeal}${!entry.panel && state.panel.draft.portionMode !== 'recipe' ? ' · Share of meal total' : ''}`
+            ? `${entry.panel ? 'Custom plan' : entry.servingsPerMeal !== undefined ? 'Custom portions' : 'Uses shared plan'} · ${summary.dayCount} ${summary.dayCount === 1 ? 'day' : 'days'} · ${summary.mealCount} ${summary.mealCount === 1 ? 'meal' : 'meals'} · ${formatMealPlannerServingNumber(summary.totalServings)} servings${perMeal}${!entry.panel && state.panel.draft.portionMode !== 'recipe' ? ' · Share of meal total' : ''}`
             : 'Choose a recipe to calculate servings.';
         updateMealPlannerYieldBalance(entry, summaries, state.edit);
+        syncMealPlannerRecipeServings(entry, summary, state, busy);
         const customize = entry.root.querySelector('[data-meal-editor-customize]');
         customize.disabled = Boolean(busy);
         customize.textContent = entry.expanded ? 'Hide custom plan' : entry.panel ? 'Show custom plan' : 'Customize';
@@ -2035,12 +2088,28 @@ function createMealPlannerEditor(dialog, root) {
             if (event.type === 'click' && !event.target.closest('[data-schedule-mode], [data-schedule-portion-mode], [data-schedule-action]')) return;
             current.touched = true;
             root.querySelector('[data-meal-editor-error]').hidden = true;
+            if (current.panel?.form.contains(event.target) && current.servingsPerMeal !== undefined) {
+                delete current.servingsPerMeal;
+                current.panel.render();
+            }
             syncMealPlannerBatchControls(dialog);
         };
         ['input', 'change', 'click'].forEach(type => root.addEventListener(type, changed));
         root.querySelector('[data-meal-editor-remove]').addEventListener('click', () => removeMealPlannerEditor(dialog, root.mealPlannerEntry));
         root.querySelector('[data-meal-editor-customize]').addEventListener('click', () => customizeMealPlannerRecipe(dialog, root.mealPlannerEntry));
         root.querySelector('[data-meal-editor-reset]').addEventListener('click', () => resetMealPlannerRecipe(dialog, root.mealPlannerEntry));
+        const servings = root.querySelector('[data-meal-recipe-servings]');
+        servings.addEventListener('input', () => setMealPlannerRecipeServings(dialog, root.mealPlannerEntry, servings.value));
+        root.querySelectorAll('[data-meal-portion-step]').forEach(button => button.addEventListener('click', () => {
+            servings.value = Math.max(0.01, MealPlanSchedule.sum([Number(servings.value) || 0, Number(button.dataset.mealPortionStep) * 0.5]));
+            setMealPlannerRecipeServings(dialog, root.mealPlannerEntry, servings.value);
+        }));
+        root.querySelector('[data-meal-portions-auto]').addEventListener('click', () => {
+            if (mealPlannerBusy(state) || state.edit) return;
+            delete root.mealPlannerEntry.servingsPerMeal;
+            root.querySelector('[data-meal-editor-error]').hidden = true;
+            syncMealPlannerBatchControls(dialog);
+        });
     }
     syncMealPlannerBatchControls(dialog);
     return entry;
@@ -2087,6 +2156,7 @@ function customizeMealPlannerRecipe(dialog, entry) {
         // Allocation errors belong to the shared calculation, not to the new
         // independent draft a user is about to adjust.
         delete initialDraft.sharedPortionErrors;
+        delete entry.servingsPerMeal;
         const form = document.createElement('form');
         form.className = 'recipe-preview-meal-panel';
         form.dataset.mealEditorForm = '';
@@ -2111,6 +2181,7 @@ function resetMealPlannerRecipe(dialog, entry) {
     if (state.edit || mealPlannerBusy(state) || !state.entries.includes(entry)) return;
     if (entry.panel) { entry.panel.endCalendarDrag(); entry.panel.generation += 1; }
     entry.panel = null;
+    delete entry.servingsPerMeal;
     entry.expanded = false;
     entry.root.querySelector('[data-meal-override-form-host]').replaceChildren();
     entry.root.querySelector('[data-meal-editor-error]').hidden = true;
@@ -2223,7 +2294,7 @@ function mealPlannerPanelOptions(dialog, entry, recipeTitle, defaultServings) {
             if (state.edit) return draft;
             // The shared controls always show the entire meal budget.
             if (!entry && draft.portionMode !== 'recipe') return draft;
-            const recipe = entry || state.entries.find(item => item.recipeUrl && !item.panel);
+            const recipe = entry || state.entries.find(item => item.recipeUrl && !item.panel && item.servingsPerMeal === undefined);
             return recipe ? mealPlannerRecipeDraft(state, recipe, draft) : draft;
         },
         getContext: () => {

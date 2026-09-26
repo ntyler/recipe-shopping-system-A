@@ -77,6 +77,35 @@ assert(M.splitSharedPlan(draft,custom).every(plan=>M.summary(plan).valid));
 """)
 
 
+def test_recipe_amount_scales_each_meals_people_without_changing_the_shared_draft():
+    run_model(r"""
+M.setMembers(draft,members.slice(0,2));M.setPortionMode(draft,'family');M.setMeals(draft,['lunch']);
+M.setFamilyDefault(draft,'you','lunch',{servings:0.5});M.setFamilyDefault(draft,'partner','lunch',{servings:1.5});
+M.setDates(draft,['2026-10-05','2026-10-07']);M.setDayFamily(draft,'2026-10-07','partner','lunch',{enabled:false});
+draft.notes='Keep notes';draft.prepSteps=[{date:'2026-10-04',instruction:'Prepare ahead'}];
+const before=JSON.stringify(draft),scaled=M.withMealServings(draft,'1');
+assert.equal(JSON.stringify(draft),before);
+const meals=M.payload(scaled).allocations;
+assert.deepEqual(plain(meals[0].member_portions),[{member_id:'you',servings:0.25},{member_id:'partner',servings:0.75}]);
+assert.deepEqual(plain(meals[1].member_portions),[{member_id:'you',servings:1}]);
+assert.equal(M.summary(scaled).totalServings,2);assert.equal(scaled.notes,'Keep notes');assert.equal(scaled.prepSteps[0].instruction,'Prepare ahead');
+M.setDates(scaled,['2026-10-05','2026-10-07','2026-10-09']);assert.equal(M.summary(scaled).totalServings,3);
+for(const invalid of ['',0,-1,'NaN'])assert.equal(M.summary(M.withMealServings(draft,invalid)).valid,false);
+""")
+
+
+def test_recipe_amount_overrides_yield_split_and_conserves_fractional_family_totals():
+    run_model(r"""
+const recipe=M.create({today:'2026-10-05',servings:8,splitRecipeYield:true,members});
+M.setDates(recipe,['2026-10-05','2026-10-07']);
+const scaled=M.withMealServings(recipe,'0.25');
+assert.equal(scaled.portionMode,'household');assert.equal(M.summary(scaled).totalServings,0.5);
+assert.equal(M.summary(recipe).totalServings,8);
+M.setPortionMode(recipe,'family');
+assert.equal(M.summary(M.withMealServings(recipe,'0.1')).totalServings,0.2);
+""")
+
+
 def test_saved_single_meal_keeps_allocations_when_date_is_cleared_then_date_and_meal_change():
     run_model(r"""
 const meal={id:'meal1',date:'2026-10-05',meal_type:'dinner',portion_mode:'family',planned_servings:1.25,prep_notes:'Pack cold',

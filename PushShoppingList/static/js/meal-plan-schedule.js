@@ -238,6 +238,40 @@
         return draft;
     }
 
+    // A recipe-level amount follows the schedule and retains who is eating.
+    // Scale named portions proportionally, with the last person receiving the
+    // decimal remainder so the requested amount is conserved.
+    function withMealServings(source, value) {
+        const draft = clone(source), target = portion(value);
+        delete draft.sharedPortionErrors;
+        delete draft.recipePortions;
+        delete draft.recipeSplitError;
+        if (draft.portionMode === 'recipe') draft.portionMode = 'household';
+        const scaleFamily = (family, meal) => {
+            const cells = draft.members.map(member => family[member.id][meal]).filter(cell => cell.enabled);
+            const weights = cells.map(cell => portion(cell.servings));
+            if (weights.some(weight => weight === null)) return; // Keep invalid source fields visible to validation.
+            const total = sum(weights);
+            let allocated = 0;
+            cells.forEach((cell, index) => {
+                if (target === null) { cell.servings = value; return; }
+                const amount = index === cells.length - 1 ? sum([target, -allocated])
+                    : Math.min(sum([target, -allocated]), Number((target * weights[index] / total).toPrecision(12)));
+                cell.servings = amount;
+                allocated = sum([allocated, amount]);
+            });
+        };
+        MEAL_TYPES.forEach(meal => {
+            if (draft.portionMode === 'family') scaleFamily(draft.familyDefaults, meal);
+            else draft.householdDefaults[meal] = value;
+        });
+        Object.values(draft.days).forEach(day => MEAL_TYPES.forEach(meal => {
+            if (draft.portionMode === 'family') scaleFamily(day.family, meal);
+            else day.household[meal] = value;
+        }));
+        return draft;
+    }
+
     function refreshDates(draft) {
         if (draft.dateMode === 'single') draft.selectedDates = parseDate(draft.singleDate) ? [draft.singleDate] : [];
         else if (draft.dateMode === 'range') draft.selectedDates = dateRange(draft.startDate, draft.endDate);
@@ -642,6 +676,6 @@
         setDateMode, setSingleDate, setRange, setDates, toggleDate, setPortionMode, setMeals,
         setHouseholdDefault, setFamilyDefault, setDayMeal, setDayHousehold, setDayFamily,
         setDayNotes, setMealNotes, mealPortionMode, canAssignMember, fromSaved,
-        applyDefaults, setMembers, setGroups, selectGroupMembers, withPortions, splitRecipeYield, splitSharedPlan, sum, summary, payload
+        applyDefaults, setMembers, setGroups, selectGroupMembers, withPortions, withMealServings, splitRecipeYield, splitSharedPlan, sum, summary, payload
     });
 })(globalThis);

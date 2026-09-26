@@ -17,7 +17,7 @@ from test_meal_prep_batches import scoped_client, sign_in
 ROOT = Path(__file__).resolve().parents[1]
 
 
-@pytest.mark.parametrize('script', ['meal_planner_editors.cjs', 'meal_calendar_drag.cjs', 'meal_planner_yield_split.cjs', 'meal_planner_shared_portions.cjs'])
+@pytest.mark.parametrize('script', ['meal_planner_editors.cjs', 'meal_calendar_drag.cjs', 'meal_planner_yield_split.cjs', 'meal_planner_shared_portions.cjs', 'meal_planner_recipe_portions.cjs'])
 def test_simultaneous_meal_editors_in_chromium(scoped_client, monkeypatch, script):
     node = shutil.which('node')
     module = os.environ.get('AI_PANTRY_PLAYWRIGHT_MODULE', 'playwright')

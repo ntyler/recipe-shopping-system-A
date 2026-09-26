@@ -704,6 +704,57 @@ assert.match(second.root.querySelector('[data-meal-editor-error]').textContent,/
 """)
 
 
+def test_inline_recipe_amounts_follow_shared_dates_and_preserve_family_allocations_in_saved_payload():
+    run_dialog(r"""
+await open('2026-10-05','lunch');const shared=await choose('recipe://bread'),state=activeDialog.mealPlanScheduleState;
+M.setPortionMode(shared.draft,'family');
+ctx.addMealPlannerEditor();const second=state.entries[1],input=second.root.querySelector('[name="recipe_url"]');
+input.value='recipe://soup';ctx.syncMealPlannerServingsFromRecipe(input);
+ctx.setMealPlannerRecipeServings(activeDialog,state.entries[0],'1.5');
+assert.equal(state.entries[0].panel,null,'A portion change must not freeze the shared schedule into a custom panel');
+M.setDates(shared.draft,['2026-10-05','2026-10-06','2026-10-07']);shared.draft.notes='Pack together';shared.render();
+assert.match(state.entries[0].root.querySelector('[data-meal-editor-summary]').textContent,/Custom portions.*3 days.*4.5 servings/);
+assert.match(second.root.querySelector('[data-meal-editor-summary]').textContent,/3 days.*1.5 servings/);
+assert.equal(shared.draft.familyDefaults.adult.lunch.servings,1);
+assert.equal(state.entries[0].root.querySelector('[data-meal-recipe-servings]').value,'1.5');
+ctx.customizeMealPlannerRecipe(activeDialog,state.entries[0]);
+assert.equal(state.entries[0].servingsPerMeal,undefined);
+assert.equal(M.summary(state.entries[0].panel.schedulingDraft()).totalServings,4.5);
+ctx.setMealPlannerRecipeServings(activeDialog,state.entries[0],'');
+assert.equal(M.summary(state.entries[0].panel.schedulingDraft()).valid,false);
+ctx.setMealPlannerRecipeServings(activeDialog,state.entries[0],'0.5');
+assert.equal(M.summary(state.entries[0].panel.schedulingDraft()).totalServings,1.5);
+ctx.resetMealPlannerRecipe(activeDialog,state.entries[0]);ctx.setMealPlannerRecipeServings(activeDialog,state.entries[0],'1.5');
+requests=[];responseFactory=async()=>ok({batches:[],meals:[]});await ctx.saveMealPlannerBatch();
+assert.equal(requests.length,1);const plans=JSON.parse(requests[0].options.body).batches;
+assert(plans.every(plan=>plan.portion_mode==='family'&&plan.allocations.length===3&&plan.prep_notes==='Pack together'));
+assert(plans[0].allocations.every(meal=>meal.member_portions.every(part=>part.servings===0.75)));
+assert(plans[1].allocations.every(meal=>meal.member_portions.every(part=>part.servings===0.25)));
+""")
+
+
+def test_inline_recipe_amount_validation_reset_and_repeated_yield_budget():
+    run_dialog(r"""
+await open('2026-10-05','lunch');const shared=await choose('recipe://soup'),state=activeDialog.mealPlanScheduleState;
+ctx.addMealPlannerEditor();const second=state.entries[1],input=second.root.querySelector('[name="recipe_url"]');
+input.value='recipe://soup';ctx.syncMealPlannerServingsFromRecipe(input);
+ctx.setMealPlannerRecipeServings(activeDialog,state.entries[0],'1.5');
+assert.equal(M.summary(ctx.mealPlannerRecipeDraft(state,second)).totalServings,2.5);
+state.entries[0].root.querySelector('[data-meal-portions-auto]').handlers.click[0]();
+assert.equal(M.summary(ctx.mealPlannerRecipeDraft(state,second)).totalServings,2);
+M.setHouseholdDefault(shared.draft,'lunch',2);
+for(const invalid of ['',0,'3']){
+ ctx.setMealPlannerRecipeServings(activeDialog,state.entries[0],invalid);
+ requests=[];await ctx.saveMealPlannerBatch();assert.equal(requests.length,0);
+}
+ctx.setMealPlannerRecipeServings(activeDialog,state.entries[0],'1.5');
+ctx.setMealPlannerRecipeServings(activeDialog,second,'1');
+requests=[];await ctx.saveMealPlannerBatch();assert.equal(requests.length,0,'Two fixed amounts must still respect the shared meal total');
+ctx.setMealPlannerRecipeServings(activeDialog,second,'0.5');
+assert(state.entries.every(entry=>M.summary(ctx.mealPlannerRecipeDraft(state,entry)).valid));
+""")
+
+
 def test_recipe_yield_balance_handles_invalid_unknown_repeated_and_cleared_recipes():
     run_dialog(r"""
 await open('2026-10-05','lunch');const shared=await choose('recipe://soup'),state=activeDialog.mealPlanScheduleState;
