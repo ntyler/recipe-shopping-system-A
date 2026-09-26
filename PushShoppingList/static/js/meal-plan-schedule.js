@@ -288,22 +288,25 @@
     // One slot is a date + meal, so two meals on a day consume two portions.
     function distributeRecipeServings(source, budget, {mode = 'keep', servingsPerMeal} = {}) {
         if (portion(budget) === null) throw new Error('No servings remain from this recipe. Adjust its other entries first.');
-        if (!['keep', 'spread', 'upcoming'].includes(mode)) throw new Error('Choose how to distribute this recipe.');
+        if (!['keep', 'spread', 'upcoming', 'people'].includes(mode)) throw new Error('Choose how to distribute this recipe.');
         let clean = clone(source);
         delete clean.sharedPortionErrors;
+        if (mode === 'people' && clean.portionMode === 'recipe') {
+            throw new Error('Choose Household total or By family member under “Who is eating?” before filling days with those portions.');
+        }
         const total = summary(clean);
         if (!total.valid) throw new Error(total.errors[0]);
         let slots = total.days.slice().sort((a, b) => a.date.localeCompare(b.date)).flatMap(day =>
             day.meals.map(meal => ({date:day.date, meal:meal.meal_type})));
         const selectedSlots = new Set(slots.map(slot => `${slot.date}/${slot.meal}`));
-        let amounts;
-        if (mode === 'upcoming') {
+        let amounts, lastMealReduced = false;
+        if (mode === 'upcoming' || mode === 'people') {
             const amount = portion(servingsPerMeal);
-            if (amount === null) throw new Error('Enter servings per meal before filling upcoming days.');
+            if (mode === 'upcoming' && amount === null) throw new Error('Enter servings per meal before filling upcoming days.');
             // Generate independent future days from the recipe's defaults, while
             // retaining existing per-day meal and family choices. Cap work at
             // the API's 1,000-meal limit even for extremely small portions.
-            clean = withMealServings(clean, amount);
+            if (mode === 'upcoming') clean = withMealServings(clean, amount);
             const cursor = parseDate(slots[0].date);
             slots = []; amounts = [];
             let remaining = budget;
@@ -317,7 +320,9 @@
                 for (const meal of day.days[0].meals) {
                     if (!remaining) break;
                     if (amounts.length === 1000) throw new Error('Fill up to 1,000 meals at a time. Increase servings per meal.');
-                    const servings = Math.min(amount, remaining);
+                    const target = mode === 'people' ? meal.planned_servings : amount;
+                    const servings = Math.min(target, remaining);
+                    lastMealReduced = servings < target;
                     slots.push({date, meal:meal.meal_type});
                     amounts.push(servings);
                     remaining = sum([remaining, -servings]);
@@ -340,7 +345,9 @@
             }
             if (!amounts.length) throw new Error('There are not enough servings for one meal at this amount. Lower servings per meal or choose to spread them.');
         }
-        const draft = withMealServings(clean, amounts[0]);
+        // Keep each meal's people and default portions for subsequent days and
+        // repeat previews, even when the final meal has a smaller remainder.
+        const draft = mode === 'people' ? clone(clean) : withMealServings(clean, amounts[0]);
         draft.selectedDates.forEach(date => {
             const day = draft.days[date];
             MEAL_TYPES.forEach(meal => { day.mealEnabled[meal] = false; });
@@ -359,7 +366,7 @@
         const result = summary(draft);
         if (!result.valid) throw new Error(result.errors[0]);
         const allocatedSlots = new Set(slots.slice(0, amounts.length).map(slot => `${slot.date}/${slot.meal}`));
-        return {draft, allocations, selectedMealCount:total.mealCount, usedServings:result.totalServings,
+        return {draft, allocations, lastMealReduced, selectedMealCount:total.mealCount, usedServings:result.totalServings,
             unfilledMealCount:[...selectedSlots].filter(slot => !allocatedSlots.has(slot)).length,
             addedMealCount:[...allocatedSlots].filter(slot => !selectedSlots.has(slot)).length,
             remainingServings:sum([budget, -result.totalServings])};

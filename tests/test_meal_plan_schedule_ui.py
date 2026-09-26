@@ -101,6 +101,74 @@ M.setMembers(result.draft,members.slice(0,2));assert.equal(JSON.stringify(M.payl
 """)
 
 
+def test_people_distribution_fills_four_days_for_two_people_and_ignores_recipe_amount():
+    run_model(r"""
+M.setMembers(draft,members.slice(0,2));M.setPortionMode(draft,'family');
+M.setSingleDate(draft,'2026-09-26');M.setMeals(draft,['dinner']);
+const before=JSON.stringify(draft);
+const result=M.distributeRecipeServings(draft,8,{mode:'people',servingsPerMeal:1});
+assert.equal(JSON.stringify(draft),before);
+assert.deepEqual(plain(result.allocations),plain(M.dateRange('2026-09-26','2026-09-29').map(date=>({date,meal_type:'dinner',planned_servings:2}))));
+assert.equal(result.remainingServings,0);assert.equal(result.lastMealReduced,false);
+assert.equal(result.addedMealCount,3);
+const payload=M.payload(result.draft);
+assert(payload.allocations.every(meal=>meal.member_portions.length===2&&meal.member_portions.every(part=>part.servings===1)));
+assert.equal(JSON.stringify(M.payload(M.distributeRecipeServings(result.draft,8,{mode:'people'}).draft)),JSON.stringify(payload));
+""")
+
+
+def test_people_distribution_uses_each_meals_portions_and_day_specific_attendance():
+    run_model(r"""
+M.setMembers(draft,members.slice(0,2));M.setPortionMode(draft,'family');
+M.setSingleDate(draft,'2026-12-31');M.setMeals(draft,['breakfast','dinner']);
+M.setFamilyDefault(draft,'you','breakfast',{servings:0.75});
+M.setFamilyDefault(draft,'partner','breakfast',{servings:0.25});
+M.setDayFamily(draft,'2026-12-31','partner','dinner',{enabled:false});
+M.setDayNotes(draft,'2026-12-31','Pack separately');
+const before=JSON.stringify(draft), result=M.distributeRecipeServings(draft,4,{mode:'people'});
+assert.equal(JSON.stringify(draft),before);
+assert.deepEqual(plain(result.allocations.map(meal=>[meal.date,meal.meal_type,meal.planned_servings])),[
+ ['2026-12-31','breakfast',1],['2026-12-31','dinner',1],['2027-01-01','breakfast',1],['2027-01-01','dinner',1]]);
+const payload=M.payload(result.draft);
+assert.deepEqual(plain(payload.allocations[2].member_portions),[{member_id:'you',servings:0.75},{member_id:'partner',servings:0.25}]);
+assert.deepEqual(plain(payload.allocations[1].member_portions),[{member_id:'you',servings:1}]);
+assert.deepEqual(plain(payload.allocations[3].member_portions),[{member_id:'you',servings:0.5},{member_id:'partner',servings:0.5}]);
+assert.equal(result.lastMealReduced,true);assert.equal(result.remainingServings,0);
+assert.equal(payload.allocations[0].prep_notes,'Pack separately');
+assert.equal(result.draft.familyDefaults.you.dinner.servings,1);
+M.setMembers(result.draft,members.slice(0,2));assert.equal(JSON.stringify(M.payload(result.draft)),JSON.stringify(payload));
+""")
+
+
+def test_people_distribution_handles_household_totals_and_skips_meals_with_nobody_eating():
+    run_model(r"""
+M.setSingleDate(draft,'2026-09-30');M.setMeals(draft,['lunch','dinner']);
+M.setHouseholdDefault(draft,'lunch',1);M.setHouseholdDefault(draft,'dinner',2);
+let result=M.distributeRecipeServings(draft,5,{mode:'people'});
+assert.deepEqual(plain(result.allocations.map(meal=>meal.planned_servings)),[1,2,1,1]);
+assert.equal(result.draft.householdDefaults.dinner,2);assert.equal(result.lastMealReduced,true);
+M.setPortionMode(draft,'family');
+for(const member of members) M.setFamilyDefault(draft,member.id,'dinner',{enabled:false});
+result=M.distributeRecipeServings(draft,6,{mode:'people'});
+assert.deepEqual(plain(result.allocations.map(meal=>[meal.date,meal.meal_type,meal.planned_servings])),[
+ ['2026-09-30','lunch',3],['2026-10-01','lunch',3]]);
+""")
+
+
+def test_people_distribution_rejects_missing_portions_and_limits_unbounded_schedules():
+    run_model(r"""
+M.setPortionMode(draft,'family');M.setMeals(draft,['dinner']);
+M.setFamilyDefault(draft,'you','dinner',{servings:''});
+assert.throws(()=>M.distributeRecipeServings(draft,8,{mode:'people'}),/positive, finite portions/);
+M.setFamilyDefault(draft,'you','dinner',{servings:1});
+assert.throws(()=>M.distributeRecipeServings(draft,3001,{mode:'people'}),/1,000/);
+M.setSingleDate(draft,'9999-12-31');
+assert.throws(()=>M.distributeRecipeServings(draft,4,{mode:'people'}),/supported calendar/);
+draft.portionMode='recipe';draft.recipeYield=8;
+assert.throws(()=>M.distributeRecipeServings(draft,8,{mode:'people'}),/Who is eating/);
+""")
+
+
 def test_upcoming_distribution_is_bounded_and_rejects_incomplete_portions():
     run_model(r"""
 const before=JSON.stringify(draft);

@@ -2032,7 +2032,9 @@ function mealPlannerDistributionPreview(state, entry, summaries) {
     if (related.some(total => !total.valid)) throw new Error('Fix this recipe’s other entries before distributing its remaining servings.');
     const reserved = MealPlanSchedule.sum(related.map(total => total.totalServings));
     const budget = MealPlanSchedule.sum([entry.yieldServings, -reserved]);
-    const source = mealPlannerRecipeDraft(state, entry);
+    // The people option uses the portions visible under “Who is eating?”,
+    // before the recipe-level amount or automatic recipe split scales them.
+    const source = entry.distributionMode === 'people' ? (entry.panel || state.panel).draft : mealPlannerRecipeDraft(state, entry);
     const preview = MealPlanSchedule.distributeRecipeServings(source, budget, {
         mode:entry.distributionMode || 'keep', servingsPerMeal:entry.root.querySelector('[data-meal-recipe-servings]').value,
     });
@@ -2073,11 +2075,12 @@ function syncMealPlannerDistribution(entry, summary, state, busy, summaries) {
         ? `Keep ${servingsText(value)} per meal on selected dates` : 'Keep servings per meal (enter an amount above)';
     box.querySelector('[data-meal-distribution-upcoming]').textContent = Number(value) > 0
         ? `Fill upcoming days at ${servingsText(value)} per meal` : 'Fill upcoming days (enter servings per meal above)';
-    box.querySelector('[data-meal-distribution-spread]').textContent = `Spread across all ${summary.mealCount} selected ${summary.mealCount === 1 ? 'meal' : 'meals'}`;
     box.querySelectorAll('[data-meal-distribution-mode]').forEach(input => { input.checked = input.value === (entry.distributionMode || 'keep'); });
     const budget = box.querySelector('[data-meal-distribution-budget]');
     budget.textContent = `One recipe makes ${servingsText(entry.yieldServings)}.`;
-    box.querySelector('[data-meal-distribution-help]').textContent = entry.distributionMode === 'upcoming'
+    box.querySelector('[data-meal-distribution-help]').textContent = entry.distributionMode === 'people'
+        ? 'Starts on the first scheduled date and fills following days using the meals, people, and portions set under “Who is eating?”. For example, 8 servings with 2 people eating 1 serving each fills 4 days with one meal per day. The final meal may have smaller portions.'
+        : entry.distributionMode === 'upcoming'
         ? 'Starts on the first scheduled date and repeats the selected meals on following days, keeping any day-specific choices. Adds dates for this recipe until its servings run out; the final portion may be smaller.'
         : 'Uses this recipe’s current schedule, earliest meals first. The shared calendar and family targets stay unchanged.';
     const text = box.querySelector('[data-meal-distribution-preview]');
@@ -2091,17 +2094,23 @@ function syncMealPlannerDistribution(entry, summary, state, busy, summaries) {
         const coverage = preview.needsPortions ? `${preview.unfilled} ${preview.unfilled === 1 ? 'meal still needs' : 'meals still need'} portions`
             : `${preview.unfilled} selected ${preview.unfilled === 1 ? 'meal without' : 'meals without'} this recipe`;
         text.textContent = `${servingsText(preview.usedServings)} used · ${formatMealPlannerServingNumber(preview.remainingServings)} remaining · ${coverage}.`;
-        if (entry.distributionMode === 'upcoming') {
+        if (['upcoming', 'people'].includes(entry.distributionMode)) {
             const days = new Set(preview.allocations.map(meal => meal.date)).size;
             const last = preview.allocations.at(-1);
             text.textContent = `${preview.allocations.length} ${preview.allocations.length === 1 ? 'meal' : 'meals'} across ${days} ${days === 1 ? 'day' : 'days'} · ` + text.textContent;
-            if (last.planned_servings < Number(value)) text.textContent += ` Last meal: ${servingsText(last.planned_servings)} (smaller portion).`;
+            if (preview.lastMealReduced) text.textContent += ` Last meal: ${servingsText(last.planned_servings)} (smaller portion).`;
         }
         text.dataset.error = 'false';
+        const proposed = MealPlanSchedule.summary(preview.draft);
         preview.allocations.forEach(meal => {
             const item = document.createElement('li');
             const date = MealPlanSchedule.parseDate(meal.date).toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'});
             item.textContent = `${date} · ${meal.meal_type} · ${servingsText(meal.planned_servings)}`;
+            if (entry.distributionMode === 'people') {
+                const parts = proposed.days.find(day => day.date === meal.date)?.meals.find(slot => slot.meal_type === meal.meal_type)?.member_portions || [];
+                if (parts.length) item.textContent += ' · ' + parts.map(part =>
+                    `${preview.draft.members.find(member => member.id === part.member_id)?.name || 'Family member'}: ${servingsText(part.servings)}`).join(' · ');
+            }
             list.appendChild(item);
         });
         review.hidden = false;
@@ -2130,7 +2139,7 @@ function applyMealPlannerDistribution(dialog, entry) {
             entry.panel.draft = preview.draft;
             entry.panel.render();
         }
-        if (entry.distributionMode === 'upcoming') entry.expanded = true;
+        if (['upcoming', 'people'].includes(entry.distributionMode)) entry.expanded = true;
         entry.touched = true;
         entry.root.querySelector('[data-meal-editor-error]').hidden = true;
         syncMealPlannerBatchControls(dialog);
@@ -2271,6 +2280,7 @@ function createMealPlannerEditor(dialog, root) {
         });
         root.querySelectorAll('[data-meal-distribution-mode]').forEach(input => input.addEventListener('change', () => {
             root.mealPlannerEntry.distributionMode = input.value;
+            if (input.value === 'people') root.querySelector('[data-meal-distribution-review]').open = true;
             syncMealPlannerBatchControls(dialog);
         }));
         root.querySelector('[data-meal-distribution-cancel]').addEventListener('click', () => {

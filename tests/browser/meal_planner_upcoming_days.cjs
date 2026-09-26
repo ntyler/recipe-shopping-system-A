@@ -88,12 +88,10 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         await row(0).getByRole('button',{name:'Fill upcoming days',exact:true}).click();
         assert.match(await box.locator('[data-meal-distribution-budget]').textContent(),/2 already assigned in other entries; 6 available here/);
         assert.equal(await proposed.count(),6);assert.match(await preview.textContent(),/6 servings used · 0 remaining/);
-        // Existing distribution modes still operate only on selected slots.
+        // Keeping a fixed amount still operates only on selected slots.
         await box.locator('[data-meal-distribution-mode][value="keep"]').check();
         assert.equal(await proposed.count(),1);assert.match(await preview.textContent(),/1 serving used · 5 remaining/);
         assert.match(await box.locator('[data-meal-distribution-keep]').textContent(),/Keep 1 serving per meal/);
-        await box.locator('[data-meal-distribution-mode][value="spread"]').check();
-        assert.equal(await proposed.count(),1);assert.match(await preview.textContent(),/6 servings used · 0 remaining/);
         assert.deepEqual(errors,[]);
         console.log('PASS: one serving per day, preview/cancel/apply, smaller final portion, invalid input, selected dates, family portions, repeat apply, save/reload, shared recipe budget, old modes, desktop/mobile, clean console');
     } finally {await browser.close();}
