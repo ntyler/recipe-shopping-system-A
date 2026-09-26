@@ -24,10 +24,30 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         const box=row(0).locator('[data-meal-distribution]');
         const preview=box.locator('[data-meal-distribution-preview]');
         const proposed=box.locator('[data-meal-distribution-meals] li');
+        const apply=box.locator('[data-meal-distribution-apply]');
+        const calendarPreview=shared.locator('[data-schedule-distribution-calendar]');
+        const draftSnapshot=()=>dialog.evaluate(element=>JSON.stringify({
+            shared:element.mealPlanScheduleState.panel.draft,
+            entries:element.mealPlanScheduleState.entries.map(entry=>({draft:entry.panel?.draft,amount:entry.servingsPerMeal,expanded:entry.expanded}))
+        }));
+        const calendarLayout=()=>shared.evaluate(element=>{
+            const rect=selector=>{
+                const {x,y,width,height}=element.querySelector(selector).getBoundingClientRect();
+                return {x,y,width,height};
+            };
+            return {dates:rect('.meal-schedule-date-area'),meals:rect('.meal-schedule-meals'),
+                scrollHeight:element.closest('dialog').scrollHeight,scrollTop:element.closest('dialog').scrollTop};
+        });
+        const assertBoundedPreview=async locator=>{
+            const bounds=await locator.boundingBox();
+            assert(bounds.width<=640,`Preview must use the normal calendar width, got ${bounds.width}`);
+            assert(bounds.height<=420,`Preview must stay bounded across months, got ${bounds.height}`);
+        };
         const save=dialog.locator('[data-meal-batch-save]');
         const open=async()=>{
             await page.getByRole('button',{name:'Add Meals',exact:true}).click();
             await page.waitForFunction(()=>!document.getElementById('mealPlannerDialog').mealPlanScheduleState.panel.ui.loading);
+            await shared.getByRole('button',{name:'One day',exact:true}).click();
         };
         const screenshot=async name=>{
             const dir=process.env.AI_PANTRY_BROWSER_ARTIFACTS;
@@ -47,12 +67,38 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         assert.match(await proposed.last().textContent(),/Sep 28, 2026 · breakfast · 1 serving$/);
         assert.match(await preview.textContent(),/4 meals across 4 days · 4 servings used · 0 remaining/);
         assert.equal(await save.textContent(),'Save 1 Meal','Preview leaves the real plan unchanged');
+        const beforeHover=await draftSnapshot();
+        await apply.hover();
+        assert(await calendarPreview.isVisible());
+        await assertBoundedPreview(calendarPreview);
+        assert.deepEqual(await calendarPreview.locator('[data-distribution-date]').evaluateAll(nodes=>nodes.map(node=>node.dataset.distributionDate)),['2026-09-25','2026-09-26','2026-09-27','2026-09-28']);
+        assert.match(await calendarPreview.locator('[data-distribution-date]').first().textContent(),/Breakfast: 1 serving/);
+        assert(await shared.locator('.meal-schedule-dates').isHidden());
+        assert.equal(await draftSnapshot(),beforeHover);assert.equal(await save.textContent(),'Save 1 Meal');assert.equal(posts.length,0);
+        await page.mouse.move(0,0);
+        assert(await calendarPreview.isHidden());assert(await shared.locator('.meal-schedule-dates').isVisible());
+        assert.equal(await draftSnapshot(),beforeHover);
+        // Tab back from Cancel to Apply, then dismiss only the preview with Escape.
+        await apply.focus();await page.keyboard.press('Tab');await page.keyboard.press('Shift+Tab');
+        assert(await calendarPreview.isVisible());
+        await calendarPreview.scrollIntoViewIfNeeded();assert(await calendarPreview.isVisible());await screenshot('distribution-preview-desktop.png');
+        await page.keyboard.press('Escape');assert(await calendarPreview.isHidden());assert(await dialog.isVisible());
+        await page.keyboard.press('Tab');await page.keyboard.press('Shift+Tab');
+        assert(await calendarPreview.isVisible());
+        await page.keyboard.press('Tab');assert(await calendarPreview.isHidden());
         await dialog.evaluate(element=>{element.scrollTop=0;});await screenshot('upcoming-days-preview-desktop.png');
         await page.setViewportSize({width:390,height:844});
         await box.scrollIntoViewIfNeeded();
         assert(await dialog.evaluate(element=>element.scrollWidth<=element.clientWidth+1));
         assert(await row(0).getByRole('button',{name:'Fill upcoming days',exact:true}).isEnabled());
         await screenshot('upcoming-days-preview-mobile.png');
+        await apply.focus();await page.keyboard.press('Tab');await page.keyboard.press('Shift+Tab');
+        assert(await calendarPreview.isVisible());
+        await calendarPreview.scrollIntoViewIfNeeded();
+        assert(await dialog.evaluate(element=>element.scrollWidth<=element.clientWidth+1));
+        await assertBoundedPreview(calendarPreview);
+        await screenshot('distribution-focus-mobile.png');
+        await page.keyboard.press('Tab');assert(await calendarPreview.isHidden());
         await page.setViewportSize({width:1440,height:1200});
         await box.getByRole('button',{name:'Cancel',exact:true}).click();
         assert.equal(await save.textContent(),'Save 1 Meal');
@@ -60,6 +106,8 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         await amount.fill('1.5');await row(0).getByRole('button',{name:'Fill upcoming days',exact:true}).click();
         assert.equal(await proposed.count(),3);
         assert.match(await preview.textContent(),/Last meal: 1 serving \(smaller portion\)/);
+        await apply.hover();
+        assert.match(await calendarPreview.locator('[data-distribution-date]').last().textContent(),/Breakfast: 1 serving/);
         await amount.fill('');assert(await box.getByRole('button',{name:'Apply distribution',exact:true}).isDisabled());
         await amount.fill('1');
         for (const cell of await shared.locator('[data-schedule-field="family"][data-meal="breakfast"]').all()) await cell.fill('0.5');
@@ -79,6 +127,31 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         // Applying again must be idempotent: do not append another full recipe.
         await row(0).getByRole('button',{name:'Fill upcoming days',exact:true}).click();
         assert.equal(await proposed.count(),4);
+        const selectedBefore=await shared.locator('[data-schedule-action="date"][aria-pressed="true"]').evaluateAll(nodes=>nodes.map(node=>node.dataset.date));
+        await apply.scrollIntoViewIfNeeded();await page.mouse.move(0,0);
+        const beforeCalendarHover=await calendarLayout();
+        for(let attempt=0;attempt<3;attempt++){
+            await apply.hover();assert(await calendarPreview.isVisible());
+            assert.deepEqual(await calendarLayout(),beforeCalendarHover,'Hover must preserve calendar size, surrounding controls, and scroll position');
+            assert(await shared.locator('.meal-schedule-dates').isHidden());
+            await page.mouse.move(0,0);assert(await calendarPreview.isHidden());
+            assert.deepEqual(await calendarLayout(),beforeCalendarHover);
+        }
+        // Use keyboard focus to inspect the preview without holding the pointer on Apply.
+        await apply.focus();await page.keyboard.press('Tab');await page.keyboard.press('Shift+Tab');
+        await calendarPreview.evaluate(element=>element.scrollIntoView({block:'center'}));await screenshot('distribution-stable-calendar-desktop.png');
+        await page.keyboard.press('Escape');
+        await page.setViewportSize({width:390,height:844});
+        await apply.scrollIntoViewIfNeeded();
+        const beforeMobileHover=await calendarLayout();
+        await page.keyboard.press('Tab');await page.keyboard.press('Shift+Tab');
+        assert(await calendarPreview.isVisible());
+        assert.deepEqual(await calendarLayout(),beforeMobileHover,'Keyboard preview must preserve the mobile calendar layout');
+        assert(await dialog.evaluate(element=>element.scrollWidth<=element.clientWidth+1));
+        await calendarPreview.evaluate(element=>element.scrollIntoView({block:'center'}));await screenshot('distribution-stable-calendar-mobile.png');
+        await page.keyboard.press('Escape');
+        await page.setViewportSize({width:1440,height:1200});
+        assert.deepEqual(await shared.locator('[data-schedule-action="date"][aria-pressed="true"]').evaluateAll(nodes=>nodes.map(node=>node.dataset.date)),selectedBefore);
         await box.getByRole('button',{name:'Apply distribution',exact:true}).click();
         const response=page.waitForResponse(res=>res.url().endsWith('/batches/bulk')&&res.request().method()==='POST');
         await save.click();const saved=await(await response).json();await dialog.waitFor({state:'hidden'});
@@ -99,11 +172,29 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         assert.equal(await proposed.count(),1);assert.match(await preview.textContent(),/1 serving used · 5 remaining/);
         assert.match(await box.locator('[data-meal-distribution-keep]').textContent(),/Keep 1 serving per meal/);
         // Multiple entries still need an independent distribution for each recipe.
+        await shared.locator('[data-schedule-field="single-date"]').fill('2026-10-29');
         await box.locator('[data-meal-distribution-mode][value="upcoming"]').check();
+        const beforeMultiHover=await draftSnapshot();
+        await apply.hover();assert(await calendarPreview.isVisible());
+        await assertBoundedPreview(calendarPreview);
+        assert.match(await calendarPreview.textContent(),/Updates only this recipe’s custom plan/);
+        assert.equal(await calendarPreview.locator('[data-distribution-date]').count(),6);
+        assert.deepEqual(await calendarPreview.locator('.meal-schedule-calendar-heading').allTextContents(),['October 2026','November 2026']);
+        assert.match(await calendarPreview.locator('[data-distribution-date]').last().getAttribute('aria-label'),/Nov 3/);
+        assert.equal(await draftSnapshot(),beforeMultiHover);
         await box.getByRole('button',{name:'Apply distribution',exact:true}).click();
+        assert(await calendarPreview.isHidden());
         assert(await row(0).locator('[data-meal-editor-form]').isVisible());
-        assert.equal(await shared.locator('[data-schedule-field="single-date"]').inputValue(),'2026-10-05');
+        assert.equal(await shared.locator('[data-schedule-field="single-date"]').inputValue(),'2026-10-29');
         assert.match(await row(1).locator('[data-meal-editor-summary]').textContent(),/1 meal · 2 servings/);
+        // Once this recipe has an open custom plan, its own calendar previews the change.
+        await row(0).getByRole('button',{name:'Fill upcoming days',exact:true}).click();
+        const customPreview=row(0).locator('[data-meal-editor-form] [data-schedule-distribution-calendar]');
+        const beforeCustomHover=await draftSnapshot();
+        await apply.hover();assert(await customPreview.isVisible());assert(await calendarPreview.isHidden());
+        assert.equal(await draftSnapshot(),beforeCustomHover);
+        await box.getByRole('button',{name:'Cancel',exact:true}).click();assert(await customPreview.isHidden());
+        assert.equal(await draftSnapshot(),beforeCustomHover);
         assert.deepEqual(errors,[]);
         console.log('PASS: one serving per day, preview/cancel/apply, smaller final portion, invalid input, selected dates, family portions, repeat apply, save/reload, shared recipe budget, old modes, desktop/mobile, clean console');
     } finally {await browser.close();}

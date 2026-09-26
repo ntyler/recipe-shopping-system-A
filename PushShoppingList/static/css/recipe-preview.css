@@ -183,7 +183,9 @@ body.recipe-preview-active { overflow: auto; }
 .meal-schedule-modes { margin-bottom: 18px; }
 .meal-schedule-modes button { flex: 1 1 0; white-space: normal; min-height: 40px; }
 .meal-schedule-panel h3 { margin: 0 0 12px; font-size: 16px; }
-.meal-schedule-dates { max-width: 640px; margin-bottom: 20px; }
+.meal-schedule-date-area { position: relative; max-width: 640px; margin-bottom: 20px; }
+.meal-schedule-dates { max-width: 640px; }
+.meal-schedule-dates.is-previewing { visibility: hidden; }
 .meal-schedule-date-range { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
 .meal-schedule-calendar-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .meal-schedule-calendar-grid { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap: 5px; user-select: none; }
@@ -200,6 +202,20 @@ body.recipe-preview-active { overflow: auto; }
 .meal-schedule-yield-legend i { width: 12px; height: 12px; border-radius: 3px; }
 .meal-schedule-yield-legend .is-selected { background: var(--app-primary); }
 .meal-schedule-yield-legend .is-short { background: #f9d68b; border: 1px dashed #ad730e; }
+.meal-schedule-distribution-calendar { box-sizing: border-box; max-width: 640px; max-height: 420px; overflow: auto; overscroll-behavior: contain; padding: 12px; border: 1px dashed var(--app-primary); border-radius: 8px; }
+.meal-schedule-date-area[data-date-mode="days"] > .meal-schedule-distribution-calendar { position: absolute; inset: 0; max-height: none; }
+.meal-schedule-distribution-heading { margin: 0 0 12px; font-size: 12px; }
+.meal-schedule-distribution-heading strong, .meal-schedule-distribution-heading span { display: block; }
+.meal-schedule-distribution-heading strong { margin-bottom: 4px; color: var(--app-primary); }
+.meal-schedule-distribution-calendar .meal-schedule-calendar + .meal-schedule-calendar { margin-top: 16px; }
+.meal-schedule-distribution-day { min-width: 0; min-height: 42px; padding: 7px 3px; border: 1px solid var(--app-border); border-radius: 6px; text-align: center; }
+.meal-schedule-distribution-day.is-proposed { border: 1px dashed var(--app-primary); background: var(--app-primary); color: #06251b; }
+.meal-schedule-distribution-day small { display: block; font-size: 10px; line-height: 1.3; overflow-wrap: anywhere; }
+.meal-schedule-distribution-day .meal-schedule-distribution-compact { display: none; }
+@media (max-width: 600px) {
+    .meal-schedule-distribution-day .meal-schedule-distribution-full { display: none; }
+    .meal-schedule-distribution-day .meal-schedule-distribution-compact { display: block; }
+}
 .meal-schedule-meals { display: flex; align-items: center; flex-wrap: wrap; gap: 14px 20px; margin-bottom: 20px; }
 .meal-schedule-panel .meal-schedule-check { display: flex; align-items: center; gap: 8px; margin: 0; cursor: pointer; }
 .meal-schedule-panel input[type="checkbox"] { appearance: auto; width: 18px; height: 18px; min-width: 18px; margin: 0; padding: 0; accent-color: var(--app-primary); flex: 0 0 18px; }

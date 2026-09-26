@@ -26,6 +26,7 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         const open=async()=>{
             await page.getByRole('button',{name:'Add Meals',exact:true}).click();
             await page.waitForFunction(()=>!document.getElementById('mealPlannerDialog').mealPlanScheduleState.panel.ui.loading);
+            await shared.getByRole('button',{name:'One day',exact:true}).click();
             await row.locator('[name="recipe_url"]').selectOption('recipe://bread');
         };
         const third=async()=>{

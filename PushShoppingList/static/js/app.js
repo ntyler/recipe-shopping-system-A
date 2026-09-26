@@ -1880,7 +1880,12 @@ function mealPlannerScheduleState(dialog) {
             closeMealPlannerDialog();
         });
         dialog.addEventListener("close", () => {
-            if (!dialog.open) clearMealPlannerActionPreview(dialog);
+            if (!dialog.open) {
+                clearMealPlannerActionPreview(dialog);
+                const state = dialog.mealPlanScheduleState;
+                state.entries.forEach(entry => { entry.distributionHover = false; entry.distributionFocus = false; });
+                [state.panel, ...state.entries.map(entry => entry.panel)].forEach(panel => panel?.showDistributionPreview(null));
+            }
         });
     }
     return dialog.mealPlanScheduleState;
@@ -2060,6 +2065,7 @@ function mealPlannerDistributionPreview(state, entry, summaries) {
 }
 
 function syncMealPlannerDistribution(entry, summary, state, busy, summaries) {
+    entry.distributionPreview = null;
     const button = entry.root.querySelector('[data-meal-distribute]');
     const upcoming = entry.root.querySelector('[data-meal-fill-upcoming]');
     const box = entry.root.querySelector('[data-meal-distribution]');
@@ -2069,7 +2075,11 @@ function syncMealPlannerDistribution(entry, summary, state, busy, summaries) {
     box.hidden = !entry.distributionOpen || Boolean(state.edit || !entry.recipeUrl);
     button.setAttribute('aria-expanded', String(!box.hidden));
     upcoming.setAttribute('aria-expanded', String(!box.hidden && entry.distributionMode === 'upcoming'));
-    if (box.hidden) return;
+    if (box.hidden) {
+        entry.distributionHover = false;
+        entry.distributionFocus = false;
+        return;
+    }
     box.querySelector('[data-meal-distribution-choices]').disabled = button.disabled;
     const value = entry.root.querySelector('[data-meal-recipe-servings]').value;
     const servingsText = amount => `${formatMealPlannerServingNumber(amount)} ${Number(amount) === 1 ? 'serving' : 'servings'}`;
@@ -2086,7 +2096,7 @@ function syncMealPlannerDistribution(entry, summary, state, busy, summaries) {
         ? 'Starts on the first scheduled date and repeats the selected meals on following days, keeping any day-specific choices. Adds dates for this recipe until its servings run out; the final portion may be smaller.'
         : 'Uses this recipe’s current schedule, earliest meals first.';
     box.querySelector('[data-meal-distribution-help]').textContent += summaries.size === 1
-        ? ' Apply updates the main calendar below.' : ' Apply updates only this recipe’s custom plan.';
+        ? ' Hover over Apply distribution to preview the main calendar below.' : ' Hover over Apply distribution to preview this recipe’s custom plan on the calendar below.';
     const text = box.querySelector('[data-meal-distribution-preview]');
     const list = box.querySelector('[data-meal-distribution-meals]');
     const review = box.querySelector('[data-meal-distribution-review]');
@@ -2119,12 +2129,14 @@ function syncMealPlannerDistribution(entry, summary, state, busy, summaries) {
         });
         review.hidden = false;
         apply.disabled = button.disabled;
+        if (!apply.disabled) entry.distributionPreview = preview;
     } catch (error) {
         text.textContent = error.message;
         text.dataset.error = 'true';
         review.hidden = true;
         apply.disabled = true;
     }
+    if (apply.disabled) { entry.distributionHover = false; entry.distributionFocus = false; }
     box.querySelector('[data-meal-distribution-cancel]').disabled = Boolean(busy);
 }
 
@@ -2215,6 +2227,13 @@ function syncMealPlannerBatchControls(dialog) {
     // dates. Refresh its amounts without recursively notifying this controller.
     state.entries.forEach(entry => { if (entry.panel?.draft.portionMode === 'recipe') entry.panel.updateTotals(false); });
     syncMealPlannerYieldCoverage(state, summaries);
+    const previewEntry = state.entries.find(entry => entry.distributionPreview && (entry.distributionHover || entry.distributionFocus));
+    const previewPanel = previewEntry && summaries.size > 1 && previewEntry.expanded && previewEntry.panel
+        ? previewEntry.panel : state.panel;
+    [state.panel, ...state.entries.map(entry => entry.panel)].forEach(panel => {
+        panel?.showDistributionPreview(panel === previewPanel ? previewEntry?.distributionPreview : null,
+            previewEntry?.title, summaries.size === 1 ? 'Updates the shared plan.' : 'Updates only this recipe’s custom plan.');
+    });
 }
 
 function syncMealPlannerEditorMode(dialog) {
@@ -2301,7 +2320,24 @@ function createMealPlannerEditor(dialog, root) {
             syncMealPlannerBatchControls(dialog);
             root.querySelector('[data-meal-distribute]').focus({preventScroll:true});
         });
-        root.querySelector('[data-meal-distribution-apply]').addEventListener('click', () => applyMealPlannerDistribution(dialog, root.mealPlannerEntry));
+        const apply = root.querySelector('[data-meal-distribution-apply]');
+        const preview = (key, active) => {
+            root.mealPlannerEntry[key] = active;
+            syncMealPlannerBatchControls(dialog);
+        };
+        apply.addEventListener('pointerenter', event => { if (event.pointerType !== 'touch') preview('distributionHover', true); });
+        apply.addEventListener('pointerleave', () => preview('distributionHover', false));
+        apply.addEventListener('pointercancel', () => preview('distributionHover', false));
+        apply.addEventListener('focus', () => preview('distributionFocus', apply.matches(':focus-visible')));
+        apply.addEventListener('blur', () => preview('distributionFocus', false));
+        apply.addEventListener('keydown', event => {
+            if (event.key !== 'Escape' || !(root.mealPlannerEntry.distributionHover || root.mealPlannerEntry.distributionFocus)) return;
+            event.preventDefault();
+            event.stopPropagation();
+            root.mealPlannerEntry.distributionHover = false;
+            preview('distributionFocus', false);
+        });
+        apply.addEventListener('click', () => applyMealPlannerDistribution(dialog, root.mealPlannerEntry));
     }
     syncMealPlannerBatchControls(dialog);
     return entry;
