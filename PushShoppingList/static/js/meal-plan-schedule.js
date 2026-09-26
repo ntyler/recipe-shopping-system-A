@@ -288,15 +288,46 @@
     // One slot is a date + meal, so two meals on a day consume two portions.
     function distributeRecipeServings(source, budget, {mode = 'keep', servingsPerMeal} = {}) {
         if (portion(budget) === null) throw new Error('No servings remain from this recipe. Adjust its other entries first.');
-        if (!['keep', 'spread'].includes(mode)) throw new Error('Choose how to distribute this recipe.');
-        const clean = clone(source);
+        if (!['keep', 'spread', 'upcoming'].includes(mode)) throw new Error('Choose how to distribute this recipe.');
+        let clean = clone(source);
         delete clean.sharedPortionErrors;
         const total = summary(clean);
         if (!total.valid) throw new Error(total.errors[0]);
-        const slots = total.days.slice().sort((a, b) => a.date.localeCompare(b.date)).flatMap(day =>
+        let slots = total.days.slice().sort((a, b) => a.date.localeCompare(b.date)).flatMap(day =>
             day.meals.map(meal => ({date:day.date, meal:meal.meal_type})));
+        const selectedSlots = new Set(slots.map(slot => `${slot.date}/${slot.meal}`));
         let amounts;
-        if (mode === 'spread') amounts = splitServings(budget, slots.length);
+        if (mode === 'upcoming') {
+            const amount = portion(servingsPerMeal);
+            if (amount === null) throw new Error('Enter servings per meal before filling upcoming days.');
+            // Generate independent future days from the recipe's defaults, while
+            // retaining existing per-day meal and family choices. Cap work at
+            // the API's 1,000-meal limit even for extremely small portions.
+            clean = withMealServings(clean, amount);
+            const cursor = parseDate(slots[0].date);
+            slots = []; amounts = [];
+            let remaining = budget;
+            for (let days = 0; remaining > 0 && days < 1000; days += 1) {
+                if (cursor.getFullYear() > 9999) throw new Error('Upcoming meals exceed the supported calendar. Choose an earlier start date.');
+                const date = formatDate(cursor);
+                ensureDay(clean, date);
+                const day = summary({...clean, dateMode:'days', selectedDates:[date]});
+                const error = day.errors.find(message => message !== 'Select at least one meal with servings.');
+                if (error) throw new Error(error);
+                for (const meal of day.days[0].meals) {
+                    if (!remaining) break;
+                    if (amounts.length === 1000) throw new Error('Fill up to 1,000 meals at a time. Increase servings per meal.');
+                    const servings = Math.min(amount, remaining);
+                    slots.push({date, meal:meal.meal_type});
+                    amounts.push(servings);
+                    remaining = sum([remaining, -servings]);
+                }
+                cursor.setDate(cursor.getDate() + 1);
+            }
+            if (remaining) throw new Error('Unable to use all servings within 1,000 days. Check the selected meals and people, or increase servings per meal.');
+            setDates(clean, slots.map(slot => slot.date));
+            clean.calendarMonth = slots[0].date.slice(0, 7);
+        } else if (mode === 'spread') amounts = splitServings(budget, slots.length);
         else {
             const amount = portion(servingsPerMeal);
             if (amount === null) throw new Error('Enter servings per meal, or choose to spread across all selected meals.');
@@ -327,7 +358,10 @@
         setDates(draft, allocations.map(meal => meal.date));
         const result = summary(draft);
         if (!result.valid) throw new Error(result.errors[0]);
-        return {draft, allocations, selectedMealCount:slots.length, usedServings:result.totalServings,
+        const allocatedSlots = new Set(slots.slice(0, amounts.length).map(slot => `${slot.date}/${slot.meal}`));
+        return {draft, allocations, selectedMealCount:total.mealCount, usedServings:result.totalServings,
+            unfilledMealCount:[...selectedSlots].filter(slot => !allocatedSlots.has(slot)).length,
+            addedMealCount:[...allocatedSlots].filter(slot => !selectedSlots.has(slot)).length,
             remainingServings:sum([budget, -result.totalServings])};
     }
 

@@ -36,7 +36,7 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         await shared.locator('[data-schedule-field="meal"][data-meal="lunch"]').check();
         await shared.getByRole('button',{name:'By family member',exact:true}).click();
         for (const member of members) assert.equal(await portion(shared,member).inputValue(),'1');
-        for (const i of [0,1]) assert.match(await row(i).locator('[data-meal-editor-summary]').textContent(),/1 meal · 1 servings \(1 per meal\).*Share of meal total/);
+        for (const i of [0,1]) assert.match(await row(i).locator('[data-meal-editor-summary]').textContent(),/1 meal · 1 serving \(1 per meal\).*Share of meal total/);
         assert.equal(await total.textContent(),'2 recipes · 1 meal · 2 servings being planned');
         assert.equal(await save.textContent(),'Save 1 Meal');
         assert.match(await shared.locator('[data-schedule-summary]').textContent(),/2 servings.*divided between recipes/);

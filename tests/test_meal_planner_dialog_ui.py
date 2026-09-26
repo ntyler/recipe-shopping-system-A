@@ -615,7 +615,7 @@ assert.match(activeDialog.querySelector('[data-meal-batch-help]').textContent,/1
 ctx.customizeMealPlannerRecipe(activeDialog,second);
 assert.equal(M.summary(second.panel.schedulingDraft()).totalServings,2);
 M.setDates(second.panel.draft,['2026-10-06','2026-10-07','2026-10-08']);second.panel.render();
-assert.match(text(state.entries[0]),/1 meal.*1 servings/);assert.match(text(second),/3 meals.*3 servings/);
+assert.match(text(state.entries[0]),/1 meal.*1 serving/);assert.match(text(second),/3 meals.*3 servings/);
 ctx.addMealPlannerEditor();const third=state.entries[2];select(third,'recipe://bread');
 assert.match(text(third),/12 servings/);
 select(third,'recipe://soup');assert.match(text(third),/0.8 servings/);

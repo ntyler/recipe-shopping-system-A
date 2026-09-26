@@ -2051,26 +2051,35 @@ function mealPlannerDistributionPreview(state, entry, summaries) {
     const needsPortions = state.panel.draft.portionMode !== 'recipe';
     const unfilled = needsPortions ? MealPlanSchedule.summary(state.panel.draft).days.reduce((count, day) => count + day.meals.filter(meal =>
         MealPlanSchedule.sum([meal.planned_servings, -(planned.get(`${day.date}/${meal.meal_type}`) || 0)]) > 0).length, 0)
-        : preview.selectedMealCount - preview.allocations.length;
+        : preview.unfilledMealCount;
     return {...preview, reserved, budget, unfilled, needsPortions};
 }
 
 function syncMealPlannerDistribution(entry, summary, state, busy, summaries) {
     const button = entry.root.querySelector('[data-meal-distribute]');
+    const upcoming = entry.root.querySelector('[data-meal-fill-upcoming]');
     const box = entry.root.querySelector('[data-meal-distribution]');
     if (!button || !box) return;
     button.disabled = Boolean(busy || state.edit || state.panel.ui.loading || entry.panel?.ui.loading || !entry.yieldServings);
+    upcoming.disabled = button.disabled;
     box.hidden = !entry.distributionOpen || Boolean(state.edit || !entry.recipeUrl);
     button.setAttribute('aria-expanded', String(!box.hidden));
+    upcoming.setAttribute('aria-expanded', String(!box.hidden && entry.distributionMode === 'upcoming'));
     if (box.hidden) return;
     box.querySelector('[data-meal-distribution-choices]').disabled = button.disabled;
     const value = entry.root.querySelector('[data-meal-recipe-servings]').value;
+    const servingsText = amount => `${formatMealPlannerServingNumber(amount)} ${Number(amount) === 1 ? 'serving' : 'servings'}`;
     box.querySelector('[data-meal-distribution-keep]').textContent = Number(value) > 0
-        ? `Keep ${formatMealPlannerServingNumber(value)} servings per meal` : 'Keep servings per meal (enter an amount above)';
+        ? `Keep ${servingsText(value)} per meal on selected dates` : 'Keep servings per meal (enter an amount above)';
+    box.querySelector('[data-meal-distribution-upcoming]').textContent = Number(value) > 0
+        ? `Fill upcoming days at ${servingsText(value)} per meal` : 'Fill upcoming days (enter servings per meal above)';
     box.querySelector('[data-meal-distribution-spread]').textContent = `Spread across all ${summary.mealCount} selected ${summary.mealCount === 1 ? 'meal' : 'meals'}`;
     box.querySelectorAll('[data-meal-distribution-mode]').forEach(input => { input.checked = input.value === (entry.distributionMode || 'keep'); });
     const budget = box.querySelector('[data-meal-distribution-budget]');
-    budget.textContent = `One recipe makes ${formatMealPlannerServingNumber(entry.yieldServings)} servings.`;
+    budget.textContent = `One recipe makes ${servingsText(entry.yieldServings)}.`;
+    box.querySelector('[data-meal-distribution-help]').textContent = entry.distributionMode === 'upcoming'
+        ? 'Starts on the first scheduled date and repeats the selected meals on following days, keeping any day-specific choices. Adds dates for this recipe until its servings run out; the final portion may be smaller.'
+        : 'Uses this recipe’s current schedule, earliest meals first. The shared calendar and family targets stay unchanged.';
     const text = box.querySelector('[data-meal-distribution-preview]');
     const list = box.querySelector('[data-meal-distribution-meals]');
     const review = box.querySelector('[data-meal-distribution-review]');
@@ -2081,12 +2090,18 @@ function syncMealPlannerDistribution(entry, summary, state, busy, summaries) {
         if (preview.reserved) budget.textContent += ` ${formatMealPlannerServingNumber(preview.reserved)} already assigned in other entries; ${formatMealPlannerServingNumber(preview.budget)} available here.`;
         const coverage = preview.needsPortions ? `${preview.unfilled} ${preview.unfilled === 1 ? 'meal still needs' : 'meals still need'} portions`
             : `${preview.unfilled} selected ${preview.unfilled === 1 ? 'meal without' : 'meals without'} this recipe`;
-        text.textContent = `${formatMealPlannerServingNumber(preview.usedServings)} servings used · ${formatMealPlannerServingNumber(preview.remainingServings)} remaining · ${coverage}.`;
+        text.textContent = `${servingsText(preview.usedServings)} used · ${formatMealPlannerServingNumber(preview.remainingServings)} remaining · ${coverage}.`;
+        if (entry.distributionMode === 'upcoming') {
+            const days = new Set(preview.allocations.map(meal => meal.date)).size;
+            const last = preview.allocations.at(-1);
+            text.textContent = `${preview.allocations.length} ${preview.allocations.length === 1 ? 'meal' : 'meals'} across ${days} ${days === 1 ? 'day' : 'days'} · ` + text.textContent;
+            if (last.planned_servings < Number(value)) text.textContent += ` Last meal: ${servingsText(last.planned_servings)} (smaller portion).`;
+        }
         text.dataset.error = 'false';
         preview.allocations.forEach(meal => {
             const item = document.createElement('li');
             const date = MealPlanSchedule.parseDate(meal.date).toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'});
-            item.textContent = `${date} · ${meal.meal_type} · ${formatMealPlannerServingNumber(meal.planned_servings)} servings`;
+            item.textContent = `${date} · ${meal.meal_type} · ${servingsText(meal.planned_servings)}`;
             list.appendChild(item);
         });
         review.hidden = false;
@@ -2115,10 +2130,11 @@ function applyMealPlannerDistribution(dialog, entry) {
             entry.panel.draft = preview.draft;
             entry.panel.render();
         }
+        if (entry.distributionMode === 'upcoming') entry.expanded = true;
         entry.touched = true;
         entry.root.querySelector('[data-meal-editor-error]').hidden = true;
         syncMealPlannerBatchControls(dialog);
-        entry.root.querySelector('[data-meal-distribute]').focus({preventScroll:true});
+        entry.root.querySelector(entry.distributionMode === 'upcoming' ? '[data-meal-fill-upcoming]' : '[data-meal-distribute]').focus({preventScroll:true});
     } catch (error) {
         mealPlannerEditorError(entry, error.message, state.entries.indexOf(entry));
     }
@@ -2143,7 +2159,7 @@ function syncMealPlannerBatchControls(dialog) {
     const save = dialog.querySelector('[data-meal-batch-save]');
     save.disabled = Boolean(busy || loading || !state.entries.some(entry => entry.recipeUrl || entry.touched));
     save.textContent = state.saving ? 'Saving meals…' : `Save ${count} ${count === 1 ? 'Meal' : 'Meals'}`;
-    dialog.querySelector('[data-meal-batch-help]').textContent = `${recipeCount} ${recipeCount === 1 ? 'recipe' : 'recipes'} · ${count} ${count === 1 ? 'meal' : 'meals'} · ${formatMealPlannerServingNumber(servings)} servings being planned`;
+    dialog.querySelector('[data-meal-batch-help]').textContent = `${recipeCount} ${recipeCount === 1 ? 'recipe' : 'recipes'} · ${count} ${count === 1 ? 'meal' : 'meals'} · ${formatMealPlannerServingNumber(servings)} ${servings === 1 ? 'serving' : 'servings'} being planned`;
     const add = dialog.querySelector('[data-meal-editor-add]');
     add.hidden = Boolean(state.edit);
     add.disabled = Boolean(busy || state.entries.length >= 100);
@@ -2157,7 +2173,7 @@ function syncMealPlannerBatchControls(dialog) {
         const perMeal = portions.length && portions.every(value => value === portions[0])
             ? ` (${formatMealPlannerServingNumber(portions[0])} per meal)` : '';
         entry.root.querySelector('[data-meal-editor-summary]').textContent = entry.recipeUrl
-            ? `${entry.panel ? 'Custom plan' : entry.servingsPerMeal !== undefined ? 'Custom portions' : 'Uses shared plan'} · ${summary.dayCount} ${summary.dayCount === 1 ? 'day' : 'days'} · ${summary.mealCount} ${summary.mealCount === 1 ? 'meal' : 'meals'} · ${formatMealPlannerServingNumber(summary.totalServings)} servings${perMeal}${!entry.panel && state.panel.draft.portionMode !== 'recipe' ? ' · Share of meal total' : ''}`
+            ? `${entry.panel ? 'Custom plan' : entry.servingsPerMeal !== undefined ? 'Custom portions' : 'Uses shared plan'} · ${summary.dayCount} ${summary.dayCount === 1 ? 'day' : 'days'} · ${summary.mealCount} ${summary.mealCount === 1 ? 'meal' : 'meals'} · ${formatMealPlannerServingNumber(summary.totalServings)} ${summary.totalServings === 1 ? 'serving' : 'servings'}${perMeal}${!entry.panel && state.panel.draft.portionMode !== 'recipe' ? ' · Share of meal total' : ''}`
             : 'Choose a recipe to calculate servings.';
         updateMealPlannerYieldBalance(entry, summaries, state.edit);
         syncMealPlannerRecipeServings(entry, summary, state, busy);
@@ -2205,6 +2221,7 @@ function createMealPlannerEditor(dialog, root) {
     distribution.id = `${entry.id}-distribution`;
     distribution.querySelectorAll('[data-meal-distribution-mode]').forEach(input => { input.name = `${entry.id}-distribution-mode`; });
     root.querySelector('[data-meal-distribute]').setAttribute('aria-controls', distribution.id);
+    root.querySelector('[data-meal-fill-upcoming]').setAttribute('aria-controls', distribution.id);
     // These listeners belong to the persistent section, not its rendered fields.
     root.mealPlannerEntry = entry;
     if (!root.mealPlannerBound) {
@@ -2242,6 +2259,14 @@ function createMealPlannerEditor(dialog, root) {
             const current = root.mealPlannerEntry;
             current.distributionOpen = !current.distributionOpen;
             current.distributionMode ||= 'keep';
+            syncMealPlannerBatchControls(dialog);
+        });
+        root.querySelector('[data-meal-fill-upcoming]').addEventListener('click', () => {
+            if (mealPlannerBusy(state) || state.edit) return;
+            const current = root.mealPlannerEntry;
+            current.distributionOpen = true;
+            current.distributionMode = 'upcoming';
+            root.querySelector('[data-meal-distribution-review]').open = true;
             syncMealPlannerBatchControls(dialog);
         });
         root.querySelectorAll('[data-meal-distribution-mode]').forEach(input => input.addEventListener('change', () => {
