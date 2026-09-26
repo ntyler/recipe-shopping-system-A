@@ -251,7 +251,7 @@
                 const calendar = model.calendarMonth(draft.calendarMonth);
                 dates = `<div class="meal-schedule-calendar"><div class="meal-schedule-calendar-heading"><button type="button" data-schedule-action="month" data-direction="-1" data-focus-key="previous-month" aria-label="Previous month">‹</button><strong>${esc(calendar.label)}</strong><button type="button" data-schedule-action="month" data-direction="1" data-focus-key="next-month" aria-label="Next month">›</button></div>
                     <div class="meal-schedule-calendar-grid">${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(day => `<span aria-hidden="true">${day}</span>`).join('')}${calendar.days.map(day => `<button type="button" data-schedule-action="date" data-date="${day.date}" data-focus-key="calendar-${day.date}" aria-label="${esc(dateLabel(day.date))}" aria-pressed="${draft.selectedDates.includes(day.date)}" class="${day.inMonth ? '' : 'is-other-month'}">${day.day}</button>`).join('')}</div>
-                    <p>Drag across dates to select a range, including other months. Click a date to select or clear it.</p></div>`;
+                    <p>Drag to select a range, or clear it if all its dates are already selected. Click to toggle one date.</p></div>`;
             }
             const dayCards = totals.days.map(day => {
                 const data = draft.days[day.date], meals = model.MEAL_TYPES.filter(meal => data.mealEnabled[meal]);
@@ -454,10 +454,15 @@
             drag.lastDate = date;
             const dates = new Set(drag.before);
             const [start, end] = [drag.anchor, date].sort();
-            // Only a press and release on one date toggles it. Range gestures
-            // always select, preserving dates that were selected beforehand.
-            if (toggle && dates.has(date)) dates.delete(date);
-            else root.MealPlanSchedule.dateRange(start, end).forEach(day => dates.add(day));
+            const range = root.MealPlanSchedule.dateRange(start, end);
+            // Evaluate against the original selection so previewed changes never
+            // flip the operation. Mixed ranges extend; fully selected ranges clear.
+            // Returning a drag to its anchor preserves it; only a click toggles it.
+            const clearing = (toggle || date !== drag.anchor) && range.every(day => dates.has(day));
+            range.forEach(day => {
+                if (clearing) dates.delete(day);
+                else dates.add(day);
+            });
             root.MealPlanSchedule.setDates(this.draft, [...dates]);
             this.render();
             // Notify the containing editor even when capture consumes the click

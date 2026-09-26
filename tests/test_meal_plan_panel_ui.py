@@ -373,9 +373,9 @@ form.handlers.pointerup({pointerId:7,buttons:0});assert.equal(panel.calendarDrag
 await panel.click({target:day('2026-10-09'),detail:1,pointerId:7,preventDefault(){}});
 assert(panel.draft.selectedDates.includes('2026-10-09'),'Release click cannot toggle the endpoint back off');
 press('2026-10-09');move('2026-10-07');panel.endCalendarDrag();
-assert.deepEqual(plain(panel.draft.selectedDates),['2026-10-05','2026-10-07','2026-10-08','2026-10-09'],'Starting on a selected day keeps the inclusive range');
+assert.deepEqual(plain(panel.draft.selectedDates),['2026-10-05'],'Dragging across a fully selected range clears it');
 await panel.click({target:day('2026-10-09'),detail:0});
-assert(!panel.draft.selectedDates.includes('2026-10-09'),'Keyboard clicks still toggle individual dates');
+assert(panel.draft.selectedDates.includes('2026-10-09'),'Keyboard clicks still toggle individual dates');
 """)
 
 
@@ -400,7 +400,10 @@ assert.equal(changes,0);
 move('2026-09-27');await release();
 assert.deepEqual(plain(panel.draft.selectedDates),['2026-09-25','2026-09-26','2026-09-27']);
 assert.equal(panel.draft.days['2026-09-25'].household.dinner,3.5,'The anchor keeps its customized portions');
-press('2026-09-25');move('2026-09-28');move('2026-09-25');await release();
+press('2026-09-25');move('2026-09-26');move('2026-09-28');
+assert.deepEqual(plain(panel.draft.selectedDates),['2026-09-25','2026-09-26','2026-09-27','2026-09-28'],'Extending beyond selected dates selects the entire range');
+assert.equal(panel.draft.days['2026-09-25'].household.dinner,3.5,'Extending restores the anchor with its customized portions');
+move('2026-09-25');await release();
 assert.deepEqual(plain(panel.draft.selectedDates),['2026-09-25','2026-09-26','2026-09-27'],'Returning a drag to its anchor must not toggle it off');
 press('2026-09-25');await release();
 assert.deepEqual(plain(panel.draft.selectedDates),['2026-09-26','2026-09-27'],'A single click clears only its date');
@@ -408,6 +411,34 @@ press('2026-09-25');await release();
 assert.deepEqual(plain(panel.draft.selectedDates),['2026-09-25','2026-09-26','2026-09-27'],'A second click selects the date again');
 press('2026-09-25');form.handlers.pointercancel({pointerId:7});
 assert.deepEqual(plain(panel.draft.selectedDates),['2026-09-25','2026-09-26','2026-09-27'],'Cancelling a press leaves dates unchanged');
+assert.equal(captured,null);
+""")
+
+
+def test_calendar_drag_clears_selected_range_across_months_and_restores_shortened_preview():
+    run_panel(r"""
+form.hidden=false;let captured=null,hit=null;
+form.setPointerCapture=id=>captured=id;form.hasPointerCapture=id=>captured===id;
+form.releasePointerCapture=()=>captured=null;form.contains=button=>button?.own===true;
+form.dispatchEvent=()=>{};ctx.Event=class {};ctx.document.elementFromPoint=()=>hit;
+const day=date=>({own:true,dataset:{date,scheduleAction:'date'},focus(){},closest(){return this;}});
+const press=date=>{hit=day(date);panel.startCalendarDrag({target:hit,pointerId:7,pointerType:'mouse',button:0,preventDefault(){}});};
+const move=date=>{hit=day(date);panel.moveCalendarDrag({pointerId:7,buttons:1});};
+const selected=['2026-09-22',...M.dateRange('2026-09-26','2026-10-09')];
+M.setDates(panel.draft,selected);
+M.setDayHousehold(panel.draft,'2026-10-03','dinner',3.5);
+press('2026-10-09');
+assert.deepEqual(plain(panel.draft.selectedDates),plain(selected),'Pressing the selected endpoint leaves it unchanged until dragging');
+move('2026-10-08');
+assert.deepEqual(plain(panel.draft.selectedDates),['2026-09-22',...M.dateRange('2026-09-26','2026-10-07')]);
+move('2026-09-26');
+assert.deepEqual(plain(panel.draft.selectedDates),['2026-09-22'],'Oct 9 back to Sep 26 clears the inclusive range and preserves unrelated dates');
+move('2026-10-05');
+assert.deepEqual(plain(panel.draft.selectedDates),['2026-09-22',...M.dateRange('2026-09-26','2026-10-04')],'Shortening the clearing preview restores untouched dates');
+assert.equal(panel.draft.days['2026-10-03'].household.dinner,3.5,'Restored dates keep their custom portions');
+move('2026-09-26');form.handlers.pointerup({pointerId:7,buttons:0});
+await panel.click({target:hit,detail:1,pointerId:7,preventDefault(){}});
+assert.deepEqual(plain(panel.draft.selectedDates),['2026-09-22'],'The release click must not select the endpoint again');
 assert.equal(captured,null);
 """)
 
