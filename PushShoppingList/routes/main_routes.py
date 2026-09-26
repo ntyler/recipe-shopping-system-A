@@ -817,6 +817,7 @@ def meal_plan_recipe_option_rows(recipe_urls, recipe_ingredient_data=None):
                 or "Recipe"
             ).strip(),
             "default_servings": planned_servings_from_yield(recipe_yield) or 1,
+            "yield_servings": planned_servings_from_yield(recipe_yield),
             "yield_label": meal_plan_yield_label(recipe_yield),
             "ingredient_requirements": [
                 public_requirement(requirement)

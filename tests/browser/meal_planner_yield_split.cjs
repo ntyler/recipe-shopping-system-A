@@ -91,6 +91,10 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         await dialog.locator('[data-meal-editor-add]').click();
         await row(1).locator('[name="recipe_url"]').selectOption('recipe://soup');
         for (const index of [0,1]) assert.match(await summary(index).textContent(),/1 meal · 2 servings \(2 per meal\)/);
+        for (const index of [0,1]) {
+            assert.equal(await row(index).locator('[data-meal-yield-remaining]').textContent(),'All servings from one full recipe are planned');
+            assert.equal(await row(index).locator('[data-meal-yield-planned]').textContent(),'4 of 4 servings planned across 2 entries.');
+        }
         assert.match(await dialog.locator('[data-meal-batch-help]').textContent(),/1 recipe · 1 meal/);
         await row(1).locator('[data-meal-editor-customize]').click();
         assert.match(await soup.locator('[data-schedule-summary]').textContent(),/1 meal · 2 servings/);

@@ -1917,6 +1917,40 @@ function syncMealPlannerScheduleControls(dialog, panel) {
     syncMealPlannerBatchControls(dialog);
 }
 
+function updateMealPlannerYieldBalance(entry, summaries, editing) {
+    const box = entry.root.querySelector('[data-meal-yield-balance]');
+    if (!box) return;
+    box.hidden = Boolean(editing || !entry.recipeUrl);
+    if (box.hidden) return;
+    // Repeated entries refer to one recipe yield, not another full recipe each.
+    const related = [...summaries].filter(([other]) => other.recipeUrl === entry.recipeUrl).map(([, summary]) => summary);
+    const remaining = box.querySelector('[data-meal-yield-remaining]');
+    const planned = box.querySelector('[data-meal-yield-planned]');
+    const servingText = value => `${formatMealPlannerServingNumber(value)} ${value === 1 ? 'serving' : 'servings'}`;
+    const total = MealPlanSchedule.sum(related.map(summary => summary.totalServings));
+    box.dataset.state = 'unknown';
+    if (related.some(summary => !summary.valid)) {
+        remaining.textContent = 'Check portions to see what remains';
+        planned.textContent = 'Resolve this recipe’s date or portion errors first.';
+        return;
+    }
+    if (!entry.yieldServings) {
+        remaining.textContent = 'Recipe yield unavailable';
+        planned.textContent = `${servingText(total)} planned. Add a recipe yield to calculate the balance.`;
+        return;
+    }
+    const balance = MealPlanSchedule.sum([entry.yieldServings, -total]);
+    planned.textContent = `${formatMealPlannerServingNumber(total)} of ${servingText(entry.yieldServings)} planned${related.length > 1 ? ` across ${related.length} entries` : ''}.`;
+    if (balance < 0) {
+        box.dataset.state = 'extra';
+        remaining.textContent = `${servingText(-balance)} beyond one full recipe`;
+        planned.textContent += ` Make ${formatMealPlannerServingNumber(total / entry.yieldServings)}× the recipe.`;
+    } else {
+        box.dataset.state = 'available';
+        remaining.textContent = balance ? `${servingText(balance)} left to distribute if you make the full recipe` : 'All servings from one full recipe are planned';
+    }
+}
+
 function syncMealPlannerBatchControls(dialog) {
     const state = mealPlannerScheduleState(dialog);
     const footer = dialog.querySelector('[data-meal-batch-footer]');
@@ -1952,6 +1986,7 @@ function syncMealPlannerBatchControls(dialog) {
         entry.root.querySelector('[data-meal-editor-summary]').textContent = entry.recipeUrl
             ? `${entry.panel ? 'Custom plan' : 'Uses shared plan'} · ${summary.dayCount} ${summary.dayCount === 1 ? 'day' : 'days'} · ${summary.mealCount} ${summary.mealCount === 1 ? 'meal' : 'meals'} · ${formatMealPlannerServingNumber(summary.totalServings)} servings${perMeal}${!entry.panel && state.panel.draft.portionMode !== 'recipe' ? ' · Share of meal total' : ''}`
             : 'Choose a recipe to calculate servings.';
+        updateMealPlannerYieldBalance(entry, summaries, state.edit);
         const customize = entry.root.querySelector('[data-meal-editor-customize]');
         customize.disabled = Boolean(busy);
         customize.textContent = entry.expanded ? 'Hide custom plan' : entry.panel ? 'Show custom plan' : 'Customize';
@@ -2252,6 +2287,8 @@ function syncMealPlannerServingsFromRecipe(input) {
     entry.touched = entry.touched || Boolean(selectedRecipe);
     entry.recipeUrl = selectedRecipe;
     entry.defaultServings = defaultServings;
+    const yieldServings = Number(option?.dataset.yieldServings);
+    entry.yieldServings = Number.isFinite(yieldServings) && yieldServings > 0 ? yieldServings : null;
     entry.title = selectedRecipe ? option.textContent.trim() : 'Choose a recipe';
     if (entry.panel) Object.assign(entry.panel.options, {title: entry.title, servings: defaultServings});
     entry.root.querySelector('[data-meal-editor-error]').hidden = true;

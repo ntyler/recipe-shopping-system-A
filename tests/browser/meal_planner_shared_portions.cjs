@@ -40,14 +40,28 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         assert.equal(await total.textContent(),'2 recipes · 1 meal · 2 servings being planned');
         assert.equal(await save.textContent(),'Save 1 Meal');
         assert.match(await shared.locator('[data-schedule-summary]').textContent(),/2 servings.*divided between recipes/);
+        // Three lunches use three servings of each recipe. Their original
+        // yields differ, so the remaining balances must differ as well.
+        await shared.getByRole('button',{name:'Date range',exact:true}).click();
+        await shared.locator('[data-schedule-field="end-date"]').fill('2026-10-07');
+        assert.equal(await row(0).locator('[data-meal-yield-remaining]').textContent(),'5 servings left to distribute if you make the full recipe');
+        assert.equal(await row(1).locator('[data-meal-yield-remaining]').textContent(),'1 serving left to distribute if you make the full recipe');
+        assert.equal(await row(1).locator('[data-meal-yield-planned]').textContent(),'3 of 4 servings planned.');
         await dialog.evaluate(e=>{e.scrollTop=0;});await screenshot('shared-lunch-desktop.png');
         await page.setViewportSize({width:390,height:844});
         assert(await dialog.evaluate(e=>e.scrollWidth<=e.clientWidth+1));await screenshot('shared-lunch-mobile.png');
         await page.setViewportSize({width:1440,height:1200});
+        await shared.locator('[data-schedule-field="end-date"]').fill('2026-10-08');
+        assert.equal(await row(1).locator('[data-meal-yield-remaining]').textContent(),'All servings from one full recipe are planned');
+        await shared.locator('[data-schedule-field="end-date"]').fill('2026-10-09');
+        assert.equal(await row(1).locator('[data-meal-yield-remaining]').textContent(),'1 serving beyond one full recipe');
+        assert.match(await row(1).locator('[data-meal-yield-planned]').textContent(),/Make 1.25× the recipe/);
+        await shared.getByRole('button',{name:'One day',exact:true}).click();
         await row(1).locator('[data-meal-editor-customize]').click();
         for (const member of members) assert.equal(await portion(custom(1),member).inputValue(),'0.5');
         await portion(custom(1),members[0]).fill('0.75');
         assert.match(await row(0).locator('[data-meal-editor-summary]').textContent(),/0.75 servings/);
+        assert.match(await row(1).locator('[data-meal-yield-remaining]').textContent(),/^2.75 servings left/);
         assert.equal(await total.textContent(),'2 recipes · 1 meal · 2 servings being planned');
         await portion(custom(1),members[0]).fill('1.25');await save.click();
         assert.equal(posts.length,0,'Overallocating one person cannot save even if the combined total fits');

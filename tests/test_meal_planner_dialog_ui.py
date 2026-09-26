@@ -52,8 +52,8 @@ const page=node({dataset:{mealWeek:'2026-09-21'},querySelector(selector){return 
 function makeDialog() {
  const options=[
   {value:'',textContent:'Choose a recipe',label:'Choose a recipe',dataset:{defaultServings:'1',yieldLabel:''}},
-  {value:'recipe://bread',textContent:'Corn Spoon Bread',label:'Corn Spoon Bread',dataset:{defaultServings:'12',yieldLabel:'12 servings'}},
-  {value:'recipe://soup',textContent:'Soup',label:'Soup',dataset:{defaultServings:'4',yieldLabel:'4 servings'}},
+  {value:'recipe://bread',textContent:'Corn Spoon Bread',label:'Corn Spoon Bread',dataset:{defaultServings:'12',yieldServings:'12',yieldLabel:'12 servings'}},
+  {value:'recipe://soup',textContent:'Soup',label:'Soup',dataset:{defaultServings:'4',yieldServings:'4',yieldLabel:'4 servings'}},
  ];
  const recipe=node({options});
  Object.defineProperty(recipe,'selectedOptions',{get:()=>[options.find(o=>o.value===recipe.value) || options[0]]});
@@ -701,6 +701,28 @@ assert.match(activeDialog.querySelector('[data-meal-batch-help]').textContent,/1
 assert.match(state.entries[0].root.querySelector('[data-meal-editor-summary]').textContent,/2 servings/);
 requests=[];await ctx.saveMealPlannerBatch();assert.equal(requests.length,0);
 assert.match(second.root.querySelector('[data-meal-editor-error]').textContent,/Please select a recipe/);
+""")
+
+
+def test_recipe_yield_balance_handles_invalid_unknown_repeated_and_cleared_recipes():
+    run_dialog(r"""
+await open('2026-10-05','lunch');const shared=await choose('recipe://soup'),state=activeDialog.mealPlanScheduleState;
+M.setHouseholdDefault(shared.draft,'lunch',0.3);shared.render();
+const balance=entry=>entry.root.querySelector('[data-meal-yield-balance]');
+const remaining=entry=>balance(entry).querySelector('[data-meal-yield-remaining]').textContent;
+const planned=entry=>balance(entry).querySelector('[data-meal-yield-planned]').textContent;
+assert.match(remaining(state.entries[0]),/^3.7 servings left/);
+ctx.addMealPlannerEditor();const second=state.entries[1],input=second.root.querySelector('[name="recipe_url"]');
+input.value='recipe://soup';ctx.syncMealPlannerServingsFromRecipe(input);
+for(const entry of state.entries){assert.match(remaining(entry),/^3.7 servings left/);assert.match(planned(entry),/0.3 of 4 servings planned across 2 entries/);}
+M.setHouseholdDefault(shared.draft,'lunch','');shared.render();
+assert.match(remaining(second),/Check portions/);
+M.setHouseholdDefault(shared.draft,'lunch',1);shared.render();
+const option=input.selectedOptions[0];option.dataset.yieldServings='';option.dataset.defaultServings='1';
+ctx.syncMealPlannerServingsFromRecipe(input);
+assert.equal(remaining(second),'Recipe yield unavailable','Fallback portions must not be presented as a known recipe yield');
+input.value='';ctx.syncMealPlannerServingsFromRecipe(input);
+assert.equal(balance(second).hidden,true);assert.match(remaining(state.entries[0]),/^3 servings left/);
 """)
 
 

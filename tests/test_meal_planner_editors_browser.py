@@ -23,7 +23,7 @@ def test_simultaneous_meal_editors_in_chromium(scoped_client, monkeypatch, scrip
     module = os.environ.get('AI_PANTRY_PLAYWRIGHT_MODULE', 'playwright')
     if not node or subprocess.run([node, '-e', 'require.resolve(process.argv[1])', module], capture_output=True).returncode:
         pytest.skip('Set AI_PANTRY_PLAYWRIGHT_MODULE to an installed Playwright module')
-    recipes = [dict(url=f'recipe://{name.lower()}', name=name, default_servings=servings,
+    recipes = [dict(url=f'recipe://{name.lower()}', name=name, default_servings=servings, yield_servings=servings,
                     yield_label=f'{servings} servings', ingredient_requirements=[{
                         'id': 'oil', 'label': 'Oil', 'default_option_id': 'olive',
                         'options': [{'id': 'olive', 'label': 'Olive', 'items': []},

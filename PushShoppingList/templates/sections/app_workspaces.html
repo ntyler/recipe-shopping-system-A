@@ -839,7 +839,11 @@
             <div data-meal-editors>
             <section class="app-meal-editor" data-meal-editor>
             <div class="app-meal-editor-heading" data-meal-editor-heading>
-                <div><h4 data-meal-editor-number>Recipe 1</h4><p data-meal-editor-summary>Uses shared plan</p></div>
+                <div><h4 data-meal-editor-number>Recipe 1</h4><p data-meal-editor-summary>Uses shared plan</p>
+                    <div class="app-meal-yield-balance" data-meal-yield-balance aria-live="polite" aria-atomic="true" hidden>
+                        <strong data-meal-yield-remaining></strong><span data-meal-yield-planned></span>
+                    </div>
+                </div>
                 <div class="app-meal-editor-actions">
                     <button type="button" class="app-page-secondary-action" data-meal-editor-customize aria-expanded="false">Customize</button>
                     <button type="button" class="app-page-secondary-action" data-meal-editor-remove hidden>Remove</button>
@@ -852,6 +856,7 @@
                         {% for recipe in meal_plan_recipe_options %}
                             <option value="{{ recipe.url }}"
                                     data-default-servings="{{ recipe.default_servings }}"
+                                    data-yield-servings="{{ recipe.yield_servings if recipe.yield_servings is defined and recipe.yield_servings else '' }}"
                                     data-yield-label="{{ recipe.yield_label }}"
                                     data-ingredient-requirements="{{ recipe.ingredient_requirements | tojson | forceescape }}">{{ recipe.name }}</option>
                         {% endfor %}
