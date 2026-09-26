@@ -191,6 +191,15 @@ body.recipe-preview-active { overflow: auto; }
 .meal-schedule-calendar-grid button { min-height: 42px; padding: 7px 3px; }
 .meal-schedule-calendar-grid .is-other-month { color: var(--app-muted); background: transparent; }
 .meal-schedule-calendar-grid button[aria-pressed="true"], .meal-schedule-panel .is-primary { background: var(--app-primary); color: #06251b; border-color: var(--app-primary); }
+.meal-schedule-calendar-grid button.is-yield-short[aria-pressed="true"] { background: #f9d68b; color: #503400; border-color: #ad730e; border-style: dashed; }
+.meal-schedule-calendar-grid [data-schedule-yield-shortage] { display: block; margin-top: 2px; font-size: 10px; line-height: 1.2; font-weight: 700; overflow-wrap: anywhere; }
+.meal-schedule-calendar-grid [data-schedule-yield-shortage][hidden], .meal-schedule-yield-legend[hidden] { display: none; }
+.meal-schedule-yield-legend { margin-top: 12px; }
+.meal-schedule-yield-legend > div { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 12px; }
+.meal-schedule-yield-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.meal-schedule-yield-legend i { width: 12px; height: 12px; border-radius: 3px; }
+.meal-schedule-yield-legend .is-selected { background: var(--app-primary); }
+.meal-schedule-yield-legend .is-short { background: #f9d68b; border: 1px dashed #ad730e; }
 .meal-schedule-meals { display: flex; align-items: center; flex-wrap: wrap; gap: 14px 20px; margin-bottom: 20px; }
 .meal-schedule-panel .meal-schedule-check { display: flex; align-items: center; gap: 8px; margin: 0; cursor: pointer; }
 .meal-schedule-panel input[type="checkbox"] { appearance: auto; width: 18px; height: 18px; min-width: 18px; margin: 0; padding: 0; accent-color: var(--app-primary); flex: 0 0 18px; }

@@ -644,6 +644,39 @@
         return {valid: !errors.length, errors, dayCount: days.length, mealCount, totalServings, memberTotals, days};
     }
 
+    // One yield per recipe, consumed by date, even across repeated entries.
+    // Same-day entries share any shortfall proportionally so row order cannot
+    // make one custom calendar appear covered at another entry's expense.
+    function recipeYieldCoverage(plans) {
+        const coverage = plans.map(() => []), groups = new Map();
+        plans.forEach((plan, index) => {
+            if (!groups.has(plan.recipeUrl)) groups.set(plan.recipeUrl, []);
+            groups.get(plan.recipeUrl).push(index);
+        });
+        groups.forEach(indices => {
+            const budget = portion(plans[indices[0]].yieldServings);
+            if (!budget || indices.some(index => !plans[index].summary.valid)) return;
+            const dates = [...new Set(indices.flatMap(index => plans[index].summary.days.map(day => day.date)))].sort();
+            let remaining = budget;
+            dates.forEach(date => {
+                const entries = indices.map(index => ({index,
+                    servings: plans[index].summary.days.find(day => day.date === date)?.totalServings || 0,
+                })).filter(entry => entry.servings > 0);
+                const total = sum(entries.map(entry => entry.servings));
+                const shortage = Math.max(0, sum([total, -remaining]));
+                remaining = Math.max(0, sum([remaining, -total]));
+                let unassigned = shortage;
+                entries.forEach((entry, index) => {
+                    const short = index === entries.length - 1 ? unassigned
+                        : Math.min(unassigned, Number((shortage * (entry.servings / total)).toPrecision(12)));
+                    unassigned = sum([unassigned, -short]);
+                    coverage[entry.index].push({date, plannedServings:entry.servings, shortageServings:short});
+                });
+            });
+        });
+        return coverage;
+    }
+
     function payload(draft) {
         const totals = summary(draft);
         if (!totals.valid) throw new Error(totals.errors[0]);
@@ -735,6 +768,6 @@
         setDateMode, setSingleDate, setRange, setDates, toggleDate, setPortionMode, setMeals,
         setHouseholdDefault, setFamilyDefault, setDayMeal, setDayHousehold, setDayFamily,
         setDayNotes, setMealNotes, mealPortionMode, canAssignMember, fromSaved,
-        applyDefaults, setMembers, setGroups, selectGroupMembers, withPortions, withMealServings, distributeRecipeServings, splitRecipeYield, splitSharedPlan, sum, summary, payload
+        applyDefaults, setMembers, setGroups, selectGroupMembers, withPortions, withMealServings, distributeRecipeServings, splitRecipeYield, splitSharedPlan, recipeYieldCoverage, sum, summary, payload
     });
 })(globalThis);

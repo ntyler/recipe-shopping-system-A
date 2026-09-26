@@ -250,7 +250,8 @@
             if (draft.dateMode === 'days') {
                 const calendar = model.calendarMonth(draft.calendarMonth);
                 dates = `<div class="meal-schedule-calendar"><div class="meal-schedule-calendar-heading"><button type="button" data-schedule-action="month" data-direction="-1" data-focus-key="previous-month" aria-label="Previous month">‹</button><strong>${esc(calendar.label)}</strong><button type="button" data-schedule-action="month" data-direction="1" data-focus-key="next-month" aria-label="Next month">›</button></div>
-                    <div class="meal-schedule-calendar-grid">${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(day => `<span aria-hidden="true">${day}</span>`).join('')}${calendar.days.map(day => `<button type="button" data-schedule-action="date" data-date="${day.date}" data-focus-key="calendar-${day.date}" aria-label="${esc(dateLabel(day.date))}" aria-pressed="${draft.selectedDates.includes(day.date)}" class="${day.inMonth ? '' : 'is-other-month'}">${day.day}</button>`).join('')}</div>
+                    <div class="meal-schedule-calendar-grid">${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(day => `<span aria-hidden="true">${day}</span>`).join('')}${calendar.days.map(day => `<button type="button" data-schedule-action="date" data-date="${day.date}" data-focus-key="calendar-${day.date}" aria-label="${esc(dateLabel(day.date))}" aria-pressed="${draft.selectedDates.includes(day.date)}" class="${day.inMonth ? '' : 'is-other-month'}"><span>${day.day}</span><small data-schedule-yield-shortage hidden></small></button>`).join('')}</div>
+                    <div class="meal-schedule-yield-legend" data-schedule-yield-legend hidden></div>
                     <p>Drag to select a range, or clear it if all its dates are already selected. Click to toggle one date.</p></div>`;
             }
             const dayCards = totals.days.map(day => {
@@ -331,6 +332,27 @@
                 cell.textContent = `${number(total)} servings`;
             });
             if (notify) this.options.onRender?.(this);
+        }
+
+        updateYieldCoverage(days) {
+            const selected = new Set(this.draft.selectedDates);
+            const shortages = new Map(days.filter(day => selected.has(day.date) && day.shortageServings > 0).map(day => [day.date, day]));
+            const amount = value => number(value) === '0' ? '<0.000001' : number(value);
+            this.form.querySelectorAll('[data-schedule-action="date"]').forEach(button => {
+                const day = button.getAttribute('aria-pressed') === 'true' && shortages.get(button.dataset.date);
+                const badge = button.querySelector('[data-schedule-yield-shortage]');
+                button.classList.toggle('is-yield-short', Boolean(day));
+                badge.hidden = !day;
+                badge.textContent = day ? `Short ${amount(day.shortageServings)}` : '';
+                const label = day ? `${dateLabel(day.date)}. ${day.details.join('; ')}. Beyond one full recipe; make more or adjust this plan.` : dateLabel(button.dataset.date);
+                button.setAttribute('aria-label', label);
+                button.title = day ? label : '';
+            });
+            const legend = this.form.querySelector('[data-schedule-yield-legend]');
+            if (legend) {
+                legend.hidden = !shortages.size;
+                legend.innerHTML = shortages.size ? `<div><span><i class="is-selected" aria-hidden="true"></i>Selected</span><span><i class="is-short" aria-hidden="true"></i>Needs more servings</span></div><p>Based on one full recipe each, used earliest dates first. “Short” shows the extra servings needed. Make more or choose fewer dates.</p>` : '';
+            }
         }
 
         syncPortionControls(active) {

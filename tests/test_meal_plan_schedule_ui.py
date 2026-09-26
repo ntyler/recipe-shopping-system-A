@@ -12,6 +12,50 @@ SOURCE = Path(__file__).resolve().parents[1] / "PushShoppingList/static/js/meal-
 pytestmark = pytest.mark.skipif(not shutil.which("node"), reason="Node.js is required for scheduling logic checks")
 
 
+def test_yield_coverage_consumes_dates_in_order_and_counts_partial_days_and_all_meals():
+    run_model(r"""
+M.setDates(draft,M.dateRange('2026-09-25','2026-10-03'));
+M.setMeals(draft,['lunch']);M.setHouseholdDefault(draft,'lunch',1);
+const plan=()=>({recipeUrl:'bread',yieldServings:8,summary:M.summary(draft)});
+const before=JSON.stringify(draft);
+let coverage=M.recipeYieldCoverage([plan()])[0];
+assert.equal(JSON.stringify(draft),before);
+assert.equal(coverage.length,9);
+assert.deepEqual(plain(coverage.filter(day=>day.shortageServings)),[{date:'2026-10-03',plannedServings:1,shortageServings:1}]);
+M.setHouseholdDefault(draft,'lunch',1.5);
+coverage=M.recipeYieldCoverage([plan()])[0];
+assert.equal(coverage[4].shortageServings,0);
+assert.equal(coverage[5].shortageServings,1);
+assert.equal(coverage[6].shortageServings,1.5);
+M.setMeals(draft,['lunch','dinner']);M.setHouseholdDefault(draft,'dinner',0.5);
+coverage=M.recipeYieldCoverage([plan()])[0];
+assert.equal(coverage[3].shortageServings,0);assert.equal(coverage[4].shortageServings,2);
+const reversed=plan();reversed.summary.days.reverse();
+assert.deepEqual(plain(M.recipeYieldCoverage([reversed])[0]),plain(coverage));
+M.setHouseholdDefault(draft,'lunch',0.1);M.setMeals(draft,['lunch']);
+coverage=M.recipeYieldCoverage([{...plan(),yieldServings:0.3}])[0];
+assert.equal(coverage[2].shortageServings,0);assert.equal(coverage[3].shortageServings,0.1);
+""")
+
+
+def test_yield_coverage_shares_repeated_recipe_budget_and_ignores_unknown_or_invalid_plans():
+    run_model(r"""
+M.setDates(draft,M.dateRange('2026-09-25','2026-10-03'));
+M.setMeals(draft,['lunch']);M.setHouseholdDefault(draft,'lunch',0.5);
+const plan={recipeUrl:'bread',yieldServings:8,summary:M.summary(draft)};
+const plans=[plan,plan,{...plan,recipeUrl:'soup',yieldServings:4}];
+const before=JSON.stringify(plans), coverage=M.recipeYieldCoverage(plans);
+assert.equal(JSON.stringify(plans),before);
+assert.equal(coverage[0][8].shortageServings,0.5);assert.equal(coverage[1][8].shortageServings,0.5);
+assert.equal(coverage[2][8].shortageServings,0.5);
+assert.equal(M.sum(coverage.flatMap(days=>days.map(day=>day.shortageServings))),1.5);
+assert.deepEqual(plain(M.recipeYieldCoverage([{...plan,yieldServings:null}])),[[]]);
+assert.deepEqual(plain(M.recipeYieldCoverage([plan,{...plan,summary:{...plan.summary,valid:false}}])),[[],[]]);
+const custom={...plan,summary:{...plan.summary,days:[{date:'2026-09-24',totalServings:8}]}};
+assert(M.recipeYieldCoverage([plan,custom])[0].every(day=>day.shortageServings===0.5),'Earlier custom dates consume the same yield');
+""")
+
+
 def test_distribution_keeps_full_meal_portions_in_date_and_meal_order_without_mutating_source():
     run_model(r"""
 M.setDates(draft,M.dateRange('2026-09-25','2026-10-03'));

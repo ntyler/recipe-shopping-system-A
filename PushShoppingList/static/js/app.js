@@ -1954,6 +1954,29 @@ function updateMealPlannerYieldBalance(entry, summaries, editing) {
     }
 }
 
+function syncMealPlannerYieldCoverage(state, summaries) {
+    const entries = [...summaries.keys()];
+    const coverage = state.edit ? entries.map(() => []) : MealPlanSchedule.recipeYieldCoverage(entries.map(entry => ({
+        recipeUrl:entry.recipeUrl, yieldServings:entry.yieldServings, summary:summaries.get(entry),
+    })));
+    const daysFor = indices => {
+        const dates = new Map();
+        indices.forEach(index => coverage[index].filter(day => day.shortageServings > 0).forEach(day => {
+            if (!dates.has(day.date)) dates.set(day.date, new Map());
+            const recipes = dates.get(day.date), entry = entries[index];
+            const recipe = recipes.get(entry.recipeUrl) || {title:entry.title, shortage:0};
+            recipe.shortage = MealPlanSchedule.sum([recipe.shortage, day.shortageServings]);
+            recipes.set(entry.recipeUrl, recipe);
+        }));
+        return [...dates].map(([date, recipes]) => ({date,
+            shortageServings:MealPlanSchedule.sum([...recipes.values()].map(recipe => recipe.shortage)),
+            details:[...recipes.values()].map(recipe => `${recipe.title}: ${Number(recipe.shortage.toFixed(6)) ? formatMealPlannerServingNumber(recipe.shortage) : '<0.000001'} ${recipe.shortage === 1 ? 'serving' : 'servings'} short`),
+        }));
+    };
+    state.panel?.updateYieldCoverage(daysFor(entries.map((_, index) => index)));
+    entries.forEach((entry, index) => entry.panel?.updateYieldCoverage(daysFor([index])));
+}
+
 function setMealPlannerRecipeServings(dialog, entry, value) {
     const state = mealPlannerScheduleState(dialog);
     if (state.edit || mealPlannerBusy(state) || state.panel.ui.loading || entry.panel?.ui.loading || !entry.recipeUrl || !state.entries.includes(entry)) return;
@@ -2153,6 +2176,7 @@ function syncMealPlannerBatchControls(dialog) {
     // A sibling row can change an open editor's share without changing its
     // dates. Refresh its amounts without recursively notifying this controller.
     state.entries.forEach(entry => { if (entry.panel?.draft.portionMode === 'recipe') entry.panel.updateTotals(false); });
+    syncMealPlannerYieldCoverage(state, summaries);
 }
 
 function syncMealPlannerEditorMode(dialog) {
