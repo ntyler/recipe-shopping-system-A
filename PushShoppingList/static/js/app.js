@@ -2041,7 +2041,9 @@ function mealPlannerDistributionPreview(state, entry, summaries) {
     // Derive the entire plan with this candidate so automatic recipes can fill
     // uncovered slots, while the real drafts remain untouched until Apply.
     const candidate = {...entry, panel:{draft:preview.draft}, servingsPerMeal:undefined};
-    const projected = {...state, entries:state.entries.map(other => other === entry ? candidate : other)};
+    const projected = {...state,
+        panel:summaries.size === 1 ? {...state.panel, draft:preview.draft} : state.panel,
+        entries:state.entries.map(other => other === entry ? candidate : other)};
     const totals = projected.entries.filter(other => other.recipeUrl).map(other => MealPlanSchedule.summary(mealPlannerRecipeDraft(projected, other)));
     const invalid = totals.find(total => !total.valid);
     if (invalid) throw new Error(invalid.errors[0]);
@@ -2050,8 +2052,8 @@ function mealPlannerDistributionPreview(state, entry, summaries) {
         const key = `${day.date}/${meal.meal_type}`;
         planned.set(key, MealPlanSchedule.sum([planned.get(key) || 0, meal.planned_servings]));
     })));
-    const needsPortions = state.panel.draft.portionMode !== 'recipe';
-    const unfilled = needsPortions ? MealPlanSchedule.summary(state.panel.draft).days.reduce((count, day) => count + day.meals.filter(meal =>
+    const needsPortions = projected.panel.draft.portionMode !== 'recipe';
+    const unfilled = needsPortions ? MealPlanSchedule.summary(projected.panel.draft).days.reduce((count, day) => count + day.meals.filter(meal =>
         MealPlanSchedule.sum([meal.planned_servings, -(planned.get(`${day.date}/${meal.meal_type}`) || 0)]) > 0).length, 0)
         : preview.unfilledMealCount;
     return {...preview, reserved, budget, unfilled, needsPortions};
@@ -2082,7 +2084,9 @@ function syncMealPlannerDistribution(entry, summary, state, busy, summaries) {
         ? 'Starts on the first scheduled date and fills following days using the meals, people, and portions set under “Who is eating?”. For example, 8 servings with 2 people eating 1 serving each fills 4 days with one meal per day. The final meal may have smaller portions.'
         : entry.distributionMode === 'upcoming'
         ? 'Starts on the first scheduled date and repeats the selected meals on following days, keeping any day-specific choices. Adds dates for this recipe until its servings run out; the final portion may be smaller.'
-        : 'Uses this recipe’s current schedule, earliest meals first. The shared calendar and family targets stay unchanged.';
+        : 'Uses this recipe’s current schedule, earliest meals first.';
+    box.querySelector('[data-meal-distribution-help]').textContent += summaries.size === 1
+        ? ' Apply updates the main calendar below.' : ' Apply updates only this recipe’s custom plan.';
     const text = box.querySelector('[data-meal-distribution-preview]');
     const list = box.querySelector('[data-meal-distribution-meals]');
     const review = box.querySelector('[data-meal-distribution-review]');
@@ -2133,13 +2137,22 @@ function applyMealPlannerDistribution(dialog, entry) {
         const preview = mealPlannerDistributionPreview(state, entry, summaries);
         entry.distributionOpen = false;
         delete entry.servingsPerMeal;
-        if (!entry.panel) customizeMealPlannerRecipe(dialog, entry, preview.draft);
-        else {
-            entry.panel.endCalendarDrag();
-            entry.panel.draft = preview.draft;
-            entry.panel.render();
+        if (summaries.size === 1) {
+            // A single recipe uses the main calendar, including any work from
+            // an existing custom plan. Retire that editor to avoid two schedules.
+            state.panel.endCalendarDrag();
+            state.panel.draft = preview.draft;
+            resetMealPlannerRecipe(dialog, entry);
+            state.panel.render();
+        } else {
+            if (!entry.panel) customizeMealPlannerRecipe(dialog, entry, preview.draft);
+            else {
+                entry.panel.endCalendarDrag();
+                entry.panel.draft = preview.draft;
+                entry.panel.render();
+            }
+            if (['upcoming', 'people'].includes(entry.distributionMode)) entry.expanded = true;
         }
-        if (['upcoming', 'people'].includes(entry.distributionMode)) entry.expanded = true;
         entry.touched = true;
         entry.root.querySelector('[data-meal-editor-error]').hidden = true;
         syncMealPlannerBatchControls(dialog);

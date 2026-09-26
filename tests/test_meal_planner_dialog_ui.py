@@ -543,6 +543,53 @@ assert.equal(panel.draft.notes,'','Successful save must not leave a resubmittabl
 """)
 
 
+@pytest.mark.parametrize('mode', ['upcoming', 'people', 'keep'])
+@pytest.mark.parametrize('custom_first', [False, True])
+def test_single_recipe_distribution_updates_main_calendar_and_saves_its_edits(mode, custom_first):
+    run_dialog(r"""
+await open();const shared=await choose('recipe://soup'),state=activeDialog.mealPlanScheduleState,entry=state.entries[0];
+M.setPortionMode(shared.draft,'family');
+for(const member of shared.draft.members) M.setFamilyDefault(shared.draft,member.id,'dinner',{servings:1.5});
+if(CUSTOM_FIRST) ctx.customizeMealPlannerRecipe(activeDialog,entry);
+const source=(entry.panel || shared).draft,previousPanel=entry.panel;
+M.setDates(source,['2026-10-09','2026-10-10','2026-10-11','2026-10-12','2026-10-13','2026-10-14']);
+source.notes='Keep refrigerated';source.prepSteps=[{date:'2026-10-08',instruction:'Make soup'}];
+M.setDayNotes(source,'2026-10-09','Pack separately');
+// An unused recipe row must not cause another calendar for the selected recipe.
+ctx.addMealPlannerEditor();
+entry.distributionMode=DISTRIBUTION_MODE;entry.distributionOpen=true;
+entry.root.querySelector('[data-meal-recipe-servings]').value=entry.distributionMode==='keep'?'1':'1.5';
+const before=JSON.stringify(shared.draft);
+const summaries=new Map([[entry,M.summary(ctx.mealPlannerRecipeDraft(state,entry))]]);
+ctx.mealPlannerDistributionPreview(state,entry,summaries);
+assert.equal(JSON.stringify(shared.draft),before,'Preview leaves the main calendar unchanged');
+ctx.applyMealPlannerDistribution(activeDialog,entry);
+assert.equal(entry.panel,null);assert.equal(entry.expanded,false);assert.equal(entry.distributionOpen,false);
+assert.equal(entry.root.querySelector('[data-meal-override-container]').hidden,true);
+assert.equal(entry.root.querySelector('[data-meal-override-form-host]').children.length,0);
+assert.equal(state.panel,shared,'Use the existing main calendar controller');
+if(previousPanel) assert.notEqual(shared.draft,previousPanel.draft,'Retired editors cannot mutate the main calendar');
+const amounts=entry.distributionMode==='keep'?[1,1,1,1]:entry.distributionMode==='people'?[3,1]:[1.5,1.5,1];
+const dates=amounts.map((_,index)=>`2026-10-${String(9+index).padStart(2,'0')}`);
+assert.deepEqual(plain(shared.draft.selectedDates),dates);
+assert.deepEqual(plain(M.summary(shared.draft).days.flatMap(day=>day.meals.map(meal=>meal.planned_servings))),amounts);
+assert.equal(shared.draft.notes,'Keep refrigerated');assert.equal(shared.draft.days[dates[0]].notes,'Pack separately');
+assert.equal(shared.draft.prepSteps[0].instruction,'Make soup');
+assert.equal(entry.servingsPerMeal,undefined);
+// Changes made in the surviving calendar must be the changes that get saved.
+M.setDayNotes(shared.draft,dates[0],'Edited in main calendar');shared.render();
+requests=[];responseFactory=async()=>ok({batches:[],meals:[]});
+await ctx.saveMealPlannerBatch();
+assert.equal(requests.length,1);const plans=JSON.parse(requests[0].options.body).batches;
+assert.equal(plans.length,1);assert.equal(plans[0].recipe_url,'recipe://soup');
+assert.deepEqual(plans[0].allocations.map(meal=>meal.date),dates);
+assert.deepEqual(plans[0].allocations.map(meal=>M.sum(meal.member_portions.map(part=>part.servings))),amounts);
+assert(plans[0].allocations.every((meal,index)=>meal.member_portions.length===2&&meal.member_portions.every(part=>part.servings===amounts[index]/2)));
+assert.equal(plans[0].allocations[0].prep_notes,'Edited in main calendar');
+assert.equal(plans[0].prep_notes,'Keep refrigerated');assert.equal(plans[0].prep_steps[0].instruction,'Make soup');
+""".replace('DISTRIBUTION_MODE', repr(mode)).replace('CUSTOM_FIRST', str(custom_first).lower()))
+
+
 def test_compact_recipes_share_a_live_plan_and_custom_recipes_keep_independent_drafts():
     run_dialog(r"""
 await open('2026-10-05','lunch');const shared=await choose('recipe://bread');
