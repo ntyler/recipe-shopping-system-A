@@ -125,13 +125,14 @@
             });
         }
 
-        render() {
+        render(notify = true) {
             if (this.calendarDrag && !this.calendarDragIsCurrent()) this.endCalendarDrag();
             this.captureOpen();
             const active = this.form.contains(document.activeElement) ? document.activeElement : null;
             const key = active?.dataset.focusKey;
             const position = active && ['text','search'].includes(active.type) ? active.selectionStart : null;
-            this.form.innerHTML = MealPlanPanel.html(this.schedulingDraft(), this.ui, this.edit?.title || this.options.title, this.options);
+            this.form.innerHTML = MealPlanPanel.html(this.distributionPreviewDraft || this.schedulingDraft(), this.ui,
+                this.edit?.title || this.options.title, {...this.options, distributionPreview:Boolean(this.distributionPreviewDraft)});
             const footer = this.form.querySelector('.meal-schedule-footer');
             if (footer) footer.hidden = Boolean(this.options.onSubmit && !this.edit);
             if (key) {
@@ -139,7 +140,7 @@
                 replacement?.focus({preventScroll:true});
             if (position !== null && replacement?.setSelectionRange) replacement.setSelectionRange(position, position);
             }
-            this.options.onRender?.(this);
+            if (notify) this.options.onRender?.(this);
         }
 
         static check(meal, enabled, action, extra = '') {
@@ -263,10 +264,7 @@
             }).join('');
             return `<div class="meal-schedule-heading"><div><h2>${singleEdit ? 'Edit scheduled meal' : draft.edit ? 'Edit prep plan' : 'Add to Meal Plan'}</h2><p>${esc(recipeTitle)}</p></div><button type="button" data-schedule-action="cancel" aria-label="Close meal planning" ${ui.busy || ui.memberBusy ? 'disabled' : ''}>×</button></div>
                 <fieldset ${disabled ? 'disabled' : ''}>${singleEdit ? '<p>Changes apply only to this scheduled meal.</p>' : `<div class="recipe-preview-segment meal-schedule-modes" role="group" aria-label="Date selection">${dateModes.map(([mode,label]) => `<button type="button" data-schedule-mode="${mode}" data-focus-key="mode-${mode}" aria-pressed="${draft.dateMode === mode}">${label}</button>`).join('')}</div>`}
-                <div class="meal-schedule-date-area" data-date-mode="${draft.dateMode}">
-                    <div class="meal-schedule-distribution-calendar" data-schedule-distribution-calendar hidden></div>
-                    <div class="meal-schedule-dates">${dates}</div>
-                </div>
+                <div class="meal-schedule-dates" ${options.distributionPreview ? 'data-distribution-preview' : ''}>${dates}</div>
                 <div class="meal-schedule-meals">${singleEdit ? `<label>Meal<select data-schedule-field="single-meal" data-focus-key="single-meal">${model.MEAL_TYPES.map(meal => `<option value="${meal}" ${draft.mealTypes[0] === meal ? 'selected' : ''}>${title(meal)}</option>`).join('')}</select></label>` : `<strong>Meals on selected days</strong>${model.MEAL_TYPES.map(meal => MealPlanPanel.check(meal, draft.mealTypes.includes(meal), 'meal', `data-focus-key="meal-${meal}"`)).join('')}`}</div>
                 <div class="meal-schedule-columns"><section>${MealPlanPanel.portionModes(draft)}
                 ${MealPlanPanel.peopleSection(draft, ui, manageMembersUrl, options)}
@@ -286,36 +284,14 @@
                 <p class="recipe-preview-status ${ui.error ? 'is-error' : ''}" data-schedule-status role="${ui.error ? 'alert' : 'status'}">${esc(ui.message)}</p>`;
         }
 
-        showDistributionPreview(preview, recipeTitle = '', target = '') {
-            const calendar = this.form.querySelector('[data-schedule-distribution-calendar]');
-            const dates = this.form.querySelector('.meal-schedule-dates');
-            if (!calendar || !dates) return;
-            calendar.hidden = !preview;
-            // Keep the existing calendar's footprint so a hover cannot resize
-            // the dialog or move the control out from under the pointer.
-            const keepCalendarSpace = this.draft.dateMode === 'days';
-            dates.hidden = Boolean(preview) && !keepCalendarSpace;
-            dates.classList.toggle('is-previewing', Boolean(preview) && keepCalendarSpace);
-            dates.inert = Boolean(preview);
-            calendar.innerHTML = preview ? MealPlanPanel.distributionCalendarHtml(preview, recipeTitle, target) : '';
-        }
-
-        static distributionCalendarHtml(preview, recipeTitle, target) {
-            const days = new Map();
-            preview.allocations.forEach(meal => {
-                if (!days.has(meal.date)) days.set(meal.date, []);
-                days.get(meal.date).push(meal);
-            });
-            const months = [...new Set([...days.keys()].map(date => date.slice(0, 7)))].sort();
-            return `<p class="meal-schedule-distribution-heading" role="status"><strong>Preview: ${esc(recipeTitle)}</strong><span>${esc(target)} Click Apply distribution to use these meals.</span></p>` + months.map(month => {
-                const calendar = root.MealPlanSchedule.calendarMonth(month);
-                return `<div class="meal-schedule-calendar"><div class="meal-schedule-calendar-heading"><strong>${esc(calendar.label)}</strong></div>
-                    <div class="meal-schedule-calendar-grid">${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(day => `<span aria-hidden="true">${day}</span>`).join('')}${calendar.days.map(day => {
-                        const meals = day.inMonth ? days.get(day.date) || [] : [];
-                        const detail = meals.map(meal => `${title(meal.meal_type)}: ${number(meal.planned_servings)} ${meal.planned_servings === 1 ? 'serving' : 'servings'}`);
-                        return `<div role="group" class="meal-schedule-distribution-day ${meals.length ? 'is-proposed' : ''} ${day.inMonth ? '' : 'is-other-month'}" ${meals.length ? `data-distribution-date="${day.date}"` : ''} aria-label="${esc([dateLabel(day.date), ...detail].join(', '))}"><span>${day.day}</span>${meals.map((meal, index) => `<small class="meal-schedule-distribution-full">${esc(detail[index])}</small><small class="meal-schedule-distribution-compact" aria-hidden="true">${meal.meal_type === 'breakfast' ? 'Bfast' : esc(title(meal.meal_type))}<br>${number(meal.planned_servings)} srv</small>`).join('')}</div>`;
-                    }).join('')}</div></div>`;
-            }).join('');
+        showDistributionPreview(preview) {
+            if (!preview && !this.distributionPreviewDraft) return;
+            // Render the ordinary planner with a separate display draft. Keep
+            // the chosen portion controls, including Split recipe yield.
+            this.distributionPreviewDraft = preview ? {...preview.draft,
+                ...(this.draft.portionMode === 'recipe' ? {portionMode:'recipe', recipeYield:this.draft.recipeYield,
+                    recipePortions:preview.allocations.map(meal => meal.planned_servings)} : {})} : null;
+            this.render(false);
         }
 
         static summaryHtml(draft, totals, options = {}) {
@@ -370,7 +346,7 @@
         }
 
         updateYieldCoverage(days) {
-            const selected = new Set(this.draft.selectedDates);
+            const selected = new Set((this.distributionPreviewDraft || this.draft).selectedDates);
             const shortages = new Map(days.filter(day => selected.has(day.date) && day.shortageServings > 0).map(day => [day.date, day]));
             const amount = value => number(value) === '0' ? '<0.000001' : number(value);
             this.form.querySelectorAll('[data-schedule-action="date"]').forEach(button => {

@@ -2061,7 +2061,8 @@ function mealPlannerDistributionPreview(state, entry, summaries) {
     const unfilled = needsPortions ? MealPlanSchedule.summary(projected.panel.draft).days.reduce((count, day) => count + day.meals.filter(meal =>
         MealPlanSchedule.sum([meal.planned_servings, -(planned.get(`${day.date}/${meal.meal_type}`) || 0)]) > 0).length, 0)
         : preview.unfilledMealCount;
-    return {...preview, reserved, budget, unfilled, needsPortions};
+    const projectedSummaries = new Map(state.entries.filter(other => other.recipeUrl).map((other, index) => [other, totals[index]]));
+    return {...preview, reserved, budget, unfilled, needsPortions, projectedSummaries};
 }
 
 function syncMealPlannerDistribution(entry, summary, state, busy, summaries) {
@@ -2226,14 +2227,22 @@ function syncMealPlannerBatchControls(dialog) {
     // A sibling row can change an open editor's share without changing its
     // dates. Refresh its amounts without recursively notifying this controller.
     state.entries.forEach(entry => { if (entry.panel?.draft.portionMode === 'recipe') entry.panel.updateTotals(false); });
-    syncMealPlannerYieldCoverage(state, summaries);
     const previewEntry = state.entries.find(entry => entry.distributionPreview && (entry.distributionHover || entry.distributionFocus));
     const previewPanel = previewEntry && summaries.size > 1 && previewEntry.expanded && previewEntry.panel
         ? previewEntry.panel : state.panel;
     [state.panel, ...state.entries.map(entry => entry.panel)].forEach(panel => {
-        panel?.showDistributionPreview(panel === previewPanel ? previewEntry?.distributionPreview : null,
-            previewEntry?.title, summaries.size === 1 ? 'Updates the shared plan.' : 'Updates only this recipe’s custom plan.');
+        panel?.showDistributionPreview(panel === previewPanel ? previewEntry?.distributionPreview : null);
     });
+    const visibleSummaries = previewEntry?.distributionPreview.projectedSummaries || summaries;
+    if (previewEntry) {
+        const visibleMeals = new Set([...visibleSummaries.values()].flatMap(summary => summary.days.flatMap(day =>
+            day.meals.map(meal => `${day.date}/${meal.meal_type}`)))).size;
+        const visibleServings = MealPlanSchedule.sum([...visibleSummaries.values()].map(summary => summary.totalServings));
+        save.textContent = `Save ${visibleMeals} ${visibleMeals === 1 ? 'Meal' : 'Meals'}`;
+        dialog.querySelector('[data-meal-batch-help]').textContent = `${recipeCount} ${recipeCount === 1 ? 'recipe' : 'recipes'} · ${visibleMeals} ${visibleMeals === 1 ? 'meal' : 'meals'} · ${formatMealPlannerServingNumber(visibleServings)} ${visibleServings === 1 ? 'serving' : 'servings'} being planned`;
+        state.entries.forEach(entry => updateMealPlannerYieldBalance(entry, visibleSummaries, state.edit));
+    }
+    syncMealPlannerYieldCoverage(state, visibleSummaries);
 }
 
 function syncMealPlannerEditorMode(dialog) {

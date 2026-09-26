@@ -25,7 +25,8 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         const preview=box.locator('[data-meal-distribution-preview]');
         const proposed=box.locator('[data-meal-distribution-meals] li');
         const apply=box.locator('[data-meal-distribution-apply]');
-        const calendarPreview=shared.locator('[data-schedule-distribution-calendar]');
+        const calendarPreview=shared.locator('.meal-schedule-dates[data-distribution-preview]');
+        const selectedDates=locator=>locator.locator('[data-schedule-action="date"][aria-pressed="true"]').evaluateAll(nodes=>nodes.map(node=>node.dataset.date));
         const draftSnapshot=()=>dialog.evaluate(element=>JSON.stringify({
             shared:element.mealPlanScheduleState.panel.draft,
             entries:element.mealPlanScheduleState.entries.map(entry=>({draft:entry.panel?.draft,amount:entry.servingsPerMeal,expanded:entry.expanded}))
@@ -35,13 +36,17 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
                 const {x,y,width,height}=element.querySelector(selector).getBoundingClientRect();
                 return {x,y,width,height};
             };
-            return {dates:rect('.meal-schedule-date-area'),meals:rect('.meal-schedule-meals'),
-                scrollHeight:element.closest('dialog').scrollHeight,scrollTop:element.closest('dialog').scrollTop};
+            return {dates:rect('.meal-schedule-dates'),meals:rect('.meal-schedule-meals'),
+                scrollTop:element.closest('dialog').scrollTop};
         });
         const assertBoundedPreview=async locator=>{
             const bounds=await locator.boundingBox();
             assert(bounds.width<=640,`Preview must use the normal calendar width, got ${bounds.width}`);
-            assert(bounds.height<=420,`Preview must stay bounded across months, got ${bounds.height}`);
+            assert(await locator.evaluate(element=>element.scrollHeight<=element.clientHeight+1),'The normal calendar must have no nested scrolling');
+            assert.equal(await locator.locator('[data-schedule-action="date"]').count(),42);
+            assert(await locator.getByRole('button',{name:'Previous month',exact:true}).isVisible());
+            assert(await locator.getByRole('button',{name:'Next month',exact:true}).isVisible());
+            assert.equal(await locator.locator('.meal-schedule-distribution-heading, .meal-schedule-distribution-day').count(),0);
         };
         const save=dialog.locator('[data-meal-batch-save]');
         const open=async()=>{
@@ -71,13 +76,16 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         await apply.hover();
         assert(await calendarPreview.isVisible());
         await assertBoundedPreview(calendarPreview);
-        assert.deepEqual(await calendarPreview.locator('[data-distribution-date]').evaluateAll(nodes=>nodes.map(node=>node.dataset.distributionDate)),['2026-09-25','2026-09-26','2026-09-27','2026-09-28']);
-        assert.match(await calendarPreview.locator('[data-distribution-date]').first().textContent(),/Breakfast: 1 serving/);
-        assert(await shared.locator('.meal-schedule-dates').isHidden());
-        assert.equal(await draftSnapshot(),beforeHover);assert.equal(await save.textContent(),'Save 1 Meal');assert.equal(posts.length,0);
+        assert.deepEqual(await selectedDates(calendarPreview),['2026-09-25','2026-09-26','2026-09-27','2026-09-28']);
+        assert.equal((await calendarPreview.locator('[data-date="2026-09-25"]').textContent()).trim(),'25');
+        assert.match(await shared.locator('[data-day-summary="2026-09-25"]').textContent(),/Breakfast: 1/);
+        assert.equal(await shared.locator('[data-schedule-day]').count(),4);
+        assert(await shared.locator('.meal-schedule-dates').isVisible());
+        assert.equal(await draftSnapshot(),beforeHover);assert.equal(await save.textContent(),'Save 4 Meals');assert.equal(posts.length,0);
         await page.mouse.move(0,0);
         assert(await calendarPreview.isHidden());assert(await shared.locator('.meal-schedule-dates').isVisible());
-        assert.equal(await draftSnapshot(),beforeHover);
+        assert.equal(await draftSnapshot(),beforeHover);assert.equal(await save.textContent(),'Save 1 Meal');
+        assert.equal(await shared.locator('[data-schedule-day]').count(),1);
         // Tab back from Cancel to Apply, then dismiss only the preview with Escape.
         await apply.focus();await page.keyboard.press('Tab');await page.keyboard.press('Shift+Tab');
         assert(await calendarPreview.isVisible());
@@ -107,7 +115,7 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         assert.equal(await proposed.count(),3);
         assert.match(await preview.textContent(),/Last meal: 1 serving \(smaller portion\)/);
         await apply.hover();
-        assert.match(await calendarPreview.locator('[data-distribution-date]').last().textContent(),/Breakfast: 1 serving/);
+        assert.match(await shared.locator('[data-day-total="2026-09-27"]').textContent(),/1 servings/);
         await amount.fill('');assert(await box.getByRole('button',{name:'Apply distribution',exact:true}).isDisabled());
         await amount.fill('1');
         for (const cell of await shared.locator('[data-schedule-field="family"][data-meal="breakfast"]').all()) await cell.fill('0.5');
@@ -133,7 +141,7 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         for(let attempt=0;attempt<3;attempt++){
             await apply.hover();assert(await calendarPreview.isVisible());
             assert.deepEqual(await calendarLayout(),beforeCalendarHover,'Hover must preserve calendar size, surrounding controls, and scroll position');
-            assert(await shared.locator('.meal-schedule-dates').isHidden());
+            assert(await shared.locator('.meal-schedule-dates').isVisible());
             await page.mouse.move(0,0);assert(await calendarPreview.isHidden());
             assert.deepEqual(await calendarLayout(),beforeCalendarHover);
         }
@@ -159,6 +167,32 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         assert(saved.meals.every(meal=>meal.planned_servings===1 && meal.member_portions.every(part=>part.servings===0.5)));
         const stored=await(await context.request.get(base+'/api/meal-plan?recipe_url=recipe://soup')).json();
         assert.equal(stored.meals.length,4);assert.equal(stored.meals.reduce((sum,meal)=>sum+meal.planned_servings,0),4);
+        // Reference screenshot: ordinary September calendar, green dates 26–29,
+        // Split recipe yield, proposed day cards, and Save 4 Meals on hover.
+        await open();await row(0).locator('[name="recipe_url"]').selectOption('recipe://soup');
+        await shared.locator('[data-schedule-field="single-date"]').fill('2026-09-26');
+        await shared.locator('[data-schedule-field="meal"][data-meal="dinner"]').uncheck();
+        await shared.locator('[data-schedule-field="meal"][data-meal="breakfast"]').check();
+        await shared.getByRole('button',{name:'Select days',exact:true}).click();
+        await amount.fill('1');await row(0).getByRole('button',{name:'Fill upcoming days',exact:true}).click();
+        await apply.scrollIntoViewIfNeeded();await page.mouse.move(0,0);
+        const referenceDraft=await draftSnapshot(), referenceLayout=await calendarLayout();
+        await apply.hover();
+        assert.deepEqual(await selectedDates(calendarPreview),['2026-09-26','2026-09-27','2026-09-28','2026-09-29']);
+        assert.deepEqual(await calendarLayout(),referenceLayout);
+        assert.equal(await shared.getByRole('button',{name:'Split recipe yield',exact:true}).getAttribute('aria-pressed'),'true');
+        assert.equal(await shared.locator('[data-schedule-day]').count(),4);
+        assert.equal(await save.textContent(),'Save 4 Meals');
+        assert.match(await row(0).locator('[data-meal-yield-remaining]').textContent(),/All servings from one full recipe are planned/);
+        assert.equal(await draftSnapshot(),referenceDraft);
+        await assertBoundedPreview(calendarPreview);
+        await calendarPreview.evaluate(element=>element.scrollIntoView({block:'center'}));
+        await screenshot('distribution-reference-desktop.png');
+        await page.mouse.move(0,0);
+        assert.equal(await save.textContent(),'Save 1 Meal');
+        assert.deepEqual(await selectedDates(shared),['2026-09-26']);
+        assert.equal(await draftSnapshot(),referenceDraft);
+        await dialog.locator('[data-meal-batch-cancel]').click();
         // A second entry reserves servings from the same recipe's eight-serving yield.
         await open();await row(0).locator('[name="recipe_url"]').selectOption('recipe://bread');await amount.fill('1');
         await dialog.locator('[data-meal-editor-add]').click();
@@ -177,10 +211,10 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         const beforeMultiHover=await draftSnapshot();
         await apply.hover();assert(await calendarPreview.isVisible());
         await assertBoundedPreview(calendarPreview);
-        assert.match(await calendarPreview.textContent(),/Updates only this recipe’s custom plan/);
-        assert.equal(await calendarPreview.locator('[data-distribution-date]').count(),6);
-        assert.deepEqual(await calendarPreview.locator('.meal-schedule-calendar-heading').allTextContents(),['October 2026','November 2026']);
-        assert.match(await calendarPreview.locator('[data-distribution-date]').last().getAttribute('aria-label'),/Nov 3/);
+        assert.equal((await selectedDates(calendarPreview)).length,6);
+        assert.deepEqual(await calendarPreview.locator('.meal-schedule-calendar-heading strong').allTextContents(),['October 2026']);
+        assert.match(await calendarPreview.locator('[data-date="2026-11-03"]').getAttribute('aria-label'),/Nov 3/);
+        assert.equal(await shared.locator('[data-schedule-day]').count(),6);
         assert.equal(await draftSnapshot(),beforeMultiHover);
         await box.getByRole('button',{name:'Apply distribution',exact:true}).click();
         assert(await calendarPreview.isHidden());
@@ -189,7 +223,7 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         assert.match(await row(1).locator('[data-meal-editor-summary]').textContent(),/1 meal · 2 servings/);
         // Once this recipe has an open custom plan, its own calendar previews the change.
         await row(0).getByRole('button',{name:'Fill upcoming days',exact:true}).click();
-        const customPreview=row(0).locator('[data-meal-editor-form] [data-schedule-distribution-calendar]');
+        const customPreview=row(0).locator('[data-meal-editor-form] .meal-schedule-dates[data-distribution-preview]');
         const beforeCustomHover=await draftSnapshot();
         await apply.hover();assert(await customPreview.isVisible());assert(await calendarPreview.isHidden());
         assert.equal(await draftSnapshot(),beforeCustomHover);
