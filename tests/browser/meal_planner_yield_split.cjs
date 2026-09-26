@@ -2,6 +2,12 @@ const {chromium} = require(process.argv[2]);
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path');
 const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
+// Opt in explicitly: Add Meals now starts with each recipe's fixed preference.
+const selectAuto = async (recipe, value) => {
+    await recipe.selectOption(value);
+    await recipe.locator('xpath=ancestor::*[@data-meal-editor]').getByRole('button',{name:'Auto split',exact:true}).click();
+};
+
 
 (async () => {
     // Browser plugin not available. Test the production modal with isolated APIs.
@@ -33,7 +39,7 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         await open();
         for (const [index, name] of ['bread','soup','rice'].entries()) {
             if (index) await dialog.locator('[data-meal-editor-add]').click();
-            await row(index).locator('[name="recipe_url"]').selectOption('recipe://' + name);
+            await selectAuto(row(index).locator('[name="recipe_url"]'), 'recipe://' + name);
         }
         assert.equal(await shared.getByRole('button',{name:'Split recipe yield',exact:true}).getAttribute('aria-pressed'),'true');
         await shared.getByRole('button',{name:'Date range',exact:true}).click();
@@ -74,7 +80,7 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
             assert.equal(stored.meals.reduce((sum,meal) => sum + meal.planned_servings,0),total);
         }
         // An uneven split also saves the original yield exactly in the real API.
-        await open();await row(0).locator('[name="recipe_url"]').selectOption('recipe://rice');
+        await open();await selectAuto(row(0).locator('[name="recipe_url"]'), 'recipe://rice');
         await shared.getByRole('button',{name:'Date range',exact:true}).click();
         await shared.locator('[data-schedule-field="start-date"]').fill('2026-11-01');
         await shared.locator('[data-schedule-field="end-date"]').fill('2026-11-07');
@@ -87,9 +93,9 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         assert(result.meals.every(meal => meal.planned_servings > 0));
         // Two entries of the same four-serving
         // recipe in the same date/meal slot must use two servings each.
-        await open();await row(0).locator('[name="recipe_url"]').selectOption('recipe://soup');
+        await open();await selectAuto(row(0).locator('[name="recipe_url"]'), 'recipe://soup');
         await dialog.locator('[data-meal-editor-add]').click();
-        await row(1).locator('[name="recipe_url"]').selectOption('recipe://soup');
+        await selectAuto(row(1).locator('[name="recipe_url"]'), 'recipe://soup');
         for (const index of [0,1]) assert.match(await summary(index).textContent(),/1 meal · 2 servings \(2 per meal\)/);
         for (const index of [0,1]) {
             assert.equal(await row(index).locator('[data-meal-yield-remaining]').textContent(),'All servings from one full recipe are planned');

@@ -2,6 +2,12 @@ const {chromium} = require(process.argv[2]);
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path');
 const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
+// Opt in explicitly: Add Meals now starts with each recipe's fixed preference.
+const selectAuto = async (recipe, value) => {
+    await recipe.selectOption(value);
+    await recipe.locator('xpath=ancestor::*[@data-meal-editor]').getByRole('button',{name:'Auto split',exact:true}).click();
+};
+
 
 (async () => {
     // Browser plugin not available. Exercise production controls with isolated APIs.
@@ -24,8 +30,8 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         const screenshot=async name=>{const dir=process.env.AI_PANTRY_BROWSER_ARTIFACTS;if(dir){fs.mkdirSync(dir,{recursive:true});await page.screenshot({path:path.join(dir,name)});}};
         await page.getByRole('button',{name:'Add Meals',exact:true}).click();
         await page.waitForFunction(()=>!document.getElementById('mealPlannerDialog').mealPlanScheduleState.panel.ui.loading);
-        await row(0).locator('[name="recipe_url"]').selectOption('recipe://bread');
-        await dialog.locator('[data-meal-editor-add]').click();await row(1).locator('[name="recipe_url"]').selectOption('recipe://soup');
+        await selectAuto(row(0).locator('[name="recipe_url"]'), 'recipe://bread');
+        await dialog.locator('[data-meal-editor-add]').click();await selectAuto(row(1).locator('[name="recipe_url"]'), 'recipe://soup');
         await shared.getByRole('button',{name:'By family member',exact:true}).click();
         assert.equal(await amount(0).inputValue(),'1');assert.equal(await amount(1).inputValue(),'1');
         await amount(0).fill('1.5');assert.equal(await amount(1).inputValue(),'0.5');

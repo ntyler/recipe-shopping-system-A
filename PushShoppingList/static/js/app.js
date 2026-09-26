@@ -1987,6 +1987,7 @@ function setMealPlannerRecipeServings(dialog, entry, value) {
     if (state.edit || mealPlannerBusy(state) || state.panel.ui.loading || entry.panel?.ui.loading || !entry.recipeUrl || !state.entries.includes(entry)) return;
     entry.touched = true;
     entry.root.querySelector('[data-meal-editor-error]').hidden = true;
+    if (Number.isFinite(Number(value)) && Number(value) > 0) entry.lastServingsPerMeal = Number(value);
     if (entry.panel) {
         if (Number.isFinite(Number(value)) && Number(value) > 0) {
             delete entry.servingsPerMeal;
@@ -2301,6 +2302,7 @@ function createMealPlannerEditor(dialog, root) {
         root.querySelector('[data-meal-portions-auto]').addEventListener('click', () => {
             if (mealPlannerBusy(state) || state.edit) return;
             delete root.mealPlannerEntry.servingsPerMeal;
+            delete root.mealPlannerEntry.lastServingsPerMeal;
             root.querySelector('[data-meal-editor-error]').hidden = true;
             syncMealPlannerBatchControls(dialog);
         });
@@ -2472,7 +2474,8 @@ async function saveMealPlannerBatch() {
             if (entry.panel) entry.expanded = true;
             const error = mealPlannerEditorError(entry, message, index);
             firstError ||= error;
-        } else configured.push({entry, payload});
+        } else configured.push({entry, payload,
+            servingsPerMeal:entry.root.querySelector('[data-meal-recipe-servings]').value || entry.lastServingsPerMeal});
     });
     if (firstError) {
         syncMealPlannerBatchControls(dialog);
@@ -2507,6 +2510,7 @@ async function saveMealPlannerBatch() {
         setMealPlannerStatus(`${error.message} Your meals are still here to review. No partial batch is saved; if the connection was interrupted, check the planner before retrying.`, true);
         return;
     }
+    configured.forEach(item => saveMealPlannerServingPreference(item.payload.recipe_url, item.servingsPerMeal));
     const date = configured.flatMap(item => item.payload.allocations.map(meal => meal.date)).sort()[0];
     panels.forEach(panel => { panel.clearEdit(); panel.ui.saved = true; });
     state.entries = [];
@@ -2572,6 +2576,27 @@ function ensureMealPlannerSchedulePanel(dialog, recipeTitle, defaultServings) {
     return state.panel;
 }
 
+function mealPlannerServingPreferenceKey(recipeUrl) {
+    return `meal-planner-servings:${document.body?.dataset.viewerUserId || 'local'}:${recipeUrl}`;
+}
+
+function loadMealPlannerServingPreference(recipeUrl) {
+    try {
+        const value = Number(localStorage.getItem(mealPlannerServingPreferenceKey(recipeUrl)));
+        if (Number.isFinite(value) && value > 0) return value;
+    } catch (_) { /* Use the default when browser storage is unavailable. */ }
+    return 1;
+}
+
+function saveMealPlannerServingPreference(recipeUrl, value) {
+    const servings = Number(value);
+    // Plans with varying portions and no entered amount have no new preference.
+    if (!recipeUrl || !Number.isFinite(servings) || servings <= 0) return;
+    try {
+        localStorage.setItem(mealPlannerServingPreferenceKey(recipeUrl), String(servings));
+    } catch (_) { /* Saving meals still succeeds if browser storage is blocked. */ }
+}
+
 function syncMealPlannerServingsFromRecipe(input) {
     const dialog = document.getElementById('mealPlannerDialog');
     const state = dialog?.mealPlanScheduleState;
@@ -2589,9 +2614,21 @@ function syncMealPlannerServingsFromRecipe(input) {
         : 'Choose a recipe to include in this plan.';
     renderMealPlannerIngredientOptions(option, entry.root, entry.id);
     const panel = entry.panel || state.panel;
-    // Each recipe has its own serving budget. Manual portions are left intact
-    // when changing recipes; the split mode alone follows the recipe's yield.
+    // Recipe yield remains the distribution budget. Initialize meal portions only
+    // when the recipe changes, so schedule changes retain the user's input.
     if (entry.panel || !state.entries.some(other => other !== entry && other.recipeUrl)) panel.draft.recipeYield = defaultServings;
+    if (selectedRecipe !== entry.recipeUrl) {
+        delete entry.lastServingsPerMeal;
+        if (selectedRecipe) {
+            const servings = loadMealPlannerServingPreference(selectedRecipe);
+            entry.servingsPerMeal = servings;
+            if (entry.panel) {
+                entry.panel.draft = MealPlanSchedule.withMealServings(entry.panel.draft, servings);
+                delete entry.servingsPerMeal;
+            }
+            entry.root.querySelector('[data-meal-recipe-servings]').value = servings;
+        } else delete entry.servingsPerMeal;
+    }
     entry.touched = entry.touched || Boolean(selectedRecipe);
     entry.recipeUrl = selectedRecipe;
     entry.defaultServings = defaultServings;

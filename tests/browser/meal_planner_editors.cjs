@@ -2,6 +2,12 @@ const {chromium} = require(process.argv[2]);
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path');
 const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
+// Opt in explicitly: Add Meals now starts with each recipe's fixed preference.
+const selectAuto = async (recipe, value) => {
+    await recipe.selectOption(value);
+    await recipe.locator('xpath=ancestor::*[@data-meal-editor]').getByRole('button',{name:'Auto split',exact:true}).click();
+};
+
 
 (async () => {
     // Browser plugin not available: use installed Playwright and isolated real APIs.
@@ -30,15 +36,15 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         const add=()=>dialog.locator('[data-meal-editor-add]').click();
         const notes=async(form,value)=>{if(!await note(form).isVisible())await form.locator('[data-schedule-section="notes"] > summary').click();await note(form).fill(value);};
         const screenshot=async name=>{const dir=process.env.AI_PANTRY_BROWSER_ARTIFACTS;if(dir){fs.mkdirSync(dir,{recursive:true});await page.screenshot({path:path.join(dir,name)});}};
-        await open();await recipe(0).selectOption('recipe://bread');
+        await open();await selectAuto(recipe(0), 'recipe://bread');
         await shared.getByRole('button',{name:'Household total',exact:true}).click();
         await notes(shared,'Shared prep notes');
         await shared.locator('[data-schedule-section="prep"] > summary').click();
         await shared.locator('[data-schedule-action="add-prep"]').click();
         await shared.locator('[data-schedule-field="prep-date"]').fill('2026-10-04');
         await shared.locator('[data-schedule-field="prep-instruction"]').fill('Prepare all recipes');
-        await add();await recipe(1).selectOption('recipe://soup');
-        await add();await recipe(2).selectOption('recipe://rice');
+        await add();await selectAuto(recipe(1), 'recipe://soup');
+        await add();await selectAuto(recipe(2), 'recipe://rice');
         assert.equal(await rows.count(),3);
         assert.equal(await dialog.locator('[data-meal-editor-form]').count(),1,'Only one scheduling form is mounted by default');
         assert.equal(await servings(shared).inputValue(),'8','Additional recipe yields must not overwrite the shared portions');
@@ -93,12 +99,12 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         await servings(custom(1)).fill('3');await notes(custom(1),'Soup only');
         await recipe(2).selectOption('');await save.click();
         assert.match(await row(2).locator('[data-meal-editor-error]').textContent(),/Recipe 3: Please select a recipe/);
-        await recipe(2).selectOption('recipe://rice');
+        await selectAuto(recipe(2), 'recipe://rice');
         // Removing the first row leaves both the shared plan and custom recipe intact.
         await row(0).locator('[data-meal-editor-remove]').click();
         assert.equal(await row(0).getAttribute('data-meal-editor'),ids[1]);
         assert.equal(await servings(custom(0)).inputValue(),'3');assert.equal(await servings(shared).inputValue(),'9');
-        await add();await recipe(2).selectOption('recipe://bread');await add();
+        await add();await selectAuto(recipe(2), 'recipe://bread');await add();
         assert.equal(await save.textContent(),'Save 3 Meals','Blank row is excluded from the total');
         await save.click();await dialog.waitFor({state:'hidden'});
         assert.equal(posts.length,1);assert.equal(posts[0].batches.length,3);
@@ -112,10 +118,10 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         const meals=async url=>(await(await context.request.get(base+'/api/meal-plan?recipe_url='+encodeURIComponent(url))).json()).meals;
         assert.equal((await meals('recipe://bread')).length,2);assert.equal((await meals('recipe://rice')).length,2);assert.equal((await meals('recipe://soup')).length,1);
         await open();assert.equal(await rows.count(),1);assert.equal(await recipe(0).inputValue(),'');
-        await recipe(0).selectOption('recipe://bread');await row(0).locator('[data-meal-editor-customize]').click();
+        await selectAuto(recipe(0), 'recipe://bread');await row(0).locator('[data-meal-editor-customize]').click();
         await dialog.getByRole('button',{name:'Cancel',exact:true}).click();await open();
         assert.equal(await rows.count(),1);assert.equal(await dialog.locator('[data-meal-editor-form]').count(),1);assert.equal(await recipe(0).inputValue(),'');
-        await recipe(0).selectOption('recipe://soup');
+        await selectAuto(recipe(0), 'recipe://soup');
         let release;const pending=new Promise(resolve=>release=resolve);
         await page.route('**/api/meal-plan/batches/bulk',async route=>{await pending;await route.continue();});
         await save.click();await page.waitForFunction(()=>document.getElementById('mealPlannerDialog').mealPlanScheduleState.saving);
@@ -123,7 +129,7 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         await page.keyboard.press('Escape');assert(await dialog.isVisible());
         await page.evaluate(()=>{void saveMealPlannerBatch();void saveMealPlannerBatch();});release();
         await dialog.waitFor({state:'hidden'});assert.equal(posts.length,2);await page.unroute('**/api/meal-plan/batches/bulk');
-        await open();await recipe(0).selectOption('recipe://soup');await save.click();
+        await open();await selectAuto(recipe(0), 'recipe://soup');await save.click();
         await page.waitForFunction(()=>!document.getElementById('mealPlannerDialog').mealPlanScheduleState.saving);
         assert(await dialog.isVisible());assert.match(await row(0).locator('[data-meal-editor-error]').textContent(),/already planned/i);
         assert.equal((await meals('recipe://soup')).length,2);

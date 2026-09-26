@@ -2,6 +2,12 @@ const {chromium} = require(process.argv[2]);
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path');
 const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
+// Opt in explicitly: Add Meals now starts with each recipe's fixed preference.
+const selectAuto = async (recipe, value) => {
+    await recipe.selectOption(value);
+    await recipe.locator('xpath=ancestor::*[@data-meal-editor]').getByRole('button',{name:'Auto split',exact:true}).click();
+};
+
 
 (async () => {
     // Browser plugin not available: production UI and isolated real APIs.
@@ -28,10 +34,10 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         const portion = (form,member) => form.locator(`[data-schedule-field="family"][data-member="${member.id}"][data-meal="lunch"]`);
         const save = dialog.locator('[data-meal-batch-save]'), total = dialog.locator('[data-meal-batch-help]');
         const ready = () => page.waitForFunction(() => {const s=document.getElementById('mealPlannerDialog').mealPlanScheduleState;return s.panel && !s.panel.ui.loading && s.entries.every(e=>!e.panel?.ui.loading);});
-        const add = async name => {await dialog.locator('[data-meal-editor-add]').click();await dialog.locator('[data-meal-editor]').last().locator('[name="recipe_url"]').selectOption('recipe://'+name);};
+        const add = async name => {await dialog.locator('[data-meal-editor-add]').click();await selectAuto(dialog.locator('[data-meal-editor]').last().locator('[name="recipe_url"]'), 'recipe://'+name);};
         const screenshot = async name => {const dir=process.env.AI_PANTRY_BROWSER_ARTIFACTS;if(dir){fs.mkdirSync(dir,{recursive:true});await page.screenshot({path:path.join(dir,name)});}};
         await page.getByRole('button',{name:'Add Meals',exact:true}).click();await ready();
-        await row(0).locator('[name="recipe_url"]').selectOption('recipe://bread');await add('soup');
+        await selectAuto(row(0).locator('[name="recipe_url"]'), 'recipe://bread');await add('soup');
         await shared.locator('[data-schedule-field="meal"][data-meal="dinner"]').uncheck();
         await shared.locator('[data-schedule-field="meal"][data-meal="lunch"]').check();
         await shared.getByRole('button',{name:'By family member',exact:true}).click();

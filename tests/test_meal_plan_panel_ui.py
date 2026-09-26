@@ -56,6 +56,25 @@ const submit=()=>panel.submit({preventDefault(){}});
     assert result.returncode == 0, result.stdout + result.stderr
 
 
+def test_distribution_preview_reuses_unchanged_dom_and_reads_preview_only_dates():
+    run_panel(r"""
+M.setMembers(panel.draft,members);M.setPortionMode(panel.draft,'family');
+const before=JSON.stringify(panel.draft);
+const preview=M.distributeRecipeServings(panel.draft,8,{mode:'upcoming',servingsPerMeal:3});
+let renders=0;const render=panel.render.bind(panel);panel.render=(...args)=>{renders++;render(...args);};
+panel.showDistributionPreview(preview);assert.equal(renders,1);
+panel.showDistributionPreview(JSON.parse(JSON.stringify(preview)));assert.equal(renders,1,'Keep inputs mounted for an unchanged preview');
+assert(!panel.draft.days['2026-10-07'],'Preview dates must not be committed');
+const total={dataset:{date:'2026-10-07',portionTotal:'dinner'}};
+const input=field('day-family','',{dataset:{scheduleField:'day-family',date:'2026-10-07',meal:'dinner',member:'you'}});
+form.portionCells=[total];form.numberInputs=[input];
+panel.updateTotals();panel.syncPortionControls();
+assert.equal(total.textContent,'2 servings');assert(input.value>0 && input.value<1);
+assert.equal(JSON.stringify(panel.draft),before);
+panel.showDistributionPreview(null);assert.equal(renders,2);
+""")
+
+
 def test_family_schedule_rendering_totals_calendar_and_escaped_user_text():
     run_panel(r"""
 assert(form.innerHTML.includes('One day'));assert(form.innerHTML.includes('Date range'));assert(form.innerHTML.includes('Select days'));

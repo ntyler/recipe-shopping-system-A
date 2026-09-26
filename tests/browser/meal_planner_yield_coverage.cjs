@@ -2,6 +2,12 @@ const {chromium} = require(process.argv[2]);
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path');
 const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
+// Opt in explicitly: Add Meals now starts with each recipe's fixed preference.
+const selectAuto = async (recipe, value) => {
+    await recipe.selectOption(value);
+    await recipe.locator('xpath=ancestor::*[@data-meal-editor]').getByRole('button',{name:'Auto split',exact:true}).click();
+};
+
 
 (async () => {
     // Browser plugin not available. Use the existing Playwright/isolated API harness.
@@ -28,7 +34,7 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         };
         await page.getByRole('button',{name:'Add Meals',exact:true}).click();
         await page.waitForFunction(() => !document.getElementById('mealPlannerDialog').mealPlanScheduleState.panel.ui.loading);
-        await row(0).locator('[name="recipe_url"]').selectOption('recipe://bread');
+        await selectAuto(row(0).locator('[name="recipe_url"]'), 'recipe://bread');
         await shared.getByRole('button',{name:'Household total',exact:true}).click();
         await shared.locator('[data-schedule-field="household"][data-meal="dinner"]').fill('1');
         await amount.fill('1');
@@ -74,12 +80,12 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         // Two entries of one recipe consume one yield and split a same-day shortfall.
         await row(0).getByRole('button',{name:'Auto split',exact:true}).click();
         await dialog.locator('[data-meal-editor-add]').click();
-        await row(1).locator('[name="recipe_url"]').selectOption('recipe://bread');
+        await selectAuto(row(1).locator('[name="recipe_url"]'), 'recipe://bread');
         assert.equal(await date(shared,'2026-10-03').locator('small').textContent(),'Short 1');
-        await row(1).locator('[name="recipe_url"]').selectOption('recipe://soup');
+        await selectAuto(row(1).locator('[name="recipe_url"]'), 'recipe://soup');
         assert.equal(await date(shared,'2026-10-03').locator('small').textContent(),'Short ½');
         assert.match(await date(shared,'2026-10-03').getAttribute('aria-label'),/Soup: 0.5 servings short/);
-        await row(1).locator('[name="recipe_url"]').selectOption('recipe://bread');
+        await selectAuto(row(1).locator('[name="recipe_url"]'), 'recipe://bread');
         await row(1).locator('[data-meal-editor-customize]').click();
         const custom = row(1).locator('[data-meal-editor-form]');
         assert.equal(await date(custom,'2026-10-03').locator('small').textContent(),'Short ½');

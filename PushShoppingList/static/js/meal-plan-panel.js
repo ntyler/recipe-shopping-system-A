@@ -288,9 +288,13 @@
             if (!preview && !this.distributionPreviewDraft) return;
             // Render the ordinary planner with a separate display draft. Keep
             // the chosen portion controls, including Split recipe yield.
-            this.distributionPreviewDraft = preview ? {...preview.draft,
+            const nextDraft = preview ? {...preview.draft,
                 ...(this.draft.portionMode === 'recipe' ? {portionMode:'recipe', recipeYield:this.draft.recipeYield,
                     recipePortions:preview.allocations.map(meal => meal.planned_servings)} : {})} : null;
+            // Repeated control/blur notifications must not replace the input
+            // receiving focus when the displayed preview has not changed.
+            if (JSON.stringify(nextDraft) === JSON.stringify(this.distributionPreviewDraft)) return;
+            this.distributionPreviewDraft = nextDraft;
             this.render(false);
         }
 
@@ -313,7 +317,7 @@
         }
 
         updateTotals(notify = true) {
-            const draft = this.schedulingDraft(), totals = root.MealPlanSchedule.summary(draft);
+            const draft = this.distributionPreviewDraft || this.schedulingDraft(), totals = root.MealPlanSchedule.summary(draft);
             const sharedSplit = this.options.sharedPlan && draft.portionMode === 'recipe';
             this.form.querySelector('[data-schedule-summary]').innerHTML = MealPlanPanel.summaryHtml(draft, totals, this.options);
             this.form.querySelector('[data-schedule-errors]').textContent = MealPlanPanel.validationMessage(draft, this.ui, totals);
@@ -334,9 +338,11 @@
                 const label = this.form.querySelector(`[data-day-default-status="${day.date}"]`);
                 if (label) label.textContent = day.customized ? 'Adjusted for this day.' : 'Using default portions.';
             });
+            const portionsDraft = this.distributionPreviewDraft || this.draft;
             this.form.querySelectorAll('[data-portion-total]').forEach(cell => {
-                const portions = cell.dataset.date ? this.draft.days[cell.dataset.date].family : this.draft.familyDefaults;
-                const total = this.draft.members.reduce((sum, member) => {
+                const portions = cell.dataset.date ? portionsDraft.days[cell.dataset.date]?.family : portionsDraft.familyDefaults;
+                if (!portions) return;
+                const total = portionsDraft.members.reduce((sum, member) => {
                     const part = portions[member.id]?.[cell.dataset.portionTotal], value = Number(part?.servings);
                     return sum + (part?.enabled && Number.isFinite(value) && value > 0 ? value : 0);
                 }, 0);
@@ -367,14 +373,15 @@
         }
 
         syncPortionControls(active) {
+            const draft = this.distributionPreviewDraft || this.draft;
             this.form.querySelectorAll('input[type="number"][data-schedule-field]').forEach(input => {
                 if (input === active) return;
                 const {scheduleField:field, date, member, meal} = input.dataset;
                 let value;
-                if (field === 'household') value = this.draft.householdDefaults[meal];
-                if (field === 'family') value = this.draft.familyDefaults[member]?.[meal]?.servings;
-                if (field === 'day-household') value = this.draft.days[date].household[meal];
-                if (field === 'day-family') value = this.draft.days[date].family[member]?.[meal]?.servings;
+                if (field === 'household') value = draft.householdDefaults[meal];
+                if (field === 'family') value = draft.familyDefaults[member]?.[meal]?.servings;
+                if (field === 'day-household') value = draft.days[date]?.household[meal];
+                if (field === 'day-family') value = draft.days[date]?.family[member]?.[meal]?.servings;
                 if (value !== undefined) input.value = value;
             });
         }
