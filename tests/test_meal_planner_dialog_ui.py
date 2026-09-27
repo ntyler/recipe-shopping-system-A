@@ -628,6 +628,25 @@ assert.equal(panel.draft.notes,'','Successful save must not leave a resubmittabl
 """)
 
 
+def test_shared_distribution_preserves_visible_family_validation_and_day_defaults():
+    run_dialog(r"""
+await open();const shared=await choose('recipe://soup'),state=activeDialog.mealPlanScheduleState,entry=state.entries[0];
+M.setPortionMode(shared.draft,'family');
+for(const member of shared.draft.members) M.setFamilyDefault(shared.draft,member.id,'dinner',{servings:1});
+M.setDayFamily(shared.draft,shared.draft.selectedDates[0],'child','dinner',{servings:0.5});
+const summaries=()=>new Map([[entry,M.summary(ctx.mealPlannerRecipeDraft(state,entry))]]);
+const before=JSON.stringify(shared.draft);
+const upcoming=ctx.mealPlannerDistributionPreview(state,entry,summaries(),'upcoming');
+const people=ctx.mealPlannerDistributionPreview(state,entry,summaries(),'people');
+assert.deepEqual(plain(M.payload(upcoming.draft).allocations),plain(M.payload(people.draft).allocations));
+assert.deepEqual(plain(upcoming.allocations.map(meal=>meal.planned_servings)),[1.5,2,0.5]);
+assert.equal(JSON.stringify(shared.draft),before);
+M.setFamilyDefault(shared.draft,'adult','dinner',{servings:''});
+M.setDayFamily(shared.draft,shared.draft.selectedDates[0],'adult','dinner',{servings:''});
+for(const mode of ['upcoming','people','keep']) assert.throws(()=>ctx.mealPlannerDistributionPreview(state,entry,summaries(),mode),/serving/i);
+""")
+
+
 @pytest.mark.parametrize('mode', ['upcoming', 'people', 'keep'])
 @pytest.mark.parametrize('custom_first', [False, True])
 def test_single_recipe_distribution_updates_main_calendar_and_saves_its_edits(mode, custom_first):
@@ -642,14 +661,14 @@ source.notes='Keep refrigerated';source.prepSteps=[{date:'2026-10-08',instructio
 M.setDayNotes(source,'2026-10-09','Pack separately');
 // An unused recipe row must not cause another calendar for the selected recipe.
 ctx.addMealPlannerEditor();
-entry.distributionMode=DISTRIBUTION_MODE;entry.distributionOpen=true;
+entry.distributionMode=DISTRIBUTION_MODE;
 entry.root.querySelector('[data-meal-recipe-servings]').value=entry.distributionMode==='keep'?'1':'1.5';
 const before=JSON.stringify(shared.draft);
 const summaries=new Map([[entry,M.summary(ctx.mealPlannerRecipeDraft(state,entry))]]);
 ctx.mealPlannerDistributionPreview(state,entry,summaries);
 assert.equal(JSON.stringify(shared.draft),before,'Preview leaves the main calendar unchanged');
 ctx.applyMealPlannerDistribution(activeDialog,entry);
-assert.equal(entry.panel,null);assert.equal(entry.expanded,false);assert.equal(entry.distributionOpen,false);
+assert.equal(entry.panel,null);assert.equal(entry.expanded,false);assert.equal(entry.distributionHover,false);assert.equal(entry.distributionFocus,false);
 assert.equal(entry.root.querySelector('[data-meal-override-container]').hidden,true);
 assert.equal(entry.root.querySelector('[data-meal-override-form-host]').children.length,0);
 assert.equal(state.panel,shared,'Use the existing main calendar controller');

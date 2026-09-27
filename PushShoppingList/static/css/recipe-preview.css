@@ -306,8 +306,6 @@ body.recipe-preview-active { overflow: auto; }
 #mealPlannerDialog .app-meal-distribution[hidden] { display: none; }
 #mealPlannerDialog .app-meal-distribution fieldset { display: grid; gap: 12px; min-width: 0; margin: 0; padding: 0; border: 0; }
 #mealPlannerDialog .app-meal-distribution legend { padding: 0 0 8px; font-weight: 700; color: var(--app-text-strong); }
-#mealPlannerDialog .app-meal-distribution label { flex-wrap: nowrap; align-items: flex-start; cursor: pointer; }
-#mealPlannerDialog .app-meal-distribution input[type="radio"] { flex: 0 0 auto; width: 16px; height: 16px; min-height: 16px; padding: 0; margin: 1px 0 0; accent-color: var(--app-primary); }
 #mealPlannerDialog .app-meal-distribution p { margin: 0 0 12px; font-size: 12px; overflow-wrap: anywhere; }
 #mealPlannerDialog .app-meal-distribution .app-meal-distribution-preview { margin-top: 16px; color: var(--app-primary); font-weight: 600; }
 #mealPlannerDialog .app-meal-distribution .app-meal-distribution-preview[data-error="true"] { color: var(--app-danger, #ef8e91); }
@@ -315,6 +313,9 @@ body.recipe-preview-active { overflow: auto; }
 #mealPlannerDialog .app-meal-distribution ol { max-height: 180px; overflow: auto; padding-left: 24px; }
 #mealPlannerDialog .app-meal-distribution li { padding: 3px 0; }
 #mealPlannerDialog .app-meal-distribution-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+#mealPlannerDialog .app-meal-distribution-actions button { min-height: 44px; max-width: 100%; white-space: normal; text-align: left; }
+#mealPlannerDialog .app-meal-distribution-actions button[hidden] { display: none; }
+#mealPlannerDialog .app-meal-distribution-actions button:focus-visible { outline: 2px solid var(--app-primary); outline-offset: 3px; }
 #mealPlannerDialog .app-meal-yield-balance { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; padding: 10px 12px; border: 1px solid var(--app-border); border-radius: 6px; background: var(--app-bg); font-size: 12px; overflow-wrap: anywhere; }
 #mealPlannerDialog .app-meal-yield-balance[hidden] { display: none; }
 #mealPlannerDialog .app-meal-yield-balance strong { color: var(--app-primary); }
