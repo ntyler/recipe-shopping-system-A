@@ -11,6 +11,8 @@ import pytest
 from werkzeug.serving import make_server
 
 from PushShoppingList.routes import main_routes
+from PushShoppingList.services import recipe_url_service
+from PushShoppingList.services.recipe_url_service import recipe_edit_page_url
 from test_meal_prep_batches import scoped_client, sign_in
 
 
@@ -30,6 +32,7 @@ def test_simultaneous_meal_editors_in_chromium(scoped_client, monkeypatch, scrip
                                     {'id': 'sunflower', 'label': 'Sunflower', 'items': []}],
                     }]) for name, servings in [('Bread', 8), ('Soup', 4), ('Rice', 6)]]
     monkeypatch.setattr(main_routes, 'meal_plan_recipe_option_rows', lambda rows: recipes)
+    monkeypatch.setattr(recipe_url_service, 'current_user', main_routes.current_public_user)
     app = scoped_client.application
     source = (ROOT / 'PushShoppingList/static/js/app.js').read_text(encoding='utf-8')
     workspace = (ROOT / 'PushShoppingList/templates/sections/app_workspaces.html').read_text(encoding='utf-8')
@@ -46,7 +49,7 @@ def test_simultaneous_meal_editors_in_chromium(scoped_client, monkeypatch, scrip
             + dialog + '''</main><script src="/qa-static/js/meal-plan-schedule.js"></script>
             <script src="/qa-static/js/meal-plan-panel.js"></script><script src="/editor-controller.js"></script>
             <script>async function refreshMealPlannerWorkspace(){return true;}</script></body></html>''',
-            meal_plan_recipe_options=recipes)
+            meal_plan_recipe_options=recipes, recipe_edit_page_url=recipe_edit_page_url)
 
     @app.get('/qa-static/<path:name>')
     def assets(name):

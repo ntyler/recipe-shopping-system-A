@@ -32,7 +32,9 @@ const {selectAuto, customPlan, selectCalendar} = require('./meal_planner_test_he
         const add=()=>dialog.locator('[data-meal-editor-add]').click();
         const notes=async(form,value)=>{if(!await note(form).isVisible())await form.locator('[data-schedule-section="notes"] > summary').click();await note(form).fill(value);};
         const screenshot=async name=>{const dir=process.env.AI_PANTRY_BROWSER_ARTIFACTS;if(dir){fs.mkdirSync(dir,{recursive:true});await page.screenshot({path:path.join(dir,name)});}};
-        await open();await selectAuto(recipe(0), 'recipe://bread');
+        await open();
+        assert(await row(0).locator('[data-meal-editor-recipe-link]').isHidden());
+        await selectAuto(recipe(0), 'recipe://bread');
         await shared.getByRole('button',{name:'Household total',exact:true}).click();
         await notes(shared,'Shared prep notes');
         await shared.locator('[data-schedule-section="prep"] > summary').click();
@@ -42,6 +44,29 @@ const {selectAuto, customPlan, selectCalendar} = require('./meal_planner_test_he
         await add();await selectAuto(recipe(1), 'recipe://soup');
         await add();await selectAuto(recipe(2), 'recipe://rice');
         assert.equal(await rows.count(),3);
+        // Recipe editor links keep the current planner and its unsaved draft open.
+        const recipeLink=i=>row(i).locator('[data-meal-editor-recipe-link]');
+        for(const [i,value] of ['bread','soup','rice'].entries()) {
+            const url=new URL(await recipeLink(i).getAttribute('href'),base);
+            assert.equal(url.origin,base);assert.equal(url.pathname,'/recipe/edit');
+            assert.equal(url.searchParams.get('url'),'recipe://'+value);
+            assert.equal(url.searchParams.get('viewer_user_id'),'editor-qa');
+            assert.equal(await recipeLink(i).getAttribute('target'),'_blank');
+            assert.equal(await recipeLink(i).getAttribute('rel'),'noopener');
+        }
+        const beforeLink=await dialog.evaluate(el=>JSON.stringify(el.mealPlanScheduleState.panel.draft));
+        // Isolate the editor document: this scenario verifies navigation and draft
+        // preservation; recipe-editor routes have their own integration tests.
+        await context.route('**/recipe/edit?**',route=>route.fulfill({status:200,contentType:'text/html',body:'<title>Recipe editor navigation</title><h1>Recipe editor</h1>'}));
+        await recipeLink(0).focus();await page.keyboard.press('Tab');await page.keyboard.press('Shift+Tab');
+        assert(await recipeLink(0).evaluate(el=>el.matches(':focus-visible')&&getComputedStyle(el).outlineStyle!=='none'));
+        const popupPromise=page.waitForEvent('popup');await page.keyboard.press('Enter');
+        const popup=await popupPromise;await popup.waitForLoadState();
+        assert.equal(new URL(popup.url()).searchParams.get('url'),'recipe://bread');
+        assert(await popup.evaluate(()=>window.opener===null));await popup.close();
+        await context.unroute('**/recipe/edit?**');
+        assert(await dialog.isVisible());assert.equal(posts.length,0);
+        assert.equal(await dialog.evaluate(el=>JSON.stringify(el.mealPlanScheduleState.panel.draft)),beforeLink);
         assert.equal(await dialog.locator('[data-meal-editor-form]').count(),1,'Only one scheduling form is mounted by default');
         assert.equal(await servings(shared).inputValue(),'8','Additional recipe yields must not overwrite the shared portions');
         assert.equal(await save.textContent(),'Save 1 Meal');
@@ -95,12 +120,16 @@ const {selectAuto, customPlan, selectCalendar} = require('./meal_planner_test_he
         await selectCalendar(dialog,1);
         await custom(1).locator('[data-schedule-field="single-date"]').fill('2026-10-09');
         await servings(custom(1)).fill('3');await notes(custom(1),'Soup only');
-        await recipe(2).selectOption('');await save.click();
+        await recipe(2).selectOption('');
+        assert(await recipeLink(2).isHidden());assert.equal(await recipeLink(2).getAttribute('href'),null);
+        await save.click();
         assert.match(await row(2).locator('[data-meal-editor-error]').textContent(),/Recipe 3: Please select a recipe/);
         await selectAuto(recipe(2), 'recipe://rice');
+        assert.equal(new URL(await recipeLink(2).getAttribute('href'),base).searchParams.get('url'),'recipe://rice');
         // Removing the first row leaves both the shared plan and custom recipe intact.
         await row(0).locator('[data-meal-editor-remove]').click();
         assert.equal(await row(0).getAttribute('data-meal-editor'),ids[1]);
+        assert.equal(new URL(await recipeLink(0).getAttribute('href'),base).searchParams.get('url'),'recipe://soup');
         assert.equal(await servings(custom(0)).inputValue(),'3');assert.equal(await servings(shared).inputValue(),'9');
         await add();await selectAuto(recipe(2), 'recipe://bread');await add();
         assert.equal(await save.textContent(),'Save 3 Meals','Blank row is excluded from the total');

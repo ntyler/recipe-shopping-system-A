@@ -2583,6 +2583,18 @@ function syncMealPlannerBatchControls(dialog) {
     state.entries.forEach((entry, index) => {
         entry.root.querySelector('[data-meal-editor-heading]').hidden = Boolean(state.edit);
         entry.root.querySelector('[data-meal-editor-number]').textContent = `Recipe ${index + 1}`;
+        const recipeLink = entry.root.querySelector('[data-meal-editor-recipe-link]');
+        const recipeEditUrl = entry.recipeUrl && entry.root.querySelector('[name="recipe_url"]').selectedOptions[0]?.dataset.recipeEditUrl;
+        recipeLink.hidden = !recipeEditUrl;
+        if (recipeEditUrl) {
+            recipeLink.setAttribute('href', recipeEditUrl);
+            recipeLink.setAttribute('aria-label', `Edit recipe: ${entry.title} (opens in a new tab)`);
+            recipeLink.title = `Edit ${entry.title} in a new tab`;
+        } else {
+            recipeLink.removeAttribute('href');
+            recipeLink.removeAttribute('aria-label');
+            recipeLink.removeAttribute('title');
+        }
         const error = entry.root.querySelector('[data-meal-editor-error]');
         if (!error.hidden) error.textContent = error.textContent.replace(/^Recipe \d+:/, `Recipe ${index + 1}:`);
         const summary = summaries.get(entry) || MealPlanSchedule.summary(mealPlannerRecipeDraft(state, entry));
