@@ -390,6 +390,7 @@
             const model = root.MealPlanSchedule, draft = this.draft;
             const {scheduleField:field, meal, member, date, step} = input.dataset;
             const value = input.value;
+            if (['household', 'family', 'family-enabled', 'day-household', 'day-family', 'day-family-enabled'].includes(field)) this.options.onPortionsChange?.();
             if (field === 'household') model.setHouseholdDefault(draft, meal, value);
             if (field === 'family' || field === 'family-enabled') {
                 const current = draft.familyDefaults[member][meal];
@@ -528,7 +529,10 @@
             const model = root.MealPlanSchedule, draft = this.draft;
             if (this.edit?.scope === 'meal' && (button.dataset.scheduleMode || ['month','date','add-prep','remove-prep','apply'].includes(button.dataset.scheduleAction))) return;
             if (button.dataset.scheduleMode) model.setDateMode(draft, button.dataset.scheduleMode);
-            else if (button.dataset.schedulePortionMode) model.setPortionMode(draft, button.dataset.schedulePortionMode, this.schedulingDraft());
+            else if (button.dataset.schedulePortionMode) {
+                this.options.onPortionsChange?.();
+                model.setPortionMode(draft, button.dataset.schedulePortionMode, this.schedulingDraft());
+            }
             else switch (button.dataset.scheduleAction) {
                 case 'cancel': this.form.hidden = true; this.options.onCancel?.(); return;
                 case 'month': draft.calendarMonth = model.shiftMonth(draft.calendarMonth, Number(button.dataset.direction)); break;

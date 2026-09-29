@@ -2860,6 +2860,7 @@ function mealPlannerPanelOptions(dialog, entry, recipeTitle, defaultServings) {
             }
             syncMealPlannerScheduleControls(dialog, panel);
         },
+        onPortionsChange: () => { if (!entry) state.sharedPortionsEdited = true; },
         onSubmit: () => saveMealPlannerBatch(),
         onCancel: () => closeMealPlannerDialog(),
         onMembersChanged: async () => {
@@ -2919,6 +2920,15 @@ function syncMealPlannerServingsFromRecipe(input) {
     const selectedRecipe = String(option?.value || '').trim();
     const changed = selectedRecipe !== entry.recipeUrl;
     const previous = state.entries.filter(other => other.recipeUrl);
+    // Recipe defaults start at one serving each. Until the user sets a shared
+    // budget, selecting another recipe must also include its portion in that
+    // budget. Explicit totals, Auto split and custom/distributed plans keep
+    // their existing allocation rules.
+    const updateDefaultTotal = changed && selectedRecipe && !entry.panel && !state.sharedPortionsEdited
+        && state.panel.draft.portionMode === 'household'
+        && previous.every(other => !other.panel && !other.distributionDates
+            && (previous.length === 1 || other.portionsDraft || other.servingsPerMeal !== undefined)
+            && MealPlanSchedule.summary(mealPlannerRecipeDraft(state, other)).valid);
     const single = previous.length === 1 && !previous[0].panel ? previous[0] : null;
     const remaining = previous.filter(other => other !== entry);
     const survivor = !selectedRecipe && remaining.length === 1 && !remaining[0].panel ? remaining[0] : null;
@@ -2964,6 +2974,13 @@ function syncMealPlannerServingsFromRecipe(input) {
         adoptMealPlannerSharedPortions(state, entry, state.panel.draft.portionMode === 'recipe' ? state.panel.draft
             : MealPlanSchedule.withMealServings(state.panel.draft, entry.servingsPerMeal));
     } else if (survivorDraft) adoptMealPlannerSharedPortions(state, survivor, survivorDraft);
+    if (updateDefaultTotal) {
+        const recipes = state.entries.filter(other => other.recipeUrl);
+        const amounts = recipes.map(other => other.servingsPerMeal ?? mealPlannerUniformServings(other.portionsDraft || state.panel.draft));
+        if (recipes.length > 1 && amounts.every(amount => Number.isFinite(Number(amount)) && Number(amount) > 0)) {
+            state.panel.draft = MealPlanSchedule.withMealServings(state.panel.draft, MealPlanSchedule.sum(amounts.map(Number)));
+        }
+    }
     if (entry.panel) Object.assign(entry.panel.options, {title: entry.title, servings: defaultServings});
     entry.root.querySelector('[data-meal-editor-error]').hidden = true;
     panel.render();
@@ -2972,6 +2989,7 @@ function syncMealPlannerServingsFromRecipe(input) {
 
 function resetMealPlannerEditors(dialog) {
     const state = mealPlannerScheduleState(dialog);
+    state.sharedPortionsEdited = false;
     if (!state.editorTemplate) {
         state.firstEditor = dialog.querySelector('[data-meal-editor]');
         state.editorTemplate = state.firstEditor.cloneNode(true);

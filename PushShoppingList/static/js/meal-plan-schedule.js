@@ -124,7 +124,7 @@
             const custom = customMeals.filter(item => item.date === day.date && item.meal_type === type);
             const remaining = sum([meal.planned_servings, ...custom.map(item => -item.planned_servings)]);
             const fail = message => errors.push(`${day.date} ${type}: ${message}`);
-            if (remaining < 0) fail('Custom portions exceed the shared meal total. Reduce custom portions or increase the shared total.');
+            if (remaining < 0) fail(`Custom portions exceed the shared meal total (${sum(custom.map(item => item.planned_servings))} planned; ${meal.planned_servings} available). Reduce recipe portions or increase “Total servings per meal” under “Who is eating?”.`);
             else if (!remaining && count) {
                 // A custom recipe can fully cover some slots while automatic
                 // recipes cover the rest of the shared calendar.

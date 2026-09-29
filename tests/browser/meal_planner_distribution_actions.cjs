@@ -24,12 +24,12 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
             const action=mode=>toolbar.locator(`[data-meal-shared-distribution-mode="${mode}"]`);
             const calendar=shared.locator('[data-distribution-preview]'),save=dialog.locator('[data-meal-batch-save]');
             const draft=()=>dialog.evaluate(element=>JSON.stringify(element.mealPlanScheduleState.panel.draft));
-            const open=async()=>{
+            const open=async(useDefaults=false)=>{
                 await page.getByRole('button',{name:'Add Meals',exact:true}).click();
                 await page.waitForFunction(()=>!document.getElementById('mealPlannerDialog').mealPlanScheduleState.panel.ui.loading);
                 await row(0).locator('[name="recipe_url"]').selectOption('recipe://soup');
                 await shared.getByRole('button',{name:'One day',exact:true}).click();
-                await shared.locator('[data-schedule-field="household"][data-meal="dinner"]').fill('1');
+                if(!useDefaults) await shared.locator('[data-schedule-field="household"][data-meal="dinner"]').fill('1');
             };
             await open();
             // Both viewports use the same isolated account; save different weeks.
@@ -81,6 +81,42 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
             assert.deepEqual(JSON.parse(await draft()).selectedDates,['2026-10-05','2026-10-07']);
             assert.equal(await save.textContent(),'Save 2 Meals');
             assert.match(await row(0).locator('[data-meal-yield-remaining]').textContent(),/1 serving left/);
+            await dialog.locator('[data-meal-batch-footer]').getByRole('button',{name:'Cancel',exact:true}).click();
+
+            // Selecting two recipes with their default portions must work
+            // without first finding and increasing the shared meal total.
+            await open(true);
+            await shared.locator('[data-schedule-field="single-date"]').fill('2026-09-26');
+            await shared.locator('[data-schedule-field="meal"][data-meal="breakfast"]').check();
+            await shared.locator('[data-schedule-field="meal"][data-meal="dinner"]').uncheck();
+            await dialog.locator('[data-meal-editor-add]').click();await row(1).locator('[name="recipe_url"]').selectOption('recipe://bread');
+            assert.equal(await shared.locator('[data-schedule-field="household"][data-meal="breakfast"]').inputValue(),'2');
+            assert.equal(await action('upcoming').getAttribute('aria-disabled'),'false');
+            assert.equal(await action('keep').getAttribute('aria-disabled'),'false');
+            const defaultDraft=await draft(),defaultPosts=posts.length;
+            if(mobile) await action('keep').tap();else await action('keep').press('Enter');
+            assert.deepEqual(JSON.parse(await draft()).selectedDates,['2026-09-26']);
+            const afterKeep=await draft();
+            if(!mobile){await action('upcoming').hover();assert.equal(await draft(),afterKeep);assert(await calendar.isVisible());}
+            if(mobile) await action('upcoming').tap();else await action('upcoming').click();
+            assert.equal(await save.textContent(),'Save 8 Meals');assert.equal(posts.length,defaultPosts);
+            const defaultApplied=await draft();assert.notEqual(defaultApplied,defaultDraft);
+            if(mobile) await action('upcoming').tap();else await action('upcoming').press('Space');
+            assert.equal(await draft(),defaultApplied);
+            const defaultAmounts=await dialog.evaluate(element=>element.mealPlanScheduleState.entries.map(entry=>MealPlanSchedule.summary(mealPlannerRecipeDraft(element.mealPlanScheduleState,entry)).totalServings));
+            assert.deepEqual(defaultAmounts,[4,8]);
+            if(mobile) await toolbar.evaluate(element=>element.scrollIntoView({block:'start'}));
+            else await dialog.evaluate(element=>{element.scrollTop=0;});
+            if(dir) await page.screenshot({path:path.join(dir,`default-portions-${mobile?'mobile':'desktop'}.png`)});
+            // An explicitly smaller total still blocks the action and explains
+            // the actual numbers, without partially applying the distribution.
+            await dialog.locator('[data-meal-batch-footer]').getByRole('button',{name:'Cancel',exact:true}).click();
+            await open();
+            await dialog.locator('[data-meal-editor-add]').click();await row(1).locator('[name="recipe_url"]').selectOption('recipe://bread');
+            const explicitDraft=await draft();
+            await action('keep').focus();await page.keyboard.press('Enter');
+            assert.equal(await draft(),explicitDraft);assert.equal(posts.length,defaultPosts);
+            assert.match(await toolbar.locator('[data-meal-shared-distribution-preview]').textContent(),/2 planned; 1 available/);
             await dialog.locator('[data-meal-batch-footer]').getByRole('button',{name:'Cancel',exact:true}).click();
 
             // Both shared recipes use their own 1-serving contribution, not the 2-serving meal total.
