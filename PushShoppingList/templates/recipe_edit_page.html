@@ -44,10 +44,18 @@ window.addEventListener("DOMContentLoaded", () => {
         const pendingOptions = typeof consumeRecipeEditPendingAction === "function"
             ? consumeRecipeEditPendingAction(recipeUrl)
             : {};
-        openRecipeEditor({ dataset: { recipeUrl } }, pendingOptions).then(() => {
+        openRecipeEditor({ dataset: { recipeUrl } }, pendingOptions).then(loaded => {
             syncRecipeEditCompactSummary();
             if (typeof openRecipeIngredientUsageTarget === "function") {
                 openRecipeIngredientUsageTarget(window.location.hash);
+            }
+            if (loaded && window.location.hash === "#recipe-preview" && typeof openIntegratedRecipePreview === "function") {
+                const existingPreview = Boolean(window.history.state?.recipePreview);
+                if (!existingPreview) {
+                    // Give Back to Editor a same-page destination for direct links.
+                    window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search);
+                }
+                openIntegratedRecipePreview({history: !existingPreview});
             }
         });
     }

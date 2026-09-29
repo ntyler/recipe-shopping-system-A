@@ -2590,8 +2590,8 @@ function syncMealPlannerBatchControls(dialog) {
             link.hidden = !recipeEditUrl;
             if (recipeEditUrl) {
                 link.setAttribute('href', recipeEditUrl);
-                link.setAttribute('aria-label', `Edit recipe: ${entry.title} (opens in a new tab)`);
-                link.title = `Edit ${entry.title} in a new tab`;
+                link.setAttribute('aria-label', `View recipe: ${entry.title} (opens in a new tab)`);
+                link.title = `View ${entry.title} in a new tab`;
             } else {
                 link.removeAttribute('href');
                 link.removeAttribute('aria-label');
@@ -25896,9 +25896,11 @@ async function openRecipeEditor(button, options = {}) {
             applyRecipeEditorInferenceOptions(optionObject);
             await inferMissingRecipeDetails(document.querySelector(".recipe-edit-ai-infer"));
         }
+        return true;
     } catch (err) {
         console.warn("Unable to open recipe editor.", err);
         setRecipeEditStatus("Unable to load recipe.", true);
+        return false;
     }
 }
 

@@ -65,6 +65,7 @@ const {selectAuto, customPlan, selectCalendar} = require('./meal_planner_test_he
             assert.equal(url.origin,base);assert.equal(url.pathname,'/recipe/edit');
             assert.equal(url.searchParams.get('url'),'recipe://'+value);
             assert.equal(url.searchParams.get('viewer_user_id'),'editor-qa');
+            assert.equal(url.hash,'#recipe-preview');
             assert.equal(await recipeLink(i).getAttribute('target'),'_blank');
             assert.equal(await recipeLink(i).getAttribute('rel'),'noopener');
         }
@@ -78,6 +79,7 @@ const {selectAuto, customPlan, selectCalendar} = require('./meal_planner_test_he
             const popupPromise=page.waitForEvent('popup');await page.keyboard.press('Enter');
             const popup=await popupPromise;await popup.waitForLoadState();
             assert.equal(new URL(popup.url()).searchParams.get('url'),'recipe://bread');
+            assert.equal(new URL(popup.url()).hash,'#recipe-preview');
             assert(await popup.evaluate(()=>window.opener===null));await popup.close();
         }
         await context.unroute('**/recipe/edit?**');

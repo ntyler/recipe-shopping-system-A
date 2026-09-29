@@ -1,4 +1,8 @@
 from pathlib import Path
+import shutil
+import subprocess
+
+import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -175,4 +179,52 @@ def test_recipe_edit_page_consumes_pending_editor_action():
     template = read_text("PushShoppingList/templates/recipe_edit_page.html")
 
     assert "consumeRecipeEditPendingAction(recipeUrl)" in template
-    assert "openRecipeEditor({ dataset: { recipeUrl } }, pendingOptions);" in template
+    assert "openRecipeEditor({ dataset: { recipeUrl } }, pendingOptions).then(" in template
+
+
+@pytest.mark.skipif(not shutil.which("node"), reason="Node.js is required for navigation checks")
+def test_recipe_preview_direct_link_waits_for_loading_and_preserves_back_navigation():
+    script = r"""
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const inline=fs.readFileSync(process.argv[1],'utf8').split('<script>')[1].split('</script>')[0];
+const source='https://example.test/menu/?category=1&menu_item=menu-item-4-Anticucho_Heart_and_Rachi';
+const base='http://127.0.0.1:5083/recipe/edit?viewer_user_id=viewer&url='+encodeURIComponent(source);
+(async()=>{
+ for(const scenario of [
+  {hash:'#recipe-preview',loaded:true,existing:false},
+  {hash:'#recipe-preview',loaded:true,existing:true},
+  {hash:'#recipe-preview',loaded:false,existing:false},
+  {hash:'',loaded:true,existing:false},
+ ]){
+  let boot,resolveLoad;const opened=[],replacements=[];
+  const location=new URL(base+scenario.hash);
+  const entries=[{url:base,state:null},{url:location.href,state:scenario.existing?{recipePreview:true}:null}];
+  const history={state:entries.at(-1).state,
+   replaceState(state,unused,url){replacements.push(url);this.state=state;location.href=new URL(url,location).href;entries[entries.length-1]={url:location.href,state};},
+   pushState(state,unused,url){this.state=state;location.href=new URL(url,location).href;entries.push({url:location.href,state});},
+   back(){entries.pop();this.state=entries.at(-1).state;location.href=entries.at(-1).url;},
+  };
+  const ctx={window:{location,history,addEventListener(type,handler){boot=handler;}},
+   document:{body:{dataset:{recipeEditUrl:source}}},
+   organizeRecipeEditCompactSummary(){},organizeRecipeEditCompactSections(){},organizeRecipeEditCoverDialog(){},syncRecipeEditCompactSummary(){},
+   consumeRecipeEditPendingAction(url){assert.equal(url,source);return {section:'ingredients'};},
+   openRecipeEditor(button,options){assert.equal(button.dataset.recipeUrl,source);assert.equal(options.section,'ingredients');return new Promise(resolve=>resolveLoad=resolve);},
+   openIntegratedRecipePreview(options){opened.push(options);if(options.history)history.pushState({recipePreview:true},'','#recipe-preview');},
+  };
+  vm.createContext(ctx);vm.runInContext(inline,ctx);boot();
+  assert.equal(opened.length,0,'Wait for the editor data before opening its preview');
+  resolveLoad(scenario.loaded);await new Promise(resolve=>setImmediate(resolve));
+  if(!scenario.loaded||!scenario.hash){assert.equal(opened.length,0);assert.equal(replacements.length,0);continue;}
+  assert.equal(opened.length,1);assert.equal(opened[0].history,!scenario.existing);
+  assert.equal(replacements.length,scenario.existing?0:1);
+  assert.equal(location.href,base+'#recipe-preview');
+  assert.equal(location.searchParams.get('url'),source);
+  assert.equal(location.searchParams.get('viewer_user_id'),'viewer');
+  history.back();assert.equal(location.href,base,'Back to Editor stays on this recipe');
+ }
+})().catch(error=>{console.error(error);process.exitCode=1;});
+"""
+    result = subprocess.run([shutil.which("node"), "-e", script,
+                             str(ROOT / "PushShoppingList/templates/recipe_edit_page.html")],
+                            capture_output=True, text=True, timeout=20)
+    assert result.returncode == 0, result.stdout + result.stderr
