@@ -2069,9 +2069,6 @@ function syncMealPlannerRecipeServings(entry, summary, state, busy) {
         button.disabled = input.disabled || !uniform && entry.servingsPerMeal === undefined;
         button.setAttribute('aria-label', `${button.dataset.mealPortionStep === '-1' ? 'Decrease' : 'Increase'} ${entry.title || 'recipe'} servings per meal`);
     });
-    const automatic = entry.root.querySelector('[data-meal-portions-auto]');
-    automatic.hidden = Boolean(shared || entry.panel || entry.servingsPerMeal === undefined && !entry.portionsDraft);
-    automatic.disabled = input.disabled;
     const help = entry.root.querySelector('[data-meal-portions-help]');
     help.textContent = shared ? 'Set portions under “Who is eating?” below. Distribution uses those portions.'
         : entry.panel ? 'Applies to every scheduled meal. Customize for individual people or dates.'
@@ -2268,12 +2265,37 @@ function applyMealPlannerSharedDistribution(dialog, mode) {
     }
 }
 
+function resetMealPlannerRecipePortions(entry) {
+    delete entry.servingsPerMeal;
+    delete entry.portionsDraft;
+    delete entry.distributionSource;
+    delete entry.distributionDates;
+    delete entry.lastServingsPerMeal;
+    entry.root.querySelector('[data-meal-editor-error]').hidden = true;
+}
+
+function autoSplitMealPlannerSharedRecipes(dialog) {
+    const state = mealPlannerScheduleState(dialog);
+    if (state.edit || mealPlannerBusy(state) || state.panel.ui.loading || state.entries.some(entry => entry.panel?.ui.loading)) return;
+    state.entries.filter(entry => entry.recipeUrl && !entry.panel).forEach(resetMealPlannerRecipePortions);
+    // Recalculate once after clearing every shared contribution and its previous
+    // distribution limits. Custom schedules and the shared meal total stay intact.
+    showMealPlannerCalendar(dialog);
+}
+
 function syncMealPlannerSharedDistribution(dialog, state, busy) {
     const box = dialog.querySelector('[data-meal-shared-distribution]');
     const shared = state.entries.filter(entry => entry.recipeUrl && !entry.panel);
     box.hidden = Boolean(state.edit);
     box.querySelector('[data-meal-shared-distribution-choices]').hidden = !shared.length;
     box.querySelector('[data-meal-shared-distribution-details]').hidden = !shared.length;
+    const automatic = box.querySelector('[data-meal-shared-portions-auto]');
+    automatic.hidden = !shared.length || state.entries.filter(entry => entry.recipeUrl).length < 2;
+    automatic.disabled = Boolean(busy || !state.panel || state.panel.ui.loading || state.entries.some(entry => entry.panel?.ui.loading));
+    if (!automatic.mealPortionsBound) {
+        automatic.mealPortionsBound = true;
+        automatic.addEventListener('click', () => autoSplitMealPlannerSharedRecipes(dialog));
+    }
     if (state.edit || !shared.length) {
         state.sharedDistributionHover = false;
         state.sharedDistributionFocus = false;
@@ -2659,16 +2681,6 @@ function createMealPlannerEditor(dialog, root) {
             servings.value = Math.max(0.01, MealPlanSchedule.sum([Number(servings.value) || 0, Number(button.dataset.mealPortionStep) * 0.5]));
             setMealPlannerRecipeServings(dialog, root.mealPlannerEntry, servings.value);
         }));
-        root.querySelector('[data-meal-portions-auto]').addEventListener('click', () => {
-            if (mealPlannerBusy(state) || state.edit) return;
-            delete root.mealPlannerEntry.servingsPerMeal;
-            delete root.mealPlannerEntry.portionsDraft;
-            delete root.mealPlannerEntry.distributionSource;
-            delete root.mealPlannerEntry.distributionDates;
-            delete root.mealPlannerEntry.lastServingsPerMeal;
-            root.querySelector('[data-meal-editor-error]').hidden = true;
-            syncMealPlannerBatchControls(dialog);
-        });
         root.querySelectorAll('[data-meal-distribution-mode]').forEach(button => {
             const mode = button.dataset.mealDistributionMode;
             const preview = (key, active) => {

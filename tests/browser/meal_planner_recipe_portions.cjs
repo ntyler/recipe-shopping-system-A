@@ -50,7 +50,7 @@ const {selectAuto, customPlan} = require('./meal_planner_test_helpers.cjs');
         await amount(0).fill('');await save.click();assert.equal(posts.length,0);
         await amount(0).fill('2.5');await save.click();assert.equal(posts.length,0);
         assert.match(await row(1).locator('[data-meal-editor-error]').textContent(),/exceed|remain/);
-        await row(0).getByRole('button',{name:'Auto split',exact:true}).click();
+        await dialog.getByRole('button',{name:'Auto split all',exact:true}).click();
         assert.equal(await amount(0).inputValue(),'1');assert.equal(await amount(1).inputValue(),'1');
         // Moving between inline amounts and per-person customization must keep
         // the same portions, including while an incomplete input is corrected.

@@ -126,7 +126,7 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
             await dialog.locator('[data-meal-editor-add]').click();await row(1).locator('[name="recipe_url"]').selectOption('recipe://bread');
             await row(0).locator('[data-meal-recipe-servings]').fill('1');
             assert.equal(await dialog.locator('[data-meal-distribution]:visible').count(),0);
-            assert.equal(await toolbar.locator('button:visible').count(),3);
+            assert.equal(await toolbar.locator('button:visible').count(),4);
             const beforeAll=await draft();await action('upcoming').focus();await page.keyboard.press('Tab');await page.keyboard.press('Shift+Tab');
             assert(await calendar.isVisible());assert.equal(await save.textContent(),'Save 8 Meals');assert.equal(await draft(),beforeAll);
             assert.equal(await shared.locator('.meal-schedule-calendar-heading strong').textContent(),'November 2026');

@@ -846,7 +846,6 @@
                             <input type="number" min="0" step="any" inputmode="decimal" data-meal-recipe-servings>
                             <button type="button" data-meal-portion-step="1" aria-label="Increase recipe servings">+</button>
                         </span></label>
-                        <button type="button" class="app-page-secondary-action" data-meal-portions-auto hidden>Auto split</button>
                         <small data-meal-portions-help></small>
                         <div class="app-meal-distribution" data-meal-distribution hidden>
                             <div class="app-meal-distribution-toolbar" data-meal-distribution-toolbar>
@@ -906,17 +905,18 @@
             <div class="app-meal-distribution app-meal-shared-distribution" data-meal-shared-distribution>
                 <div class="app-meal-distribution-toolbar">
                     <button type="button" class="app-page-secondary-action" data-meal-editor-add onclick="return addMealPlannerEditor()">+ Add another recipe</button>
-                    <fieldset data-meal-shared-distribution-choices aria-label="Distribute all shared-plan recipes" hidden>
+                    <fieldset data-meal-shared-distribution-choices aria-label="Shared plan actions" hidden>
                         <div class="app-meal-distribution-actions">
                             <button type="button" class="app-page-secondary-action" data-meal-shared-distribution-mode="upcoming" aria-describedby="mealPlannerDistributionHelp">Fill upcoming days for all</button>
                             <button type="button" class="app-page-secondary-action" data-meal-shared-distribution-mode="keep" aria-describedby="mealPlannerDistributionHelp">Distribute all on selected days</button>
+                            <button type="button" class="app-page-secondary-action" data-meal-shared-portions-auto title="Reset shared-plan recipes to automatic portions." aria-describedby="mealPlannerDistributionHelp" hidden>Auto split all</button>
                         </div>
                     </fieldset>
                 </div>
                 <div data-meal-shared-distribution-details hidden>
                     <p class="app-meal-distribution-preview" data-meal-shared-distribution-preview aria-live="polite" aria-atomic="true"></p>
                     <details data-meal-shared-distribution-review><summary>Review proposed meals</summary><ol data-meal-shared-distribution-meals></ol></details>
-                    <p id="mealPlannerDistributionHelp" class="app-dialog-helper">Applies to shared-plan recipes using each recipe’s portions. Preview on hover or focus; activate to update the draft, then Save Meals.</p>
+                    <p id="mealPlannerDistributionHelp" class="app-dialog-helper">Shared-plan recipes only. Preview distribution on hover or focus. Changes stay in the draft until Save Meals.</p>
                 </div>
             </div>
             </section>
