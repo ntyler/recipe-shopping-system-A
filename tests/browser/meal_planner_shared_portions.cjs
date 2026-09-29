@@ -2,7 +2,7 @@ const {chromium} = require(process.argv[2]);
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path');
 const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
-const {selectAuto} = require('./meal_planner_test_helpers.cjs');
+const {selectAuto, customPlan, selectCalendar} = require('./meal_planner_test_helpers.cjs');
 
 
 (async () => {
@@ -26,7 +26,7 @@ const {selectAuto} = require('./meal_planner_test_helpers.cjs');
         assert(await page.getByRole('heading',{name:'Meal Planner',exact:true}).isVisible());
         const dialog = page.locator('#mealPlannerDialog'), shared = dialog.locator('[data-meal-shared-form]');
         const row = i => dialog.locator('[data-meal-editor]').nth(i);
-        const custom = i => row(i).locator('[data-meal-editor-form]');
+        const custom = i => customPlan(dialog,i).locator('[data-meal-editor-form]');
         const portion = (form,member) => form.locator(`[data-schedule-field="family"][data-member="${member.id}"][data-meal="lunch"]`);
         const save = dialog.locator('[data-meal-batch-save]'), total = dialog.locator('[data-meal-batch-help]');
         const ready = () => page.waitForFunction(() => {const s=document.getElementById('mealPlannerDialog').mealPlanScheduleState;return s.panel && !s.panel.ui.loading && s.entries.every(e=>!e.panel?.ui.loading);});
@@ -68,8 +68,9 @@ const {selectAuto} = require('./meal_planner_test_helpers.cjs');
         await portion(custom(1),members[0]).fill('1.25');await save.click();
         assert.equal(posts.length,0,'Overallocating one person cannot save even if the combined total fits');
         assert.match(await row(0).locator('[data-meal-editor-error]').textContent(),/exceed.*Nate/);
+        await selectCalendar(dialog,1);
         await portion(custom(1),members[0]).fill('0.75');
-        await row(1).locator('[data-meal-editor-reset]').click();
+        await customPlan(dialog,1).locator('[data-meal-editor-reset]').click();
         await add('rice');assert.match(await total.textContent(),/3 recipes · 1 meal · 2 servings/);
         await row(2).locator('[data-meal-editor-remove]').click();
         // Small valid shares must remain editable when division takes them
@@ -80,7 +81,7 @@ const {selectAuto} = require('./meal_planner_test_helpers.cjs');
             assert.equal(await portion(custom(1),member).inputValue(),'0.005');
             assert(await portion(custom(1),member).evaluate(input=>input.checkValidity()));
         }
-        await row(1).locator('[data-meal-editor-reset]').click();
+        await customPlan(dialog,1).locator('[data-meal-editor-reset]').click();
         for (const member of members) await portion(shared,member).fill('1');
         await row(1).locator('[data-meal-editor-customize]').click();
         await portion(custom(1),members[0]).fill('0.75');

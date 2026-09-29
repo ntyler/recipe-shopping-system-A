@@ -2,7 +2,7 @@ const {chromium} = require(process.argv[2]);
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path');
 const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
-const {selectAuto} = require('./meal_planner_test_helpers.cjs');
+const {selectAuto, customPlan} = require('./meal_planner_test_helpers.cjs');
 
 
 (async () => {
@@ -55,12 +55,12 @@ const {selectAuto} = require('./meal_planner_test_helpers.cjs');
         // Moving between inline amounts and per-person customization must keep
         // the same portions, including while an incomplete input is corrected.
         await amount(0).fill('1.5');await row(0).locator('[data-meal-editor-customize]').click();
-        const custom=row(0).locator('[data-meal-editor-form]');
+        const custom=customPlan(dialog,0).locator('[data-meal-editor-form]');
         const family=custom.locator('[data-schedule-field="family"][data-meal="dinner"]');
         assert.equal(await family.first().inputValue(),'0.75');
         await amount(0).fill('');await amount(0).fill('1');
         assert.equal(await family.first().inputValue(),'0.5');
-        await row(0).locator('[data-meal-editor-reset]').click();
+        await customPlan(dialog,0).locator('[data-meal-editor-reset]').click();
         await amount(0).fill('1.5');await amount(1).fill('1');await save.click();assert.equal(posts.length,0);
         await amount(1).fill('0.5');
         const response=page.waitForResponse(r=>r.url().endsWith('/batches/bulk')&&r.request().method()==='POST');

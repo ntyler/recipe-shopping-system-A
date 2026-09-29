@@ -790,7 +790,7 @@ assert.equal(shared.draft.days[shared.draft.selectedDates[0]].mealEnabled.lunch,
 
 @pytest.mark.parametrize('mode', ['upcoming', 'people', 'keep'])
 @pytest.mark.parametrize('custom_first', [False, True])
-def test_single_recipe_distribution_updates_main_calendar_and_saves_its_edits(mode, custom_first):
+def test_single_recipe_distribution_updates_selected_calendar_and_saves_its_edits(mode, custom_first):
     run_dialog(r"""
 await open();const shared=await chooseAuto('recipe://soup'),state=activeDialog.mealPlanScheduleState,entry=state.entries[0];
 M.setPortionMode(shared.draft,'family');
@@ -809,21 +809,21 @@ const summaries=new Map([[entry,M.summary(ctx.mealPlannerRecipeDraft(state,entry
 ctx.mealPlannerDistributionPreview(state,entry,summaries);
 assert.equal(JSON.stringify(shared.draft),before,'Preview leaves the main calendar unchanged');
 ctx.applyMealPlannerDistribution(activeDialog,entry);
-assert.equal(entry.panel,null);assert.equal(entry.expanded,false);assert.equal(entry.distributionHover,false);assert.equal(entry.distributionFocus,false);
-assert.equal(entry.root.querySelector('[data-meal-override-container]').hidden,true);
-assert.equal(entry.root.querySelector('[data-meal-override-form-host]').children.length,0);
-assert.equal(state.panel,shared,'Use the existing main calendar controller');
-if(previousPanel) assert.notEqual(shared.draft,previousPanel.draft,'Retired editors cannot mutate the main calendar');
+assert.equal(Boolean(entry.panel),CUSTOM_FIRST);assert.equal(entry.expanded,CUSTOM_FIRST);
+assert.equal(entry.distributionHover,false);assert.equal(entry.distributionFocus,false);
+const active=entry.panel || shared;
+assert.equal(entry.overrideContainer.hidden,!CUSTOM_FIRST);assert.equal(shared.form.hidden,CUSTOM_FIRST);
+if(CUSTOM_FIRST) {assert.equal(entry.panel===previousPanel,true);assert.equal(JSON.stringify(shared.draft),before,'Custom distribution preserves the shared draft');}
 const amounts=!CUSTOM_FIRST ? (entry.distributionMode==='keep'?[3]:[3,1])
     : entry.distributionMode==='keep'?[1,1,1,1]:entry.distributionMode==='people'?[3,1]:[1.5,1.5,1];
 const dates=amounts.map((_,index)=>`2026-10-${String(9+index).padStart(2,'0')}`);
-assert.deepEqual(plain(shared.draft.selectedDates),dates);
-assert.deepEqual(plain(M.summary(shared.draft).days.flatMap(day=>day.meals.map(meal=>meal.planned_servings))),amounts);
-assert.equal(shared.draft.notes,'Keep refrigerated');assert.equal(shared.draft.days[dates[0]].notes,'Pack separately');
-assert.equal(shared.draft.prepSteps[0].instruction,'Make soup');
+assert.deepEqual(plain(active.draft.selectedDates),dates);
+assert.deepEqual(plain(M.summary(active.draft).days.flatMap(day=>day.meals.map(meal=>meal.planned_servings))),amounts);
+assert.equal(active.draft.notes,'Keep refrigerated');assert.equal(active.draft.days[dates[0]].notes,'Pack separately');
+assert.equal(active.draft.prepSteps[0].instruction,'Make soup');
 assert.equal(entry.servingsPerMeal,undefined);
 // Changes made in the surviving calendar must be the changes that get saved.
-M.setDayNotes(shared.draft,dates[0],'Edited in main calendar');shared.render();
+M.setDayNotes(active.draft,dates[0],'Edited in main calendar');active.render();
 requests=[];responseFactory=async()=>ok({batches:[],meals:[]});
 await ctx.saveMealPlannerBatch();
 assert.equal(requests.length,1);const plans=JSON.parse(requests[0].options.body).batches;
@@ -834,6 +834,31 @@ assert(plans[0].allocations.every((meal,index)=>meal.member_portions.length===2&
 assert.equal(plans[0].allocations[0].prep_notes,'Edited in main calendar');
 assert.equal(plans[0].prep_notes,'Keep refrigerated');assert.equal(plans[0].prep_steps[0].instruction,'Make soup');
 """.replace('DISTRIBUTION_MODE', repr(mode)).replace('CUSTOM_FIRST', str(custom_first).lower()))
+
+
+def test_calendar_switch_preserves_each_draft_and_falls_back_after_reset_or_removal():
+    run_dialog(r"""
+await open();const shared=await chooseAuto('recipe://soup'),state=activeDialog.mealPlanScheduleState,first=state.entries[0];
+ctx.customizeMealPlannerRecipe(activeDialog,first);const firstPanel=first.panel;
+M.setDates(firstPanel.draft,['2026-10-08']);firstPanel.draft.notes='First only';firstPanel.render();
+ctx.addMealPlannerEditor();const second=state.entries[1],input=second.root.querySelector('[name="recipe_url"]');
+input.value='recipe://bread';selectAuto(input);ctx.customizeMealPlannerRecipe(activeDialog,second);
+M.setDates(second.panel.draft,['2026-10-12']);second.panel.draft.notes='Second only';second.panel.render();
+const drafts=()=>JSON.stringify([shared.draft,first.panel.draft,second.panel.draft]);const before=drafts();
+for(const id of ['',first.id,second.id,'']){
+ ctx.showMealPlannerCalendar(activeDialog,id);
+ assert.equal(drafts(),before,'Switching calendars never changes their dates, portions or notes');
+ assert.equal(shared.form.hidden,id!=='');
+ assert.equal(first.overrideContainer.hidden,id!==first.id);assert.equal(second.overrideContainer.hidden,id!==second.id);
+ assert.equal(activeDialog.querySelector('[data-meal-calendar-select]').value,id);
+}
+state.saving=true;ctx.showMealPlannerCalendar(activeDialog,first.id);assert.equal(state.activeCalendar,'');state.saving=false;
+ctx.showMealPlannerCalendar(activeDialog,first.id);ctx.resetMealPlannerRecipe(activeDialog,first);
+assert.equal(state.activeCalendar,'');assert.equal(shared.form.hidden,false);assert.equal(first.panel,null);
+ctx.showMealPlannerCalendar(activeDialog,second.id);ctx.removeMealPlannerEditor(activeDialog,second);
+assert.equal(state.activeCalendar,'');assert.equal(activeDialog.querySelector('[data-meal-calendar-picker]').hidden,true);
+assert.equal(shared.form.hidden,false);assert.equal(requests.filter(request=>request.options?.method==='POST').length,0);
+""")
 
 
 def test_compact_recipes_share_a_live_plan_and_custom_recipes_keep_independent_drafts():
@@ -974,7 +999,8 @@ ctx.customizeMealPlannerRecipe(activeDialog,second);assert.equal(second.expanded
 M.setHouseholdDefault(shared.draft,'dinner',0);await ctx.saveMealPlannerBatch();
 assert.equal(requests.length,0);assert.equal(shared.draft.notes,'Keep shared');assert.equal(state.entries.length,2);
 assert.equal(activeDialog.querySelector('[data-meal-shared-error]').hidden,false);
-assert.equal(second.expanded,true,'Invalid custom settings are revealed');
+assert.equal(shared.form.hidden,false,'The first invalid plan is shown');
+ctx.showMealPlannerCalendar(activeDialog,second.id);assert.equal(second.expanded,true,'Other invalid plans remain available');
 assert.match(second.root.querySelector('[data-meal-editor-error]').textContent,/Recipe 2:.*date/i);
 M.setHouseholdDefault(shared.draft,'dinner',2);ctx.resetMealPlannerRecipe(activeDialog,second);
 ctx.addMealPlannerEditor();requests=[];responseFactory=async()=>ok({batches:[],meals:[]});await ctx.saveMealPlannerBatch();

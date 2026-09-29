@@ -1,3 +1,4 @@
+const {customPlan} = require('./meal_planner_test_helpers.cjs');
 const {chromium} = require(process.argv[2]);
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path');
@@ -147,7 +148,7 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
             // A custom schedule keeps both its draft and its own action buttons.
             await dialog.locator('[data-meal-editor-add]').click();await row(2).locator('[name="recipe_url"]').selectOption('recipe://rice');
             await row(2).locator('[data-meal-editor-customize]').click();
-            const custom=row(2).locator('[data-meal-editor-form]');
+            const custom=customPlan(dialog,2).locator('[data-meal-editor-form]');
             await custom.getByRole('button',{name:'One day',exact:true}).click();
             await custom.locator('[data-schedule-field="single-date"]').fill(mobile?'2026-11-15':'2026-11-01');
             await row(2).locator('[data-meal-editor-customize]').click();

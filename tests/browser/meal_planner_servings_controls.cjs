@@ -1,3 +1,4 @@
+const {customPlan} = require('./meal_planner_test_helpers.cjs');
 const {chromium} = require(process.argv[2]);
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path');
@@ -104,7 +105,7 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         await family.nth(0).fill('0.5');
         await row(0).locator('[data-meal-editor-customize]').click();
         assert(await amount(0).isVisible(),'A custom recipe retains its own servings control');
-        await amount(0).fill('2');await row(0).locator('[data-meal-editor-reset]').click();
+        await amount(0).fill('2');await customPlan(dialog,0).locator('[data-meal-editor-reset]').click();
         assert(await amount(0).isHidden());assert.equal(await family.nth(0).inputValue(),'0.5');
         await dialog.getByRole('button',{name:'Fill upcoming days for all',exact:true}).hover();
         assert.equal(await box.locator('[data-meal-shared-distribution-meals] li').count(),3);

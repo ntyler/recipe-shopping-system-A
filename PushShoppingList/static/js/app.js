@@ -2097,6 +2097,7 @@ function mealPlannerDistributionPreview(state, entry, summaries, mode = entry.di
         mode, servingsPerMeal:entry.root.querySelector('[data-meal-recipe-servings]').value,
         useScheduledPortions:shared,
     });
+    preview.draft.calendarMonth = preview.draft.selectedDates[0].slice(0, 7);
     // Derive the entire plan with this candidate so automatic recipes can fill
     // uncovered slots, while the real drafts remain untouched until Apply.
     const candidate = {...entry, panel:{draft:preview.draft}, servingsPerMeal:undefined, portionsDraft:undefined};
@@ -2237,6 +2238,7 @@ function applyMealPlannerSharedDistribution(dialog, mode) {
     state.sharedDistributionFocus = false;
     try {
         const preview = mealPlannerSharedDistributionPreview(state, mode);
+        state.activeCalendar = '';
         state.panel.endCalendarDrag();
         preview.results.forEach((result, entry) => {
             entry.portionsDraft = result.draft;
@@ -2444,9 +2446,8 @@ function applyMealPlannerDistribution(dialog, entry) {
         delete entry.portionsDraft;
         delete entry.distributionSource;
         delete entry.distributionDates;
-        if (summaries.size === 1) {
-            // A single recipe uses the main calendar, including any work from
-            // an existing custom plan. Retire that editor to avoid two schedules.
+        if (summaries.size === 1 && !entry.panel) {
+            // Shared recipes continue to use the shared calendar.
             state.panel.endCalendarDrag();
             state.panel.draft = preview.draft;
             resetMealPlannerRecipe(dialog, entry);
@@ -2458,7 +2459,7 @@ function applyMealPlannerDistribution(dialog, entry) {
                 entry.panel.draft = preview.draft;
                 entry.panel.render();
             }
-            if (['upcoming', 'people'].includes(entry.distributionMode)) entry.expanded = true;
+            state.activeCalendar = entry.id;
         }
         entry.touched = true;
         entry.root.querySelector('[data-meal-editor-error]').hidden = true;
@@ -2477,6 +2478,55 @@ function applyMealPlannerDistribution(dialog, entry) {
     }
 }
 
+function showMealPlannerCalendar(dialog, entryId = '', focus = false) {
+    const state = mealPlannerScheduleState(dialog);
+    if (state.edit || mealPlannerBusy(state)) return false;
+    state.activeCalendar = state.entries.find(entry => entry.id === entryId && entry.panel)?.id || '';
+    state.sharedDistributionHover = false;
+    state.sharedDistributionFocus = false;
+    state.entries.forEach(entry => { entry.distributionHover = false; entry.distributionFocus = false; });
+    [state.panel, ...state.entries.map(entry => entry.panel)].forEach(panel => panel?.endCalendarDrag());
+    syncMealPlannerBatchControls(dialog);
+    if (focus) {
+        dialog.querySelector('[data-meal-calendar-workspace]').scrollIntoView({block:'start'});
+        dialog.querySelector('[data-meal-calendar-select]').focus({preventScroll:true});
+    }
+    return false;
+}
+
+function syncMealPlannerCalendar(dialog, state, previewPanel = null) {
+    const custom = state.entries.filter(entry => entry.panel);
+    if (!custom.some(entry => entry.id === state.activeCalendar)) state.activeCalendar = '';
+    const active = custom.find(entry => entry.id === state.activeCalendar);
+    const visible = state.edit ? state.panel : previewPanel || active?.panel || state.panel;
+    const picker = dialog.querySelector('[data-meal-calendar-select]');
+    const choices = [['', 'Shared plan'], ...custom.map(entry => [entry.id, `Recipe ${state.entries.indexOf(entry) + 1}: ${entry.title} — custom plan`])];
+    const signature = JSON.stringify(choices);
+    if (picker.dataset.choices !== signature) {
+        picker.replaceChildren(...choices.map(([value, text]) => {
+            const option = document.createElement('option');
+            option.value = value; option.textContent = text;
+            return option;
+        }));
+        picker.dataset.choices = signature;
+    }
+    picker.value = custom.find(entry => entry.panel === visible)?.id || '';
+    picker.disabled = Boolean(mealPlannerBusy(state));
+    dialog.querySelector('[data-meal-calendar-picker]').hidden = Boolean(state.edit || !custom.length);
+    dialog.querySelector('[data-meal-shared-heading]').hidden = Boolean(state.edit || visible !== state.panel);
+    if (state.panel) state.panel.form.hidden = visible !== state.panel;
+    state.entries.forEach((entry, index) => {
+        entry.expanded = entry === active;
+        entry.overrideContainer.dataset.mealCalendarRecipe = String(index);
+        entry.overrideContainer.hidden = !entry.panel || visible !== entry.panel;
+        entry.overrideContainer.querySelector('[data-meal-editor-reset]').disabled = Boolean(mealPlannerBusy(state));
+        entry.overrideContainer.querySelector('[data-meal-custom-plan-title]').textContent = `Recipe ${index + 1}: ${entry.title} · Custom plan`;
+        const button = entry.root.querySelector('[data-meal-editor-customize]');
+        button.textContent = entry.expanded ? 'Show shared plan' : entry.panel ? 'Show custom plan' : 'Customize';
+        button.setAttribute('aria-expanded', String(entry.expanded));
+    });
+}
+
 function syncMealPlannerBatchControls(dialog) {
     const state = mealPlannerScheduleState(dialog);
     const footer = dialog.querySelector('[data-meal-batch-footer]');
@@ -2491,7 +2541,9 @@ function syncMealPlannerBatchControls(dialog) {
     const multiple = recipes.length > 1;
     const servingsHeading = state.panel?.form.querySelector('[data-schedule-servings-heading]');
     if (servingsHeading) servingsHeading.textContent = multiple && !state.edit ? 'Total servings per meal' : 'Servings per meal';
-    dialog.querySelector('[data-meal-shared-help]').textContent = multiple
+    dialog.querySelector('[data-meal-shared-help]').textContent = recipes.length && recipes.every(entry => entry.panel)
+        ? 'No recipes use this plan. Choose “Use shared plan” in a custom plan to share these dates and portions.'
+        : multiple
         ? 'Household and family portions are totals for each meal. Each recipe contributes to that total; recipes on Auto split share the remainder. Split recipe yield shares each recipe’s yield across its entries.'
         : 'Set servings under “Who is eating?”. These portions also control recipe distribution. Customize a recipe for its own dates and portions.';
     const summaries = new Map(recipes.map(entry => [entry, MealPlanSchedule.summary(mealPlannerRecipeDraft(state, entry))]));
@@ -2523,10 +2575,6 @@ function syncMealPlannerBatchControls(dialog) {
         syncMealPlannerDistribution(entry, summary, state, busy, summaries);
         const customize = entry.root.querySelector('[data-meal-editor-customize]');
         customize.disabled = Boolean(busy);
-        customize.textContent = entry.expanded ? 'Hide custom plan' : entry.panel ? 'Show custom plan' : 'Customize';
-        customize.setAttribute('aria-expanded', String(Boolean(entry.expanded)));
-        entry.root.querySelector('[data-meal-editor-reset]').disabled = Boolean(busy);
-        entry.root.querySelector('[data-meal-override-container]').hidden = !entry.expanded;
         const remove = entry.root.querySelector('[data-meal-editor-remove]');
         remove.hidden = state.entries.length === 1 || Boolean(state.edit);
         remove.disabled = Boolean(busy);
@@ -2538,11 +2586,12 @@ function syncMealPlannerBatchControls(dialog) {
     const sharedPreview = syncMealPlannerSharedDistribution(dialog, state, busy);
     const previewEntry = state.entries.find(entry => entry.distributionPreview && (entry.distributionHover || entry.distributionFocus));
     const preview = sharedPreview || previewEntry?.distributionPreview;
-    const previewPanel = !sharedPreview && previewEntry && summaries.size > 1 && previewEntry.expanded && previewEntry.panel
+    const previewPanel = !sharedPreview && previewEntry?.panel
         ? previewEntry.panel : state.panel;
     [state.panel, ...state.entries.map(entry => entry.panel)].forEach(panel => {
         panel?.showDistributionPreview(panel === previewPanel ? preview : null);
     });
+    syncMealPlannerCalendar(dialog, state, preview ? previewPanel : null);
     const visibleSummaries = preview?.projectedSummaries || summaries;
     if (preview) {
         const visibleMeals = new Set([...visibleSummaries.values()].flatMap(summary => summary.days.flatMap(day =>
@@ -2573,6 +2622,7 @@ function createMealPlannerEditor(dialog, root) {
     root.setAttribute('aria-labelledby', heading.id);
     state.entries.push(entry);
     const container = root.querySelector('[data-meal-override-container]');
+    entry.overrideContainer = container;
     container.id = `${entry.id}-override`;
     root.querySelector('[data-meal-editor-customize]').setAttribute('aria-controls', container.id);
     container.hidden = true;
@@ -2599,6 +2649,7 @@ function createMealPlannerEditor(dialog, root) {
             syncMealPlannerBatchControls(dialog);
         };
         ['input', 'change', 'click'].forEach(type => root.addEventListener(type, changed));
+        ['input', 'change', 'click'].forEach(type => container.addEventListener(type, changed));
         root.querySelector('[data-meal-editor-remove]').addEventListener('click', () => removeMealPlannerEditor(dialog, root.mealPlannerEntry));
         root.querySelector('[data-meal-editor-customize]').addEventListener('click', () => customizeMealPlannerRecipe(dialog, root.mealPlannerEntry));
         root.querySelector('[data-meal-editor-reset]').addEventListener('click', () => resetMealPlannerRecipe(dialog, root.mealPlannerEntry));
@@ -2681,6 +2732,7 @@ function removeMealPlannerEditor(dialog, entry) {
     const portions = survivor ? mealPlannerRecipeDraft(state, survivor) : null;
     const next = state.entries[index + 1] || state.entries[index - 1];
     if (entry.panel) { entry.panel.endCalendarDrag(); entry.panel.generation += 1; entry.panel.ui.loading = false; }
+    entry.root.appendChild(entry.overrideContainer);
     entry.root.remove();
     state.entries.splice(index, 1);
     if (survivor) adoptMealPlannerSharedPortions(state, survivor, portions);
@@ -2705,7 +2757,8 @@ function customizeMealPlannerRecipe(dialog, entry, distributionDraft = null) {
         form.className = 'recipe-preview-meal-panel';
         form.dataset.mealEditorForm = '';
         form.noValidate = true;
-        entry.root.querySelector('[data-meal-override-form-host]').appendChild(form);
+        entry.overrideContainer.querySelector('[data-meal-override-form-host]').appendChild(form);
+        dialog.querySelector('[data-meal-custom-calendars]').appendChild(entry.overrideContainer);
         entry.panel = new MealPlanPanel(form, mealPlannerPanelOptions(dialog, entry, entry.title || 'Custom recipe plan', entry.defaultServings));
         entry.panel.draft = {...initialDraft, recipeYield: entry.defaultServings};
         // Share the current roster by value, keeping all portion overrides local.
@@ -2716,8 +2769,7 @@ function customizeMealPlannerRecipe(dialog, entry, distributionDraft = null) {
         if (!entry.panel.ui.membersLoaded) void entry.panel.loadMembers();
         entry.touched = true;
     }
-    entry.expanded = !entry.expanded;
-    syncMealPlannerBatchControls(dialog);
+    showMealPlannerCalendar(dialog, state.activeCalendar === entry.id ? '' : entry.id, true);
 }
 
 function resetMealPlannerRecipe(dialog, entry) {
@@ -2730,7 +2782,8 @@ function resetMealPlannerRecipe(dialog, entry) {
     delete entry.distributionSource;
     delete entry.distributionDates;
     entry.expanded = false;
-    entry.root.querySelector('[data-meal-override-form-host]').replaceChildren();
+    entry.overrideContainer.querySelector('[data-meal-override-form-host]').replaceChildren();
+    if (state.activeCalendar === entry.id) state.activeCalendar = '';
     entry.root.querySelector('[data-meal-editor-error]').hidden = true;
     syncMealPlannerBatchControls(dialog);
 }
@@ -2779,7 +2832,7 @@ async function saveMealPlannerBatch() {
         if (!entry.recipeUrl) message = 'Please select a recipe.';
         else if (!payload) message ||= entry.panel?.ui.message || 'Please check the shared plan below.';
         if (message) {
-            if (entry.panel) entry.expanded = true;
+            if (!firstError) state.activeCalendar = entry.panel ? entry.id : '';
             const error = mealPlannerEditorError(entry, message, index);
             firstError ||= error;
         } else configured.push({entry, payload,
@@ -2788,6 +2841,7 @@ async function saveMealPlannerBatch() {
                 : entry.servingsPerMeal ?? (mealPlannerUniformServings(mealPlannerRecipeDraft(state, entry), true) || entry.lastServingsPerMeal)});
     });
     if (firstError) {
+        if (firstError === sharedError) state.activeCalendar = '';
         syncMealPlannerBatchControls(dialog);
         firstError.scrollIntoView({block: 'center'});
         firstError.focus({preventScroll: true});
@@ -2823,6 +2877,7 @@ async function saveMealPlannerBatch() {
     configured.forEach(item => saveMealPlannerServingPreference(item.payload.recipe_url, item.servingsPerMeal));
     const date = configured.flatMap(item => item.payload.allocations.map(meal => meal.date)).sort()[0];
     panels.forEach(panel => { panel.clearEdit(); panel.ui.saved = true; });
+    state.entries.forEach(entry => { entry.overrideContainer.hidden = true; entry.root.appendChild(entry.overrideContainer); });
     state.entries = [];
     state.saving = false;
     syncMealPlannerBatchControls(dialog);
@@ -2990,11 +3045,16 @@ function syncMealPlannerServingsFromRecipe(input) {
 function resetMealPlannerEditors(dialog) {
     const state = mealPlannerScheduleState(dialog);
     state.sharedPortionsEdited = false;
+    state.activeCalendar = '';
     if (!state.editorTemplate) {
         state.firstEditor = dialog.querySelector('[data-meal-editor]');
         state.editorTemplate = state.firstEditor.cloneNode(true);
     }
-    state.entries.forEach(entry => { if (entry.panel) { entry.panel.endCalendarDrag(); entry.panel.generation += 1; entry.panel.ui.loading = false; } });
+    state.entries.forEach(entry => {
+        if (entry.panel) { entry.panel.endCalendarDrag(); entry.panel.generation += 1; entry.panel.ui.loading = false; }
+        entry.root.appendChild(entry.overrideContainer);
+    });
+    dialog.querySelector('[data-meal-custom-calendars]').replaceChildren();
     state.sharedDistributionHover = false;
     state.sharedDistributionFocus = false;
     state.sharedDistributionMode = 'keep';

@@ -2,7 +2,7 @@ const {chromium} = require(process.argv[2]);
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path');
 const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
-const {selectAuto} = require('./meal_planner_test_helpers.cjs');
+const {selectAuto, customPlan} = require('./meal_planner_test_helpers.cjs');
 
 
 (async () => {
@@ -46,7 +46,7 @@ const {selectAuto} = require('./meal_planner_test_helpers.cjs');
             assert((await summary(index).textContent()).includes(`4 meals · ${total} servings (${perMeal} per meal)`));
         }
         await row(1).locator('[data-meal-editor-customize]').click();
-        const soup = row(1).locator('[data-meal-editor-form]');
+        const soup = customPlan(dialog,1).locator('[data-meal-editor-form]');
         await soup.getByRole('button',{name:'One day',exact:true}).click();
         await soup.locator('[data-schedule-field="single-date"]').fill('2026-10-09');
         await soup.locator('[data-schedule-field="meal"][data-meal="lunch"]').uncheck();
@@ -106,7 +106,7 @@ const {selectAuto} = require('./meal_planner_test_helpers.cjs');
         await portions.fill('1.5');
         assert.match(await summary(0).textContent(),/1 meal · 2.5 servings/);
         await soup.getByRole('button',{name:'Split recipe yield',exact:true}).click();
-        await row(1).locator('[data-meal-editor-reset]').click();
+        await customPlan(dialog,1).locator('[data-meal-editor-reset]').click();
         for (const index of [0,1]) assert.match(await summary(index).textContent(),/1 meal · 2 servings/);
         await dialog.evaluate(element => {element.scrollTop = 0;});
         await screenshot('repeated-recipe-split-desktop.png');

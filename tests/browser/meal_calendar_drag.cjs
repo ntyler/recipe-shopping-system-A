@@ -1,4 +1,5 @@
 const {chromium} = require(process.argv[2]);
+const {customPlan, selectCalendar} = require('./meal_planner_test_helpers.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path');
 const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
@@ -16,7 +17,7 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         assert.equal(await page.title(), 'AI Pantry — Meal Planner');
         const dialog = page.locator('#mealPlannerDialog');
         const row = i => dialog.locator('[data-meal-editor]').nth(i);
-        const editor = i => i === 0 ? dialog.locator('[data-meal-shared-form]') : row(i).locator('[data-meal-editor-form]');
+        const editor = i => i === 0 ? dialog.locator('[data-meal-shared-form]') : customPlan(dialog,i).locator('[data-meal-editor-form]');
         const day = (i,date) => editor(i).locator(`[data-schedule-action="date"][data-date="${date}"]`);
         const selected = i => editor(i).locator('[data-schedule-action="date"][aria-pressed="true"]').evaluateAll(nodes => nodes.map(n => n.dataset.date));
         const point = async locator => { const box=await locator.boundingBox();assert(box);return {x:box.x+box.width/2,y:box.y+box.height/2}; };
@@ -59,8 +60,11 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         await drag(1,'2026-10-27','2026-11-02');
         assert.deepEqual(await selected(1),[...stopped,'2026-10-27','2026-10-28','2026-10-29','2026-10-30','2026-10-31','2026-11-01','2026-11-02']);
         assert.deepEqual(await selected(0),stopped,'The other meal keeps its dates');
+        await selectCalendar(dialog);
         await editor(0).locator('.meal-schedule-calendar').scrollIntoViewIfNeeded();
         await move(day(0,'2026-10-25'));await page.mouse.down();
+        // Switching calendars ends the active drag before showing another plan.
+        await selectCalendar(dialog,1);
         await editor(1).locator('.meal-schedule-calendar').scrollIntoViewIfNeeded();
         await move(day(1,'2026-10-20'));await page.mouse.up();
         assert(!(await selected(1)).includes('2026-10-20'),'A drag cannot spill into another editor');
