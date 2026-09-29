@@ -1950,7 +1950,7 @@ function mealPlannerRecipeDraft(state, entry, draft = (entry.panel || state.pane
     const recipeDraft = other => {
         if (raw(other).portionMode !== 'recipe') return raw(other);
         const related = state.entries.filter(item => item.recipeUrl === other.recipeUrl);
-        return MealPlanSchedule.splitRecipeYield(related.map(raw), other.defaultServings)[related.indexOf(other)];
+        return MealPlanSchedule.splitRecipeYield(related.map(raw), other.yieldServings || other.defaultServings)[related.indexOf(other)];
     };
     if (state.panel.draft.portionMode === 'recipe') return recipeDraft(entry);
     const selected = state.entries.filter(other => other.recipeUrl);
@@ -2073,6 +2073,7 @@ function syncMealPlannerRecipeServings(entry, summary, state, busy) {
     help.textContent = shared ? 'Set portions under “Who is eating?” below. Distribution uses those portions.'
         : entry.panel ? 'Applies to every meal in this recipe’s schedule.'
         : entry.servingsPerMeal !== undefined || entry.portionsDraft ? 'This recipe contributes these portions to the meal total. Dates follow the shared plan.'
+        : state.panel.draft.portionMode === 'recipe' ? 'Auto split. This recipe’s yield is shared across the selected meals.'
         : 'Auto split. This recipe shares the remaining meal portions.';
     if (meals.length && meals[0].member_portions.length && meals.every(meal => JSON.stringify(meal.member_portions) === JSON.stringify(meals[0].member_portions))) {
         help.textContent += ' ' + meals[0].member_portions.map(part =>
@@ -2265,22 +2266,55 @@ function applyMealPlannerSharedDistribution(dialog, mode) {
     }
 }
 
-function resetMealPlannerRecipePortions(entry) {
+function resetMealPlannerRecipePortions(entry, clearError = true) {
     delete entry.servingsPerMeal;
     delete entry.portionsDraft;
     delete entry.distributionSource;
     delete entry.distributionDates;
     delete entry.lastServingsPerMeal;
-    entry.root.querySelector('[data-meal-editor-error]').hidden = true;
+    if (clearError) entry.root.querySelector('[data-meal-editor-error]').hidden = true;
 }
 
 function autoSplitMealPlannerSharedRecipes(dialog) {
     const state = mealPlannerScheduleState(dialog);
     if (state.edit || mealPlannerBusy(state) || state.panel.ui.loading || state.entries.some(entry => entry.panel?.ui.loading)) return;
-    state.entries.filter(entry => entry.recipeUrl && !entry.panel).forEach(resetMealPlannerRecipePortions);
-    // Recalculate once after clearing every shared contribution and its previous
-    // distribution limits. Custom schedules and the shared meal total stay intact.
-    showMealPlannerCalendar(dialog);
+    const shared = state.entries.filter(entry => entry.recipeUrl && !entry.panel);
+    if (!shared.length) return;
+    try {
+        // Validate the complete split before replacing any live contributions.
+        // The existing yield splitter also reserves custom entries and shares
+        // one yield budget across repeated entries of the same recipe.
+        const draft = JSON.parse(JSON.stringify(state.panel.draft));
+        draft.recipeYield = shared[0].yieldServings;
+        delete draft.recipePortions;
+        delete draft.recipeSplitError;
+        delete draft.sharedPortionErrors;
+        const entries = state.entries.map(entry => {
+            const candidate = {...entry};
+            if (shared.includes(entry)) {
+                if (!(entry.yieldServings > 0)) throw new Error(`Recipe ${state.entries.indexOf(entry) + 1} (${entry.title}): Add a recipe yield before using Auto split all.`);
+                resetMealPlannerRecipePortions(candidate, false);
+            }
+            return candidate;
+        });
+        MealPlanSchedule.setPortionMode(draft, 'recipe');
+        const projected = {...state, panel:{draft}, entries};
+        entries.filter(entry => entry.recipeUrl).forEach(entry => {
+            const total = MealPlanSchedule.summary(mealPlannerRecipeDraft(projected, entry));
+            if (!total.valid) throw new Error(`Recipe ${entries.indexOf(entry) + 1} (${entry.title}): ${total.errors[0]}`);
+        });
+        shared.forEach(entry => resetMealPlannerRecipePortions(entry));
+        state.panel.endCalendarDrag();
+        state.panel.draft = draft;
+        state.sharedDistributionMode = 'keep';
+        showMealPlannerCalendar(dialog);
+        state.panel.render();
+    } catch (error) {
+        showMealPlannerCalendar(dialog);
+        const text = dialog.querySelector('[data-meal-shared-distribution-preview]');
+        text.textContent = error.message;
+        text.dataset.error = 'true';
+    }
 }
 
 function syncMealPlannerSharedDistribution(dialog, state, busy) {
@@ -2563,7 +2597,9 @@ function syncMealPlannerBatchControls(dialog) {
     dialog.querySelector('[data-meal-shared-help]').textContent = recipes.length && recipes.every(entry => entry.panel)
         ? 'No recipes use this plan. Choose “Use shared plan” in a custom plan to share these dates and portions.'
         : multiple
-        ? 'Household and family portions are totals for each meal. Each recipe contributes to that total; recipes on Auto split share the remainder. Split recipe yield shares each recipe’s yield across its entries.'
+        ? state.panel.draft.portionMode === 'recipe'
+            ? 'Each recipe’s yield is split across the selected meals. Repeated entries share one recipe yield.'
+            : 'Household and family portions set the meal total. Auto split all spreads each recipe’s yield across the selected meals.'
         : 'Choose dates on the calendar and set portions under “Who is eating?”. These portions also control recipe distribution.';
     const summaries = new Map(recipes.map(entry => [entry, MealPlanSchedule.summary(mealPlannerRecipeDraft(state, entry))]));
     const count = new Set(recipes.flatMap(entry => summaries.get(entry).days.flatMap(day =>

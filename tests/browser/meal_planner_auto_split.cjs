@@ -1,5 +1,5 @@
 const {chromium} = require(process.argv[2]);
-const {customPlan, legacyCustomPlan, selectDates} = require('./meal_planner_test_helpers.cjs');
+const {customPlan, legacyCustomPlan, selectDates, dateRange} = require('./meal_planner_test_helpers.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path');
 const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
@@ -52,7 +52,7 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
             assert.equal(await amount(0).inputValue(),'2');assert.equal(await amount(1).inputValue(),'2');
             assert.match(await row(0).locator('[data-meal-yield-planned]').textContent(),/4 of 4 servings planned across 2 entries/);
             assert.equal(await row(2).evaluate(el=>JSON.stringify(el.mealPlannerEntry.panel.draft)),customBefore);
-            assert.equal(await shared.evaluate(el=>JSON.stringify(document.getElementById('mealPlannerDialog').mealPlanScheduleState.panel.draft)),sharedBefore);
+            assert.deepEqual(await shared.evaluate(el=>JSON.parse(JSON.stringify(document.getElementById('mealPlannerDialog').mealPlanScheduleState.panel.draft))),{...JSON.parse(sharedBefore),portionMode:'recipe'});
             assert.equal(await dialog.locator('[data-meal-shared-distribution-mode="keep"]').getAttribute('aria-disabled'),'false');
             const applied=await payloads();
             if(mobile) await automatic.tap();else await automatic.press('Space');
@@ -74,6 +74,46 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
             assert.equal(result.ok,true);assert.equal(posts.length,1);
             assert.deepEqual(posts[0].batches.map(batch=>batch.allocations[0].planned_servings),[2,2,1]);
             assert.equal(posts[0].batches[2].prep_notes,'Keep custom portions');
+            await dialog.waitFor({state:'hidden'});
+
+            // Reproduction: a four-serving recipe and a two-serving recipe,
+            // four selected meals with old per-day totals of 2, 2, 1, 1.
+            await page.getByRole('button',{name:'Add Meals',exact:true}).click();
+            await page.waitForFunction(()=>!document.getElementById('mealPlannerDialog').mealPlanScheduleState.panel.ui.loading);
+            await row(0).locator('[name="recipe_url"]').selectOption('recipe://soup');
+            await dialog.locator('[data-meal-editor-add]').click();
+            await row(1).locator('[name="recipe_url"]').selectOption('recipe://salad');
+            const dates=dateRange(mobile?'2026-10-20':'2026-09-29',mobile?'2026-10-23':'2026-10-02');
+            await selectDates(shared,dates);
+            await shared.locator('[data-schedule-field="household"][data-meal="dinner"]').fill('2');
+            for(const date of dates.slice(2)) {
+                await shared.locator(`[data-schedule-day="${date}"] > summary`).click();
+                await shared.locator(`[data-schedule-field="day-household"][data-date="${date}"][data-meal="dinner"]`).fill('1');
+            }
+            if(mobile) await automatic.tap();else await automatic.press('Enter');
+            assert.equal(await amount(0).inputValue(),'1');assert.equal(await amount(1).inputValue(),'0.5');
+            assert.equal(await shared.getByRole('button',{name:'Split recipe yield',exact:true}).getAttribute('aria-pressed'),'true');
+            assert.match(await row(0).locator('[data-meal-yield-planned]').textContent(),/4 of 4 servings/);
+            assert.match(await row(1).locator('[data-meal-yield-planned]').textContent(),/2 of 2 servings/);
+            assert.equal(await shared.locator('.is-yield-short').count(),0);
+            assert.match(await dialog.locator('[data-meal-shared-distribution-preview]').textContent(),/4 meals across 4 days.*6 servings used.*0 remaining/);
+            const split=await payloads();if(mobile)await automatic.tap();else await automatic.press('Space');
+            assert.equal(await payloads(),split);assert.equal(posts.length,1);
+            // The split continues to follow calendar edits without another click.
+            const extra=mobile?'2026-10-24':'2026-10-03';
+            await selectDates(shared,[...dates,extra]);
+            assert.equal(await amount(0).inputValue(),'0.8');assert.equal(await amount(1).inputValue(),'0.4');
+            await selectDates(shared,dates);assert.equal(await payloads(),split);
+            await dialog.evaluate(el=>{el.scrollTop=0;});
+            if(dir)await page.screenshot({path:path.join(dir,`auto-split-yields-${mobile?'mobile':'desktop'}.png`)});
+            await shared.locator('.meal-schedule-calendar').scrollIntoViewIfNeeded();
+            if(dir)await page.screenshot({path:path.join(dir,`auto-split-calendar-${mobile?'mobile':'desktop'}.png`)});
+            assert(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth+1));
+            const splitResponse=page.waitForResponse(r=>r.request().method()==='POST'&&r.url().endsWith('/batches/bulk'));
+            await dialog.locator('[data-meal-batch-save]').click();const splitResult=await(await splitResponse).json();
+            assert.equal(splitResult.ok,true);assert.equal(posts.length,2);
+            assert.deepEqual(posts[1].batches.map(batch=>batch.allocations.map(meal=>meal.planned_servings)),[[1,1,1,1],[0.5,0.5,0.5,0.5]]);
+            assert(posts[1].batches.every(batch=>JSON.stringify(batch.allocations.map(meal=>meal.date))===JSON.stringify(dates)));
             assert.deepEqual(errors,[]);await context.close();
         }
         console.log('PASS: Auto split all placement, shared/custom scope, repeated recipe budget, invalid portion recovery, keyboard/touch, idempotence, save boundary, responsive toolbar, clean console');

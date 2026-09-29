@@ -32,7 +32,7 @@ def test_simultaneous_meal_editors_in_chromium(scoped_client, monkeypatch, scrip
                         'id': 'oil', 'label': 'Oil', 'default_option_id': 'olive',
                         'options': [{'id': 'olive', 'label': 'Olive', 'items': []},
                                     {'id': 'sunflower', 'label': 'Sunflower', 'items': []}],
-                    }]) for name, servings in [('Bread', 8), ('Soup', 4), ('Rice', 6)]]
+                    }]) for name, servings in [('Bread', 8), ('Soup', 4), ('Rice', 6), ('Salad', 2)]]
     monkeypatch.setattr(main_routes, 'meal_plan_recipe_option_rows', lambda rows: recipes)
     monkeypatch.setattr(recipe_url_service, 'current_user', main_routes.current_public_user)
     app = scoped_client.application

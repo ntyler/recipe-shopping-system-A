@@ -50,6 +50,9 @@ const {selectAuto, customPlan, legacyCustomPlan, selectDates, dateRange} = requi
         await amount(0).fill('2.5');await save.click();assert.equal(posts.length,0);
         assert.match(await row(1).locator('[data-meal-editor-error]').textContent(),/exceed|remain/);
         await dialog.getByRole('button',{name:'Auto split all',exact:true}).click();
+        assert.match(await row(0).locator('[data-meal-yield-planned]').textContent(),/8 of 8 servings/);
+        assert.match(await row(1).locator('[data-meal-yield-planned]').textContent(),/4 of 4 servings/);
+        await shared.getByRole('button',{name:'By family member',exact:true}).click();
         assert.equal(await amount(0).inputValue(),'1');assert.equal(await amount(1).inputValue(),'1');
         // Moving between inline amounts and per-person customization must keep
         // the same portions, including while an incomplete input is corrected.

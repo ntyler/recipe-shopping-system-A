@@ -9,7 +9,18 @@ const selectAuto = async (recipe, value) => {
         const calendar=dialog.locator('#'+await row.evaluate(element=>element.mealPlannerEntry.overrideContainer.id));
         if(await calendar.isVisible()) await calendar.getByRole('button',{name:'Split recipe yield',exact:true}).click();
     } else {
+        const mode=await dialog.evaluate(element=>element.mealPlanScheduleState.panel.draft.portionMode);
+        const shared=dialog.locator('[data-meal-shared-form]');
+        const totals=mode==='household'?await shared.locator('[data-schedule-field="household"]').evaluateAll(inputs=>
+            inputs.map(input=>({meal:input.dataset.meal,value:input.value}))):[];
         await dialog.getByRole('button',{name:'Auto split all',exact:true}).click();
+        // These existing scenarios may share a configured household/family total.
+        // Auto split all now explicitly selects full recipe yields; switching
+        // back restores family settings; re-enter explicit household totals.
+        if(mode!=='recipe') await shared.getByRole('button',{
+            name:mode==='family'?'By family member':'Household total',exact:true
+        }).click();
+        for(const total of totals)await shared.locator(`[data-schedule-field="household"][data-meal="${total.meal}"]`).fill(total.value);
     }
 };
 
