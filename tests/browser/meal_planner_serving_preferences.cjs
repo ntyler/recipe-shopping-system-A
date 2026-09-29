@@ -105,7 +105,7 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         await open();await recipe(0).selectOption('recipe://bread');assert.equal(await amount(0).inputValue(),'4');
         // Remember the entered amount even when distribution creates a smaller final meal.
         await recipe(0).selectOption('recipe://rice');await amount(0).fill('2.5');
-        await row(0).getByRole('button',{name:'Fill upcoming days',exact:true}).click();
+        await dialog.getByRole('button',{name:'Fill upcoming days for all',exact:true}).click();
         const distributed=await saveMeals();
         assert.deepEqual(distributed.meals.map(meal=>meal.planned_servings),[2.5,2.5,1]);
         await page.reload();await open();await recipe(0).selectOption('recipe://rice');

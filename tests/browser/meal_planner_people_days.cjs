@@ -20,8 +20,8 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         assert(await page.getByRole('heading',{name:'Meal Planner',exact:true}).isVisible());
         const dialog=page.locator('#mealPlannerDialog'), shared=dialog.locator('[data-meal-shared-form]');
         const row=dialog.locator('[data-meal-editor]').first(), amount=row.locator('[data-meal-recipe-servings]');
-        const box=row.locator('[data-meal-distribution]'), preview=box.locator('[data-meal-distribution-preview]');
-        const proposed=box.locator('[data-meal-distribution-meals] li'), apply=box.locator('[data-meal-distribution-mode="upcoming"]');
+        const box=dialog.locator('[data-meal-shared-distribution]'), preview=box.locator('[data-meal-shared-distribution-preview]');
+        const proposed=box.locator('[data-meal-shared-distribution-meals] li'), apply=box.locator('[data-meal-shared-distribution-mode="upcoming"]');
         const save=dialog.locator('[data-meal-batch-save]');
         const open=async()=>{
             await page.getByRole('button',{name:'Add Meals',exact:true}).click();
@@ -31,15 +31,14 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         };
         const third=async()=>{
             await apply.hover();
-            assert(await box.locator('[data-meal-distribution-mode="people"]').isHidden());
+            assert.equal(await box.locator('[data-meal-shared-distribution-mode="people"]').count(),0);
         };
         const screenshot=async name=>{
             const dir=process.env.AI_PANTRY_BROWSER_ARTIFACTS;
             if(dir){fs.mkdirSync(dir,{recursive:true});await page.screenshot({path:path.join(dir,name)});}
         };
         await open();await shared.getByRole('button',{name:'Split recipe yield',exact:true}).click();
-        assert(await box.locator('[data-meal-distribution-mode="people"]').isDisabled());
-        assert.match(await box.locator('[data-meal-distribution-mode="people"]').getAttribute('title'),/Who is eating/);
+        assert.equal(await box.locator('[data-meal-shared-distribution-mode]').count(),2);
         await shared.locator('[data-schedule-field="single-date"]').fill('2026-09-26');
         await shared.getByRole('button',{name:'By family member',exact:true}).click();
         const portions=shared.locator('[data-schedule-field="family"][data-meal="dinner"]');
@@ -76,7 +75,7 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         await third();assert.equal(await proposed.count(),3);
         assert.match(await preview.textContent(),/Last meal: 2 servings \(smaller portion\)/);
         assert.match(await proposed.last().textContent(),/Nate: 1 serving · Gary: 1 serving/);
-        await portions.first().fill('');assert(await apply.isDisabled());
+        await portions.first().fill('');assert.equal(await apply.getAttribute('aria-disabled'),'true');
         await portions.first().fill('1.5');assert(await apply.isEnabled());
         const attendance=shared.locator('[data-schedule-field="family-enabled"][data-meal="dinner"]');
         await attendance.last().uncheck();await third();assert.equal(await proposed.count(),6);

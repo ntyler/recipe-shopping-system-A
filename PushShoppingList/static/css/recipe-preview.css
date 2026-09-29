@@ -313,9 +313,19 @@ body.recipe-preview-active { overflow: auto; }
 #mealPlannerDialog .app-meal-distribution ol { max-height: 180px; overflow: auto; padding-left: 24px; }
 #mealPlannerDialog .app-meal-distribution li { padding: 3px 0; }
 #mealPlannerDialog .app-meal-distribution-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-#mealPlannerDialog .app-meal-distribution-actions button { min-height: 44px; max-width: 100%; white-space: normal; text-align: left; }
+#mealPlannerDialog .app-meal-distribution-actions button { width: auto; margin: 0; min-height: 44px; max-width: 100%; white-space: normal; text-align: left; user-select: none; }
 #mealPlannerDialog .app-meal-distribution-actions button[hidden] { display: none; }
+#mealPlannerDialog .app-meal-distribution-actions button[aria-disabled="true"] { opacity: .6; cursor: not-allowed; }
 #mealPlannerDialog .app-meal-distribution-actions button:focus-visible { outline: 2px solid var(--app-primary); outline-offset: 3px; }
+#mealPlannerDialog .app-meal-distribution-toolbar { display: flex; flex-wrap: wrap; align-items: start; gap: 8px; }
+#mealPlannerDialog .app-meal-distribution-toolbar fieldset { flex: 1 1 auto; }
+#mealPlannerDialog .app-meal-shared-distribution { margin-top: 12px; padding: 0; border: 0; background: transparent; }
+#mealPlannerDialog .app-meal-shared-distribution fieldset { flex: 0 1 auto; }
+#mealPlannerDialog .app-meal-shared-distribution fieldset[hidden] { display: none; }
+#mealPlannerDialog .app-meal-shared-distribution .app-meal-distribution-preview { margin: 10px 0 6px; }
+#mealPlannerDialog .app-meal-shared-distribution details { margin-bottom: 6px; }
+#mealPlannerDialog .app-meal-shared-distribution .app-dialog-helper { margin-bottom: 0; color: var(--app-muted); }
+#mealPlannerDialog .app-meal-distribution [data-meal-distribution-help] { margin-bottom: 0; color: var(--app-muted); }
 #mealPlannerDialog .app-meal-yield-balance { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; padding: 10px 12px; border: 1px solid var(--app-border); border-radius: 6px; background: var(--app-bg); font-size: 12px; overflow-wrap: anywhere; }
 #mealPlannerDialog .app-meal-yield-balance[hidden] { display: none; }
 #mealPlannerDialog .app-meal-yield-balance strong { color: var(--app-primary); }
@@ -342,6 +352,7 @@ body.recipe-preview-active { overflow: auto; }
 #mealPlannerDialog .app-meal-override-heading button { width: auto; margin: 0; min-height: 44px; font-size: 12px; }
 #mealPlannerDialog .app-meal-editor-error { grid-column: 1 / -1; color: var(--app-danger, #ef8e91); margin: 0; }
 #mealPlannerDialog [data-meal-editor-add] { width: auto; justify-self: start; margin: 16px 0 0; min-height: 44px; }
+#mealPlannerDialog .app-meal-distribution-toolbar [data-meal-editor-add] { margin: 0; }
 #mealPlannerDialog .app-meal-batch-footer-actions { display: flex; gap: 12px; }
 #mealPlannerDialog .app-meal-batch-footer { position: sticky; bottom: -1px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 0; border-top: 1px solid var(--app-border-strong); background: var(--app-surface); z-index: 1; }
 #mealPlannerDialog .app-meal-batch-footer p { margin: 0; font-size: 12px; line-height: 1.5; color: var(--app-muted); }
