@@ -1,3 +1,4 @@
+const {selectDates, dateRange} = require('./meal_planner_test_helpers.cjs');
 const {chromium} = require(process.argv[2]);
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path');
@@ -45,8 +46,7 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         assert.equal(await amount(0).inputValue(),'1','Cancel must not remember portions');
 
         await amount(0).fill('2.5');
-        await shared.getByRole('button',{name:'Date range',exact:true}).click();
-        await shared.locator('[data-schedule-field="end-date"]').fill('2026-10-06');
+        await selectDates(shared, dateRange('2026-10-05', '2026-10-06'));
         await shared.locator('[data-schedule-field="meal"][data-meal="lunch"]').check();
         await shared.locator('[data-schedule-field="household"][data-meal="lunch"]').fill('2.5');
         await shared.locator('[data-schedule-section="notes"] > summary').click();
@@ -79,8 +79,7 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         assert(await dialog.isVisible());assert.equal(await amount(0).inputValue(),'4');
         await page.unroute('**/api/meal-plan/batches/bulk');await cancel();await page.reload();await open();
         await recipe(0).selectOption('recipe://bread');assert.equal(await amount(0).inputValue(),'2.5');
-        await shared.getByRole('button',{name:'One day',exact:true}).click();
-        await shared.locator('[data-schedule-field="single-date"]').fill('2026-10-12');
+        await selectDates(shared, ['2026-10-12']);
         await amount(0).fill('4');const latest = await saveMeals();assert.equal(latest.meals[0].planned_servings,4);
         await page.reload();await open();await recipe(0).selectOption('recipe://bread');
         assert.equal(await amount(0).inputValue(),'4','Latest successful save replaces the preference');

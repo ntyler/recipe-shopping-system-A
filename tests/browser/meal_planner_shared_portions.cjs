@@ -2,7 +2,7 @@ const {chromium} = require(process.argv[2]);
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path');
 const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
-const {selectAuto, customPlan, selectCalendar} = require('./meal_planner_test_helpers.cjs');
+const {selectAuto, customPlan, selectCalendar, legacyCustomPlan, selectDates, dateRange} = require('./meal_planner_test_helpers.cjs');
 
 
 (async () => {
@@ -44,8 +44,7 @@ const {selectAuto, customPlan, selectCalendar} = require('./meal_planner_test_he
         assert.match(await shared.locator('[data-schedule-summary]').textContent(),/2 servings.*divided between recipes/);
         // Three lunches use three servings of each recipe. Their original
         // yields differ, so the remaining balances must differ as well.
-        await shared.getByRole('button',{name:'Date range',exact:true}).click();
-        await shared.locator('[data-schedule-field="end-date"]').fill('2026-10-07');
+        await selectDates(shared, dateRange('2026-10-05', '2026-10-07'));
         assert.equal(await row(0).locator('[data-meal-yield-remaining]').textContent(),'5 servings left to distribute if you make the full recipe');
         assert.equal(await row(1).locator('[data-meal-yield-remaining]').textContent(),'1 serving left to distribute if you make the full recipe');
         assert.equal(await row(1).locator('[data-meal-yield-planned]').textContent(),'3 of 4 servings planned.');
@@ -53,13 +52,13 @@ const {selectAuto, customPlan, selectCalendar} = require('./meal_planner_test_he
         await page.setViewportSize({width:390,height:844});
         assert(await dialog.evaluate(e=>e.scrollWidth<=e.clientWidth+1));await screenshot('shared-lunch-mobile.png');
         await page.setViewportSize({width:1440,height:1200});
-        await shared.locator('[data-schedule-field="end-date"]').fill('2026-10-08');
+        await selectDates(shared, dateRange('2026-10-05', '2026-10-08'));
         assert.equal(await row(1).locator('[data-meal-yield-remaining]').textContent(),'All servings from one full recipe are planned');
-        await shared.locator('[data-schedule-field="end-date"]').fill('2026-10-09');
+        await selectDates(shared, dateRange('2026-10-05', '2026-10-09'));
         assert.equal(await row(1).locator('[data-meal-yield-remaining]').textContent(),'1 serving beyond one full recipe');
         assert.match(await row(1).locator('[data-meal-yield-planned]').textContent(),/Make 1.25× the recipe/);
-        await shared.getByRole('button',{name:'One day',exact:true}).click();
-        await row(1).locator('[data-meal-editor-customize]').click();
+        await selectDates(shared, ['2026-10-05']);
+        await legacyCustomPlan(row(1));
         for (const member of members) assert.equal(await portion(custom(1),member).inputValue(),'0.5');
         await portion(custom(1),members[0]).fill('0.75');
         assert.match(await row(0).locator('[data-meal-editor-summary]').textContent(),/0.75 servings/);
@@ -76,14 +75,14 @@ const {selectAuto, customPlan, selectCalendar} = require('./meal_planner_test_he
         // Small valid shares must remain editable when division takes them
         // below the old number input minimum of 0.01.
         for (const member of members) await portion(shared,member).fill('0.01');
-        await row(1).locator('[data-meal-editor-customize]').click();
+        await legacyCustomPlan(row(1));
         for (const member of members) {
             assert.equal(await portion(custom(1),member).inputValue(),'0.005');
             assert(await portion(custom(1),member).evaluate(input=>input.checkValidity()));
         }
         await customPlan(dialog,1).locator('[data-meal-editor-reset]').click();
         for (const member of members) await portion(shared,member).fill('1');
-        await row(1).locator('[data-meal-editor-customize]').click();
+        await legacyCustomPlan(row(1));
         await portion(custom(1),members[0]).fill('0.75');
         const response = page.waitForResponse(r=>r.url().endsWith('/batches/bulk') && r.request().method()==='POST');
         await save.click();const saved=await(await response).json();await dialog.waitFor({state:'hidden'});

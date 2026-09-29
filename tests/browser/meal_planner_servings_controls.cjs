@@ -1,4 +1,4 @@
-const {customPlan} = require('./meal_planner_test_helpers.cjs');
+const {customPlan, legacyCustomPlan, selectDates, dateRange} = require('./meal_planner_test_helpers.cjs');
 const {chromium} = require(process.argv[2]);
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path');
@@ -63,8 +63,8 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         await cancel();
 
         // Unequal meal amounts and an individually adjusted day survive both transitions.
-        await open();await shared.getByRole('button',{name:'Date range',exact:true}).click();
-        await shared.locator('[data-schedule-field="end-date"]').fill('2026-10-06');
+        await open();
+        await selectDates(shared, dateRange('2026-10-05', '2026-10-06'));
         await shared.locator('[data-schedule-field="meal"][data-meal="lunch"]').check();
         await household('lunch').fill('0.5');await household('dinner').fill('1.5');
         const day=shared.locator('[data-schedule-day="2026-10-06"]');
@@ -103,7 +103,7 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         await family.nth(0).fill('0.75');
         assert.match(await row(0).locator('[data-meal-editor-summary]').textContent(),/1.75 servings/);
         await family.nth(0).fill('0.5');
-        await row(0).locator('[data-meal-editor-customize]').click();
+        await legacyCustomPlan(row(0));
         assert(await amount(0).isVisible(),'A custom recipe retains its own servings control');
         await amount(0).fill('2');await customPlan(dialog,0).locator('[data-meal-editor-reset]').click();
         assert(await amount(0).isHidden());assert.equal(await family.nth(0).inputValue(),'0.5');

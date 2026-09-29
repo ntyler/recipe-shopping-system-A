@@ -1,5 +1,5 @@
 const {chromium} = require(process.argv[2]);
-const {customPlan, selectCalendar} = require('./meal_planner_test_helpers.cjs');
+const {customPlan, selectCalendar, legacyCustomPlan, selectDates} = require('./meal_planner_test_helpers.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path');
 const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
@@ -29,16 +29,14 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
                 await row(0).locator('[name="recipe_url"]').selectOption('recipe://soup');
             };
             await open();
-            await shared.getByRole('button',{name:'One day',exact:true}).click();
-            await shared.locator('[data-schedule-field="single-date"]').fill(mobile?'2026-10-28':'2026-09-28');
+            await selectDates(shared, [mobile?'2026-10-28':'2026-09-28']);
             for(const recipe of ['recipe://bread','recipe://rice']){
                 await dialog.locator('[data-meal-editor-add]').click();
                 await dialog.locator('[data-meal-editor]').last().locator('[name="recipe_url"]').selectOption(recipe);
             }
             for(const i of [0,1]){
-                await row(i).locator('[data-meal-editor-customize]').click();await oneCalendar();
-                await form(i).getByRole('button',{name:'One day',exact:true}).click();
-                await form(i).locator('[data-schedule-field="single-date"]').fill(`2026-${mobile?'10':'09'}-${26+i}`);
+                await legacyCustomPlan(row(i));await oneCalendar();
+                await selectDates(form(i), [`2026-${mobile?'10':'09'}-${26+i}`]);
                 await form(i).locator('[data-schedule-section="notes"] > summary').click();
                 await form(i).locator('[data-schedule-field="notes"]').fill(`Custom notes ${i}`);
             }
@@ -77,13 +75,13 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
             assert.deepEqual(posts[0].batches.map(b=>b.allocations[0].date),[26,27,28].map(day=>`2026-${mobile?'10':'09'}-${day}`));
             assert.deepEqual(posts[0].batches.slice(0,2).map(b=>b.prep_notes),['Custom notes 0','Custom notes 1']);
             // Removing the original row must not break reopening its reusable editor.
-            await open();await row(0).locator('[data-meal-editor-customize]').click();await oneCalendar();
+            await open();await legacyCustomPlan(row(0));await oneCalendar();
             await dialog.locator('[data-meal-editor-add]').click();await row(1).locator('[name="recipe_url"]').selectOption('recipe://bread');
             await row(0).locator('[data-meal-editor-remove]').click();await oneCalendar();assert(await shared.isVisible());
-            await row(0).locator('[data-meal-editor-customize]').click();
+            await legacyCustomPlan(row(0));
             await customPlan(dialog,0).locator('[data-meal-editor-reset]').click();await oneCalendar();assert(await picker.isHidden());
             await dialog.locator('[data-meal-batch-footer]').getByRole('button',{name:'Cancel',exact:true}).click();
-            await open();await row(0).locator('[data-meal-editor-customize]').click();await oneCalendar();assert(await form(0).isVisible());
+            await open();await legacyCustomPlan(row(0));await oneCalendar();assert(await form(0).isVisible());
             assert.equal(posts.length,1);assert.deepEqual(errors,[]);await context.close();
         }
         console.log('PASS: one calendar, shared/custom switching, keyboard, previews, draft preservation, atomic save, reset/removal/reopen, desktop/mobile');

@@ -42,7 +42,11 @@
             this.ui.saved = false;
             this.form.hidden = false;
             this.form.scrollIntoView({block:'start'});
-            this.form.querySelector(this.edit?.scope === 'meal' ? '[data-schedule-field="single-date"]' : '[data-schedule-mode][aria-pressed="true"]')?.focus({preventScroll:true});
+            const focusTarget = this.form.querySelector(this.edit?.scope === 'meal' ? '[data-schedule-field="single-date"]'
+                : this.options.calendarOnly ? '[data-schedule-action="date"][aria-pressed="true"]'
+                : '[data-schedule-mode][aria-pressed="true"]')
+                || (this.options.calendarOnly ? this.form.querySelector('[data-schedule-action="date"]') : null);
+            focusTarget?.focus({preventScroll:true});
             await this.loadMembers();
         }
 
@@ -233,6 +237,7 @@
             const model = root.MealPlanSchedule, totals = model.summary(draft);
             const sharedSplit = options.sharedPlan && draft.portionMode === 'recipe';
             const singleEdit = draft.edit?.scope === 'meal';
+            const calendarOnly = options.calendarOnly && !draft.edit;
             const disabled = ui.busy || ui.memberBusy || ui.saved;
             const reviewRequired = draft.portionMode === 'family' && ui.memberReview.length > 0;
             const manageMembersUrl = typeof root.withCanonicalViewerUserId === 'function'
@@ -248,7 +253,7 @@
             let dates = draft.dateMode === 'single'
                 ? `<label>Date<input type="date" data-schedule-field="single-date" data-focus-key="single-date" value="${esc(draft.singleDate)}" required></label>`
                 : draft.dateMode === 'range' ? `<div class="meal-schedule-date-range"><label>Start date<input type="date" data-schedule-field="start-date" data-focus-key="start-date" value="${esc(draft.startDate)}" required></label><label>End date<input type="date" data-schedule-field="end-date" data-focus-key="end-date" value="${esc(draft.endDate)}" required></label></div>` : '';
-            if (draft.dateMode === 'days') {
+            if (calendarOnly || draft.dateMode === 'days') {
                 const calendar = model.calendarMonth(draft.calendarMonth);
                 dates = `<div class="meal-schedule-calendar"><div class="meal-schedule-calendar-heading"><button type="button" data-schedule-action="month" data-direction="-1" data-focus-key="previous-month" aria-label="Previous month">‹</button><strong>${esc(calendar.label)}</strong><button type="button" data-schedule-action="month" data-direction="1" data-focus-key="next-month" aria-label="Next month">›</button></div>
                     <div class="meal-schedule-calendar-grid">${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(day => `<span aria-hidden="true">${day}</span>`).join('')}${calendar.days.map(day => `<button type="button" data-schedule-action="date" data-date="${day.date}" data-focus-key="calendar-${day.date}" aria-label="${esc(dateLabel(day.date))}" aria-pressed="${draft.selectedDates.includes(day.date)}" class="${day.inMonth ? '' : 'is-other-month'}"><span>${day.day}</span><small data-schedule-yield-shortage hidden></small></button>`).join('')}</div>
@@ -263,7 +268,7 @@
                     <p data-day-default-status="${day.date}">${day.customized ? 'Adjusted for this day.' : 'Using default portions.'}</p></div></details>`;
             }).join('');
             return `<div class="meal-schedule-heading"><div><h2>${singleEdit ? 'Edit scheduled meal' : draft.edit ? 'Edit prep plan' : 'Add to Meal Plan'}</h2><p>${esc(recipeTitle)}</p></div><button type="button" data-schedule-action="cancel" aria-label="Close meal planning" ${ui.busy || ui.memberBusy ? 'disabled' : ''}>×</button></div>
-                <fieldset ${disabled ? 'disabled' : ''}>${singleEdit ? '<p>Changes apply only to this scheduled meal.</p>' : `<div class="recipe-preview-segment meal-schedule-modes" role="group" aria-label="Date selection">${dateModes.map(([mode,label]) => `<button type="button" data-schedule-mode="${mode}" data-focus-key="mode-${mode}" aria-pressed="${draft.dateMode === mode}">${label}</button>`).join('')}</div>`}
+                <fieldset ${disabled ? 'disabled' : ''}>${singleEdit ? '<p>Changes apply only to this scheduled meal.</p>' : calendarOnly ? '<p class="meal-schedule-calendar-label">Select days</p>' : `<div class="recipe-preview-segment meal-schedule-modes" role="group" aria-label="Date selection">${dateModes.map(([mode,label]) => `<button type="button" data-schedule-mode="${mode}" data-focus-key="mode-${mode}" aria-pressed="${draft.dateMode === mode}">${label}</button>`).join('')}</div>`}
                 <div class="meal-schedule-dates" ${options.distributionPreview ? 'data-distribution-preview' : ''}>${dates}</div>
                 <div class="meal-schedule-meals">${singleEdit ? `<label>Meal<select data-schedule-field="single-meal" data-focus-key="single-meal">${model.MEAL_TYPES.map(meal => `<option value="${meal}" ${draft.mealTypes[0] === meal ? 'selected' : ''}>${title(meal)}</option>`).join('')}</select></label>` : `<strong>Meals on selected days</strong>${model.MEAL_TYPES.map(meal => MealPlanPanel.check(meal, draft.mealTypes.includes(meal), 'meal', `data-focus-key="meal-${meal}"`)).join('')}`}</div>
                 <div class="meal-schedule-columns"><section>${MealPlanPanel.portionModes(draft)}

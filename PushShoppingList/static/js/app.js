@@ -2071,7 +2071,7 @@ function syncMealPlannerRecipeServings(entry, summary, state, busy) {
     });
     const help = entry.root.querySelector('[data-meal-portions-help]');
     help.textContent = shared ? 'Set portions under “Who is eating?” below. Distribution uses those portions.'
-        : entry.panel ? 'Applies to every scheduled meal. Customize for individual people or dates.'
+        : entry.panel ? 'Applies to every meal in this recipe’s schedule.'
         : entry.servingsPerMeal !== undefined || entry.portionsDraft ? 'This recipe contributes these portions to the meal total. Dates follow the shared plan.'
         : 'Auto split. This recipe shares the remaining meal portions.';
     if (meals.length && meals[0].member_portions.length && meals.every(meal => JSON.stringify(meal.member_portions) === JSON.stringify(meals[0].member_portions))) {
@@ -2543,9 +2543,6 @@ function syncMealPlannerCalendar(dialog, state, previewPanel = null) {
         entry.overrideContainer.hidden = !entry.panel || visible !== entry.panel;
         entry.overrideContainer.querySelector('[data-meal-editor-reset]').disabled = Boolean(mealPlannerBusy(state));
         entry.overrideContainer.querySelector('[data-meal-custom-plan-title]').textContent = `Recipe ${index + 1}: ${entry.title} · Custom plan`;
-        const button = entry.root.querySelector('[data-meal-editor-customize]');
-        button.textContent = entry.expanded ? 'Show shared plan' : entry.panel ? 'Show custom plan' : 'Customize';
-        button.setAttribute('aria-expanded', String(entry.expanded));
     });
 }
 
@@ -2567,7 +2564,7 @@ function syncMealPlannerBatchControls(dialog) {
         ? 'No recipes use this plan. Choose “Use shared plan” in a custom plan to share these dates and portions.'
         : multiple
         ? 'Household and family portions are totals for each meal. Each recipe contributes to that total; recipes on Auto split share the remainder. Split recipe yield shares each recipe’s yield across its entries.'
-        : 'Set servings under “Who is eating?”. These portions also control recipe distribution. Customize a recipe for its own dates and portions.';
+        : 'Choose dates on the calendar and set portions under “Who is eating?”. These portions also control recipe distribution.';
     const summaries = new Map(recipes.map(entry => [entry, MealPlanSchedule.summary(mealPlannerRecipeDraft(state, entry))]));
     const count = new Set(recipes.flatMap(entry => summaries.get(entry).days.flatMap(day =>
         day.meals.map(meal => `${day.date}/${meal.meal_type}`)))).size;
@@ -2622,10 +2619,9 @@ function syncMealPlannerBatchControls(dialog) {
         updateMealPlannerYieldBalance(entry, summaries, state.edit);
         syncMealPlannerRecipeServings(entry, summary, state, busy);
         syncMealPlannerDistribution(entry, summary, state, busy, summaries);
-        const customize = entry.root.querySelector('[data-meal-editor-customize]');
-        customize.disabled = Boolean(busy);
         const remove = entry.root.querySelector('[data-meal-editor-remove]');
         remove.hidden = state.entries.length === 1 || Boolean(state.edit);
+        entry.root.querySelector('.app-meal-editor-actions').hidden = remove.hidden;
         remove.disabled = Boolean(busy);
         remove.setAttribute('aria-label', `Remove Recipe ${index + 1}`);
     });
@@ -2673,7 +2669,6 @@ function createMealPlannerEditor(dialog, root) {
     const container = root.querySelector('[data-meal-override-container]');
     entry.overrideContainer = container;
     container.id = `${entry.id}-override`;
-    root.querySelector('[data-meal-editor-customize]').setAttribute('aria-controls', container.id);
     container.hidden = true;
     root.querySelector('[data-meal-override-form-host]').replaceChildren();
     const distribution = root.querySelector('[data-meal-distribution]');
@@ -2708,7 +2703,6 @@ function createMealPlannerEditor(dialog, root) {
         ['input', 'change', 'click'].forEach(type => root.addEventListener(type, changed));
         ['input', 'change', 'click'].forEach(type => container.addEventListener(type, changed));
         root.querySelector('[data-meal-editor-remove]').addEventListener('click', () => removeMealPlannerEditor(dialog, root.mealPlannerEntry));
-        root.querySelector('[data-meal-editor-customize]').addEventListener('click', () => customizeMealPlannerRecipe(dialog, root.mealPlannerEntry));
         root.querySelector('[data-meal-editor-reset]').addEventListener('click', () => resetMealPlannerRecipe(dialog, root.mealPlannerEntry));
         const servings = root.querySelector('[data-meal-recipe-servings]');
         servings.addEventListener('input', () => setMealPlannerRecipeServings(dialog, root.mealPlannerEntry, servings.value));
@@ -2943,6 +2937,7 @@ function mealPlannerPanelOptions(dialog, entry, recipeTitle, defaultServings) {
     return {
         today: state.date, servings: defaultServings, title: recipeTitle,
         splitRecipeYield: true, sharedPlan: !entry,
+        get calendarOnly() { return !state.edit; },
         get multipleRecipes() { return !state.edit && state.entries.filter(other => other.recipeUrl).length > 1; },
         getDraft: draft => {
             if (state.edit) return draft;

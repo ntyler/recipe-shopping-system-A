@@ -320,7 +320,9 @@ assert.match(activeDialog.helper.textContent,/12 servings/);
 assert.equal(panel.draft.members.length,2);
 assert.equal(activeDialog.form.handlers.submit.length,1);
 assert.equal(requests.filter(r=>r.options?.method==='POST').length,0);
-assert(activeDialog.form.innerHTML.includes('Date range'));
+assert(!activeDialog.form.innerHTML.includes('Date range'));
+assert(!activeDialog.form.innerHTML.includes('data-schedule-mode='));
+assert(activeDialog.form.innerHTML.includes('data-schedule-action="date"'));
 assert(activeDialog.form.innerHTML.includes('Select days'));
 assert(activeDialog.form.innerHTML.includes('By family member'));
 """)

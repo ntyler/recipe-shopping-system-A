@@ -1,4 +1,4 @@
-const {customPlan} = require('./meal_planner_test_helpers.cjs');
+const {customPlan, legacyCustomPlan, selectDates} = require('./meal_planner_test_helpers.cjs');
 const {chromium} = require(process.argv[2]);
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path');
@@ -29,12 +29,11 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
                 await page.getByRole('button',{name:'Add Meals',exact:true}).click();
                 await page.waitForFunction(()=>!document.getElementById('mealPlannerDialog').mealPlanScheduleState.panel.ui.loading);
                 await row(0).locator('[name="recipe_url"]').selectOption('recipe://soup');
-                await shared.getByRole('button',{name:'One day',exact:true}).click();
                 if(!useDefaults) await shared.locator('[data-schedule-field="household"][data-meal="dinner"]').fill('1');
             };
             await open();
             // Both viewports use the same isolated account; save different weeks.
-            if(mobile) await shared.locator('[data-schedule-field="single-date"]').fill('2026-10-12');
+            if(mobile) await selectDates(shared, ['2026-10-12']);
             assert.deepEqual(await toolbar.locator('[data-meal-shared-distribution-mode]:visible').allTextContents(),['Fill upcoming days for all','Distribute all on selected days']);
             assert(await row(0).locator('[data-meal-distribution]').isHidden());
             assert(await toolbar.locator('[data-meal-editor-add]').isVisible());
@@ -75,7 +74,7 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
             const saved=await(await response).json();assert.equal(saved.ok,true);assert.equal(saved.meals.length,4);assert.equal(posts.length,1);
 
             // Preserve nonconsecutive dates and portions when applying selected days.
-            await open();await shared.getByRole('button',{name:'Select days',exact:true}).click();
+            await open();
             await shared.locator('[data-schedule-action="date"][data-date="2026-10-07"]').click();
             await shared.locator('[data-schedule-field="household"][data-meal="dinner"]').fill('1.5');
             if(mobile) await action('keep').tap();else await action('keep').press('Enter');
@@ -87,7 +86,7 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
             // Selecting two recipes with their default portions must work
             // without first finding and increasing the shared meal total.
             await open(true);
-            await shared.locator('[data-schedule-field="single-date"]').fill('2026-09-26');
+            await selectDates(shared, ['2026-09-26']);
             await shared.locator('[data-schedule-field="meal"][data-meal="breakfast"]').check();
             await shared.locator('[data-schedule-field="meal"][data-meal="dinner"]').uncheck();
             await dialog.locator('[data-meal-editor-add]').click();await row(1).locator('[name="recipe_url"]').selectOption('recipe://bread');
@@ -122,7 +121,7 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
 
             // Both shared recipes use their own 1-serving contribution, not the 2-serving meal total.
             await open();await shared.locator('[data-schedule-field="household"][data-meal="dinner"]').fill('2');
-            await shared.locator('[data-schedule-field="single-date"]').fill(mobile?'2026-11-16':'2026-11-02');
+            await selectDates(shared, [mobile?'2026-11-16':'2026-11-02']);
             await dialog.locator('[data-meal-editor-add]').click();await row(1).locator('[name="recipe_url"]').selectOption('recipe://bread');
             await row(0).locator('[data-meal-recipe-servings]').fill('1');
             assert.equal(await dialog.locator('[data-meal-distribution]:visible').count(),0);
@@ -147,11 +146,10 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
             await row(1).locator('[data-meal-recipe-servings]').fill('1');
             // A custom schedule keeps both its draft and its own action buttons.
             await dialog.locator('[data-meal-editor-add]').click();await row(2).locator('[name="recipe_url"]').selectOption('recipe://rice');
-            await row(2).locator('[data-meal-editor-customize]').click();
+            await legacyCustomPlan(row(2));
             const custom=customPlan(dialog,2).locator('[data-meal-editor-form]');
-            await custom.getByRole('button',{name:'One day',exact:true}).click();
-            await custom.locator('[data-schedule-field="single-date"]').fill(mobile?'2026-11-15':'2026-11-01');
-            await row(2).locator('[data-meal-editor-customize]').click();
+            await selectDates(custom, [mobile?'2026-11-15':'2026-11-01']);
+            await legacyCustomPlan(row(2));
             assert(await row(2).locator('[data-meal-distribution]').isVisible());
             const customBefore=await row(2).evaluate(element=>JSON.stringify(element.mealPlannerEntry.panel.draft));
             if(mobile) await action('upcoming').tap();else await action('upcoming').press('Enter');

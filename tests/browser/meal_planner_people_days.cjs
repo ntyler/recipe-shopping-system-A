@@ -1,3 +1,4 @@
+const {selectDates} = require('./meal_planner_test_helpers.cjs');
 const {chromium} = require(process.argv[2]);
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path');
@@ -26,7 +27,6 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         const open=async()=>{
             await page.getByRole('button',{name:'Add Meals',exact:true}).click();
             await page.waitForFunction(()=>!document.getElementById('mealPlannerDialog').mealPlanScheduleState.panel.ui.loading);
-            await shared.getByRole('button',{name:'One day',exact:true}).click();
             await row.locator('[name="recipe_url"]').selectOption('recipe://bread');
         };
         const third=async()=>{
@@ -39,7 +39,7 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         };
         await open();await shared.getByRole('button',{name:'Split recipe yield',exact:true}).click();
         assert.equal(await box.locator('[data-meal-shared-distribution-mode]').count(),2);
-        await shared.locator('[data-schedule-field="single-date"]').fill('2026-09-26');
+        await selectDates(shared, ['2026-09-26']);
         await shared.getByRole('button',{name:'By family member',exact:true}).click();
         const portions=shared.locator('[data-schedule-field="family"][data-meal="dinner"]');
         for(const cell of await portions.all()) await cell.fill('1');

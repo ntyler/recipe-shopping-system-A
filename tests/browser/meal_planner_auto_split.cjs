@@ -1,5 +1,5 @@
 const {chromium} = require(process.argv[2]);
-const {customPlan} = require('./meal_planner_test_helpers.cjs');
+const {customPlan, legacyCustomPlan, selectDates} = require('./meal_planner_test_helpers.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path');
 const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
@@ -25,17 +25,16 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
             await page.waitForFunction(()=>!document.getElementById('mealPlannerDialog').mealPlanScheduleState.panel.ui.loading);
             await row(0).locator('[name="recipe_url"]').selectOption('recipe://soup');
             assert(await automatic.isHidden(),'One recipe already uses all shared portions');
-            await shared.getByRole('button',{name:'One day',exact:true}).click();
-            await shared.locator('[data-schedule-field="single-date"]').fill(mobile?'2026-10-12':'2026-10-05');
+            await selectDates(shared, [mobile?'2026-10-12':'2026-10-05']);
             for (const recipe of ['recipe://soup','recipe://rice']) {
                 await dialog.locator('[data-meal-editor-add]').click();
                 await dialog.locator('[data-meal-editor]').last().locator('[name="recipe_url"]').selectOption(recipe);
             }
-            await row(2).locator('[data-meal-editor-customize]').click();
+            await legacyCustomPlan(row(2));
             const custom=customPlan(dialog,2).locator('[data-meal-editor-form]');
             await custom.locator('[data-schedule-section="notes"] > summary').click();
             await custom.locator('[data-schedule-field="notes"]').fill('Keep custom portions');
-            await row(2).locator('[data-meal-editor-customize]').click();
+            await legacyCustomPlan(row(2));
             await shared.locator('[data-schedule-field="household"][data-meal="dinner"]').fill('5');
             await amount(0).fill('3');await amount(1).fill('3');
             assert.equal(await dialog.locator('[data-meal-shared-distribution-mode="keep"]').getAttribute('aria-disabled'),'true');

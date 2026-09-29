@@ -2,7 +2,7 @@ const {chromium} = require(process.argv[2]);
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path');
 const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
-const {selectAuto, customPlan} = require('./meal_planner_test_helpers.cjs');
+const {selectAuto, customPlan, legacyCustomPlan, selectDates, dateRange} = require('./meal_planner_test_helpers.cjs');
 
 
 (async () => {
@@ -38,17 +38,15 @@ const {selectAuto, customPlan} = require('./meal_planner_test_helpers.cjs');
             await selectAuto(row(index).locator('[name="recipe_url"]'), 'recipe://' + name);
         }
         assert.equal(await shared.getByRole('button',{name:'Split recipe yield',exact:true}).getAttribute('aria-pressed'),'true');
-        await shared.getByRole('button',{name:'Date range',exact:true}).click();
-        await shared.locator('[data-schedule-field="end-date"]').fill('2026-10-06');
+        await selectDates(shared, dateRange('2026-10-05', '2026-10-06'));
         await shared.locator('[data-schedule-field="meal"][data-meal="lunch"]').check();
         assert.equal(await save.textContent(),'Save 4 Meals');
         for (const [index,total,perMeal] of [[0,8,2],[1,4,1],[2,6,1.5]]) {
             assert((await summary(index).textContent()).includes(`4 meals · ${total} servings (${perMeal} per meal)`));
         }
-        await row(1).locator('[data-meal-editor-customize]').click();
+        await legacyCustomPlan(row(1));
         const soup = customPlan(dialog,1).locator('[data-meal-editor-form]');
-        await soup.getByRole('button',{name:'One day',exact:true}).click();
-        await soup.locator('[data-schedule-field="single-date"]').fill('2026-10-09');
+        await selectDates(soup, ['2026-10-09']);
         await soup.locator('[data-schedule-field="meal"][data-meal="lunch"]').uncheck();
         assert.match(await summary(1).textContent(),/1 meal · 4 servings \(4 per meal\)/);
         await soup.getByRole('button',{name:'Household total',exact:true}).click();
@@ -56,7 +54,7 @@ const {selectAuto, customPlan} = require('./meal_planner_test_helpers.cjs');
         assert.match(await summary(1).textContent(),/1 meal · 2.5 servings/);
         await soup.getByRole('button',{name:'Split recipe yield',exact:true}).click();
         assert.match(await summary(1).textContent(),/1 meal · 4 servings/);
-        await row(1).locator('[data-meal-editor-customize]').click();
+        await legacyCustomPlan(row(1));
         assert.equal(await save.textContent(),'Save 5 Meals');
         await dialog.evaluate(element => {element.scrollTop = 0;});
         await screenshot('add-meals-split-desktop.png');
@@ -77,9 +75,7 @@ const {selectAuto, customPlan} = require('./meal_planner_test_helpers.cjs');
         }
         // An uneven split also saves the original yield exactly in the real API.
         await open();await selectAuto(row(0).locator('[name="recipe_url"]'), 'recipe://rice');
-        await shared.getByRole('button',{name:'Date range',exact:true}).click();
-        await shared.locator('[data-schedule-field="start-date"]').fill('2026-11-01');
-        await shared.locator('[data-schedule-field="end-date"]').fill('2026-11-07');
+        await selectDates(shared, dateRange('2026-11-01', '2026-11-07'));
         assert.match(await summary(0).textContent(),/7 meals · 6 servings/);
         const response = page.waitForResponse(res => res.url().endsWith('/batches/bulk') && res.request().method() === 'POST');
         await save.click();const result = await (await response).json();await dialog.waitFor({state:'hidden'});
@@ -98,7 +94,7 @@ const {selectAuto, customPlan} = require('./meal_planner_test_helpers.cjs');
             assert.equal(await row(index).locator('[data-meal-yield-planned]').textContent(),'4 of 4 servings planned across 2 entries.');
         }
         assert.match(await dialog.locator('[data-meal-batch-help]').textContent(),/1 recipe · 1 meal/);
-        await row(1).locator('[data-meal-editor-customize]').click();
+        await legacyCustomPlan(row(1));
         assert.match(await soup.locator('[data-schedule-summary]').textContent(),/1 meal · 2 servings/);
         await soup.getByRole('button',{name:'Household total',exact:true}).click();
         const portions = soup.locator('[data-schedule-field="household"][data-meal="dinner"]');

@@ -2,7 +2,7 @@ const {chromium} = require(process.argv[2]);
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path');
 const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
-const {selectAuto, customPlan} = require('./meal_planner_test_helpers.cjs');
+const {selectAuto, customPlan, legacyCustomPlan, selectDates, dateRange} = require('./meal_planner_test_helpers.cjs');
 
 
 (async () => {
@@ -33,8 +33,7 @@ const {selectAuto, customPlan} = require('./meal_planner_test_helpers.cjs');
         await amount(0).fill('1.5');assert.equal(await amount(1).inputValue(),'0.5');
         assert.equal(await dialog.locator('[data-meal-editor-form]').count(),1,'Inline amounts retain one shared schedule');
         assert.match(await row(0).locator('[data-meal-portions-help]').textContent(),/Nate: 0.75 · Gary: 0.75/);
-        await shared.getByRole('button',{name:'Date range',exact:true}).click();
-        await shared.locator('[data-schedule-field="end-date"]').fill('2026-10-07');
+        await selectDates(shared, dateRange('2026-10-05', '2026-10-07'));
         assert.match(await row(0).locator('[data-meal-editor-summary]').textContent(),/3 days.*4.5 servings/);
         assert.match(await row(1).locator('[data-meal-editor-summary]').textContent(),/3 days.*1.5 servings/);
         assert.match(await dialog.locator('[data-meal-batch-help]').textContent(),/2 recipes · 3 meals · 6 servings/);
@@ -54,7 +53,7 @@ const {selectAuto, customPlan} = require('./meal_planner_test_helpers.cjs');
         assert.equal(await amount(0).inputValue(),'1');assert.equal(await amount(1).inputValue(),'1');
         // Moving between inline amounts and per-person customization must keep
         // the same portions, including while an incomplete input is corrected.
-        await amount(0).fill('1.5');await row(0).locator('[data-meal-editor-customize]').click();
+        await amount(0).fill('1.5');await legacyCustomPlan(row(0));
         const custom=customPlan(dialog,0).locator('[data-meal-editor-form]');
         const family=custom.locator('[data-schedule-field="family"][data-meal="dinner"]');
         assert.equal(await family.first().inputValue(),'0.75');
