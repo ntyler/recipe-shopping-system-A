@@ -874,12 +874,19 @@
                 </div>
             </div>
             <fieldset id="mealPlannerRecipeFields" data-meal-recipe-fields>
+                <div class="app-meal-recipe-picker">
+                <a class="app-meal-recipe-thumbnail" data-meal-editor-image-link target="_blank" rel="noopener" hidden>
+                    <img data-meal-editor-image width="56" height="56" alt="" decoding="async" hidden>
+                    <span data-meal-editor-image-empty>No image</span>
+                </a>
                 <label for="mealPlannerRecipe"><span class="sr-only">Recipe</span>
                     <select id="mealPlannerRecipe" name="recipe_url" required aria-describedby="mealPlannerServingsHelp" onchange="return syncMealPlannerServingsFromRecipe(this)">
                         <option value="" data-default-servings="1" data-yield-label="">Choose a recipe</option>
                         {% for recipe in meal_plan_recipe_options %}
                             <option value="{{ recipe.url }}"
                                     data-recipe-edit-url="{{ recipe_edit_page_url(recipe.url) }}"
+                                    data-recipe-image-url="{{ recipe.image_url | default('') }}"
+                                    data-recipe-image-alt="{{ recipe.image_alt | default('') }}"
                                     data-default-servings="{{ recipe.default_servings }}"
                                     data-yield-servings="{{ recipe.yield_servings if recipe.yield_servings is defined and recipe.yield_servings else '' }}"
                                     data-yield-label="{{ recipe.yield_label }}"
@@ -887,6 +894,7 @@
                         {% endfor %}
                     </select>
                 </label>
+                </div>
                 <details class="app-meal-ingredient-options"
                          data-meal-ingredient-options
                          aria-live="polite"

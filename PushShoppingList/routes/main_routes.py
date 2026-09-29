@@ -808,6 +808,13 @@ def meal_plan_recipe_option_rows(recipe_urls, recipe_ingredient_data=None):
             or recipe.get("base_servings")
             or recipe.get("servings")
         )
+        # Request only the selected recipe's thumbnail in the browser; do not
+        # generate image variants for the entire recipe picker while rendering.
+        cover = recipe_data.get("cover_image", recipe_meta.get("cover_image"))
+        cover = cover if isinstance(cover, dict) else {}
+        image_url = recipe_cover_image_src(recipe_url, cover)
+        if image_url and cover.get("path"):
+            image_url = recipe_cover_image_url(recipe_url, variant="thumb")
         options.append({
             "url": recipe_url,
             "name": str(
@@ -819,6 +826,8 @@ def meal_plan_recipe_option_rows(recipe_urls, recipe_ingredient_data=None):
             "default_servings": planned_servings_from_yield(recipe_yield) or 1,
             "yield_servings": planned_servings_from_yield(recipe_yield),
             "yield_label": meal_plan_yield_label(recipe_yield),
+            "image_url": image_url,
+            "image_alt": str(cover.get("alt") or "").strip(),
             "ingredient_requirements": [
                 public_requirement(requirement)
                 for requirement in ingredient_requirements(recipe_data)

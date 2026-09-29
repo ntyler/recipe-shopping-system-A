@@ -426,6 +426,35 @@ def test_meal_plan_recipe_options_use_saved_default_yield(monkeypatch):
     ]
 
 
+def test_meal_plan_recipe_thumbnails_use_private_urls_and_preserve_removed_covers(monkeypatch):
+    from urllib.parse import parse_qs, urlsplit
+    from flask import Flask
+    from PushShoppingList.routes import main_routes
+    from PushShoppingList.services import recipe_url_service
+
+    source = "https://example.test/recipe?size=2&dish=bread#photo"
+    remote = "https://example.test/soup.jpg"
+    saved = {
+        source: {"cover_image": {"path": "covers/bread.png", "alt": "Corn spoon bread"}},
+        "recipe://remote": {"cover_image": {"url": remote}},
+        "recipe://legacy": {},
+        "recipe://removed": {"cover_image": {}},
+    }
+    metadata = {main_routes.normalize_recipe_url_key(url): {"cover_image": {"url": remote}}
+                for url in ["recipe://legacy", "recipe://removed"]}
+    monkeypatch.setattr(main_routes, "load_saved_recipe_output", lambda url: saved[url])
+    monkeypatch.setattr(recipe_url_service, "current_user", lambda: {"user_id": "thumbnail-viewer"})
+    with Flask(__name__).test_request_context("/"):
+        options = main_routes.meal_plan_recipe_option_rows(
+            [{"url": url, "name": url} for url in saved], recipe_ingredient_data=metadata)
+
+    thumbnail = urlsplit(options[0]["image_url"])
+    assert thumbnail.path == "/recipe_cover_image"
+    assert parse_qs(thumbnail.query) == {"viewer_user_id": ["thumbnail-viewer"], "url": [source], "variant": ["thumb"]}
+    assert options[0]["image_alt"] == "Corn spoon bread"
+    assert [option["image_url"] for option in options[1:]] == [remote, remote, ""]
+
+
 def test_meal_plan_routes_create_and_delete_real_entries(monkeypatch, isolated_meal_plan):
     from PushShoppingList.app import create_app
     from PushShoppingList.routes import main_routes

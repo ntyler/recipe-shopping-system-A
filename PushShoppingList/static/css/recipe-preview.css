@@ -339,7 +339,13 @@ body.recipe-preview-active { overflow: auto; }
 #mealPlannerDialog .app-meal-editor-actions { display: flex; gap: 8px; grid-column: 2; grid-row: 1; align-self: start; }
 #mealPlannerDialog .app-meal-editor-actions button { padding: 8px 12px; font-size: 12px; }
 #mealPlannerDialog .app-meal-editor [data-meal-recipe-fields] { grid-column: 1; grid-row: 1; grid-template-columns: auto minmax(0,1fr); gap: 6px 12px; }
-#mealPlannerDialog .app-meal-editor [data-meal-recipe-fields] > label { margin: 0; grid-column: 1 / -1; }
+#mealPlannerDialog .app-meal-recipe-picker { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; min-width: 0; }
+#mealPlannerDialog .app-meal-recipe-picker > label { flex: 1; min-width: 0; margin: 0; }
+#mealPlannerDialog .app-meal-recipe-thumbnail { display: grid; place-items: center; flex: 0 0 56px; width: 56px; height: 56px; overflow: hidden; border: 1px solid var(--app-border); border-radius: 8px; background: var(--app-bg); color: var(--app-muted); text-decoration: none; }
+#mealPlannerDialog .app-meal-recipe-thumbnail img { display: block; width: 100%; height: 100%; object-fit: cover; }
+#mealPlannerDialog .app-meal-recipe-thumbnail span { padding: 4px; font-size: 11px; line-height: 1.3; text-align: center; }
+#mealPlannerDialog .app-meal-recipe-thumbnail[hidden], #mealPlannerDialog .app-meal-recipe-thumbnail [hidden] { display: none; }
+#mealPlannerDialog .app-meal-recipe-thumbnail:focus-visible { outline: 2px solid var(--app-primary); outline-offset: 3px; }
 #mealPlannerDialog .app-meal-editor [data-meal-servings-help] { grid-column: 1; grid-row: 2; align-self: center; }
 #mealPlannerDialog .app-meal-editor .app-meal-ingredient-options { margin: 0; padding: 8px 12px; }
 #mealPlannerDialog .app-meal-editor .app-meal-ingredient-options:not([open]) { grid-column: 2; grid-row: 2; justify-self: end; border: 0; padding: 0; background: transparent; }

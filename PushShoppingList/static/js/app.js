@@ -2583,17 +2583,32 @@ function syncMealPlannerBatchControls(dialog) {
     state.entries.forEach((entry, index) => {
         entry.root.querySelector('[data-meal-editor-heading]').hidden = Boolean(state.edit);
         entry.root.querySelector('[data-meal-editor-number]').textContent = `Recipe ${index + 1}`;
-        const recipeLink = entry.root.querySelector('[data-meal-editor-recipe-link]');
-        const recipeEditUrl = entry.recipeUrl && entry.root.querySelector('[name="recipe_url"]').selectedOptions[0]?.dataset.recipeEditUrl;
-        recipeLink.hidden = !recipeEditUrl;
-        if (recipeEditUrl) {
-            recipeLink.setAttribute('href', recipeEditUrl);
-            recipeLink.setAttribute('aria-label', `Edit recipe: ${entry.title} (opens in a new tab)`);
-            recipeLink.title = `Edit ${entry.title} in a new tab`;
-        } else {
-            recipeLink.removeAttribute('href');
-            recipeLink.removeAttribute('aria-label');
-            recipeLink.removeAttribute('title');
+        const option = entry.root.querySelector('[name="recipe_url"]').selectedOptions[0];
+        const recipeEditUrl = entry.recipeUrl && option?.dataset.recipeEditUrl;
+        for (const selector of ['[data-meal-editor-recipe-link]', '[data-meal-editor-image-link]']) {
+            const link = entry.root.querySelector(selector);
+            link.hidden = !recipeEditUrl;
+            if (recipeEditUrl) {
+                link.setAttribute('href', recipeEditUrl);
+                link.setAttribute('aria-label', `Edit recipe: ${entry.title} (opens in a new tab)`);
+                link.title = `Edit ${entry.title} in a new tab`;
+            } else {
+                link.removeAttribute('href');
+                link.removeAttribute('aria-label');
+                link.removeAttribute('title');
+            }
+        }
+        const image = entry.root.querySelector('[data-meal-editor-image]');
+        const imageUrl = entry.recipeUrl && option?.dataset.recipeImageUrl || '';
+        image.alt = option?.dataset.recipeImageAlt || entry.title || '';
+        if (image.dataset.source !== imageUrl) {
+            image.dataset.source = imageUrl;
+            image.hidden = true;
+            const placeholder = entry.root.querySelector('[data-meal-editor-image-empty]');
+            placeholder.hidden = false;
+            placeholder.textContent = imageUrl ? 'Loading…' : 'No image';
+            if (imageUrl) image.setAttribute('src', imageUrl);
+            else image.removeAttribute('src');
         }
         const error = entry.root.querySelector('[data-meal-editor-error]');
         if (!error.hidden) error.textContent = error.textContent.replace(/^Recipe \d+:/, `Recipe ${index + 1}:`);
@@ -2670,6 +2685,14 @@ function createMealPlannerEditor(dialog, root) {
     root.mealPlannerEntry = entry;
     if (!root.mealPlannerBound) {
         root.mealPlannerBound = true;
+        const image = root.querySelector('[data-meal-editor-image]');
+        const placeholder = root.querySelector('[data-meal-editor-image-empty]');
+        image.addEventListener('load', () => { image.hidden = false; placeholder.hidden = true; });
+        image.addEventListener('error', () => {
+            image.hidden = true;
+            placeholder.hidden = false;
+            placeholder.textContent = 'No image';
+        });
         const changed = event => {
             const current = root.mealPlannerEntry;
             if (!current || state.edit || state.saving) return;

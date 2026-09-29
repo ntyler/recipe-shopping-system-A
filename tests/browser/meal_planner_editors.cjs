@@ -22,6 +22,8 @@ const {selectAuto, customPlan, selectCalendar} = require('./meal_planner_test_he
         assert(await page.getByRole('heading',{name:'Meal Planner',exact:true}).isVisible());
         const dialog=page.locator('#mealPlannerDialog'), rows=dialog.locator('[data-meal-editor]');
         const row=i=>rows.nth(i), recipe=i=>row(i).locator('[name="recipe_url"]');
+        const image=i=>row(i).locator('[data-meal-editor-image]'), imageLink=i=>row(i).locator('[data-meal-editor-image-link]');
+        const loaded=async i=>{await image(i).waitFor({state:'visible'});assert(await image(i).evaluate(el=>el.complete&&el.naturalWidth>0));};
         const shared=dialog.locator('[data-meal-shared-form]');
         const custom=i=>customPlan(dialog,i).locator('[data-meal-editor-form]');
         const servings=form=>form.locator('[data-schedule-field="household"][data-meal="dinner"]');
@@ -34,7 +36,16 @@ const {selectAuto, customPlan, selectCalendar} = require('./meal_planner_test_he
         const screenshot=async name=>{const dir=process.env.AI_PANTRY_BROWSER_ARTIFACTS;if(dir){fs.mkdirSync(dir,{recursive:true});await page.screenshot({path:path.join(dir,name)});}};
         await open();
         assert(await row(0).locator('[data-meal-editor-recipe-link]').isHidden());
+        assert(await imageLink(0).isHidden());
+        // A broken cover uses the same compact placeholder as an absent cover.
+        await context.route('**/qa-static/images/ai-pantry-home-hero.png',route=>route.fulfill({status:200,contentType:'image/png',body:'invalid image'}));
         await selectAuto(recipe(0), 'recipe://bread');
+        await row(0).getByText('No image',{exact:true}).waitFor({state:'visible'});assert(await image(0).isHidden());
+        await context.unroute('**/qa-static/images/ai-pantry-home-hero.png');
+        await selectAuto(recipe(0), 'recipe://soup');await loaded(0);
+        assert.equal(await image(0).getAttribute('alt'),'Soup recipe photo');
+        await selectAuto(recipe(0), 'recipe://bread');await loaded(0);
+        assert.equal(await image(0).getAttribute('alt'),'Bread recipe photo');
         await shared.getByRole('button',{name:'Household total',exact:true}).click();
         await notes(shared,'Shared prep notes');
         await shared.locator('[data-schedule-section="prep"] > summary').click();
@@ -44,6 +55,9 @@ const {selectAuto, customPlan, selectCalendar} = require('./meal_planner_test_he
         await add();await selectAuto(recipe(1), 'recipe://soup');
         await add();await selectAuto(recipe(2), 'recipe://rice');
         assert.equal(await rows.count(),3);
+        await loaded(0);await loaded(1);
+        assert.notEqual(await image(0).getAttribute('src'),await image(1).getAttribute('src'));
+        assert(await image(2).isHidden());assert(await row(2).getByText('No image',{exact:true}).isVisible());
         // Recipe editor links keep the current planner and its unsaved draft open.
         const recipeLink=i=>row(i).locator('[data-meal-editor-recipe-link]');
         for(const [i,value] of ['bread','soup','rice'].entries()) {
@@ -58,12 +72,14 @@ const {selectAuto, customPlan, selectCalendar} = require('./meal_planner_test_he
         // Isolate the editor document: this scenario verifies navigation and draft
         // preservation; recipe-editor routes have their own integration tests.
         await context.route('**/recipe/edit?**',route=>route.fulfill({status:200,contentType:'text/html',body:'<title>Recipe editor navigation</title><h1>Recipe editor</h1>'}));
-        await recipeLink(0).focus();await page.keyboard.press('Tab');await page.keyboard.press('Shift+Tab');
-        assert(await recipeLink(0).evaluate(el=>el.matches(':focus-visible')&&getComputedStyle(el).outlineStyle!=='none'));
-        const popupPromise=page.waitForEvent('popup');await page.keyboard.press('Enter');
-        const popup=await popupPromise;await popup.waitForLoadState();
-        assert.equal(new URL(popup.url()).searchParams.get('url'),'recipe://bread');
-        assert(await popup.evaluate(()=>window.opener===null));await popup.close();
+        for(const link of [recipeLink(0),imageLink(0)]) {
+            await link.focus();await page.keyboard.press('Tab');await page.keyboard.press('Shift+Tab');
+            assert(await link.evaluate(el=>el.matches(':focus-visible')&&getComputedStyle(el).outlineStyle!=='none'));
+            const popupPromise=page.waitForEvent('popup');await page.keyboard.press('Enter');
+            const popup=await popupPromise;await popup.waitForLoadState();
+            assert.equal(new URL(popup.url()).searchParams.get('url'),'recipe://bread');
+            assert(await popup.evaluate(()=>window.opener===null));await popup.close();
+        }
         await context.unroute('**/recipe/edit?**');
         assert(await dialog.isVisible());assert.equal(posts.length,0);
         assert.equal(await dialog.evaluate(el=>JSON.stringify(el.mealPlanScheduleState.panel.draft)),beforeLink);
@@ -122,6 +138,7 @@ const {selectAuto, customPlan, selectCalendar} = require('./meal_planner_test_he
         await servings(custom(1)).fill('3');await notes(custom(1),'Soup only');
         await recipe(2).selectOption('');
         assert(await recipeLink(2).isHidden());assert.equal(await recipeLink(2).getAttribute('href'),null);
+        assert(await imageLink(2).isHidden());assert.equal(await image(2).getAttribute('src'),null);
         await save.click();
         assert.match(await row(2).locator('[data-meal-editor-error]').textContent(),/Recipe 3: Please select a recipe/);
         await selectAuto(recipe(2), 'recipe://rice');
@@ -130,6 +147,7 @@ const {selectAuto, customPlan, selectCalendar} = require('./meal_planner_test_he
         await row(0).locator('[data-meal-editor-remove]').click();
         assert.equal(await row(0).getAttribute('data-meal-editor'),ids[1]);
         assert.equal(new URL(await recipeLink(0).getAttribute('href'),base).searchParams.get('url'),'recipe://soup');
+        assert.equal(await image(0).getAttribute('alt'),'Soup recipe photo');await loaded(0);
         assert.equal(await servings(custom(0)).inputValue(),'3');assert.equal(await servings(shared).inputValue(),'9');
         await add();await selectAuto(recipe(2), 'recipe://bread');await add();
         assert.equal(await save.textContent(),'Save 3 Meals','Blank row is excluded from the total');
