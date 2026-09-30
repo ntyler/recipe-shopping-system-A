@@ -43,7 +43,7 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         await shared.getByRole('button',{name:'By family member',exact:true}).click();
         const portions=shared.locator('[data-schedule-field="family"][data-meal="dinner"]');
         for(const cell of await portions.all()) await cell.fill('1');
-        assert(await amount.isHidden()); // The shared family controls are the only portion inputs.
+        assert(await amount.isVisible());assert.equal(await amount.inputValue(),'2'); // The row reflects the shared family total.
         await third();assert.equal(await proposed.count(),4);assert(await apply.isEnabled());
         assert.match(await preview.textContent(),/4 meals across 4 days · 8 servings used · 0 remaining/);
         assert.match(await proposed.first().textContent(),/Sep 26, 2026 · dinner · 2 servings · Nate: 1 serving · Gary: 1 serving/);

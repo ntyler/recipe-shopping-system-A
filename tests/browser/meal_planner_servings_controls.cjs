@@ -9,7 +9,7 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
     // Flow: shared portions -> add/remove recipes -> distribute -> save/reopen.
     const browser = await chromium.launch({channel:process.env.AI_PANTRY_BROWSER_CHANNEL || 'chrome',headless:true});
     try {
-        const context = await browser.newContext({viewport:{width:1440,height:1100}});
+        const context = await browser.newContext({viewport:{width:1440,height:1100},hasTouch:true});
         await context.addCookies([cookie]);
         for (const name of ['Nate','Gary']) assert.equal((await context.request.post(base+'/api/meal-plan/members',{data:{name}})).status(),201);
         const page = await context.newPage(), errors = [], posts = [];
@@ -37,12 +37,44 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
             const dir=process.env.AI_PANTRY_BROWSER_ARTIFACTS;
             if(dir){fs.mkdirSync(dir,{recursive:true});await page.screenshot({path:path.join(dir,name)});}
         };
+        // One recipe: the row edits the same shared plan as the controls below.
+        for (const mobile of [false,true]) {
+            await page.setViewportSize(mobile?{width:390,height:844}:{width:1440,height:1100});
+            await open();await recipe(0).selectOption('recipe://bread');
+            await row(0).locator('[data-meal-yield-scale="2"]').click();
+            const dates=dateRange('2026-10-05','2026-10-12');
+            await selectDates(shared,dates);
+            assert(await amount(0).isVisible());assert.equal(await amount(0).inputValue(),'1');
+            assert.equal(await row(0).locator('[data-meal-table-planned]').textContent(),'8 / 16');
+            await amount(0).fill('2');
+            assert.equal(await household('dinner').inputValue(),'2');
+            assert.equal(await row(0).locator('[data-meal-table-planned]').textContent(),'16 / 16');
+            assert.equal(await shared.locator('.is-yield-short').count(),0);
+            assert.deepEqual(JSON.parse(await draft()).selectedDates,dates);
+            await household('dinner').fill('1.5');assert.equal(await amount(0).inputValue(),'1.5');
+            const more=row(0).locator('[data-meal-portion-step="1"]');
+            if(mobile)await more.tap();else{await amount(0).focus();await page.keyboard.press('Tab');assert(await more.evaluate(el=>el===document.activeElement));await page.keyboard.press('Space');}
+            assert.equal(await amount(0).inputValue(),'2');assert.equal(await household('dinner').inputValue(),'2');
+            await dialog.evaluate(el=>{el.scrollTop=0;});
+            assert(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth+1));
+            await screenshot(`servings-editable-single-${mobile?'mobile':'desktop'}.png`);
+            // A typed total also replaces varying day portions while retaining dates.
+            const day=shared.locator('[data-schedule-day="2026-10-06"]');
+            await day.locator('summary').click();
+            await day.locator('[data-schedule-field="day-household"][data-meal="dinner"]').fill('3');
+            assert.equal(await amount(0).inputValue(),'');assert.equal(await amount(0).getAttribute('placeholder'),'Varies');
+            await amount(0).fill('2');assert.equal(await household('dinner').inputValue(),'2');
+            assert.equal(await row(0).locator('[data-meal-table-planned]').textContent(),'16 / 16');
+            assert.deepEqual(JSON.parse(await draft()).selectedDates,dates);
+            assert.equal(posts.length,0);await cancel();
+        }
+        await page.setViewportSize({width:1440,height:1100});
         await open();
-        assert(await amount(0).isHidden());
+        assert(await amount(0).isVisible());
         assert.equal(await shared.locator('[data-schedule-servings-heading]').textContent(),'Servings per meal');
         await household('dinner').fill('2');
         await dialog.locator('[data-meal-editor-add]').click();
-        assert(await amount(0).isHidden(),'An empty recipe row does not expose a second servings control');
+        assert(await amount(0).isVisible(),'An empty recipe row keeps the selected recipe’s servings editable');
         assert.equal(await household('dinner').inputValue(),'2');
         await recipe(1).selectOption('recipe://bread');
         assert.equal(await amount(0).inputValue(),'2');assert.equal(await amount(1).inputValue(),'1');
@@ -56,10 +88,10 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         await amount(0).fill('1.5');await amount(1).fill('0.75');
         await dialog.evaluate(element=>{element.scrollTop=0;});await screenshot('servings-multiple-desktop.png');
         await row(1).locator('[data-meal-editor-remove]').click();
-        assert(await amount(0).isHidden());assert.equal(await household('dinner').inputValue(),'1.5');
+        assert(await amount(0).isVisible());assert.equal(await household('dinner').inputValue(),'1.5');
         await add('recipe://bread');assert.equal(await amount(0).inputValue(),'1.5');
         await amount(1).fill('0.5');await row(0).locator('[data-meal-editor-remove]').click();
-        assert(await amount(0).isHidden());assert.equal(await household('dinner').inputValue(),'0.5');
+        assert(await amount(0).isVisible());assert.equal(await household('dinner').inputValue(),'0.5');
         await cancel();
 
         // Unequal meal amounts and an individually adjusted day survive both transitions.
@@ -88,7 +120,7 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         await page.mouse.move(0,0);assert.equal(await draft(),beforeHover);
         await page.mouse.move(0,0);
         await shared.getByRole('button',{name:'Split recipe yield',exact:true}).click();
-        assert(await amount(0).isHidden());
+        assert(await amount(0).isVisible());
         assert.match(await row(0).locator('[data-meal-yield-remaining]').textContent(),/All servings/);
         await dialog.getByRole('button',{name:'Fill upcoming days for all',exact:true}).hover();
         assert(await apply.isEnabled());await page.mouse.move(0,0);
@@ -106,7 +138,7 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         await legacyCustomPlan(row(0));
         assert(await amount(0).isVisible(),'A custom recipe retains its own servings control');
         await amount(0).fill('2');await customPlan(dialog,0).locator('[data-meal-editor-reset]').click();
-        assert(await amount(0).isHidden());assert.equal(await family.nth(0).inputValue(),'0.5');
+        assert(await amount(0).isVisible());assert.equal(await family.nth(0).inputValue(),'0.5');
         await dialog.getByRole('button',{name:'Fill upcoming days for all',exact:true}).hover();
         assert.equal(await box.locator('[data-meal-shared-distribution-meals] li').count(),3);
         assert.match(await box.locator('[data-meal-shared-distribution-preview]').textContent(),/Last meal: 1 serving/);
@@ -115,7 +147,7 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         await page.setViewportSize({width:390,height:844});
         assert(await dialog.evaluate(element=>element.scrollWidth<=element.clientWidth+1));
         await family.first().scrollIntoViewIfNeeded();await screenshot('servings-single-mobile.png');
-        assert(await amount(0).isHidden());
+        assert(await amount(0).isVisible());
         const response=page.waitForResponse(res=>res.url().endsWith('/batches/bulk')&&res.request().method()==='POST');
         await save.click();const saved=await(await response).json();assert.equal(saved.ok,true);
         assert.deepEqual(saved.meals.map(meal=>meal.planned_servings),[1.5,1.5,1]);
@@ -123,6 +155,6 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
         await page.reload();await open();
         assert.equal(await household('dinner').inputValue(),'1.5','The preference keeps the normal portion, not the smaller final meal');
         assert.deepEqual(errors,[]);
-        console.log('PASS: one visible control, contextual labels, empty rows, preserving meal/day/family portions, both removal directions, over-budget validation, custom controls, yield split, hover, partial distribution, preferences, desktop/mobile');
+        console.log('PASS: synchronized row and shared controls, contextual labels, empty rows, preserving meal/day/family portions, both removal directions, over-budget validation, custom controls, yield split, hover, partial distribution, preferences, desktop/mobile');
     } finally {await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

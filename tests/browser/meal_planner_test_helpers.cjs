@@ -3,7 +3,7 @@ const selectAuto = async (recipe, value) => {
     await recipe.selectOption(value);
     const row=recipe.locator('xpath=ancestor::*[@data-meal-editor]');
     const dialog=row.locator('xpath=ancestor::dialog');
-    if (await row.locator('[data-meal-recipe-amount]').isHidden()) {
+    if (await row.evaluate(element=>mealPlannerUsesSharedPortions(element.closest('dialog').mealPlanScheduleState,element.mealPlannerEntry))) {
         await dialog.locator('[data-meal-shared-form]').getByRole('button',{name:'Split recipe yield',exact:true}).click();
     } else if (await row.evaluate(element=>Boolean(element.mealPlannerEntry.panel))) {
         const calendar=dialog.locator('#'+await row.evaluate(element=>element.mealPlannerEntry.overrideContainer.id));

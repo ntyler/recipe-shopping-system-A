@@ -207,6 +207,33 @@ M.setDates(entry.panel.draft,['2026-10-08']);entry.panel.render();assert.equal(a
 """)
 
 
+def test_single_recipe_row_servings_keep_shared_family_weights_and_recover_from_invalid_input():
+    run_dialog(r"""
+await open();const panel=await choose('recipe://bread'),state=activeDialog.mealPlanScheduleState,entry=state.entries[0];
+M.setPortionMode(panel.draft,'family');
+M.setFamilyDefault(panel.draft,'adult','dinner',{enabled:true,servings:1});
+M.setFamilyDefault(panel.draft,'child','dinner',{enabled:true,servings:0.5});panel.render();
+const original=JSON.stringify(panel.draft.familyDefaults);
+ctx.setMealPlannerRecipeServings(activeDialog,entry,'');
+assert.equal(JSON.stringify(panel.draft.familyDefaults),original,'Clearing the row keeps the underlying family weights');
+assert.equal(M.summary(ctx.mealPlannerRecipeDraft(state,entry)).valid,false);
+requests=[];await ctx.saveMealPlannerBatch();assert.equal(requests.length,0);
+ctx.setMealPlannerRecipeServings(activeDialog,entry,'3');
+assert.equal(Number(panel.draft.familyDefaults.adult.dinner.servings),2);
+assert.equal(Number(panel.draft.familyDefaults.child.dinner.servings),1);
+assert.equal(entry.servingsPerMeal,undefined);assert.equal(state.sharedPortionsEdited,true);
+ctx.setMealPlannerRecipeServings(activeDialog,entry,'');
+panel.updateField({dataset:{scheduleField:'family',member:'adult',meal:'dinner'},value:'2.5'});panel.render();
+assert.equal(entry.servingsPerMeal,undefined,'Editing shared portions clears the incomplete row override');
+assert.equal(Number(entry.root.querySelector('[data-meal-recipe-servings]').value),3.5);
+assert.equal(M.summary(ctx.mealPlannerRecipeDraft(state,entry)).valid,true);
+responseFactory=async()=>ok({batches:[],meals:[]});await ctx.saveMealPlannerBatch();
+assert.equal(requests.length,1);
+const parts=JSON.parse(requests[0].options.body).batches[0].allocations[0].member_portions;
+assert.deepEqual(parts.map(part=>part.servings),[2.5,1]);
+""")
+
+
 def test_clearing_second_recipe_restores_shared_portions_and_invalid_input_without_resetting():
     run_dialog(r"""
 await open();const panel=await choose('recipe://bread'),state=activeDialog.mealPlanScheduleState,first=state.entries[0];

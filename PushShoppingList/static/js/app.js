@@ -2046,7 +2046,14 @@ function setMealPlannerRecipeServings(dialog, entry, value) {
     delete entry.distributionDates;
     if (Number.isFinite(Number(value)) && Number(value) > 0) entry.lastServingsPerMeal = Number(value);
     if (mealPlannerUsesSharedPortions(state, entry)) {
-        adoptMealPlannerSharedPortions(state, entry, MealPlanSchedule.withMealServings(state.panel.draft, value));
+        state.sharedPortionsEdited = true;
+        if (Number.isFinite(Number(value)) && Number(value) > 0) {
+            adoptMealPlannerSharedPortions(state, entry, MealPlanSchedule.withMealServings(state.panel.draft, value));
+        } else {
+            // Keep family proportions intact while the row input is incomplete.
+            // Its temporary override still participates in draft validation.
+            entry.servingsPerMeal = value;
+        }
         state.panel.render();
     } else if (entry.panel) {
         if (Number.isFinite(Number(value)) && Number(value) > 0) {
@@ -2069,13 +2076,9 @@ function syncMealPlannerRecipeServings(entry, summary, state, busy) {
     if (!controls) return;
     controls.hidden = Boolean(state.edit || !entry.recipeUrl);
     const shared = mealPlannerUsesSharedPortions(state, entry);
-    entry.root.querySelector('[data-meal-recipe-amount]').hidden = shared;
     const input = entry.root.querySelector('[data-meal-recipe-servings]');
     const meals = summary.days.flatMap(day => day.meals);
     const uniform = meals.length && meals.every(meal => meal.planned_servings === meals[0].planned_servings);
-    const sharedAmount = entry.root.querySelector('[data-meal-shared-amount]');
-    sharedAmount.hidden = !shared;
-    sharedAmount.textContent = uniform ? formatMealPlannerServingNumber(meals[0].planned_servings) : meals.length ? 'Varies' : '—';
     entry.root.querySelector('[data-meal-table-mode]').textContent = shared ? 'Shared portions'
         : entry.panel ? 'Custom plan' : entry.servingsPerMeal !== undefined || entry.portionsDraft ? 'Manual' : 'Auto split';
     if (document.activeElement !== input) input.value = entry.servingsPerMeal ?? (uniform ? meals[0].planned_servings : '');
@@ -2087,7 +2090,7 @@ function syncMealPlannerRecipeServings(entry, summary, state, busy) {
         button.setAttribute('aria-label', `${button.dataset.mealPortionStep === '-1' ? 'Decrease' : 'Increase'} ${entry.title || 'recipe'} servings per meal`);
     });
     const help = entry.root.querySelector('[data-meal-portions-help]');
-    help.textContent = shared ? 'Set portions under “Who is eating?” below. Distribution uses those portions.'
+    help.textContent = shared ? 'Applies to every selected meal and updates “Who is eating?” below. Distribution uses these portions.'
         : entry.panel ? 'Applies to every meal in this recipe’s schedule.'
         : entry.servingsPerMeal !== undefined || entry.portionsDraft ? 'This recipe contributes these portions to the meal total. Dates follow the shared plan.'
         : state.panel.draft.portionMode === 'recipe' ? 'Auto split. This recipe’s yield is shared across the selected meals.'
@@ -3079,7 +3082,13 @@ function mealPlannerPanelOptions(dialog, entry, recipeTitle, defaultServings) {
             }
             syncMealPlannerScheduleControls(dialog, panel);
         },
-        onPortionsChange: () => { if (!entry) state.sharedPortionsEdited = true; },
+        onPortionsChange: () => {
+            if (!entry) {
+                state.sharedPortionsEdited = true;
+                const single = state.entries.find(item => mealPlannerUsesSharedPortions(state, item));
+                if (single) delete single.servingsPerMeal;
+            }
+        },
         onSubmit: () => saveMealPlannerBatch(),
         onCancel: () => closeMealPlannerDialog(),
         onMembersChanged: async () => {

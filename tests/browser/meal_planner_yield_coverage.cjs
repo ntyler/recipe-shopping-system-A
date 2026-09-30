@@ -73,7 +73,7 @@ const {selectAuto, customPlan, legacyCustomPlan} = require('./meal_planner_test_
         await amount.fill('1');
         await shared.locator('[data-schedule-field="household"][data-meal="dinner"]').fill('1');
         // Two entries of one recipe consume one yield and split a same-day shortfall.
-        assert(await row(0).locator('[data-meal-recipe-amount]').isHidden());
+        assert(await row(0).locator('[data-meal-recipe-amount]').isVisible());
         await dialog.locator('[data-meal-editor-add]').click();
         await selectAuto(row(1).locator('[name="recipe_url"]'), 'recipe://bread');
         assert.equal(await date(shared,'2026-10-03').locator('small').textContent(),'Short 1');
