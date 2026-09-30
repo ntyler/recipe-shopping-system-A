@@ -2904,8 +2904,9 @@ function addMealPlannerEditor() {
     });
     dialog.querySelector('[data-meal-editors]').appendChild(root);
     createMealPlannerEditor(dialog, root);
-    root.scrollIntoView({block: 'start'});
-    root.querySelector('[name="recipe_url"]').focus({preventScroll: true});
+    const picker = root.querySelector('[name="recipe_url"]');
+    picker.scrollIntoView({block: 'nearest', inline: 'nearest'});
+    picker.focus({preventScroll: true});
     return false;
 }
 
