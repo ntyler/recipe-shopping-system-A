@@ -836,17 +836,54 @@
                 <button type="button" onclick="return loadMealPlannerEdit('batch')"><strong>Edit entire prep plan</strong><span>Change the plan’s days, meals, people, portions, and prep tasks together.</span></button>
             </section>
             <section data-meal-recipes-section aria-label="Recipes to plan">
-            <div data-meal-editors>
-            <section class="app-meal-editor" data-meal-editor>
-            <div class="app-meal-editor-heading" data-meal-editor-heading>
-                <div><h4 data-meal-editor-number>Recipe 1</h4><a class="app-meal-recipe-link" data-meal-editor-recipe-link target="_blank" rel="noopener" hidden>View recipe <span aria-hidden="true">↗</span></a><p data-meal-editor-summary>Uses shared plan</p>
-                    <div class="app-meal-recipe-portions" data-meal-recipe-portions hidden>
-                        <label data-meal-recipe-amount><span>This recipe’s servings per meal</span><span class="app-meal-recipe-stepper">
-                            <button type="button" data-meal-portion-step="-1" aria-label="Decrease recipe servings">−</button>
-                            <input type="number" min="0" step="any" inputmode="decimal" data-meal-recipe-servings>
-                            <button type="button" data-meal-portion-step="1" aria-label="Increase recipe servings">+</button>
-                        </span></label>
-                        <small data-meal-portions-help></small>
+            <table class="app-meal-recipe-table" role="table">
+                <caption class="sr-only">Recipes to plan, their yields, servings per meal, and planned servings</caption>
+                <colgroup><col class="app-meal-recipe-column"><col class="app-meal-yield-column"><col class="app-meal-portions-column"><col class="app-meal-planned-column"><col class="app-meal-actions-column"></colgroup>
+                <thead role="rowgroup"><tr role="row">
+                    <th scope="col" role="columnheader">Recipe</th>
+                    <th scope="col" role="columnheader">Yield</th>
+                    <th scope="col" role="columnheader">Servings / meal</th>
+                    <th scope="col" role="columnheader">Planned</th>
+                    <th scope="col" role="columnheader"><span class="sr-only">Actions</span></th>
+                </tr></thead>
+                <tbody data-meal-editors role="rowgroup">
+                <tr class="app-meal-editor" data-meal-editor role="row">
+                    <td class="app-meal-recipe-cell" role="cell">
+                        <fieldset id="mealPlannerRecipeFields" data-meal-recipe-fields>
+                            <div class="app-meal-recipe-picker">
+                            <a class="app-meal-recipe-thumbnail" data-meal-editor-image-link target="_blank" rel="noopener" hidden>
+                                <img data-meal-editor-image width="56" height="56" alt="" decoding="async" hidden>
+                                <span data-meal-editor-image-empty>No image</span>
+                            </a>
+                            <label for="mealPlannerRecipe"><span class="sr-only">Recipe</span>
+                                <select id="mealPlannerRecipe" name="recipe_url" required aria-describedby="mealPlannerServingsHelp" onchange="return syncMealPlannerServingsFromRecipe(this)">
+                                    <option value="" data-default-servings="1" data-yield-label="">Choose a recipe</option>
+                                    {% for recipe in meal_plan_recipe_options %}
+                                        <option value="{{ recipe.url }}"
+                                                data-recipe-edit-url="{{ recipe_edit_page_url(recipe.url) }}#recipe-preview"
+                                                data-recipe-image-url="{{ recipe.image_url | default('') }}"
+                                                data-recipe-image-alt="{{ recipe.image_alt | default('') }}"
+                                                data-default-servings="{{ recipe.default_servings }}"
+                                                data-yield-servings="{{ recipe.yield_servings if recipe.yield_servings is defined and recipe.yield_servings else '' }}"
+                                                data-yield-label="{{ recipe.yield_label }}"
+                                                data-ingredient-requirements="{{ recipe.ingredient_requirements | tojson | forceescape }}">{{ recipe.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </label>
+                            </div>
+                            <div class="app-meal-editor-heading" data-meal-editor-heading>
+                                <h4 class="sr-only" data-meal-editor-number>Recipe 1</h4>
+                                <a class="app-meal-recipe-link" data-meal-editor-recipe-link target="_blank" rel="noopener" hidden>View recipe <span aria-hidden="true">↗</span></a>
+                                <p class="sr-only" data-meal-editor-summary>Uses shared plan</p>
+                            </div>
+                            <details class="app-meal-ingredient-options"
+                                     data-meal-ingredient-options
+                                     aria-live="polite"
+                                     hidden>
+                                <summary>Ingredient choices</summary>
+                                <div data-meal-ingredient-option-list></div>
+                            </details>
+                        </fieldset>
                         <div class="app-meal-distribution" data-meal-distribution hidden>
                             <div class="app-meal-distribution-toolbar" data-meal-distribution-toolbar>
                                 <fieldset data-meal-distribution-choices aria-label="Distribute recipe servings">
@@ -863,53 +900,45 @@
                             <details data-meal-distribution-review><summary>Review proposed meals</summary><ol data-meal-distribution-meals></ol></details>
                             <p class="app-dialog-helper" data-meal-distribution-help>Hover or focus an action to preview. Activate it to update the draft, then Save Meals.</p>
                         </div>
-                    </div>
-                    <div class="app-meal-yield-balance" data-meal-yield-balance aria-live="polite" aria-atomic="true" hidden>
-                        <strong data-meal-yield-remaining></strong><span data-meal-yield-planned></span>
-                    </div>
-                </div>
-                <div class="app-meal-editor-actions">
-                    <button type="button" class="app-page-secondary-action" data-meal-editor-remove hidden>Remove</button>
-                </div>
-            </div>
-            <fieldset id="mealPlannerRecipeFields" data-meal-recipe-fields>
-                <div class="app-meal-recipe-picker">
-                <a class="app-meal-recipe-thumbnail" data-meal-editor-image-link target="_blank" rel="noopener" hidden>
-                    <img data-meal-editor-image width="56" height="56" alt="" decoding="async" hidden>
-                    <span data-meal-editor-image-empty>No image</span>
-                </a>
-                <label for="mealPlannerRecipe"><span class="sr-only">Recipe</span>
-                    <select id="mealPlannerRecipe" name="recipe_url" required aria-describedby="mealPlannerServingsHelp" onchange="return syncMealPlannerServingsFromRecipe(this)">
-                        <option value="" data-default-servings="1" data-yield-label="">Choose a recipe</option>
-                        {% for recipe in meal_plan_recipe_options %}
-                            <option value="{{ recipe.url }}"
-                                    data-recipe-edit-url="{{ recipe_edit_page_url(recipe.url) }}#recipe-preview"
-                                    data-recipe-image-url="{{ recipe.image_url | default('') }}"
-                                    data-recipe-image-alt="{{ recipe.image_alt | default('') }}"
-                                    data-default-servings="{{ recipe.default_servings }}"
-                                    data-yield-servings="{{ recipe.yield_servings if recipe.yield_servings is defined and recipe.yield_servings else '' }}"
-                                    data-yield-label="{{ recipe.yield_label }}"
-                                    data-ingredient-requirements="{{ recipe.ingredient_requirements | tojson | forceescape }}">{{ recipe.name }}</option>
-                        {% endfor %}
-                    </select>
-                </label>
-                </div>
-                <details class="app-meal-ingredient-options"
-                         data-meal-ingredient-options
-                         aria-live="polite"
-                         hidden>
-                    <summary>Ingredient choices</summary>
-                    <div data-meal-ingredient-option-list></div>
-                </details>
-                <small id="mealPlannerServingsHelp" class="app-dialog-helper" data-meal-servings-help aria-live="polite">Select a recipe to use its default yield.</small>
-            </fieldset>
-            <div class="app-meal-override" data-meal-override-container hidden>
-                <div class="app-meal-override-heading"><p data-meal-custom-plan-title>Custom plan for this recipe</p><button type="button" class="app-page-secondary-action" data-meal-editor-reset>Use shared plan</button></div>
-                <div data-meal-override-form-host></div>
-            </div>
-            <p class="app-meal-editor-error" data-meal-editor-error role="alert" tabindex="-1" hidden></p>
-            </section>
-            </div>
+                        <div class="app-meal-override" data-meal-override-container hidden>
+                            <div class="app-meal-override-heading"><p data-meal-custom-plan-title>Custom plan for this recipe</p><button type="button" class="app-page-secondary-action" data-meal-editor-reset>Use shared plan</button></div>
+                            <div data-meal-override-form-host></div>
+                        </div>
+                        <p class="app-meal-editor-error" data-meal-editor-error role="alert" tabindex="-1" hidden></p>
+                    </td>
+                    <td class="app-meal-yield-cell" role="cell">
+                        <span class="app-meal-cell-label" aria-hidden="true">Yield</span>
+                        <strong class="app-meal-cell-value" data-meal-table-yield>—</strong>
+                        <small>servings</small>
+                        <small id="mealPlannerServingsHelp" class="sr-only" data-meal-servings-help aria-live="polite">Select a recipe to use its default yield.</small>
+                    </td>
+                    <td class="app-meal-portions-cell" role="cell">
+                        <span class="app-meal-cell-label" aria-hidden="true">Servings / meal</span>
+                        <div class="app-meal-recipe-portions" data-meal-recipe-portions hidden>
+                            <label data-meal-recipe-amount><span class="sr-only">This recipe’s servings per meal</span><span class="app-meal-recipe-stepper">
+                                <button type="button" data-meal-portion-step="-1" aria-label="Decrease recipe servings">−</button>
+                                <input type="number" min="0" step="any" inputmode="decimal" data-meal-recipe-servings>
+                                <button type="button" data-meal-portion-step="1" aria-label="Increase recipe servings">+</button>
+                            </span></label>
+                            <strong class="app-meal-cell-value" data-meal-shared-amount hidden></strong>
+                            <small data-meal-table-mode></small>
+                            <small class="sr-only" data-meal-portions-help></small>
+                        </div>
+                    </td>
+                    <td class="app-meal-planned-cell" role="cell">
+                        <span class="app-meal-cell-label" aria-hidden="true">Planned</span>
+                        <div class="app-meal-yield-balance" data-meal-yield-balance aria-live="polite" aria-atomic="true" hidden>
+                            <strong class="app-meal-cell-value" data-meal-table-planned aria-hidden="true"></strong>
+                            <small data-meal-table-balance aria-hidden="true"></small>
+                            <strong class="sr-only" data-meal-yield-remaining></strong><span class="sr-only" data-meal-yield-planned></span>
+                        </div>
+                    </td>
+                    <td class="app-meal-actions-cell" role="cell">
+                        <div class="app-meal-editor-actions"><button type="button" class="app-page-secondary-action" data-meal-editor-remove hidden>Remove</button></div>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
             <div class="app-meal-distribution app-meal-shared-distribution" data-meal-shared-distribution>
                 <div class="app-meal-distribution-toolbar">
                     <button type="button" class="app-page-secondary-action" data-meal-editor-add onclick="return addMealPlannerEditor()">+ Add another recipe</button>

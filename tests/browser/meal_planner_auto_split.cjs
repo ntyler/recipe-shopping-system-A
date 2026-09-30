@@ -92,6 +92,20 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
             }
             if(mobile) await automatic.tap();else await automatic.press('Enter');
             assert.equal(await amount(0).inputValue(),'1');assert.equal(await amount(1).inputValue(),'0.5');
+            assert.deepEqual(await dialog.locator('.app-meal-recipe-table th').allTextContents(),['Recipe','Yield','Servings / meal','Planned','Actions']);
+            assert.deepEqual(await dialog.locator('[data-meal-table-planned]').allTextContents(),['4 / 4','2 / 2']);
+            if(!mobile) {
+                const columns=await dialog.locator('[data-meal-editor]').evaluateAll(rows=>rows.map(row=>({
+                    height:row.getBoundingClientRect().height,
+                    left:[...row.cells].map(cell=>cell.getBoundingClientRect().left)
+                })));
+                assert.deepEqual(columns[0].left,columns[1].left,'Recipe rows use aligned columns');
+                assert(columns.every(row=>row.height<150),'The table keeps recipe rows compact');
+            }
+            const stepper=await row(0).locator('.app-meal-recipe-stepper').evaluate(element=>[...element.children].map(child=>{
+                const box=child.getBoundingClientRect();return {top:box.top,height:box.height};
+            }));
+            assert(stepper.every(box=>box.top===stepper[0].top&&box.height===stepper[0].height),'Portion controls align and have equal height');
             assert.equal(await shared.getByRole('button',{name:'Split recipe yield',exact:true}).getAttribute('aria-pressed'),'true');
             assert.match(await row(0).locator('[data-meal-yield-planned]').textContent(),/4 of 4 servings/);
             assert.match(await row(1).locator('[data-meal-yield-planned]').textContent(),/2 of 2 servings/);

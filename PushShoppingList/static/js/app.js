@@ -1979,18 +1979,28 @@ function updateMealPlannerYieldBalance(entry, summaries, editing) {
     const planned = box.querySelector('[data-meal-yield-planned]');
     const servingText = value => `${formatMealPlannerServingNumber(value)} ${value === 1 ? 'serving' : 'servings'}`;
     const total = MealPlanSchedule.sum(related.map(summary => summary.totalServings));
+    const compactPlanned = box.querySelector('[data-meal-table-planned]');
+    const compactBalance = box.querySelector('[data-meal-table-balance]');
+    compactPlanned.textContent = `${formatMealPlannerServingNumber(total)} / ${entry.yieldServings ? formatMealPlannerServingNumber(entry.yieldServings) : '—'}`;
+    compactBalance.textContent = '';
     box.dataset.state = 'unknown';
     if (related.some(summary => !summary.valid)) {
+        compactPlanned.textContent = 'Check portions';
+        compactBalance.textContent = 'Review the plan';
         remaining.textContent = 'Check portions to see what remains';
         planned.textContent = 'Resolve this recipe’s date or portion errors first.';
         return;
     }
     if (!entry.yieldServings) {
+        compactBalance.textContent = 'Yield unavailable';
         remaining.textContent = 'Recipe yield unavailable';
         planned.textContent = `${servingText(total)} planned. Add a recipe yield to calculate the balance.`;
         return;
     }
     const balance = MealPlanSchedule.sum([entry.yieldServings, -total]);
+    compactBalance.textContent = balance < 0 ? `${servingText(-balance)} over`
+        : balance ? `${servingText(balance)} left` : 'All planned';
+    if (related.length > 1) compactBalance.textContent += ` · ${related.length} entries`;
     planned.textContent = `${formatMealPlannerServingNumber(total)} of ${servingText(entry.yieldServings)} planned${related.length > 1 ? ` across ${related.length} entries` : ''}.`;
     if (balance < 0) {
         box.dataset.state = 'extra';
@@ -2061,6 +2071,11 @@ function syncMealPlannerRecipeServings(entry, summary, state, busy) {
     const input = entry.root.querySelector('[data-meal-recipe-servings]');
     const meals = summary.days.flatMap(day => day.meals);
     const uniform = meals.length && meals.every(meal => meal.planned_servings === meals[0].planned_servings);
+    const sharedAmount = entry.root.querySelector('[data-meal-shared-amount]');
+    sharedAmount.hidden = !shared;
+    sharedAmount.textContent = uniform ? formatMealPlannerServingNumber(meals[0].planned_servings) : meals.length ? 'Varies' : '—';
+    entry.root.querySelector('[data-meal-table-mode]').textContent = shared ? 'Shared portions'
+        : entry.panel ? 'Custom plan' : entry.servingsPerMeal !== undefined || entry.portionsDraft ? 'Manual' : 'Auto split';
     if (document.activeElement !== input) input.value = entry.servingsPerMeal ?? (uniform ? meals[0].planned_servings : '');
     input.placeholder = 'Varies';
     input.disabled = Boolean(busy || state.panel?.ui.loading || entry.panel?.ui.loading);
@@ -2617,6 +2632,7 @@ function syncMealPlannerBatchControls(dialog) {
         entry.root.querySelector('[data-meal-editor-heading]').hidden = Boolean(state.edit);
         entry.root.querySelector('[data-meal-editor-number]').textContent = `Recipe ${index + 1}`;
         const option = entry.root.querySelector('[name="recipe_url"]').selectedOptions[0];
+        entry.root.querySelector('[data-meal-table-yield]').textContent = entry.recipeUrl && entry.yieldServings ? formatMealPlannerServingNumber(entry.yieldServings) : '—';
         const recipeEditUrl = entry.recipeUrl && option?.dataset.recipeEditUrl;
         for (const selector of ['[data-meal-editor-recipe-link]', '[data-meal-editor-image-link]']) {
             const link = entry.root.querySelector(selector);
