@@ -871,9 +871,8 @@
                                 </select>
                             </label>
                             </div>
-                            <div class="app-meal-editor-heading" data-meal-editor-heading>
+                            <div class="app-meal-editor-heading sr-only" data-meal-editor-heading>
                                 <h4 class="sr-only" data-meal-editor-number>Recipe 1</h4>
-                                <a class="app-meal-recipe-link" data-meal-editor-recipe-link target="_blank" rel="noopener" hidden>View recipe <span aria-hidden="true">↗</span></a>
                                 <p class="sr-only" data-meal-editor-summary>Uses shared plan</p>
                             </div>
                             <details class="app-meal-ingredient-options"
@@ -914,12 +913,12 @@
                                 <input type="number" min="0.01" step="any" inputmode="decimal" data-meal-table-yield aria-describedby="mealPlannerServingsHelp">
                                 <button type="button" data-meal-yield-step="1" aria-label="Increase recipe yield">+</button>
                             </span></label>
-                            <small>servings for this plan</small>
                             <div class="app-meal-yield-scales" role="group" aria-label="Recipe yield scale">
                                 <button type="button" data-meal-yield-scale="1" aria-pressed="false">1×</button>
                                 <button type="button" data-meal-yield-scale="2" aria-pressed="false">2×</button>
                                 <button type="button" data-meal-yield-scale="3" aria-pressed="false">3×</button>
                             </div>
+                            <small>servings for this plan</small>
                             <small data-meal-yield-error role="alert" hidden></small>
                         </div>
                         <small id="mealPlannerServingsHelp" class="sr-only" data-meal-servings-help aria-live="polite">Select a recipe to use its default yield.</small>

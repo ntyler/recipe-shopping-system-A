@@ -35,7 +35,7 @@ const {selectAuto, customPlan, selectCalendar, legacyCustomPlan, selectDates, da
         const notes=async(form,value)=>{if(!await note(form).isVisible())await form.locator('[data-schedule-section="notes"] > summary').click();await note(form).fill(value);};
         const screenshot=async name=>{const dir=process.env.AI_PANTRY_BROWSER_ARTIFACTS;if(dir){fs.mkdirSync(dir,{recursive:true});await page.screenshot({path:path.join(dir,name)});}};
         await open();
-        assert(await row(0).locator('[data-meal-editor-recipe-link]').isHidden());
+        assert.equal(await dialog.locator('[data-meal-editor-recipe-link]').count(),0);
         assert(await imageLink(0).isHidden());
         // A broken cover uses the same compact placeholder as an absent cover.
         await context.route('**/qa-static/images/ai-pantry-home-hero.png',route=>route.fulfill({status:200,contentType:'image/png',body:'invalid image'}));
@@ -71,7 +71,7 @@ const {selectAuto, customPlan, selectCalendar, legacyCustomPlan, selectDates, da
         assert.notEqual(await image(0).getAttribute('src'),await image(1).getAttribute('src'));
         assert(await image(2).isHidden());assert(await row(2).getByText('No image',{exact:true}).isVisible());
         // Recipe editor links keep the current planner and its unsaved draft open.
-        const recipeLink=i=>row(i).locator('[data-meal-editor-recipe-link]');
+        const recipeLink=imageLink;
         for(const [i,value] of ['bread','soup','rice'].entries()) {
             const url=new URL(await recipeLink(i).getAttribute('href'),base);
             assert.equal(url.origin,base);assert.equal(url.pathname,'/recipe/edit');
@@ -85,12 +85,13 @@ const {selectAuto, customPlan, selectCalendar, legacyCustomPlan, selectDates, da
         // Isolate the editor document: this scenario verifies navigation and draft
         // preservation; recipe-editor routes have their own integration tests.
         await context.route('**/recipe/edit?**',route=>route.fulfill({status:200,contentType:'text/html',body:'<title>Recipe editor navigation</title><h1>Recipe editor</h1>'}));
-        for(const link of [recipeLink(0),imageLink(0)]) {
+        for(const index of [0,2]) {
+            const link=recipeLink(index);
             await link.focus();await page.keyboard.press('Tab');await page.keyboard.press('Shift+Tab');
             assert(await link.evaluate(el=>el.matches(':focus-visible')&&getComputedStyle(el).outlineStyle!=='none'));
             const popupPromise=page.waitForEvent('popup');await page.keyboard.press('Enter');
             const popup=await popupPromise;await popup.waitForLoadState();
-            assert.equal(new URL(popup.url()).searchParams.get('url'),'recipe://bread');
+            assert.equal(new URL(popup.url()).searchParams.get('url'),index===0?'recipe://bread':'recipe://rice');
             assert.equal(new URL(popup.url()).hash,'#recipe-preview');
             assert(await popup.evaluate(()=>window.opener===null));await popup.close();
         }

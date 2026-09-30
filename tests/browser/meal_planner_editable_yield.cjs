@@ -74,6 +74,12 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
                 const box=button.getBoundingClientRect();return {width:box.width,height:box.height};
             }));
             assert(controls.every(box=>box.width>=44&&box.height>=44),'Yield controls have touch targets');
+            if(!mobile) {
+                const stepper=await row(0).locator('.app-meal-yield-stepper').boundingBox();
+                const scales=await row(0).locator('.app-meal-yield-scales').boundingBox();
+                assert.equal(scales.y,stepper.y,'Yield shortcuts align beside the servings input');
+                assert(scales.x>=stepper.x+stepper.width,'Yield shortcuts do not overlap the servings input');
+            }
             const dir=process.env.AI_PANTRY_BROWSER_ARTIFACTS;
             if(dir){fs.mkdirSync(dir,{recursive:true});await page.screenshot({path:path.join(dir,`editable-yield-${mobile?'mobile':'desktop'}.png`)});}
             await add('recipe://soup');assert.equal(await yieldInput(2).inputValue(),'8');

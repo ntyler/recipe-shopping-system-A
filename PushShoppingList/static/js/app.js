@@ -2690,18 +2690,16 @@ function syncMealPlannerBatchControls(dialog) {
         const option = entry.root.querySelector('[name="recipe_url"]').selectedOptions[0];
         syncMealPlannerRecipeYield(entry, state, busy);
         const recipeEditUrl = entry.recipeUrl && option?.dataset.recipeEditUrl;
-        for (const selector of ['[data-meal-editor-recipe-link]', '[data-meal-editor-image-link]']) {
-            const link = entry.root.querySelector(selector);
-            link.hidden = !recipeEditUrl;
-            if (recipeEditUrl) {
-                link.setAttribute('href', recipeEditUrl);
-                link.setAttribute('aria-label', `View recipe: ${entry.title} (opens in a new tab)`);
-                link.title = `View ${entry.title} in a new tab`;
-            } else {
-                link.removeAttribute('href');
-                link.removeAttribute('aria-label');
-                link.removeAttribute('title');
-            }
+        const link = entry.root.querySelector('[data-meal-editor-image-link]');
+        link.hidden = !recipeEditUrl;
+        if (recipeEditUrl) {
+            link.setAttribute('href', recipeEditUrl);
+            link.setAttribute('aria-label', `View recipe: ${entry.title} (opens in a new tab)`);
+            link.title = `View ${entry.title} in a new tab`;
+        } else {
+            link.removeAttribute('href');
+            link.removeAttribute('aria-label');
+            link.removeAttribute('title');
         }
         const image = entry.root.querySelector('[data-meal-editor-image]');
         const imageUrl = entry.recipeUrl && option?.dataset.recipeImageUrl || '';
