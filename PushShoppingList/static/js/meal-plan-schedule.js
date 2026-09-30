@@ -375,6 +375,19 @@
             else day.household[meal] = amount;
             return {date, meal_type:meal, planned_servings:amount};
         });
+        if (mode === 'spread') {
+            // The visible defaults should describe the new split. Day-specific
+            // people and the exact final rounding remainder stay on their days.
+            const seeded = new Set();
+            allocations.forEach(({date, meal_type:meal, planned_servings:amount}) => {
+                if (seeded.has(meal)) return;
+                draft.householdDefaults[meal] = amount;
+                if (draft.portionMode === 'family') draft.members.forEach(member => {
+                    draft.familyDefaults[member.id][meal] = clone(draft.days[date].family[member.id][meal]);
+                });
+                seeded.add(meal);
+            });
+        }
         setDates(draft, allocations.map(meal => meal.date));
         const result = summary(draft);
         if (!result.valid) throw new Error(result.errors[0]);

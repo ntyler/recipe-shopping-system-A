@@ -2230,7 +2230,9 @@ function mealPlannerSharedDistributionPreview(state, mode = 'keep') {
     }
     shared.forEach(entry => {
         try {
-            results.set(entry, MealPlanSchedule.distributeRecipeServings(sources.get(entry), budgets.get(entry), {mode, useScheduledPortions:true}));
+            results.set(entry, MealPlanSchedule.distributeRecipeServings(sources.get(entry), budgets.get(entry), {
+                mode:mode === 'keep' ? 'spread' : mode, useScheduledPortions:true,
+            }));
         } catch (error) { throw new Error(named(entry, error.message)); }
     });
     const schedule = JSON.parse(JSON.stringify(state.panel.draft));
@@ -2240,7 +2242,9 @@ function mealPlannerSharedDistributionPreview(state, mode = 'keep') {
     }
     const proposedEntries = entries.map(entry => results.has(entry) ? {...entry,
         portionsDraft:results.get(entry).draft, distributionDates:schedule.selectedDates, servingsPerMeal:undefined} : entry);
-    const projected = {...state, panel:{...state.panel, draft:schedule}, entries:proposedEntries};
+    // Spreading full yields establishes new meal totals. Derive each completed
+    // recipe first, then validate against their combined totals below.
+    const projected = {...state, panel:{...state.panel, draft:mode === 'keep' ? {...schedule, portionMode:'recipe'} : schedule}, entries:proposedEntries};
     const projectedSummaries = new Map(entries.map((entry, index) => {
         const total = MealPlanSchedule.summary(mealPlannerRecipeDraft(projected, proposedEntries[index]));
         if (!total.valid) throw new Error(named(entry, total.errors[0]));
@@ -2255,6 +2259,7 @@ function mealPlannerSharedDistributionPreview(state, mode = 'keep') {
     projectedSummaries.forEach(total => total.days.forEach(day => {
         mealsByDate.set(day.date, [...(mealsByDate.get(day.date) || []), ...day.meals]);
     }));
+    const seededDefaults = new Set();
     draft.selectedDates.forEach(date => {
         const day = draft.days[date];
         MealPlanSchedule.MEAL_TYPES.forEach(type => {
@@ -2269,7 +2274,7 @@ function mealPlannerSharedDistributionPreview(state, mode = 'keep') {
                 const named = new Map(draft.members.map(member => [member.id, MealPlanSchedule.sum(meals.flatMap(meal =>
                     meal.member_portions.filter(part => part.member_id === member.id).map(part => part.servings)))]));
                 const people = (target?.member_portions || []).map(part => ({...part,
-                    servings:Math.max(0, MealPlanSchedule.sum([part.servings, -(named.get(part.member_id) || 0)]))})).filter(part => part.servings > 0);
+                    servings:mode === 'keep' ? part.servings : Math.max(0, MealPlanSchedule.sum([part.servings, -(named.get(part.member_id) || 0)]))})).filter(part => part.servings > 0);
                 const total = MealPlanSchedule.sum(people.map(part => part.servings));
                 let allocated = 0;
                 draft.members.forEach(member => {
@@ -2280,6 +2285,13 @@ function mealPlannerSharedDistributionPreview(state, mode = 'keep') {
                     const servings = MealPlanSchedule.sum([share, named.get(member.id)]);
                     day.family[member.id][type] = {enabled:servings > 0, servings:servings || day.family[member.id][type].servings};
                 });
+            }
+            if (mode === 'keep' && meals.length && !seededDefaults.has(type)) {
+                draft.householdDefaults[type] = day.household[type];
+                if (draft.portionMode === 'family') draft.members.forEach(member => {
+                    draft.familyDefaults[member.id][type] = {...day.family[member.id][type]};
+                });
+                seededDefaults.add(type);
             }
         });
         day.overrides.meals = true;
@@ -2292,6 +2304,14 @@ function mealPlannerSharedDistributionPreview(state, mode = 'keep') {
     }
     const totals = MealPlanSchedule.summary(draft);
     if (!totals.valid) throw new Error(totals.errors[0]);
+    if (mode === 'keep') {
+        const completed = {...projected, panel:{...state.panel, draft}};
+        proposedEntries.forEach((entry, index) => {
+            const total = MealPlanSchedule.summary(mealPlannerRecipeDraft(completed, entry));
+            if (!total.valid) throw new Error(named(entries[index], total.errors[0]));
+            projectedSummaries.set(entries[index], total);
+        });
+    }
     const allocations = totals.days.flatMap(day => day.meals.map(meal => ({date:day.date, ...meal})));
     return {draft, allocations, sources, results, projectedSummaries,
         usedServings:MealPlanSchedule.sum([...results.values()].map(result => result.usedServings)),
@@ -2414,7 +2434,9 @@ function syncMealPlannerSharedDistribution(dialog, state, busy) {
         const mode = button.dataset.mealSharedDistributionMode;
         button.disabled = disabled;
         button.setAttribute('aria-disabled', String(disabled || Boolean(choices.get(mode).error)));
-        button.title = choices.get(mode).error?.message || '';
+        button.title = choices.get(mode).error?.message || (mode === 'keep'
+            ? 'Spread each recipe’s planned yield across the selected meals.'
+            : 'Fill upcoming days using the current servings per meal.');
         if (button.mealDistributionBound) return;
         button.mealDistributionBound = true;
         const preview = (key, active) => {

@@ -271,7 +271,7 @@ ctx.applyMealPlannerSharedDistribution(activeDialog,MODE);
 assert.equal(requests.length,0);
 const payloads=()=>plain(state.entries.map(entry=>M.payload(ctx.mealPlannerRecipeDraft(state,entry))));
 const applied=payloads();assert.deepEqual(applied.map(plan=>plan.allocations.length),MODE==='upcoming'?[4,12]:[1,1]);
-assert(applied.every(plan=>plan.allocations.every(meal=>meal.planned_servings===1)));
+assert(applied.every((plan,index)=>plan.allocations.every(meal=>meal.planned_servings===(MODE==='upcoming'?1:[4,12][index]))));
 assert.equal(applied[0].allocations[0].date,'2026-09-26');
 ctx.applyMealPlannerSharedDistribution(activeDialog,MODE);assert.deepEqual(payloads(),applied);
 assert.equal(requests.length,0);responseFactory=async()=>ok({batches:[],meals:[]});await ctx.saveMealPlannerBatch();
@@ -732,16 +732,16 @@ shared.draft.notes='Keep shared notes';shared.draft.prepSteps=[{date:'2026-10-04
 const snapshot=()=>JSON.stringify([shared.draft,...state.entries.map(e=>[e.servingsPerMeal,e.portionsDraft,e.distributionSource,e.distributionDates,e.panel?.draft])]);
 requests=[];const before=snapshot();const preview=ctx.mealPlannerSharedDistributionPreview(state,MODE);
 assert.equal(snapshot(),before,'Preview never mutates draft state');assert.equal(requests.length,0);
-assert.deepEqual([...preview.results.values()].map(p=>p.usedServings),MODE==='upcoming'?[12,4]:[4,2]);
-assert.equal(preview.results.get(bread).allocations[0].planned_servings,2);
-assert.equal(preview.results.get(soup).allocations[0].planned_servings,1);
+assert.deepEqual([...preview.results.values()].map(p=>p.usedServings),[12,4]);
+assert.equal(preview.results.get(bread).allocations[0].planned_servings,MODE==='upcoming'?2:6);
+assert.equal(preview.results.get(soup).allocations[0].planned_servings,MODE==='upcoming'?1:2);
 ctx.applyMealPlannerSharedDistribution(activeDialog,MODE);
 assert.equal(requests.length,0);assert(state.entries.every(e=>!e.panel));
 assert.equal(shared.draft.notes,'Keep shared notes');assert.equal(shared.draft.prepSteps[0].instruction,'Cook ahead');
 const planned=()=>JSON.stringify([shared.draft,...state.entries.map(e=>M.payload(ctx.mealPlannerRecipeDraft(state,e)))]);
 const after=planned();ctx.applyMealPlannerSharedDistribution(activeDialog,MODE);assert.equal(planned(),after,'Repeated activation is idempotent');
 const amounts=state.entries.map(e=>M.payload(ctx.mealPlannerRecipeDraft(state,e)).allocations.map(a=>a.planned_servings));
-assert.deepEqual(plain(amounts),MODE==='upcoming'?[[2,2,2,2,2,2],[1,1,1,1]]:[[2,2],[1,1]]);
+assert.deepEqual(plain(amounts),MODE==='upcoming'?[[2,2,2,2,2,2],[1,1,1,1]]:[[6,6],[2,2]]);
 if(MODE==='keep')assert.deepEqual(plain(shared.draft.selectedDates),['2026-10-05','2026-10-07']);
 soup.yieldServings=null;const valid=snapshot();ctx.applyMealPlannerSharedDistribution(activeDialog,'upcoming');
 assert.equal(snapshot(),valid);assert.match(activeDialog.querySelector('[data-meal-shared-distribution-preview]').textContent,/Recipe 2.*yield/);
@@ -751,7 +751,8 @@ assert.equal(JSON.parse(requests[0].options.body).batches.length,2);
 """.replace('MODE', repr(mode)))
 
 
-def test_merged_distribution_shares_duplicate_yield_and_preserves_custom_schedule():
+@pytest.mark.parametrize('mode', ['upcoming', 'keep'])
+def test_merged_distribution_shares_duplicate_yield_and_preserves_custom_schedule(mode):
     run_dialog(r"""
 await open();const shared=await choose('recipe://soup'),state=activeDialog.mealPlanScheduleState;
 M.setHouseholdDefault(shared.draft,'dinner',2);
@@ -760,16 +761,65 @@ const second=add();ctx.setMealPlannerRecipeServings(activeDialog,state.entries[0
 const custom=add();ctx.customizeMealPlannerRecipe(activeDialog,custom);
 M.setDates(custom.panel.draft,['2026-10-04']);M.setHouseholdDefault(custom.panel.draft,'dinner',1);custom.panel.draft.notes='Custom only';
 const customBefore=JSON.stringify(custom.panel.draft);requests=[];
-const preview=ctx.mealPlannerSharedDistributionPreview(state,'upcoming');
+const preview=ctx.mealPlannerSharedDistributionPreview(state,MODE);
 assert.deepEqual([...preview.results.values()].map(p=>p.usedServings),[1.5,1.5]);
-ctx.applyMealPlannerSharedDistribution(activeDialog,'upcoming');
+ctx.applyMealPlannerSharedDistribution(activeDialog,MODE);
 assert.equal(JSON.stringify(custom.panel.draft),customBefore);assert.equal(requests.length,0);
 const totals=state.entries.map(e=>M.summary(ctx.mealPlannerRecipeDraft(state,e)).totalServings);
 assert.deepEqual(plain(totals),[1.5,1.5,1]);assert.equal(M.sum(totals),4);
-const before=JSON.stringify(shared.draft);ctx.applyMealPlannerSharedDistribution(activeDialog,'upcoming');assert.equal(JSON.stringify(shared.draft),before);
+const before=JSON.stringify(shared.draft);ctx.applyMealPlannerSharedDistribution(activeDialog,MODE);assert.equal(JSON.stringify(shared.draft),before);
 M.setDates(shared.draft,['2026-10-07']);shared.render();
 assert.deepEqual(plain(M.payload(ctx.mealPlannerRecipeDraft(state,second)).allocations.map(a=>a.date)),['2026-10-07']);
 assert.equal(JSON.stringify(custom.panel.draft),customBefore);
+""".replace('MODE', repr(mode)))
+
+
+def test_selected_days_spreads_scaled_yield_updates_visible_portions_and_saves_only_on_request():
+    run_dialog(r"""
+await open('2026-09-29','lunch');const shared=await choose('recipe://soup'),state=activeDialog.mealPlanScheduleState,entry=state.entries[0];
+const dates=['2026-09-29','2026-09-30','2026-10-01','2026-10-02','2026-10-03'];
+M.setDates(shared.draft,dates);ctx.setMealPlannerRecipeYield(activeDialog,entry,12);
+M.setDayNotes(shared.draft,dates[2],'Pack separately');shared.draft.notes='Chill after cooking';shared.render();
+const before=JSON.stringify(shared.draft);requests=[];
+const preview=ctx.mealPlannerSharedDistributionPreview(state,'keep');
+assert.equal(JSON.stringify(shared.draft),before);assert.equal(preview.usedServings,12);assert.equal(preview.remainingServings,0);
+assert.deepEqual(plain(preview.allocations.map(meal=>meal.planned_servings)),[2.4,2.4,2.4,2.4,2.4]);
+assert.deepEqual(plain(preview.draft.selectedDates),dates);
+ctx.applyMealPlannerSharedDistribution(activeDialog,'keep');
+assert.equal(Number(entry.root.querySelector('[data-meal-recipe-servings]').value),2.4);
+assert.equal(Number(shared.draft.householdDefaults.lunch),2.4);
+assert.equal(shared.draft.days[dates[2]].notes,'Pack separately');assert.equal(shared.draft.notes,'Chill after cooking');
+assert.equal(entry.root.querySelector('[data-meal-table-planned]').textContent,'12 / 12');assert.equal(requests.length,0);
+const applied=JSON.stringify(shared.draft);ctx.applyMealPlannerSharedDistribution(activeDialog,'keep');assert.equal(JSON.stringify(shared.draft),applied);
+responseFactory=async()=>ok({batches:[],meals:[]});await ctx.saveMealPlannerBatch();assert.equal(requests.length,1);
+const meals=JSON.parse(requests[0].options.body).batches[0].allocations;
+assert.deepEqual(meals.map(meal=>meal.date),dates);assert.deepEqual(meals.map(meal=>meal.planned_servings),[2.4,2.4,2.4,2.4,2.4]);
+""")
+
+
+def test_selected_days_spreads_across_meal_slots_and_preserves_family_day_choices():
+    run_dialog(r"""
+await open();const shared=await choose('recipe://soup'),state=activeDialog.mealPlanScheduleState,entry=state.entries[0];
+ctx.setMealPlannerRecipeYield(activeDialog,entry,12);
+const dates=['2026-10-05','2026-10-07','2026-10-09','2026-10-12','2026-10-14'];
+M.setDates(shared.draft,dates);M.setMeals(shared.draft,['lunch','dinner']);M.setPortionMode(shared.draft,'family');
+for(const meal of ['lunch','dinner']){
+ M.setFamilyDefault(shared.draft,'adult',meal,{enabled:true,servings:1.5});
+ M.setFamilyDefault(shared.draft,'child',meal,{enabled:true,servings:0.5});
+}
+M.setDayMeal(shared.draft,dates[1],'lunch',false);
+M.setDayFamily(shared.draft,dates[2],'child','dinner',{enabled:false});shared.render();
+const before=JSON.stringify(shared.draft),preview=ctx.mealPlannerSharedDistributionPreview(state,'keep');
+assert.equal(JSON.stringify(shared.draft),before);assert.equal(preview.allocations.length,9);
+assert.equal(preview.usedServings,12);assert.equal(preview.remainingServings,0);
+ctx.applyMealPlannerSharedDistribution(activeDialog,'keep');
+assert.deepEqual(plain(shared.draft.selectedDates),dates);assert.equal(shared.draft.days[dates[1]].mealEnabled.lunch,false);
+assert.equal(shared.draft.days[dates[2]].family.child.dinner.enabled,false);
+const meals=M.payload(shared.draft).allocations;
+assert.equal(M.sum(meals.flatMap(meal=>meal.member_portions.map(part=>part.servings))),12);
+assert(meals.slice(0,-1).every(meal=>M.sum(meal.member_portions.map(part=>part.servings))===1.333333));
+assert.equal(M.sum(meals.at(-1).member_portions.map(part=>part.servings)),1.333336);
+const applied=JSON.stringify(shared.draft);ctx.applyMealPlannerSharedDistribution(activeDialog,'keep');assert.equal(JSON.stringify(shared.draft),applied);
 """)
 
 
@@ -805,8 +855,9 @@ M.setPortionMode(shared.draft,'family');M.setFamilyDefault(shared.draft,'adult',
 ctx.addMealPlannerEditor();const custom=state.entries[1];custom.root.querySelector('[name="recipe_url"]').value='recipe://bread';ctx.syncMealPlannerServingsFromRecipe(custom.root.querySelector('[name="recipe_url"]'));
 ctx.customizeMealPlannerRecipe(activeDialog,custom);M.setPortionMode(custom.panel.draft,'household');M.setHouseholdDefault(custom.panel.draft,'dinner',1);autoSplit(state.entries[0]);
 const customBefore=JSON.stringify(custom.panel.draft);const preview=ctx.mealPlannerSharedDistributionPreview(state,'keep');
-assert.equal(M.summary(preview.draft).totalServings,3);
-assert.deepEqual(plain(M.summary(preview.draft).memberTotals),{adult:2,child:1});
+assert.equal(M.summary(preview.draft).totalServings,5,'The shared recipe uses all four servings, plus the custom recipe’s one serving');
+const memberTotals=M.summary(preview.draft).memberTotals;
+assert(Math.abs(memberTotals.adult-10/3)<0.00001);assert(Math.abs(memberTotals.child-5/3)<0.00001);
 ctx.applyMealPlannerSharedDistribution(activeDialog,'keep');assert.equal(JSON.stringify(custom.panel.draft),customBefore);
 assert.equal(M.summary(ctx.mealPlannerRecipeDraft(state,state.entries[0])).valid,true);
 M.setMeals(custom.panel.draft,['lunch']);M.setHouseholdDefault(custom.panel.draft,'lunch',1);

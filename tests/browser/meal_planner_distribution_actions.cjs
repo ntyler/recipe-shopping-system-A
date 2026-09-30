@@ -73,14 +73,16 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
             if(mobile) await save.tap();else await save.click();
             const saved=await(await response).json();assert.equal(saved.ok,true);assert.equal(saved.meals.length,4);assert.equal(posts.length,1);
 
-            // Preserve nonconsecutive dates and portions when applying selected days.
+            // Spread the full yield across nonconsecutive selected dates.
             await open();
             await shared.locator('[data-schedule-action="date"][data-date="2026-10-07"]').click();
             await shared.locator('[data-schedule-field="household"][data-meal="dinner"]').fill('1.5');
             if(mobile) await action('keep').tap();else await action('keep').press('Enter');
             assert.deepEqual(JSON.parse(await draft()).selectedDates,['2026-10-05','2026-10-07']);
             assert.equal(await save.textContent(),'Save 2 Meals');
-            assert.match(await row(0).locator('[data-meal-yield-remaining]').textContent(),/1 serving left/);
+            assert.match(await row(0).locator('[data-meal-yield-remaining]').textContent(),/All servings/);
+            assert.equal(await row(0).locator('[data-meal-recipe-servings]').inputValue(),'2');
+            assert.equal(await shared.locator('[data-schedule-field="household"][data-meal="dinner"]').inputValue(),'2');
             await dialog.locator('[data-meal-batch-footer]').getByRole('button',{name:'Cancel',exact:true}).click();
 
             // Selecting two recipes with their default portions must work
@@ -171,6 +173,33 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
             assert.match(await dialog.locator('[data-meal-batch-help]').textContent(),/4 servings/);
             assert.equal(await dialog.locator('[data-meal-editor-form]').count(),1);
             assert(await dialog.evaluate(element=>element.scrollWidth<=element.clientWidth+1));
+            await dialog.locator('[data-meal-batch-footer]').getByRole('button',{name:'Cancel',exact:true}).click();
+
+            // Screenshot reproduction: 12 servings, five selected lunches, 2.4 each.
+            await open();
+            const splitDates=mobile?['2026-10-19','2026-10-20','2026-10-21','2026-10-22','2026-10-23']:['2026-09-29','2026-09-30','2026-10-01','2026-10-02','2026-10-03'];
+            await selectDates(shared,splitDates);
+            await shared.locator('[data-schedule-field="meal"][data-meal="lunch"]').check();
+            await shared.locator('[data-schedule-field="meal"][data-meal="dinner"]').uncheck();
+            await row(0).locator('[data-meal-yield-scale="3"]').click();
+            const splitBefore=await draft(),splitPosts=posts.length;
+            if(!mobile){await action('keep').hover();assert.equal(await draft(),splitBefore);assert.match(await toolbar.locator('[data-meal-shared-distribution-preview]').textContent(),/12 servings used · 0 remaining/);}
+            if(mobile)await action('keep').tap();else await action('keep').press('Enter');
+            assert.deepEqual(JSON.parse(await draft()).selectedDates,splitDates);
+            assert.equal(await row(0).locator('[data-meal-recipe-servings]').inputValue(),'2.4');
+            assert.equal(await shared.locator('[data-schedule-field="household"][data-meal="lunch"]').inputValue(),'2.4');
+            assert.equal(await row(0).locator('[data-meal-table-planned]').textContent(),'12 / 12');
+            assert.equal(await shared.locator('.is-yield-short').count(),0);assert.equal(posts.length,splitPosts);
+            const splitApplied=await draft();if(mobile)await action('keep').tap();else await action('keep').press('Space');
+            assert.equal(await draft(),splitApplied);
+            await dialog.evaluate(element=>{element.scrollTop=0;});
+            if(dir)await page.screenshot({path:path.join(dir,`selected-days-full-yield-${mobile?'mobile':'desktop'}.png`)});
+            const splitResponse=page.waitForResponse(res=>res.url().endsWith('/batches/bulk')&&res.request().method()==='POST');
+            await save.click();const splitSaved=await(await splitResponse).json();assert.equal(splitSaved.ok,true);
+            assert.equal(posts.length,splitPosts+1);
+            assert.deepEqual(posts.at(-1).batches[0].allocations.map(meal=>meal.planned_servings),[2.4,2.4,2.4,2.4,2.4]);
+            assert.deepEqual(posts.at(-1).batches[0].allocations.map(meal=>meal.date),splitDates);
+
             assert.deepEqual(errors,[]);await context.close();
         }
         console.log('PASS: direct buttons, hover/focus/leave, Enter/Space, first-tap mobile, repeated activation, save boundary, selected dates, distinct and merged custom strategies, clean console');
