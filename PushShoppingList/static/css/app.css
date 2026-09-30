@@ -33718,6 +33718,12 @@ img[data-deferred-src] {
     overflow-wrap: anywhere;
 }
 
+.app-page-workspace-meal-planner .app-meal-image-link,
+.app-page-workspace-meal-planner .app-meal-image-link img {
+    display: block;
+    border-radius: 6px;
+}
+
 .app-page-workspace-meal-planner .app-meal-planner-cell .app-meal-actions-toggle {
     grid-column: -2 / -1;
     grid-row: 1;
@@ -33806,7 +33812,7 @@ img[data-deferred-src] {
     color: var(--app-danger);
 }
 
-.app-page-workspace-meal-planner :is(.app-meal-actions-toggle, .app-meal-card-menu > button, .app-meal-add-slot):focus-visible {
+.app-page-workspace-meal-planner :is(.app-meal-image-link, .app-meal-actions-toggle, .app-meal-card-menu > button, .app-meal-add-slot):focus-visible {
     outline: 2px solid var(--app-primary);
     outline-offset: 2px;
 }

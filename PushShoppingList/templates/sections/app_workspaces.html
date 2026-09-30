@@ -735,7 +735,9 @@
                                     <article class="app-meal-card{% if meal.cover_image and meal.cover_image.src %} has-image{% endif %}" data-meal-plan-id="{{ meal.id }}" data-meal-plan-batch-id="{{ meal.batch_id or '' }}">
                                         <span class="app-meal-action-preview-label" aria-hidden="true"></span>
                                         {% if meal.cover_image and meal.cover_image.src %}
-                                            <img src="{{ meal.cover_image.thumb_url or meal.cover_image.card_url or meal.cover_image.src }}" alt="">
+                                            <a class="app-meal-image-link" href="{{ meal.edit_url or recipe_edit_page_url(meal.recipe_url) }}#recipe-preview" target="_blank" rel="noopener" aria-label="View {{ meal.recipe_name }} recipe (opens in a new tab)">
+                                                <img src="{{ meal.cover_image.thumb_url or meal.cover_image.card_url or meal.cover_image.src }}" alt="">
+                                            </a>
                                         {% endif %}
                                         <a href="#recipeView" data-recipe-url="{{ meal.recipe_url }}" onclick="return jumpToRecipeViewRecipe(this, event)">{{ meal.recipe_name }}</a>
                                         <button type="button" id="mealActionsTrigger{{ meal.id }}" class="app-meal-actions-toggle"
