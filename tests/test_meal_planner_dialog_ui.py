@@ -797,6 +797,39 @@ assert.deepEqual(meals.map(meal=>meal.date),dates);assert.deepEqual(meals.map(me
 """)
 
 
+@pytest.mark.parametrize('recipe_count', [1, 2])
+def test_selected_days_redistributes_after_meal_types_change(recipe_count):
+    run_dialog(r"""
+await open('2026-09-29','lunch');const shared=await choose('recipe://soup'),state=activeDialog.mealPlanScheduleState;
+const dates=['2026-09-29','2026-09-30','2026-10-01','2026-10-02','2026-10-03'];
+M.setDates(shared.draft,dates);ctx.setMealPlannerRecipeYield(activeDialog,state.entries[0],2);
+if(RECIPE_COUNT===2){
+ ctx.addMealPlannerEditor();const second=state.entries[1];second.root.querySelector('[name="recipe_url"]').value='recipe://bread';
+ ctx.syncMealPlannerServingsFromRecipe(second.root.querySelector('[name="recipe_url"]'));
+}
+ctx.applyMealPlannerSharedDistribution(activeDialog,'keep');requests=[];
+for(const types of [['lunch','snack'],M.MEAL_TYPES,['breakfast','dinner'],['snack']]){
+ M.setMeals(shared.draft,types);shared.render();
+ const before=JSON.stringify([shared.draft,...state.entries.map(entry=>entry.portionsDraft)]);
+ const preview=ctx.mealPlannerSharedDistributionPreview(state,'keep');
+ assert.equal(JSON.stringify([shared.draft,...state.entries.map(entry=>entry.portionsDraft)]),before);
+ assert.equal(preview.allocations.length,dates.length*types.length);
+ ctx.applyMealPlannerSharedDistribution(activeDialog,'keep');
+ assert.deepEqual(plain(shared.draft.selectedDates),dates);
+ for(const entry of state.entries){
+  const totals=M.summary(ctx.mealPlannerRecipeDraft(state,entry));
+  assert.equal(totals.valid,true);assert.equal(totals.totalServings,entry.yieldServings);
+  for(const day of totals.days){
+   assert.deepEqual(plain(day.meals.map(meal=>meal.meal_type)),plain(types));
+   assert(day.meals.every(meal=>meal.planned_servings===entry.yieldServings/(dates.length*types.length)));
+  }
+ }
+ const applied=JSON.stringify(shared.draft);ctx.applyMealPlannerSharedDistribution(activeDialog,'keep');
+ assert.equal(JSON.stringify(shared.draft),applied);assert.equal(requests.length,0);
+}
+""".replace('RECIPE_COUNT', str(recipe_count)))
+
+
 def test_selected_days_spreads_across_meal_slots_and_preserves_family_day_choices():
     run_dialog(r"""
 await open();const shared=await choose('recipe://soup'),state=activeDialog.mealPlanScheduleState,entry=state.entries[0];

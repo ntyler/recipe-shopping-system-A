@@ -200,6 +200,43 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
             assert.deepEqual(posts.at(-1).batches[0].allocations.map(meal=>meal.planned_servings),[2.4,2.4,2.4,2.4,2.4]);
             assert.deepEqual(posts.at(-1).batches[0].allocations.map(meal=>meal.date),splitDates);
 
+            // Adding meal types after distribution must update every selected date.
+            await open();
+            const mealDates=mobile?['2026-12-08','2026-12-09','2026-12-10','2026-12-11','2026-12-12']:['2026-12-01','2026-12-02','2026-12-03','2026-12-04','2026-12-05'];
+            await selectDates(shared,mealDates);
+            const mealCheck=type=>shared.locator(`[data-schedule-field="meal"][data-meal="${type}"]`);
+            await mealCheck('lunch').check();await mealCheck('dinner').uncheck();
+            await row(0).locator('[data-meal-table-yield]').fill('2');
+            await action('keep').click();assert.equal(await save.textContent(),'Save 5 Meals');
+            const mealPosts=posts.length;
+            for(const types of [['lunch','snack'],['breakfast','lunch','dinner','snack'],['lunch','snack']]){
+                for(const type of ['breakfast','lunch','dinner','snack'])await mealCheck(type).setChecked(types.includes(type));
+                const beforeMeals=await draft();
+                if(!mobile){await action('keep').hover();assert.equal(await draft(),beforeMeals);}
+                if(mobile)await action('keep').tap();else await action('keep').press('Enter');
+                const meals=await dialog.evaluate(element=>MealPlanSchedule.payload(element.mealPlanScheduleState.panel.draft).allocations);
+                assert.equal(meals.length,mealDates.length*types.length);
+                assert(meals.every(meal=>meal.planned_servings===2/(mealDates.length*types.length)));
+                for(const date of mealDates)assert.deepEqual(meals.filter(meal=>meal.date===date).map(meal=>meal.meal_type),types);
+                assert.deepEqual(JSON.parse(await draft()).selectedDates,mealDates);
+                for(const type of types)assert.equal(await shared.locator(`[data-schedule-field="household"][data-meal="${type}"]`).inputValue(),String(2/meals.length));
+                const appliedMeals=await draft();await action('keep').click();assert.equal(await draft(),appliedMeals);
+                assert.equal(posts.length,mealPosts);
+            }
+            assert.equal(await save.textContent(),'Save 10 Meals');
+            assert.equal(await row(0).locator('[data-meal-table-planned]').textContent(),'2 / 2');
+            await dialog.evaluate(element=>{element.scrollTop=0;});
+            if(dir)await page.screenshot({path:path.join(dir,`selected-meal-types-${mobile?'mobile':'desktop'}.png`)});
+            if(mobile){
+                await mealCheck('lunch').evaluate(element=>element.scrollIntoView({block:'start'}));
+                if(dir)await page.screenshot({path:path.join(dir,'selected-meal-types-mobile-portions.png')});
+            }
+            const mealsResponse=page.waitForResponse(res=>res.url().endsWith('/batches/bulk')&&res.request().method()==='POST');
+            await save.click();assert.equal((await(await mealsResponse).json()).ok,true);
+            const savedMeals=posts.at(-1).batches[0].allocations;assert.equal(posts.length,mealPosts+1);
+            assert.equal(savedMeals.length,10);assert(savedMeals.every(meal=>meal.planned_servings===0.2));
+            for(const date of mealDates)assert.deepEqual(savedMeals.filter(meal=>meal.date===date).map(meal=>meal.meal_type),['lunch','snack']);
+
             assert.deepEqual(errors,[]);await context.close();
         }
         console.log('PASS: direct buttons, hover/focus/leave, Enter/Space, first-tap mobile, repeated activation, save boundary, selected dates, distinct and merged custom strategies, clean console');

@@ -476,6 +476,7 @@
     }
 
     function setMeals(draft, types) {
+        const changed = MEAL_TYPES.filter(meal => draft.mealTypes.includes(meal) !== types.includes(meal));
         if (draft.edit?.scope === 'meal') {
             const next = MEAL_TYPES.find(meal => types.includes(meal));
             if (!next) return draft;
@@ -495,6 +496,13 @@
             types = [next];
         }
         draft.mealTypes = MEAL_TYPES.filter(meal => types.includes(meal));
+        // The bulk checkboxes apply the toggled meal types to every selected
+        // date, including days previously frozen by distribution. Other meal
+        // choices, portions, people and notes keep their individual overrides.
+        draft.selectedDates.forEach(date => {
+            const day = ensureDay(draft, date);
+            changed.forEach(meal => { day.mealEnabled[meal] = draft.mealTypes.includes(meal); });
+        });
         syncDefaults(draft);
         return draft;
     }

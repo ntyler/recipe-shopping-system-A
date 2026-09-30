@@ -612,7 +612,7 @@ M.setHouseholdDefault(draft,'breakfast',3);M.setMeals(draft,['breakfast','lunch'
 assert.equal(draft.days['2026-10-05'].household.breakfast,3);
 assert.equal(draft.days['2026-10-07'].household.breakfast,0.5);
 assert.equal(draft.days['2026-10-07'].mealEnabled.dinner,false);
-assert.equal(draft.days['2026-10-07'].mealEnabled.lunch,false);
+assert.equal(draft.days['2026-10-07'].mealEnabled.lunch,true,'Checking Lunch adds it without changing the disabled dinner');
 assert.equal(M.summary(draft).days[1].customized,true);
 M.setDateMode(draft,'range');M.setRange(draft,'2026-10-06','2026-10-08');
 assert.equal(draft.days['2026-10-07'].household.breakfast,0.5);
