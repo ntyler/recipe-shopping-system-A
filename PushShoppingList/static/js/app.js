@@ -1872,7 +1872,7 @@ function mealPlannerScheduleState(dialog) {
     if (!dialog.mealPlanScheduleState) {
         dialog.mealPlanScheduleState = {
             panel: null, date: MealPlanSchedule.formatDate(new Date()), meal: "dinner",
-            entries: [], saving: false, nextEntryId: 0,
+            entries: [], saving: false, nextEntryId: 0, yieldOverrides: new Map(),
         };
         // Native Escape follows the same pending-save protection as Cancel.
         dialog.addEventListener("cancel", event => {
@@ -1998,17 +1998,19 @@ function updateMealPlannerYieldBalance(entry, summaries, editing) {
         return;
     }
     const balance = MealPlanSchedule.sum([entry.yieldServings, -total]);
+    const scaled = entry.baseYieldServings && entry.yieldServings !== entry.baseYieldServings;
     compactBalance.textContent = balance < 0 ? `${servingText(-balance)} over`
         : balance ? `${servingText(balance)} left` : 'All planned';
     if (related.length > 1) compactBalance.textContent += ` · ${related.length} entries`;
     planned.textContent = `${formatMealPlannerServingNumber(total)} of ${servingText(entry.yieldServings)} planned${related.length > 1 ? ` across ${related.length} entries` : ''}.`;
     if (balance < 0) {
         box.dataset.state = 'extra';
-        remaining.textContent = `${servingText(-balance)} beyond one full recipe`;
-        planned.textContent += ` Make ${formatMealPlannerServingNumber(total / entry.yieldServings)}× the recipe.`;
+        remaining.textContent = `${servingText(-balance)} beyond ${scaled ? 'the selected yield' : 'one full recipe'}`;
+        planned.textContent += ` Make ${formatMealPlannerServingNumber(total / (entry.baseYieldServings || entry.yieldServings))}× the recipe.`;
     } else {
         box.dataset.state = 'available';
-        remaining.textContent = balance ? `${servingText(balance)} left to distribute if you make the full recipe` : 'All servings from one full recipe are planned';
+        remaining.textContent = scaled ? balance ? `${servingText(balance)} left from the selected yield` : 'All servings from the selected yield are planned'
+            : balance ? `${servingText(balance)} left to distribute if you make the full recipe` : 'All servings from one full recipe are planned';
     }
 }
 
@@ -2094,6 +2096,56 @@ function syncMealPlannerRecipeServings(entry, summary, state, busy) {
         help.textContent += ' ' + meals[0].member_portions.map(part =>
             `${state.panel.draft.members.find(member => member.id === part.member_id)?.name || 'Family member'}: ${formatMealPlannerServingNumber(part.servings)}`).join(' · ');
     }
+}
+
+function syncMealPlannerRecipeYield(entry, state, busy) {
+    const input = entry.root.querySelector('[data-meal-table-yield]');
+    const disabled = Boolean(busy || state.edit || !entry.recipeUrl || state.panel?.ui.loading || entry.panel?.ui.loading);
+    if (document.activeElement !== input) input.value = entry.yieldServings || '';
+    input.disabled = disabled;
+    input.placeholder = '—';
+    input.max = (entry.baseYieldServings || entry.defaultServings) * 1000;
+    input.setAttribute('aria-label', `${entry.title || 'Recipe'} yield in servings`);
+    if (state.yieldOverrides.has(entry.recipeUrl)) entry.root.querySelector('[data-meal-servings-help]').textContent = `Planning ${formatMealPlannerServingNumber(entry.yieldServings)} servings${entry.baseYieldServings ? ` from a recipe yielding ${formatMealPlannerServingNumber(entry.baseYieldServings)}` : ''}. Repeated entries share this yield.`;
+    entry.root.querySelectorAll('[data-meal-yield-step]').forEach(button => {
+        button.disabled = disabled;
+        button.setAttribute('aria-label', `${button.dataset.mealYieldStep === '-1' ? 'Decrease' : 'Increase'} ${entry.title || 'recipe'} yield`);
+    });
+    entry.root.querySelectorAll('[data-meal-yield-scale]').forEach(button => {
+        const scale = Number(button.dataset.mealYieldScale);
+        button.disabled = disabled || !entry.baseYieldServings;
+        button.setAttribute('aria-pressed', String(Boolean(entry.baseYieldServings && entry.yieldServings === entry.baseYieldServings * scale)));
+        button.title = entry.baseYieldServings ? `${formatMealPlannerServingNumber(entry.baseYieldServings * scale)} servings (${scale}× original yield)` : 'The original recipe yield is unavailable. Enter servings directly.';
+    });
+}
+
+function setMealPlannerRecipeYield(dialog, entry, value) {
+    const state = mealPlannerScheduleState(dialog);
+    if (!entry?.recipeUrl || state.edit || mealPlannerBusy(state) || state.panel?.ui.loading || entry.panel?.ui.loading) return;
+    const input = entry.root.querySelector('[data-meal-table-yield]');
+    const error = entry.root.querySelector('[data-meal-yield-error]');
+    const servings = Number(value), maximum = (entry.baseYieldServings || entry.defaultServings) * 1000;
+    if (!Number.isFinite(servings) || servings < 0.01 || servings > maximum) {
+        input.value = entry.yieldServings || '';
+        error.textContent = `Enter 0.01–${formatMealPlannerServingNumber(maximum)} servings. Yield has not changed.`;
+        error.hidden = false;
+        return;
+    }
+    // Scaling belongs to this plan. Every repeated entry shares the same budget;
+    // the recipe's original yield still anchors the 1× / 2× / 3× shortcuts.
+    state.yieldOverrides.set(entry.recipeUrl, servings);
+    state.sharedDistributionHover = false;
+    state.sharedDistributionFocus = false;
+    state.entries.filter(other => other.recipeUrl === entry.recipeUrl).forEach(other => {
+        other.yieldServings = servings;
+        other.touched = true;
+        other.distributionHover = false;
+        other.distributionFocus = false;
+        other.root.querySelector('[data-meal-table-yield]').value = servings;
+        other.root.querySelector('[data-meal-yield-error]').hidden = true;
+        if (other.panel) other.panel.draft.recipeYield = servings;
+    });
+    state.panel.render();
 }
 
 function mealPlannerDistributionPreview(state, entry, summaries, mode = entry.distributionMode || 'keep') {
@@ -2456,7 +2508,7 @@ function syncMealPlannerDistribution(entry, summary, state, busy, summaries) {
     }
     const mode = entry.distributionHover || entry.distributionFocus || entry.distributionMode || 'keep';
     const budget = box.querySelector('[data-meal-distribution-budget]');
-    budget.textContent = `One recipe makes ${servingsText(entry.yieldServings)}.`;
+    budget.textContent = `Planning ${servingsText(entry.yieldServings)}.`;
     box.querySelector('[data-meal-distribution-help]').textContent = mode === 'people'
         ? 'Fills from the first scheduled day using “Who is eating?” portions; the last meal may be smaller.'
         : mode === 'upcoming'
@@ -2601,7 +2653,8 @@ function syncMealPlannerBatchControls(dialog) {
     if (!footer) return;
     footer.hidden = Boolean(state.edit);
     if (state.panel?.draft.portionMode === 'recipe') {
-        state.panel.draft.recipeYield = state.entries.find(entry => entry.recipeUrl && !entry.panel)?.defaultServings || 1;
+        const recipe = state.entries.find(entry => entry.recipeUrl && !entry.panel);
+        state.panel.draft.recipeYield = recipe?.yieldServings || recipe?.defaultServings || 1;
     }
     const busy = mealPlannerBusy(state);
     const loading = state.panel?.ui.loading || state.entries.some(entry => entry.panel?.ui.loading);
@@ -2632,7 +2685,7 @@ function syncMealPlannerBatchControls(dialog) {
         entry.root.querySelector('[data-meal-editor-heading]').hidden = Boolean(state.edit);
         entry.root.querySelector('[data-meal-editor-number]').textContent = `Recipe ${index + 1}`;
         const option = entry.root.querySelector('[name="recipe_url"]').selectedOptions[0];
-        entry.root.querySelector('[data-meal-table-yield]').textContent = entry.recipeUrl && entry.yieldServings ? formatMealPlannerServingNumber(entry.yieldServings) : '—';
+        syncMealPlannerRecipeYield(entry, state, busy);
         const recipeEditUrl = entry.recipeUrl && option?.dataset.recipeEditUrl;
         for (const selector of ['[data-meal-editor-recipe-link]', '[data-meal-editor-image-link]']) {
             const link = entry.root.querySelector(selector);
@@ -2743,6 +2796,7 @@ function createMealPlannerEditor(dialog, root) {
         const changed = event => {
             const current = root.mealPlannerEntry;
             if (!current || state.edit || state.saving) return;
+            if (event.target.closest('.app-meal-yield-controls')) return;
             if (event.type === 'click' && !event.target.closest('[data-schedule-mode], [data-schedule-portion-mode], [data-schedule-action]')) return;
             current.touched = true;
             root.querySelector('[data-meal-editor-error]').hidden = true;
@@ -2756,6 +2810,22 @@ function createMealPlannerEditor(dialog, root) {
         ['input', 'change', 'click'].forEach(type => container.addEventListener(type, changed));
         root.querySelector('[data-meal-editor-remove]').addEventListener('click', () => removeMealPlannerEditor(dialog, root.mealPlannerEntry));
         root.querySelector('[data-meal-editor-reset]').addEventListener('click', () => resetMealPlannerRecipe(dialog, root.mealPlannerEntry));
+        const yieldInput = root.querySelector('[data-meal-table-yield]');
+        yieldInput.addEventListener('change', () => setMealPlannerRecipeYield(dialog, root.mealPlannerEntry, yieldInput.value));
+        yieldInput.addEventListener('input', () => { root.querySelector('[data-meal-yield-error]').hidden = true; });
+        yieldInput.addEventListener('keydown', event => {
+            if (event.key !== 'Enter') return;
+            event.preventDefault();
+            setMealPlannerRecipeYield(dialog, root.mealPlannerEntry, yieldInput.value);
+        });
+        root.querySelectorAll('[data-meal-yield-step]').forEach(button => button.addEventListener('click', () => {
+            const current = root.mealPlannerEntry;
+            setMealPlannerRecipeYield(dialog, current, Math.max(0.01, MealPlanSchedule.sum([current.yieldServings || 0, Number(button.dataset.mealYieldStep)])));
+        }));
+        root.querySelectorAll('[data-meal-yield-scale]').forEach(button => button.addEventListener('click', () => {
+            const current = root.mealPlannerEntry;
+            setMealPlannerRecipeYield(dialog, current, current.baseYieldServings * Number(button.dataset.mealYieldScale));
+        }));
         const servings = root.querySelector('[data-meal-recipe-servings]');
         servings.addEventListener('input', () => setMealPlannerRecipeServings(dialog, root.mealPlannerEntry, servings.value));
         root.querySelectorAll('[data-meal-portion-step]').forEach(button => button.addEventListener('click', () => {
@@ -2853,7 +2923,7 @@ function customizeMealPlannerRecipe(dialog, entry, distributionDraft = null) {
         entry.overrideContainer.querySelector('[data-meal-override-form-host]').appendChild(form);
         dialog.querySelector('[data-meal-custom-calendars]').appendChild(entry.overrideContainer);
         entry.panel = new MealPlanPanel(form, mealPlannerPanelOptions(dialog, entry, entry.title || 'Custom recipe plan', entry.defaultServings));
-        entry.panel.draft = {...initialDraft, recipeYield: entry.defaultServings};
+        entry.panel.draft = {...initialDraft, recipeYield: entry.yieldServings || entry.defaultServings};
         // Share the current roster by value, keeping all portion overrides local.
         ['membersLoaded', 'memberLoadError', 'archivedMembers', 'memberReview'].forEach(key => {
             entry.panel.ui[key] = JSON.parse(JSON.stringify(state.panel.ui[key]));
@@ -3097,7 +3167,6 @@ function syncMealPlannerServingsFromRecipe(input) {
     const panel = entry.panel || state.panel;
     // Recipe yield remains the distribution budget. Initialize meal portions only
     // when the recipe changes, so schedule changes retain the user's input.
-    if (entry.panel || !state.entries.some(other => other !== entry && other.recipeUrl)) panel.draft.recipeYield = defaultServings;
     if (changed) {
         delete entry.lastServingsPerMeal;
         delete entry.portionsDraft;
@@ -3117,7 +3186,10 @@ function syncMealPlannerServingsFromRecipe(input) {
     entry.recipeUrl = selectedRecipe;
     entry.defaultServings = defaultServings;
     const yieldServings = Number(option?.dataset.yieldServings);
-    entry.yieldServings = Number.isFinite(yieldServings) && yieldServings > 0 ? yieldServings : null;
+    entry.baseYieldServings = Number.isFinite(yieldServings) && yieldServings > 0 ? yieldServings : null;
+    entry.yieldServings = state.yieldOverrides.get(selectedRecipe) ?? entry.baseYieldServings;
+    entry.root.querySelector('[data-meal-yield-error]').hidden = true;
+    if (entry.panel || !state.entries.some(other => other !== entry && other.recipeUrl)) panel.draft.recipeYield = entry.yieldServings || defaultServings;
     entry.title = selectedRecipe ? option.textContent.trim() : 'Choose a recipe';
     if (changed && mealPlannerUsesSharedPortions(state, entry)) {
         adoptMealPlannerSharedPortions(state, entry, state.panel.draft.portionMode === 'recipe' ? state.panel.draft
@@ -3138,6 +3210,7 @@ function syncMealPlannerServingsFromRecipe(input) {
 
 function resetMealPlannerEditors(dialog) {
     const state = mealPlannerScheduleState(dialog);
+    state.yieldOverrides = new Map();
     state.sharedPortionsEdited = false;
     state.activeCalendar = '';
     if (!state.editorTemplate) {

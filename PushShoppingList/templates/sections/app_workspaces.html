@@ -908,8 +908,20 @@
                     </td>
                     <td class="app-meal-yield-cell" role="cell">
                         <span class="app-meal-cell-label" aria-hidden="true">Yield</span>
-                        <strong class="app-meal-cell-value" data-meal-table-yield>—</strong>
-                        <small>servings</small>
+                        <div class="app-meal-yield-controls">
+                            <label><span class="sr-only">Recipe yield in servings</span><span class="app-meal-recipe-stepper app-meal-yield-stepper">
+                                <button type="button" data-meal-yield-step="-1" aria-label="Decrease recipe yield">−</button>
+                                <input type="number" min="0.01" step="any" inputmode="decimal" data-meal-table-yield aria-describedby="mealPlannerServingsHelp">
+                                <button type="button" data-meal-yield-step="1" aria-label="Increase recipe yield">+</button>
+                            </span></label>
+                            <small>servings for this plan</small>
+                            <div class="app-meal-yield-scales" role="group" aria-label="Recipe yield scale">
+                                <button type="button" data-meal-yield-scale="1" aria-pressed="false">1×</button>
+                                <button type="button" data-meal-yield-scale="2" aria-pressed="false">2×</button>
+                                <button type="button" data-meal-yield-scale="3" aria-pressed="false">3×</button>
+                            </div>
+                            <small data-meal-yield-error role="alert" hidden></small>
+                        </div>
                         <small id="mealPlannerServingsHelp" class="sr-only" data-meal-servings-help aria-live="polite">Select a recipe to use its default yield.</small>
                     </td>
                     <td class="app-meal-portions-cell" role="cell">

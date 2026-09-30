@@ -366,14 +366,14 @@
                 button.classList.toggle('is-yield-short', Boolean(day));
                 badge.hidden = !day;
                 badge.textContent = day ? `Short ${amount(day.shortageServings)}` : '';
-                const label = day ? `${dateLabel(day.date)}. ${day.details.join('; ')}. Beyond one full recipe; make more or adjust this plan.` : dateLabel(button.dataset.date);
+                const label = day ? `${dateLabel(day.date)}. ${day.details.join('; ')}. Beyond the planned yield; make more or adjust this plan.` : dateLabel(button.dataset.date);
                 button.setAttribute('aria-label', label);
                 button.title = day ? label : '';
             });
             const legend = this.form.querySelector('[data-schedule-yield-legend]');
             if (legend) {
                 legend.hidden = !shortages.size;
-                legend.innerHTML = shortages.size ? `<div><span><i class="is-selected" aria-hidden="true"></i>Selected</span><span><i class="is-short" aria-hidden="true"></i>Needs more servings</span></div><p>Based on one full recipe each, used earliest dates first. “Short” shows the extra servings needed. Make more or choose fewer dates.</p>` : '';
+                legend.innerHTML = shortages.size ? `<div><span><i class="is-selected" aria-hidden="true"></i>Selected</span><span><i class="is-short" aria-hidden="true"></i>Needs more servings</span></div><p>Based on the planned yields, used earliest dates first. “Short” shows the extra servings needed. Increase yield or choose fewer dates.</p>` : '';
             }
         }
 

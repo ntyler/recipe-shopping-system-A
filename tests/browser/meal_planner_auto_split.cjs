@@ -102,7 +102,7 @@ const base = process.argv[3], cookie = JSON.parse(fs.readFileSync(0, 'utf8'));
                 assert.deepEqual(columns[0].left,columns[1].left,'Recipe rows use aligned columns');
                 assert(columns.every(row=>row.height<150),'The table keeps recipe rows compact');
             }
-            const stepper=await row(0).locator('.app-meal-recipe-stepper').evaluate(element=>[...element.children].map(child=>{
+            const stepper=await row(0).locator('[data-meal-recipe-amount] .app-meal-recipe-stepper').evaluate(element=>[...element.children].map(child=>{
                 const box=child.getBoundingClientRect();return {top:box.top,height:box.height};
             }));
             assert(stepper.every(box=>box.top===stepper[0].top&&box.height===stepper[0].height),'Portion controls align and have equal height');

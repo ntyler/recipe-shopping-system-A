@@ -1076,6 +1076,58 @@ assert(state.entries.every(entry=>M.summary(ctx.mealPlannerRecipeDraft(state,ent
 """)
 
 
+def test_editable_yield_shares_budget_with_repeated_and_custom_entries():
+    run_dialog(r"""
+await open();const panel=await choose('recipe://soup'),state=activeDialog.mealPlanScheduleState;
+const first=state.entries[0];
+ctx.setMealPlannerRecipeYield(activeDialog,first,'8');
+assert.equal(first.baseYieldServings,4);assert.equal(first.yieldServings,8);
+ctx.addMealPlannerEditor();const second=state.entries[1],input=second.root.querySelector('[name="recipe_url"]');
+input.value='recipe://soup';ctx.syncMealPlannerServingsFromRecipe(input);
+assert.equal(second.yieldServings,8,'Repeated entries inherit the edited budget');
+ctx.customizeMealPlannerRecipe(activeDialog,second);
+second.panel.draft=M.withMealServings(second.panel.draft,2);
+M.setDates(second.panel.draft,['2026-10-07']);second.panel.render();
+const custom=JSON.stringify(M.payload(second.panel.draft));
+M.setDates(panel.draft,['2026-10-05','2026-10-06']);
+ctx.autoSplitMealPlannerSharedRecipes(activeDialog);
+const amounts=entry=>plain(M.payload(ctx.mealPlannerRecipeDraft(state,entry)).allocations.map(meal=>meal.planned_servings));
+assert.deepEqual(amounts(first),[3,3]);
+ctx.setMealPlannerRecipeYield(activeDialog,second,'10');
+assert.equal(first.yieldServings,10);assert.equal(second.yieldServings,10);
+assert.deepEqual(amounts(first),[4,4]);assert.equal(JSON.stringify(M.payload(second.panel.draft)),custom);
+// Changing the selection away and back retains this plan's edited yield.
+input.value='recipe://bread';ctx.syncMealPlannerServingsFromRecipe(input);assert.equal(second.yieldServings,12);
+input.value='recipe://soup';ctx.syncMealPlannerServingsFromRecipe(input);assert.equal(second.yieldServings,10);
+const before=first.yieldServings;
+state.saving=true;ctx.setMealPlannerRecipeYield(activeDialog,first,20);state.saving=false;
+assert.equal(first.yieldServings,before);
+""")
+
+
+def test_editable_yield_fixes_missing_yield_and_updates_upcoming_preview_without_saving():
+    run_dialog(r"""
+await open();const panel=await choose('recipe://soup'),state=activeDialog.mealPlanScheduleState,entry=state.entries[0];
+const option=activeDialog.recipe.selectedOptions[0];delete option.dataset.yieldServings;
+ctx.syncMealPlannerServingsFromRecipe();assert.equal(entry.yieldServings,null);
+ctx.setMealPlannerRecipeYield(activeDialog,entry,'2.5');assert.equal(entry.yieldServings,2.5);
+const draft=JSON.stringify(panel.draft),preview=ctx.mealPlannerSharedDistributionPreview(state,'upcoming');
+assert.equal(preview.usedServings,2.5);assert.equal(preview.allocations.length,3);
+assert.equal(JSON.stringify(panel.draft),draft);
+requests=[];
+for(const invalid of ['',0,-1,NaN,Infinity,4001]){
+ ctx.setMealPlannerRecipeYield(activeDialog,entry,invalid);
+ assert.equal(entry.yieldServings,2.5);assert.equal(JSON.stringify(panel.draft),draft);
+ assert.equal(entry.root.querySelector('[data-meal-yield-error]').hidden,false);
+}
+ctx.applyMealPlannerSharedDistribution(activeDialog,'upcoming');
+const allocations=()=>plain(M.payload(ctx.mealPlannerRecipeDraft(state,entry)).allocations);
+assert.deepEqual(allocations().map(meal=>meal.planned_servings),[1,1,0.5]);
+const applied=JSON.stringify(allocations());ctx.applyMealPlannerSharedDistribution(activeDialog,'upcoming');
+assert.equal(JSON.stringify(allocations()),applied);assert.equal(requests.length,0);
+""")
+
+
 def test_auto_split_all_spreads_different_full_yields_over_selected_meals():
     run_dialog(r"""
 await open('2026-09-29');const shared=await choose('recipe://soup'),state=activeDialog.mealPlanScheduleState;
